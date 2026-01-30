@@ -14,8 +14,8 @@ Use the Claude Code `AskUserQuestion tool `
 
 1. I want to build a CDK application to deploy Zabbix server in AWS as Fargate Tasks. Please help me create a plan. Write this plan in a prd.md
 2. I reviewed the PRD. We must make the solution internal facing with the ALB, so it is only available via VPC.
-3. Interview me and use the AskUserQuestion tool, to make the prd complete
-4. Read this plan and interview me in detail using AskUserQuestionTool about literally anything; technical implementation, UI & UX, concerns, tradeoffs, etc.
+3. Interview me and use the `AskUserQuestion` tool, to make the prd complete
+4. Read this plan and interview me in detail using `AskUserQuestionTool` about literally anything; technical implementation, UI & UX, concerns, tradeoffs, etc.
 5. We have created a prd.md file, what should be our next step to create good code.
   I know that we need to follow a development process of "> Feature > Test > Complete > Next Feature" but I do not know where to start.
   I know thing need a progress.txt also, to track our progress and ensure we do not jump ahead of ourselves
