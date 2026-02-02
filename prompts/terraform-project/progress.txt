@@ -1,0 +1,59 @@
+# Terraform Kit — Progress
+
+Source: prompts/terraform-project/prd.md
+
+## Phase 1 — Kit Content
+
+[x] 1.1 — CLAUDE.md project rules template — Completed 2026-01-30
+      File: prompts/terraform-project/CLAUDE.md
+      Source: prompts/cdk-project/CLAUDE.md
+      Adapt all sections for Terraform (HCL, terraform CLI, tflint, validate).
+      Use <PROFILE_NAME> placeholder. No version constraint.
+      Prescribed directories: modules/, envs/<env>/, docs/, agents/.
+      Include all 10 Terraform-specific defensive coding rules from PRD.
+      Reference /test-terraform and /update-docs-terraform skills.
+      Validate: every section in CDK CLAUDE.md has a Terraform equivalent.
+      Validate: no CDK-specific terms remain (Jest, npm, TypeScript, cdk.json, lib/).
+      Validate: no future/deferred content.
+
+[x] 1.2 — test-terraform.md command — Completed 2026-01-30
+      File: commands/test-terraform.md
+      Source: commands/test-cdk.md
+      Gate 1: git-secrets, terraform fmt -check, terraform init, terraform validate, tflint, tfsec/checkov.
+      Gate 2: terraform plan -out=tfplan, terraform apply tfplan.
+      Gate 3: update progress.txt, CHANGELOG.md, create feature doc, stage individually, commit locally.
+      Sequential gates. Stop on failure. Same output format as test-cdk.
+      Use <PROFILE_NAME> placeholder for AWS profile.
+      Validate: gate structure matches PRD section 3.
+      Validate: no CDK-specific terms remain.
+
+[x] 1.3 — update-docs-terraform.md command — Completed 2026-01-30
+      File: commands/update-docs-terraform.md
+      Source: commands/update-docs.md
+      Replace CDK data sources with Terraform equivalents per PRD mapping table.
+      Data sources: variables.tf, locals.tf, terraform.tfvars, backend.tf, modules/.
+      Documents refreshed: README.md, docs/ARCHITECTURE.md.
+      No docs/TESTING.md — validation covered in ARCHITECTURE.md.
+      Validate: data source mapping matches PRD section 4.
+      Validate: no CDK-specific data sources remain.
+
+[x] 1.4 — CLAUDE_CODE_USER_GUIDE.md developer workflow guide — Completed 2026-01-30
+      File: prompts/terraform-project/CLAUDE_CODE_USER_GUIDE.md
+      Source: prompts/cdk-project/CLAUDE_CODE_USER_GUIDE.md
+      Prerequisites: Terraform CLI, AWS CLI, tflint (optional), tfsec/checkov (optional).
+      Skills table: /test-terraform, /update-docs-terraform, plus shared skills.
+      Workflow steps adapted for Terraform.
+      Session lifecycle unchanged.
+      Project directories table: prescribed Terraform structure.
+      Validate: all referenced skills exist (1.2 and 1.3 must be complete first).
+      Validate: no CDK-specific terms remain.
+      Validate: no future/deferred content.
+
+## NOTES
+
+- Process: Feature > Test > Complete > /compact > Next Feature
+- Run /compact after every completed feature before starting the next one
+- This is a content project — all deliverables are markdown
+- "Test" means: review against PRD, verify no CDK leakage, confirm cross-references
+- prd.md is the authoritative source for all requirements
+- No runtime code. Quality = clarity + correctness.
