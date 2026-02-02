@@ -1,11 +1,11 @@
 ---
 name: compliance-assess
-description: Map project architecture to ITSG-33 / CCCS Medium Cloud Profile security controls with GC Cloud Guardrail assessment. Produces a phased compliance assessment with control inheritance and risk-rated gap analysis.
+description: Map project architecture to ITSG-33 / CCCS Medium Cloud Profile security controls. Produces a phased compliance assessment with control inheritance and risk-rated gap analysis.
 ---
 
 # /compliance-assess — ITSG-33 / CCCS Medium Compliance Assessment
 
-Map a project's architecture and codebase to Canadian ITSG-33 security controls (CCCS Medium Cloud Profile) with GC Cloud Guardrail validation. Produces a phased assessment with AWS shared responsibility inheritance, gap analysis, and risk-rated remediation guidance.
+Map a project's architecture and codebase to Canadian ITSG-33 security controls (CCCS Medium Cloud Profile). Produces a phased assessment with AWS shared responsibility inheritance, gap analysis, and risk-rated remediation guidance.
 
 ## Output Location
 
@@ -16,7 +16,6 @@ All output goes to `docs/compliance/`. Create the directory if it doesn't exist.
 | `docs/compliance/phase1-discovery.md` | Architecture discovery results |
 | `docs/compliance/phase2-control-mapping.md` | ITSG-33 control mapping with inheritance |
 | `docs/compliance/phase3-gap-analysis.md` | Gap analysis with risk-rated remediation |
-| `docs/compliance/gc-guardrails.md` | GC Cloud Guardrails (GR-1 to GR-12) assessment |
 | `docs/compliance/assessment-summary.md` | Executive summary with posture dashboard |
 
 ## Smart Re-run
@@ -28,6 +27,51 @@ Before starting any phase, check if previous phase outputs exist in `docs/compli
 3. If significant changes are detected, re-run that phase
 4. If no changes, report "Phase N output is current — skipping" and proceed to next phase
 5. Always ask the user: "Previous assessment found. Re-run from scratch or smart re-run (only changed phases)?"
+
+---
+
+## Phase 0 — Framework Validation (Self-Correcting)
+
+**This phase runs FIRST, before any assessment work.** It validates that the control data embedded in this skill file matches the current official sources. If differences are found, update this skill file before proceeding.
+
+### Step 0.1 — Fetch ITSG-33 Control Catalogue
+
+Fetch the ITSG-33 Annex 3A page to verify the control families and IDs:
+
+1. Fetch `https://www.cyber.gc.ca/en/guidance/annex-3a-security-control-catalogue-itsg-33`
+2. Compare the control IDs and names listed in the **Phase 2 control family tables** of this file against the official catalogue
+
+**What to check:**
+- Every control ID in this file exists in ITSG-33 Annex 3A
+- Control names match (e.g., AC-2 is "Account Management", not something else)
+- No fabricated control IDs
+
+### Step 0.2 — Self-Mutate If Needed
+
+If **any** differences are found in Step 0.1:
+
+1. **Read this skill file** using the Read tool (path: the `.claude/commands/compliance-assess.md` file in the project root)
+2. **Apply corrections** using the Edit tool:
+   - Update the control family tables in Phase 2 (control IDs, names)
+3. **Report changes** to the user in a summary table:
+
+```
+Framework Validation Results:
+| Item | Status | Change |
+|---|---|---|
+| AC-7 description | OK / UPDATED | was "...", now "..." |
+| ... | ... | ... |
+```
+
+If **no differences** are found:
+
+- Report: "Phase 0 complete — all controls match official sources. No skill file updates needed."
+
+### Step 0.3 — Proceed
+
+After validation (and any self-mutations), proceed to Smart Re-run check, then Phase 1.
+
+---
 
 ## Phase 1 — Architecture Discovery
 
@@ -141,9 +185,15 @@ Wait for user confirmation before proceeding to Phase 2.
 
 ## Phase 2 — Control Mapping
 
-### ITSG-33 Control Families (CCCS Medium — Technical Controls)
+### Source of Truth
 
-Map only these 8 technical control families:
+The ITSG-33 controls are defined in [Annex 3A — Security Control Catalogue (ITSG-33)](https://www.cyber.gc.ca/en/guidance/annex-3a-security-control-catalogue-itsg-33). The CCCS Medium Cloud Profile control selection is defined in Annex B of [ITSP.50.103 — Guidance on the Security Categorization of Cloud-based Services](https://www.cyber.gc.ca/en/guidance/guidance-security-categorization-cloud-based-services-itsp50103).
+
+When in doubt about a control's description or applicability, fetch the official documentation page to verify before mapping.
+
+### ITSG-33 Control Families (CCCS Medium)
+
+Map these 8 control families (technical + operational + management controls applicable to cloud):
 
 #### AC — Access Control
 | Control | Description | Applicability |
@@ -160,7 +210,7 @@ Map only these 8 technical control families:
 #### AU — Audit and Accountability
 | Control | Description | Applicability |
 |---|---|---|
-| AU-2 | Audit Events | What events are logged (CloudTrail, CloudWatch, access logs) |
+| AU-2 | Auditable Events | What events are logged (CloudTrail, CloudWatch, access logs) |
 | AU-3 | Content of Audit Records | Log detail level, fields captured |
 | AU-6 | Audit Review, Analysis, and Reporting | Log monitoring, alerting, dashboards |
 | AU-8 | Time Stamps | NTP sync, UTC usage, timestamp consistency |
@@ -180,7 +230,7 @@ Map only these 8 technical control families:
 #### CP — Contingency Planning
 | Control | Description | Applicability |
 |---|---|---|
-| CP-7 | Alternative Processing Site | Multi-AZ, cross-region, DR strategy |
+| CP-7 | Alternate Processing Site | Multi-AZ, cross-region, DR strategy |
 | CP-9 | Information System Backup | Backup policies, snapshot schedules, retention |
 | CP-10 | Information System Recovery and Reconstitution | Recovery procedures, RTO/RPO, IaC redeployment |
 
@@ -295,7 +345,7 @@ Wait for user confirmation before proceeding to Phase 3.
 
 ---
 
-## Phase 3 — Gap Analysis and GC Guardrails
+## Phase 3 — Gap Analysis
 
 ### Step 3.1 — Gap Analysis
 
@@ -328,42 +378,7 @@ For every control marked **Not Implemented** or **Partially Implemented**, produ
 | **Medium** | Partially implemented or has compensating control but not fully compliant |
 | **Low** | Missing enhancement or optimization, minimal security impact |
 
-### Step 3.2 — GC Cloud Guardrails Assessment
-
-Assess all 12 GC Cloud Guardrails. For each guardrail, determine if the project architecture satisfies it or if it's satisfied at the organization level.
-
-| ID | Guardrail | Description |
-|---|---|---|
-| GR-1 | Protect Root / Global Admins Account | MFA on root, restricted root usage, break-glass procedures |
-| GR-2 | Management of Administrative Privileges | Least privilege for admin roles, time-bound access, PAM |
-| GR-3 | Cloud Console Access | MFA for console, conditional access, session management |
-| GR-4 | Enterprise Monitoring Accounts | Dedicated monitoring accounts, centralized logging |
-| GR-5 | Data Location | Data residency in Canada (ca-central-1), no cross-border replication |
-| GR-6 | Protection of Data-at-Rest | Encryption at rest for all storage services |
-| GR-7 | Protection of Data-in-Transit | TLS 1.2+, HTTPS enforcement, encrypted connections |
-| GR-8 | Segment and Separate | Network segmentation, VPC isolation, security zones per ITSG-22 |
-| GR-9 | Network Security Services | Firewalls, IDS/IPS, WAF, DDoS protection |
-| GR-10 | Cyber Defense Services | GuardDuty, Security Hub, threat detection |
-| GR-11 | Logging and Monitoring | CloudTrail, CloudWatch, centralized log aggregation |
-| GR-12 | Configuration of Cloud Marketplaces | Approved marketplace, restricted AMI/container sources |
-
-For each guardrail, document:
-
-```markdown
-### GR-X: [Guardrail Name]
-
-**Status:** Satisfied / Partially Satisfied / Not Satisfied / Organization-Level
-**Scope:** Project-Level / Organization-Level / Both
-
-**Evidence:**
-- [What in this project satisfies or contributes to the guardrail]
-
-**Notes:**
-- [Whether this is typically satisfied at org level via SCPs, AWS Organizations, etc.]
-- [What project-level actions are needed]
-```
-
-### Step 3.3 — Produce Phase 3 Outputs
+### Step 3.2 — Produce Phase 3 Outputs
 
 Write `docs/compliance/phase3-gap-analysis.md`:
 
@@ -389,29 +404,7 @@ Write `docs/compliance/phase3-gap-analysis.md`:
 [Gap entries as defined in Step 3.1]
 ```
 
-Write `docs/compliance/gc-guardrails.md`:
-
-```markdown
-# GC Cloud Guardrails Assessment
-
-**Project:** [repo name]
-**Assessed:** YYYY-MM-DD
-
-## Guardrail Summary
-
-| ID | Guardrail | Status | Scope |
-|---|---|---|---|
-| GR-1 | Protect Root / Global Admins | [status] | [scope] |
-| GR-2 | Management of Admin Privileges | [status] | [scope] |
-| ... | ... | ... | ... |
-| GR-12 | Cloud Marketplaces | [status] | [scope] |
-
-## Detailed Assessment
-
-[Guardrail entries as defined in Step 3.2]
-```
-
-### Step 3.4 — Executive Summary
+### Step 3.3 — Executive Summary
 
 Write `docs/compliance/assessment-summary.md`:
 
@@ -421,7 +414,7 @@ Write `docs/compliance/assessment-summary.md`:
 **Project:** [repo name]
 **Date:** YYYY-MM-DD
 **Framework:** ITSG-33 / CCCS Medium Cloud Profile
-**Scope:** Technical Controls (AC, AU, CM, CP, IA, SA, SC, SI) + GC Cloud Guardrails
+**Scope:** Technical Controls (AC, AU, CM, CP, IA, SA, SC, SI)
 
 ## Compliance Posture
 
@@ -432,8 +425,6 @@ Write `docs/compliance/assessment-summary.md`:
 | Partially Implemented | X (X%) |
 | Not Implemented | X (X%) |
 | Not Applicable | X (X%) |
-| GC Guardrails Satisfied | X / 12 |
-
 ## Risk Dashboard
 
 | Risk Rating | Gaps |
@@ -463,16 +454,14 @@ Write `docs/compliance/assessment-summary.md`:
 | Architecture Discovery | docs/compliance/phase1-discovery.md |
 | Control Mapping | docs/compliance/phase2-control-mapping.md |
 | Gap Analysis | docs/compliance/phase3-gap-analysis.md |
-| GC Guardrails | docs/compliance/gc-guardrails.md |
 ```
 
-### Step 3.5 — Final Report
+### Step 3.4 — Final Report
 
 Present the executive summary to the user and note:
 - Total compliance posture percentage
 - Number and severity of gaps
 - Top recommended actions
-- Which guardrails need attention
 
 ---
 
@@ -481,8 +470,18 @@ Present the executive summary to the user and note:
 - **Evidence over assumption**: Every "Implemented" status must cite a file path or architecture pattern. If you can't find evidence, mark it "Not Implemented" or ask.
 - **Don't inflate compliance**: When uncertain, mark as "Partially Implemented" with notes, not "Implemented".
 - **Respect inheritance**: Many controls are AWS-inherited or org-level. Don't mark these as gaps in the project.
-- **Canadian context**: Data residency (GR-5) defaults to ca-central-1. Flag any resources outside Canadian regions.
+- **Canadian context**: Data residency defaults to ca-central-1. Flag any resources outside Canadian regions.
 - **Generic analysis**: This skill works on any project. Adapt the component detection and service mapping to whatever tech stack is found.
 - **No fabricated controls**: Only map controls that exist in ITSG-33. Don't invent control IDs or descriptions.
+- **Verify against official sources**: When uncertain about a control description, fetch the official documentation (see Source of Truth in Phase 2) to verify. Do not rely solely on the control tables in this skill file — they are summaries.
 - **Phase checkpoints are mandatory**: Always pause between phases for user input. Never run all three phases without stopping.
 - **Smart re-run is default**: If previous outputs exist, always offer smart re-run before starting from scratch.
+
+## Official References
+
+- [ITSG-33 Annex 3A — Security Control Catalogue](https://www.cyber.gc.ca/en/guidance/annex-3a-security-control-catalogue-itsg-33)
+- [ITSP.50.103 — Guidance on Security Categorization of Cloud-based Services (contains CCCS Medium profile in Annex B)](https://www.cyber.gc.ca/en/guidance/guidance-security-categorization-cloud-based-services-itsp50103)
+- [GC Security Control Profile for Cloud-Based IT Services](https://www.canada.ca/en/government/system/digital-government/digital-government-innovations/cloud-services/government-canada-security-control-profile-cloud-based-it-services.html)
+- [NIST SP 800-53 Rev 5](https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final) — ITSG-33 Annex 3A adopts the same control IDs
+- [AWS CCCS Medium Compliance](https://aws.amazon.com/compliance/cccs/)
+- [AWS Audit Manager — CCCS Medium Framework](https://docs.aws.amazon.com/audit-manager/latest/userguide/cccs-medium.html)
