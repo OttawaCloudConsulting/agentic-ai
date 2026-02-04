@@ -16,10 +16,6 @@ Read these files to understand what's current:
 
 1. **`progress.txt`** — which features are complete
 2. **`CHANGELOG.md`** — recent feature entries
-3. **`npm test -- --verbose`** — run tests to get exact suite/test counts
-4. **`lib/config.ts`** — current `ZabbixConfig` interface for config parameters
-5. **`cdk.json`** — current default values for all parameters
-6. **`test/`** — scan test files for describe blocks and test counts per suite
 
 ### Step 2 — Update README.md
 
@@ -28,10 +24,8 @@ Check and update these sections:
 | Section | What to check |
 |---------|---------------|
 | Architecture Overview (ASCII diagram) | Matches current stack structure |
-| Configuration table | All params from `ZabbixConfig` present with correct defaults |
+| Configuration table | All params from present with correct defaults |
 | Project Structure (tree) | File paths match actual structure |
-| Stacks table | Stack names, purposes, key resources accurate |
-| Monitoring section | Alarm count, dashboard reference, metric lists |
 | Testing section | Suite count, total test count, suite descriptions |
 | Cost Estimate | Reflects current infrastructure |
 | Tech Stack | Version numbers current |
@@ -47,7 +41,7 @@ Check and update these sections:
 | Optional Features list | All feature flags listed |
 | Stack Architecture | Diagram and dependency graph current |
 | Component Design | All Fargate services, LBs, Lambda documented |
-| Configuration Management | Parameter tables match `ZabbixConfig` |
+| Configuration Management | Parameter tables match |
 | Monitoring and Observability | Alarm count, dashboard, metric lists |
 | Cost Profile | Breakdown matches current resources |
 | Testing section | Total test count, suite count |

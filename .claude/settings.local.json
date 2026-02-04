@@ -5,7 +5,18 @@
       "Bash(wc:*)",
       "Bash(git:*)",
       "Bash(ls:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:awslabs.github.io)",
+      "WebFetch(domain:www.builder.io)",
+      "Bash(claude mcp list:*)",
+      "Bash(claude mcp --help:*)",
+      "Bash(claude mcp add --help:*)",
+      "Bash(claude mcp remove --help:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(shellcheck:*)",
+      "Bash(bash:*)"
     ]
   }
 }

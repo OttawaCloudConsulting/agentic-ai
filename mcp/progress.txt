@@ -1,0 +1,106 @@
+# Progress: Dynamic MCP Installation Script
+# Source: prd.md + ARCHITECTURE_AND_DESIGN.md
+# Spec: docs/ARCHITECTURE_AND_DESIGN.md is the authoritative design reference
+# Style: Google Shell Style Guide + ShellCheck clean
+
+## Phase 1 — Script Foundation
+
+[x] Feature 1: Script Foundation and Pattern Registry
+    - POSIX-compatible argument parser (add/remove/list actions, --remove flag, --help)
+    - Pattern registry using case statements (no bash 4+ features)
+    - Case-insensitive pattern name handling
+    - Usage/help output with examples
+    - Google Shell Style Guide compliant, ShellCheck clean
+    NOTES: Started 2026-02-03, Completed 2026-02-03
+           Also implemented: do_list (Feature 5), all 12 pattern registries (Features 6-17),
+           all 19 server entries with install commands, prereqs, and descriptions.
+           Stubs in place for do_add (Feature 3) and do_remove (Feature 4).
+
+[ ] Feature 2: Prerequisite Checking
+    - Validate claude CLI, uvx, npx, docker availability
+    - Hard fail for claude/uvx/npx; soft warn for Docker
+    - Collect and report all missing prerequisites together
+    - Skip checks for list and remove operations
+    NOTES:
+
+## Phase 2 — Core Operations
+
+[ ] Feature 3: Add Operation
+    - Resolve patterns to server lists with deduplication
+    - Check installed servers via `claude mcp list` and skip already-present
+    - Execute `claude mcp add -s project` for each server
+    - Report per-server status and summary counts
+    NOTES:
+
+[ ] Feature 4: Remove Operation
+    - --remove flag triggers remove mode
+    - Resolve and deduplicate server lists
+    - Execute `claude mcp remove -s project` for each server
+    - Graceful handling of not-installed servers (warning, not error)
+    NOTES:
+
+[ ] Feature 5: List Operation
+    - No pattern: show all patterns with server counts and descriptions
+    - With pattern: show servers in that pattern with details
+    - Aligned terminal output
+    NOTES:
+
+## Phase 3 — Server Inventory
+
+[ ] Feature 6: Server Inventory — AWS Pattern
+    - awslabs.core-mcp-server (uvx, stdio, FASTMCP_LOG_LEVEL=warning)
+    - aws-knowledge-mcp (http, no tool prerequisite)
+    - awslabs.aws-documentation-mcp-server (uvx, stdio)
+    - awslabs.diagram-mcp-server (uvx, stdio)
+    NOTES:
+
+[ ] Feature 7: Server Inventory — CDK Pattern
+    - awslabs.iac-mcp-server (uvx, stdio)
+    NOTES:
+
+[ ] Feature 8: Server Inventory — Terraform Pattern
+    - terraform-mcp-server (docker, stdio) — HashiCorp, Docker soft-warn
+    - awslabs.terraform-mcp-server (uvx, stdio) — AWS Terraform + Checkov
+    NOTES:
+
+[ ] Feature 9: Server Inventory — Documentation Pattern
+    - awslabs.aws-documentation-mcp-server (uvx, stdio)
+    - awslabs.code-doc-gen-mcp-server (uvx, stdio)
+    - context7 via @upstash/context7-mcp (npx, stdio)
+    NOTES:
+
+[ ] Feature 10: Server Inventory — Architecture Pattern
+    - awslabs.diagram-mcp-server (uvx, stdio)
+    - mcp-mermaid (npx, stdio) — hustcc/mcp-mermaid
+    NOTES:
+
+[ ] Feature 11: Server Inventory — Security Pattern
+    - trivy-mcp (trivy CLI + plugin auto-install, stdio)
+    - awslabs.well-architected-security-mcp-server (uvx, stdio)
+    NOTES:
+
+[ ] Feature 12: Server Inventory — Kubernetes Pattern
+    - kubernetes-mcp-server (npx, stdio) — Red Hat, general-purpose K8s
+    NOTES:
+
+[ ] Feature 13: Server Inventory — Crossplane Pattern
+    - controlplane-mcp-server (docker/OCI, http-stream) — Upbound, Docker soft-warn
+    NOTES:
+
+[ ] Feature 14: Server Inventory — Pricing Pattern
+    - awslabs.aws-pricing-mcp-server (uvx, stdio)
+    - awslabs.cost-analysis-mcp-server (uvx, stdio)
+    NOTES:
+
+[ ] Feature 15: Server Inventory — Git Pattern
+    - @modelcontextprotocol/server-git (npx, stdio)
+    NOTES:
+
+[ ] Feature 16: Server Inventory — GitHub Pattern
+    - @github/mcp-server (npx, stdio)
+    - @modelcontextprotocol/server-git (npx, stdio)
+    NOTES:
+
+[ ] Feature 17: Server Inventory — Serverless Pattern
+    - awslabs.serverless-mcp-server (uvx, stdio)
+    NOTES:
