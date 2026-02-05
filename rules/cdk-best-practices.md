@@ -86,7 +86,7 @@ Pass generated names to consumers via environment variables, SSM Parameter Store
 **Enforce guardrails at multiple layers:**
 
 1. **SCPs and permission boundaries** — organization-level controls CDK cannot bypass
-2. **cdk-nag** — static analysis of constructs before deployment (AWS Solutions, HIPAA, NIST 800-53 rule packs)
+2. **cdk-nag** — static analysis of constructs before deployment (AWS Solutions, NIST 800-53 rule packs)
 3. **Aspects** — cross-cutting validation applied to all constructs in a stack
 4. **CloudFormation Guard** — template-level validation in CI/CD pipeline
 

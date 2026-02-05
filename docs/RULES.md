@@ -9,6 +9,9 @@ Rules are always-on behavioral guidelines loaded automatically via `.claude/rule
 | Defensive Protocol | `rules/defensive-protocol.md` | Defensive epistemology for agentic coding: failure handling, prediction protocols, evidence standards |
 | CDK Best Practices | `rules/cdk-best-practices.md` | AWS CDK guidelines: construct design, security, testing, deployment safety, anti-patterns |
 | Terraform Best Practices | `rules/terraform-best-practices.md` | Terraform guidelines: state management, module design, security, naming, deployment safety |
+| Crossplane Best Practices | `rules/crossplane-best-practices.md` | Crossplane/Upbound guidelines: XR design, compositions, managed resources, provider config |
+| Crossplane v2 Best Practices | `rules/crossplane-v2-best-practices.md` | Crossplane v2 specifics: namespaced XRs, spec.crossplane, Configuration packages, migration |
+| Kubernetes Best Practices | `rules/kubernetes-best-practices.md` | Kubernetes guidelines: resource management, security, RBAC, networking, high availability |
 
 ## How Rules Work
 
@@ -190,14 +193,198 @@ This rule synthesizes guidance from:
 
 ---
 
+### Crossplane Best Practices
+
+**File:** `rules/crossplane-best-practices.md`
+**Scope:** Crossplane and Upbound projects
+**Core principle:** Prevent composition errors, state corruption, API breakage, and resource leaks through correct Crossplane patterns.
+
+This rule provides comprehensive guidelines for generating Crossplane infrastructure code. It codifies Upbound documentation, Crossplane best practices, and community-learned anti-patterns into actionable rules for AI code generation.
+
+#### Sections
+
+**XR Design** — Design APIs to avoid versioning. Minimize required fields. Avoid boolean fields (use enums). Default to arrays. Plan for variants. Seek external review before finalizing schemas.
+
+**Composition Architecture** — Use Composition Functions (Pipeline mode). Copy all desired state forward in functions. Limit dynamic resource requests. Functions cannot modify XR metadata/spec. Validate function inputs.
+
+**Managed Resources** — Set explicit deletion policies (`Delete`, `Orphan`, `ObserveOnly`). Use `Orphan` for critical resources. Understand the deletion lifecycle. Use management policies for import scenarios.
+
+**Provider Configuration** — One ProviderConfig per account/credential set. Reference ProviderConfig explicitly in managed resources. Store credentials in Kubernetes Secrets. Use IRSA/Workload Identity where possible.
+
+**Connection Secrets** — Publish connection details for consumer resources. Use `publishConnectionDetailsTo` for XRs. Scope connection secrets to consumer namespaces.
+
+**Claims and Namespacing** — Use Claims for self-service. Claims are namespaced, XRs are cluster-scoped. Name Claims descriptively.
+
+**Testing** — Use `crossplane render` for local testing. Test with Development runtime. Write unit tests for composition functions. Validate rendered output. Test API evolution.
+
+**RBAC and Permissions** — Grant RBAC for extra resource requests. Limit provider permissions to resources actually managed.
+
+**Versioning and Upgrades** — Pin provider versions. Test upgrades in non-production. Monitor provider health.
+
+#### Bad Practices Table
+
+The rule includes a consolidated table of 14 anti-patterns with explanations. Key entries:
+
+- Not copying desired state in functions (resources silently deleted)
+- Boolean fields in XR schemas (limits future API evolution)
+- Required fields without careful consideration (cannot be made optional later)
+- Hardcoded credentials in ProviderConfig (security exposure)
+- `deletionPolicy: Delete` on production databases (accidental deletion destroys data)
+- Force-deleting managed resources (orphans external resources)
+- Mixing PnT and Functions for same resources (unclear ownership)
+
+#### Sources
+
+This rule synthesizes guidance from:
+
+- [Upbound Documentation — Authoring Compositions](https://docs.upbound.io/build/control-plane-projects/authoring-compositions/)
+- [Crossplane Documentation — Compositions](https://docs.crossplane.io/latest/composition/compositions/)
+- [Mastering API Evolution: Best Practices for Crossplane XR Design](https://blog.upbound.io/crossplane-xr-best-practices)
+- [Crossplane Testing: Rendering and Validating Compositions](https://blog.upbound.io/composition-testing-patterns-rendering)
+
+---
+
+### Crossplane v2 Best Practices
+
+**File:** `rules/crossplane-v2-best-practices.md`
+**Scope:** Crossplane v2+ projects
+**Core principle:** Correctly handle v2 breaking changes, namespaced resources, spec.crossplane fields, and Configuration packages.
+
+This rule covers Crossplane v2-specific features and migration patterns. Use alongside the general Crossplane Best Practices rule.
+
+#### Breaking Changes from v1
+
+- Native patch-and-transform composition removed — use Composition Functions
+- `ControllerConfig` removed — use `DeploymentRuntimeConfig`
+- External secret stores removed
+- XR connection details removed — use functions to compose secrets
+- Default registry removed — must use fully qualified package URLs
+
+#### Key v2 Changes
+
+**XRD Scope** — v2 defaults to `Namespaced` instead of cluster-scoped. Three options: `Namespaced` (default), `Cluster`, `LegacyCluster` (v1 compatibility with Claims support).
+
+**spec.crossplane Structure** — All Crossplane machinery moved under `spec.crossplane`: `compositionRef`, `compositionSelector`, `compositionRevisionRef`, `compositionRevisionSelector`, `compositionUpdatePolicy`.
+
+**Namespaced Managed Resources** — All MRs are namespaced in v2, enabling fine-grained RBAC. Cluster-scoped MRs are legacy.
+
+**Claims Removed for v2-style XRs** — Claims only work with `scope: LegacyCluster`.
+
+#### Configuration Packages
+
+**crossplane.yaml format** — Metadata file with `meta.pkg.crossplane.io/v1` API, dependencies, and Crossplane version constraints.
+
+**Fully qualified package URLs required** — No default registry in v2.
+
+**Building and publishing** — Use `crossplane xpkg build`, `crossplane xpkg login`, and `crossplane xpkg push`.
+
+**Dependencies** — Declare providers, functions, and other configurations with semantic version constraints.
+
+#### XRD Versioning
+
+- Only one version can be `referenceable: true`
+- `compositeTypeRef.apiVersion` is immutable in Compositions
+- Breaking changes require a new XRD, not a new version
+
+#### Migration
+
+1. Convert compositions: `crossplane beta convert pipeline-composition`
+2. Update XRDs with appropriate `scope`
+3. Update package references to fully qualified URLs
+4. Test in non-production before upgrading
+
+#### Bad Practices Table
+
+The rule includes 11 anti-patterns specific to v2:
+
+- Using `scope: Namespaced` expecting cross-namespace composition
+- Adding breaking changes as new XRD version
+- Omitting Crossplane version constraint in packages
+- Using short package references without registry
+- Relying on native EnvironmentConfig selection (removed)
+- Expecting Claims with v2-style XRDs
+
+#### Sources
+
+- [Crossplane v2 What's New](https://docs.crossplane.io/latest/whats-new/)
+- [Crossplane v2 XRD and Composition Version Management](https://tinfoilcipher.co.uk/2025/10/28/crossplane-v2-xrd-and-composition-version-management/)
+- [Crossplane Configurations Documentation](https://docs.crossplane.io/latest/packages/configurations/)
+- [Releasing Crossplane Extensions](https://docs.crossplane.io/latest/guides/extensions-release-process/)
+
+---
+
+### Kubernetes Best Practices
+
+**File:** `rules/kubernetes-best-practices.md`
+**Scope:** Kubernetes deployments (any distribution)
+**Core principle:** Prevent security vulnerabilities, resource exhaustion, availability failures, and operational incidents through correct Kubernetes patterns.
+
+This rule provides comprehensive guidelines for generating Kubernetes manifests. It codifies official Kubernetes documentation, CIS benchmarks, and production-learned anti-patterns into actionable rules for AI code generation.
+
+#### Sections
+
+**Resource Management** — Set resource requests and limits on every container. Be cautious with CPU limits (throttling). Use LimitRange for namespace defaults. Use ResourceQuota to cap namespace consumption. Understand QoS classes.
+
+**Health Probes** — Configure readiness probes for traffic routing. Configure liveness probes for stuck process detection. Use startup probes for slow-starting applications. Keep probes independent of external dependencies.
+
+**Pod Disruption Budgets** — Create PDBs for all production workloads. Use `minAvailable` or `maxUnavailable`. Don't set PDB too restrictively.
+
+**Security — Pod Security** — Run containers as non-root. Use read-only root filesystem. Drop all capabilities, add only what's needed. Disable privilege escalation. Never use privileged containers.
+
+**Security — RBAC** — Follow least privilege. Use Role/RoleBinding for namespace-scoped access. Never grant high-risk permissions (secrets list, pods/exec, nodes/proxy, escalate, bind, impersonate). Disable service account token auto-mounting. Audit RBAC regularly.
+
+**Security — Network Policies** — Start with default deny. Allow only required traffic. Don't forget DNS egress. Test in staging first.
+
+**Application Lifecycle** — Handle SIGTERM properly. Drain connections before exit. Use ConfigMaps for non-sensitive configuration. Mount Secrets as files, not environment variables.
+
+**High Availability** — Run multiple replicas. Spread pods across nodes with anti-affinity. Spread across availability zones with topology constraints. Don't store state in container filesystem.
+
+**Labels and Annotations** — Apply consistent labels (technical, business, security). Use annotations for non-identifying metadata.
+
+**Observability** — Log to stdout/stderr. Export metrics in Prometheus format. Include request tracing.
+
+**Image Security** — Use specific image tags. Pull from trusted registries only. Scan images for vulnerabilities. Use minimal base images.
+
+**Namespace Organization** — Use namespaces for isolation. Apply LimitRange and ResourceQuota per namespace. Use NetworkPolicy per namespace. Don't use the `default` namespace.
+
+**Cluster Hardening** — Run CIS Kubernetes Benchmark. Disable metadata API access from pods. Use Pod Security Admission. Prefer OIDC for user authentication.
+
+#### Bad Practices Table
+
+The rule includes a consolidated table of 18 anti-patterns with explanations. Key entries:
+
+- No resource requests/limits (resource exhaustion, noisy neighbors)
+- Single-replica deployments (node failure = downtime)
+- Readiness probes checking external deps (cascading failures)
+- Running as root (privilege escalation attacks)
+- Secrets in environment variables (visible in `/proc`)
+- Wildcard RBAC permissions (excessive access)
+- No NetworkPolicy (unrestricted lateral movement)
+- Auto-mounted service account tokens (unnecessary credential exposure)
+
+#### Sources
+
+This rule synthesizes guidance from:
+
+- [Kubernetes RBAC Good Practices (official)](https://kubernetes.io/docs/concepts/security/rbac-good-practices/)
+- [Kubernetes Network Policies (official)](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+- [Kubernetes Production Best Practices](https://learnkube.com/production-best-practices)
+- [14 Kubernetes Best Practices You Must Know in 2025](https://komodor.com/learn/14-kubernetes-best-practices-you-must-know-in-2025/)
+- [A Practical Guide to Kubernetes Security: Hardening Your Cluster in 2025](https://sealos.io/blog/a-practical-guide-to-kubernetes-security-hardening-your-cluster-in-2025)
+
+---
+
 ## Consuming Rules
 
 To use a rule in a target project, copy the file from `rules/` into `.claude/rules/` in the target repository:
 
 ```bash
-cp rules/defensive-protocol.md       <target-repo>/.claude/rules/
-cp rules/cdk-best-practices.md       <target-repo>/.claude/rules/
-cp rules/terraform-best-practices.md  <target-repo>/.claude/rules/
+cp rules/defensive-protocol.md             <target-repo>/.claude/rules/
+cp rules/cdk-best-practices.md             <target-repo>/.claude/rules/
+cp rules/terraform-best-practices.md       <target-repo>/.claude/rules/
+cp rules/crossplane-best-practices.md      <target-repo>/.claude/rules/
+cp rules/crossplane-v2-best-practices.md   <target-repo>/.claude/rules/
+cp rules/kubernetes-best-practices.md      <target-repo>/.claude/rules/
 ```
 
 Rules take effect immediately on the next Claude Code conversation in that repository.
@@ -209,3 +396,6 @@ Rules take effect immediately on the next Claude Code conversation in that repos
 | Any project | `defensive-protocol.md` |
 | AWS CDK projects | `defensive-protocol.md` + `cdk-best-practices.md` |
 | Terraform projects | `defensive-protocol.md` + `terraform-best-practices.md` |
+| Crossplane v1 projects | `defensive-protocol.md` + `crossplane-best-practices.md` + `kubernetes-best-practices.md` |
+| Crossplane v2 projects | `defensive-protocol.md` + `crossplane-best-practices.md` + `crossplane-v2-best-practices.md` + `kubernetes-best-practices.md` |
+| Kubernetes projects | `defensive-protocol.md` + `kubernetes-best-practices.md` |
