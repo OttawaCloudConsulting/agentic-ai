@@ -104,7 +104,6 @@ Only execute this gate if Gates 1-2 both passed.
 
 6. **Generate commit message** based on feature context:
    - Format: `feat: X.Y — [Brief description from progress.txt]`
-   - Include `Co-Authored-By: Claude <noreply@anthropic.com>` footer
 
 7. **Commit locally:**
    ```bash
@@ -112,8 +111,6 @@ Only execute this gate if Gates 1-2 both passed.
    feat: X.Y — [Description]
 
    [Optional: 1-2 sentence summary of what changed]
-
-   Co-Authored-By: Claude <noreply@anthropic.com>
    EOF
    )"
    ```

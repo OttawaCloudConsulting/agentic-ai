@@ -1,9 +1,3 @@
----
-name: defensive-protocol
-description: Defensive coding protocol for agentic work. Apply when writing code, debugging, investigating issues, making architectural decisions, or performing multi-step tasks. Covers failure handling, prediction protocols, evidence standards, and autonomy boundaries.
-user-invocable: false
----
-
 # Defensive Coding Protocol
 
 > Defensive epistemology for agentic coding: minimize false beliefs, catch errors early, prevent compounding mistakes.

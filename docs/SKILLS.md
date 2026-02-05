@@ -18,11 +18,13 @@ Skills are slash commands that provide structured workflows for common tasks. Th
 | Catchup | `/catchup` | Read session state at start of a new session |
 | Handoff | `/handoff` | Save session state before ending |
 
-### Non-Invocable Skills
+### Rules (Always-On)
 
-| Skill | Purpose |
+Rules are behavioral guidelines loaded automatically via `.claude/rules/`. They are not commands and cannot be invoked.
+
+| Rule | Purpose |
 |---|---|
-| Defensive Protocol | Loaded automatically when writing code, debugging, or investigating. Not directly invoked. |
+| Defensive Protocol | Defensive epistemology for agentic coding: failure handling, prediction protocols, evidence standards, autonomy boundaries. |
 
 ---
 
@@ -228,14 +230,16 @@ Run this before `/clear` or closing the terminal.
     compliance-auto-assess.md                Automated compliance assessment (dispatcher)
     catchup.md                               Session start
     create-prd.md                            Project setup
-    defensive-protocol.md                    Always-active coding protocol (not user-invocable)
     handoff.md                               Session end
     investigate.md                           Structured debugging
     start-feature.md                         Feature workflow
     test-cdk.md                              CDK validation + commit
     test-terraform.md                        Terraform validation + commit
     update-docs.md                           General doc refresh
+    update-docs-cdk.md                       CDK doc refresh
     update-docs-terraform.md                 Terraform doc refresh
+  rules/                                     Always-on behavioral guidelines
+    defensive-protocol.md                    Defensive coding protocol
   compliance-auto-assess-instructions.md     Assessment payload for sub-agent (not a skill)
 ```
 
@@ -247,7 +251,8 @@ Skills support these frontmatter fields:
 ---
 name: skill-name                    # Required. The /command name.
 description: What the skill does    # Required. Shown in /skills list.
-user-invocable: false               # Optional. Hides from user invocation (e.g., defensive-protocol).
 disable-model-invocation: true      # Optional. Prevents the model from auto-invoking the skill.
 ---
 ```
+
+**Note:** Rules (in `.claude/rules/`) do not use YAML frontmatter. They are pure content files.
