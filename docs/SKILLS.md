@@ -20,11 +20,12 @@ Skills are slash commands that provide structured workflows for common tasks. Th
 
 ### Rules (Always-On)
 
-Rules are behavioral guidelines loaded automatically via `.claude/rules/`. They are not commands and cannot be invoked.
+Rules are behavioral guidelines loaded automatically via `.claude/rules/`. They are not commands and cannot be invoked. See [RULES.md](RULES.md) for full documentation.
 
 | Rule | Purpose |
 |---|---|
 | Defensive Protocol | Defensive epistemology for agentic coding: failure handling, prediction protocols, evidence standards, autonomy boundaries. |
+| CDK Best Practices | AWS CDK guidelines: construct design, security, testing, deployment safety, anti-patterns. |
 
 ---
 
