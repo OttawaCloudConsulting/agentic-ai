@@ -16,91 +16,106 @@
            all 19 server entries with install commands, prereqs, and descriptions.
            Stubs in place for do_add (Feature 3) and do_remove (Feature 4).
 
-[ ] Feature 2: Prerequisite Checking
+[x] Feature 2: Prerequisite Checking
     - Validate claude CLI, uvx, npx, docker availability
     - Hard fail for claude/uvx/npx; soft warn for Docker
     - Collect and report all missing prerequisites together
     - Skip checks for list and remove operations
-    NOTES:
+    NOTES: Started 2026-02-04, Completed 2026-02-04
+           Added check_prerequisites() and collect_prereqs() functions.
+           Docker soft-fail filters docker-based servers from the install list.
+           Trivy treated as hard prereq. Only checks tools needed by resolved servers.
+           ShellCheck clean.
 
 ## Phase 2 — Core Operations
 
-[ ] Feature 3: Add Operation
+[x] Feature 3: Add Operation
     - Resolve patterns to server lists with deduplication
     - Check installed servers via `claude mcp list` and skip already-present
     - Execute `claude mcp add -s project` for each server
     - Report per-server status and summary counts
-    NOTES:
+    NOTES: Started 2026-02-04, Completed 2026-02-04
+           Added get_installed_servers(), is_server_installed(), print_add_summary().
+           Replaced do_add() stub with full implementation.
+           Tested: install, idempotency (skip already-installed), Docker soft-skip.
+           KNOWN ISSUE: claude mcp add rejects dots in server names — all awslabs.*
+           entries fail. Server registry names need updating (Features 6-17).
+           ShellCheck clean.
 
-[ ] Feature 4: Remove Operation
+[x] Feature 4: Remove Operation
     - --remove flag triggers remove mode
     - Resolve and deduplicate server lists
     - Execute `claude mcp remove -s project` for each server
     - Graceful handling of not-installed servers (warning, not error)
-    NOTES:
+    NOTES: Started 2026-02-04, Completed 2026-02-04
+           Replaced do_remove() stub with full implementation.
+           Tested: remove installed server, remove not-installed (graceful warning).
+           No prereq checking needed for remove. ShellCheck clean.
 
-[ ] Feature 5: List Operation
+[x] Feature 5: List Operation
     - No pattern: show all patterns with server counts and descriptions
     - With pattern: show servers in that pattern with details
     - Aligned terminal output
-    NOTES:
+    NOTES: Completed 2026-02-04
+           Already implemented in Feature 1. Verified all acceptance criteria met:
+           list (all patterns), list PATTERN (specific), unknown pattern (error + valid list).
 
 ## Phase 3 — Server Inventory
 
-[ ] Feature 6: Server Inventory — AWS Pattern
-    - awslabs.core-mcp-server (uvx, stdio, FASTMCP_LOG_LEVEL=warning)
+[x] Feature 6: Server Inventory — AWS Pattern
+    - awslabs-core-mcp-server (uvx, stdio, FASTMCP_LOG_LEVEL=warning)
     - aws-knowledge-mcp (http, no tool prerequisite)
-    - awslabs.aws-documentation-mcp-server (uvx, stdio)
-    - awslabs.diagram-mcp-server (uvx, stdio)
-    NOTES:
+    - awslabs-aws-documentation-mcp-server (uvx, stdio)
+    - awslabs-diagram-mcp-server (uvx, stdio)
+    NOTES: Implemented in Feature 1, naming fixed (dots→hyphens). Verified.
 
-[ ] Feature 7: Server Inventory — CDK Pattern
-    - awslabs.iac-mcp-server (uvx, stdio)
-    NOTES:
+[x] Feature 7: Server Inventory — CDK Pattern
+    - awslabs-iac-mcp-server (uvx, stdio)
+    NOTES: Implemented in Feature 1, naming fixed. Install tested end-to-end.
 
-[ ] Feature 8: Server Inventory — Terraform Pattern
+[x] Feature 8: Server Inventory — Terraform Pattern
     - terraform-mcp-server (docker, stdio) — HashiCorp, Docker soft-warn
-    - awslabs.terraform-mcp-server (uvx, stdio) — AWS Terraform + Checkov
-    NOTES:
+    - awslabs-terraform-mcp-server (uvx, stdio) — AWS Terraform + Checkov
+    NOTES: Implemented in Feature 1, naming fixed. Docker soft-skip tested.
 
-[ ] Feature 9: Server Inventory — Documentation Pattern
-    - awslabs.aws-documentation-mcp-server (uvx, stdio)
-    - awslabs.code-doc-gen-mcp-server (uvx, stdio)
+[x] Feature 9: Server Inventory — Documentation Pattern
+    - awslabs-aws-documentation-mcp-server (uvx, stdio)
+    - awslabs-code-doc-gen-mcp-server (uvx, stdio)
     - context7 via @upstash/context7-mcp (npx, stdio)
-    NOTES:
+    NOTES: Implemented in Feature 1, naming fixed. Verified.
 
-[ ] Feature 10: Server Inventory — Architecture Pattern
-    - awslabs.diagram-mcp-server (uvx, stdio)
-    - mcp-mermaid (npx, stdio) — hustcc/mcp-mermaid
-    NOTES:
+[x] Feature 10: Server Inventory — Architecture Pattern
+    - awslabs-diagram-mcp-server (uvx, stdio)
+    - mermaid-mcp (npx, stdio) — hustcc/mcp-mermaid
+    NOTES: Implemented in Feature 1, naming fixed. Verified.
 
-[ ] Feature 11: Server Inventory — Security Pattern
+[x] Feature 11: Server Inventory — Security Pattern
     - trivy-mcp (trivy CLI + plugin auto-install, stdio)
-    - awslabs.well-architected-security-mcp-server (uvx, stdio)
-    NOTES:
+    - awslabs-well-architected-security-mcp-server (uvx, stdio)
+    NOTES: Implemented in Feature 1, naming fixed. Verified.
 
-[ ] Feature 12: Server Inventory — Kubernetes Pattern
+[x] Feature 12: Server Inventory — Kubernetes Pattern
     - kubernetes-mcp-server (npx, stdio) — Red Hat, general-purpose K8s
-    NOTES:
+    NOTES: Implemented in Feature 1. Verified.
 
-[ ] Feature 13: Server Inventory — Crossplane Pattern
+[x] Feature 13: Server Inventory — Crossplane Pattern
     - controlplane-mcp-server (docker/OCI, http-stream) — Upbound, Docker soft-warn
-    NOTES:
+    NOTES: Implemented in Feature 1. Verified.
 
-[ ] Feature 14: Server Inventory — Pricing Pattern
-    - awslabs.aws-pricing-mcp-server (uvx, stdio)
-    - awslabs.cost-analysis-mcp-server (uvx, stdio)
-    NOTES:
+[x] Feature 14: Server Inventory — Pricing Pattern
+    - awslabs-aws-pricing-mcp-server (uvx, stdio)
+    - awslabs-cost-analysis-mcp-server (uvx, stdio)
+    NOTES: Implemented in Feature 1, naming fixed. Verified.
 
-[ ] Feature 15: Server Inventory — Git Pattern
-    - @modelcontextprotocol/server-git (npx, stdio)
-    NOTES:
+[x] Feature 15: Server Inventory — Git Pattern
+    - mcp-server-git (npx, stdio)
+    NOTES: Implemented in Feature 1. Install + remove tested end-to-end.
 
-[ ] Feature 16: Server Inventory — GitHub Pattern
-    - @github/mcp-server (npx, stdio)
-    - @modelcontextprotocol/server-git (npx, stdio)
-    NOTES:
+[x] Feature 16: Server Inventory — GitHub Pattern
+    - github-mcp-server (npx, stdio)
+    - mcp-server-git (npx, stdio)
+    NOTES: Implemented in Feature 1. Install tested end-to-end.
 
-[ ] Feature 17: Server Inventory — Serverless Pattern
-    - awslabs.serverless-mcp-server (uvx, stdio)
+[x] Feature 17: Server Inventory — Serverless Pattern
+    - awslabs-serverless-mcp-server (uvx, stdio)
     NOTES:
