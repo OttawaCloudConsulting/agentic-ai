@@ -26,6 +26,7 @@ Rules are behavioral guidelines loaded automatically via `.claude/rules/`. They 
 |---|---|
 | Defensive Protocol | Defensive epistemology for agentic coding: failure handling, prediction protocols, evidence standards, autonomy boundaries. |
 | CDK Best Practices | AWS CDK guidelines: construct design, security, testing, deployment safety, anti-patterns. |
+| Terraform Best Practices | Terraform guidelines: state management, module design, security, naming, deployment safety. |
 
 ---
 

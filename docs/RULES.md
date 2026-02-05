@@ -8,6 +8,7 @@ Rules are always-on behavioral guidelines loaded automatically via `.claude/rule
 |---|---|---|
 | Defensive Protocol | `rules/defensive-protocol.md` | Defensive epistemology for agentic coding: failure handling, prediction protocols, evidence standards |
 | CDK Best Practices | `rules/cdk-best-practices.md` | AWS CDK guidelines: construct design, security, testing, deployment safety, anti-patterns |
+| Terraform Best Practices | `rules/terraform-best-practices.md` | Terraform guidelines: state management, module design, security, naming, deployment safety |
 
 ## How Rules Work
 
@@ -126,13 +127,77 @@ This rule synthesizes guidance from:
 
 ---
 
+### Terraform Best Practices
+
+**File:** `rules/terraform-best-practices.md`
+**Scope:** Terraform projects (HCL, any provider, primarily AWS)
+**Core principle:** Prevent state corruption, security holes, drift, and deployment failures through correct Terraform patterns.
+
+This rule provides comprehensive guidelines for generating Terraform infrastructure code. It codifies AWS Prescriptive Guidance, HashiCorp best practices, and community-learned anti-patterns into actionable rules for AI code generation.
+
+#### Sections
+
+**Repository Structure** — Standard file layout (`main.tf`, `variables.tf`, `outputs.tf`, `locals.tf`, `providers.tf`, `versions.tf`). Keep resources in `main.tf`, split only when exceeding ~150 lines. Organize supporting files in `scripts/`, `helpers/`, `files/`, `templates/`.
+
+**Module Design** — Don't wrap single resources. Encapsulate logical relationships. Keep inheritance flat (max 1-2 levels). Export at least one output per resource. Don't configure providers in modules — only declare `required_providers`.
+
+**State Management** — Use remote state (S3 + DynamoDB). Enable state locking and versioning. Separate backends per environment. Never manually edit state files. Monitor state access via CloudTrail.
+
+**Security** — Use IAM roles, not access keys. Follow least privilege. Encrypt state at rest. Never store secrets in code or state. Scan with Checkov/tfsec/TFLint. Enforce policy as code (Sentinel, OPA). Use OIDC for CI/CD authentication.
+
+**Variables and Configuration** — All variables need types and descriptions. Provide defaults for environment-independent values, omit for environment-specific. Don't over-parameterize. Use locals for computed values. Don't pass outputs through input variables.
+
+**Naming Conventions** — `snake_case` for everything. Name resources by purpose, not type. Singular nouns. Units on numeric variables. Positive names for booleans.
+
+**Resource Patterns** — Attachment resources over embedded attributes. `default_tags` in the provider. Deliberate `lifecycle` blocks. Avoid provisioners when native resources exist.
+
+**Version Management** — Pin providers with `~>`. Pin module versions explicitly. Pin Terraform CLI version. Upgrade in non-production first. Automate version checks in CI/CD.
+
+**Testing and Validation** — `terraform fmt -check` on every commit. `terraform validate` after init. TFLint and security scans in CI/CD. Automated module tests. Always review plan before apply.
+
+**Deployment Safety** — CI/CD pipelines for all deployments. Separate plan/apply permissions. Review destructive changes. Use `-target` sparingly. Protect critical resources with `prevent_destroy`. Implement drift detection.
+
+**Community Modules** — Search before building. Customize via variables, don't fork. Audit dependencies. Use trusted sources. Pin commit hashes for Git-sourced modules.
+
+**Monitoring and Drift** — Drift detection via scheduled plans. CloudTrail on state buckets. Alert on bypassed CI/CD. Track costs with tags.
+
+**Project Hygiene** — `.gitignore` for Terraform artifacts. Pre-commit hooks. Auto-generate docs with `terraform-docs`. Follow registry naming. Limit blast radius with state boundaries.
+
+#### Bad Practices Table
+
+The rule includes a consolidated table of 17 anti-patterns with explanations. Key entries:
+
+- Local state files for team projects (no locking, no backup, state loss)
+- Hardcoded credentials in provider blocks (exposed in VCS)
+- Secrets in `.tfvars` or HCL (plaintext in repos and state)
+- Unpinned provider/module versions (non-deterministic builds)
+- `terraform apply` without reviewing plan (blind deployment)
+- Manual `terraform apply` to production (no audit trail)
+- Single-resource wrapper modules (unnecessary abstraction)
+- Manual state file edits (corruption, drift)
+- Wildcard IAM policies (violates least privilege)
+- `terraform destroy` without safeguards (deletes all infrastructure)
+
+#### Sources
+
+This rule synthesizes guidance from:
+
+- [AWS Prescriptive Guidance — Terraform AWS Provider Best Practices](https://docs.aws.amazon.com/prescriptive-guidance/latest/terraform-aws-provider-best-practices/introduction.html)
+- [AWS Prescriptive Guidance — Code Structure and Organization](https://docs.aws.amazon.com/prescriptive-guidance/latest/terraform-aws-provider-best-practices/structure.html)
+- [HashiCorp — Terraform Recommended Practices](https://developer.hashicorp.com/terraform/cloud-docs/recommended-practices)
+- [10 Most Common Mistakes Using Terraform](https://blog.pipetail.io/posts/2020-10-29-most-common-mistakes-terraform/)
+- [Terraform Anti-Patterns: Practices to Steer Clear Of](https://reaverops.medium.com/terraform-anti-patterns-practices-to-steer-clear-of-b7ce2784e85d)
+
+---
+
 ## Consuming Rules
 
 To use a rule in a target project, copy the file from `rules/` into `.claude/rules/` in the target repository:
 
 ```bash
-cp rules/defensive-protocol.md  <target-repo>/.claude/rules/
-cp rules/cdk-best-practices.md  <target-repo>/.claude/rules/
+cp rules/defensive-protocol.md       <target-repo>/.claude/rules/
+cp rules/cdk-best-practices.md       <target-repo>/.claude/rules/
+cp rules/terraform-best-practices.md  <target-repo>/.claude/rules/
 ```
 
 Rules take effect immediately on the next Claude Code conversation in that repository.
@@ -143,3 +208,4 @@ Rules take effect immediately on the next Claude Code conversation in that repos
 |---|---|
 | Any project | `defensive-protocol.md` |
 | AWS CDK projects | `defensive-protocol.md` + `cdk-best-practices.md` |
+| Terraform projects | `defensive-protocol.md` + `terraform-best-practices.md` |
