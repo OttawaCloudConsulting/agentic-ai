@@ -16,9 +16,17 @@ Before running /test-terraform, ensure:
 
 ## Execution Steps
 
-### Gate 1 — Validation
+### Gate 1 & 2 — Validation, Plan & Apply
 
-Run each check sequentially. Stop on first failure.
+Run the automated test script that performs all validation checks, generates a plan, and deploys to the development environment.
+
+**Command:**
+
+```bash
+bash tests/test-terraform.sh
+```
+
+The script automatically performs the following steps:
 
 | Step | Tool | Purpose |
 |------|------|---------|
@@ -27,49 +35,28 @@ Run each check sequentially. Stop on first failure.
 | 3 | terraform init | Ensures providers are initialized |
 | 4 | terraform validate | Syntax and internal consistency check |
 | 5 | tflint | Provider-aware linting (skip if not installed) |
-| 6 | tfsec / checkov | Security scanning (skip if not installed) |
+| 6 | checkov | Security scanning |
+| 7 | trivy | Security scanning |
+| 8 | terraform plan | Generate deployment plan |
+| 9 | terraform apply | Deploy to dev account |
 
-**Commands:**
+The script will:
 
-```bash
-# Step 1
-git-secrets --scan
+- Auto-detect your OS (macOS, Ubuntu/Debian, RHEL/CentOS/Fedora)
+- Install missing tools automatically using the appropriate package manager
+- Stop on critical failures (Steps 1-5, 8-9)
+- Continue with warnings for security scan findings (Steps 6-7) - security scans report findings but do NOT fail the pipeline
 
-# Step 2 — Do NOT auto-fix; report and stop
-terraform fmt -check -recursive
+**Pass criteria:** All validation checks pass and deployment completes successfully (exit code 0)
 
-# Step 3
-terraform init
+**On failure:** STOP. Review the error output. Do not proceed to Gate 3.
 
-# Step 4
-terraform validate
+**Note:** Checkov and Trivy security scans will report findings as warnings but will not stop the pipeline. Review security findings and address them as needed, but they do not block deployment. If security findings are false positives or accepted risks, it is acceptable to suppress specific rules:
 
-# Step 5 (skip if not installed, note in output)
-tflint
+- **Checkov**: Use inline comments in the terraform code `# checkov:skip=CKV_AWS_XX:Reason for suppression`
+- **Trivy**: Use `.trivyignore` file or inline comments with `# trivy:ignore:AVD-AWS-XXXX`
 
-# Step 6 (skip if not installed, note in output)
-tfsec . || checkov -d .
-```
-
-**Pass criteria:** All required checks pass (Steps 1–4). Steps 5–6 are advisory if the tool is not installed.
-**On failure:** STOP. Report which check failed. Do not proceed to Gate 2.
-
-### Gate 2 — Plan & Apply
-
-Deploy to the development environment:
-
-```bash
-# Step 1 — Plan
-AWS_PROFILE=<PROFILE_NAME> terraform plan -out=tfplan
-
-# Step 2 — Review plan summary (resources to add/change/destroy)
-
-# Step 3 — Apply from saved plan
-AWS_PROFILE=<PROFILE_NAME> terraform apply tfplan
-```
-
-**Pass criteria:** Plan produces expected changes and apply completes successfully (exit code 0)
-**On failure:** STOP. Report the error. Do not proceed to Gate 3.
+Document suppression decisions in feature documentation or commit messages.
 
 ### Gate 3 — Commit
 
@@ -128,6 +115,7 @@ Only execute this gate if Gates 1–2 both passed.
    - Format: `feat: X.Y — [Brief description from progress.txt]`
 
 7. **Commit locally:**
+
    ```bash
    git commit -m "$(cat <<'EOF'
    feat: X.Y — [Description]
@@ -143,16 +131,15 @@ Only execute this gate if Gates 1–2 both passed.
 
 Report results after each gate:
 
-```
-GATE 1 — Validation: PASS
+```text
+GATE 1 & 2 — Validation, Plan & Apply: PASS
   - git-secrets: passed
   - terraform fmt: passed
   - terraform init: passed
   - terraform validate: passed
   - tflint: passed (or skipped — not installed)
-  - tfsec: passed (or skipped — not installed)
-
-GATE 2 — Plan & Apply: PASS
+  - checkov: completed with warnings (or passed)
+  - trivy: completed with warnings (or passed)
   Plan: 3 to add, 0 to change, 0 to destroy
   Apply: completed successfully
 
@@ -163,13 +150,13 @@ All gates passed. Feature X.Y is complete.
 
 If any gate fails:
 
-```
-GATE 1 — Validation: FAIL
+```text
+GATE 1 & 2 — Validation, Plan & Apply: FAIL
 
 Failed at: terraform validate
 Error: [error message]
 
-Stopping at Gate 1. Please fix the error and run /test-terraform again.
+Stopping. Please fix the error and run /test-terraform again.
 ```
 
 ## Important Rules
