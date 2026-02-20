@@ -157,9 +157,9 @@ bash scripts/my-script.sh        # correct
 ./scripts/my-script.sh           # wrong — requires +x, bypasses interpreter control
 ```
 
-- Do not add shebangs (`#!/usr/bin/env bash`) — they imply direct execution
-- Do not run `chmod +x` on scripts
-- Explicit interpreter invocation makes the execution mechanism visible and auditable
+- Shebangs (`#!/usr/bin/env bash`) may be included for documentation purposes
+- Do not run `chmod +x` on scripts — never set the executable bit
+- Scripts must always be invoked with an explicit interpreter (e.g., `bash script.sh`)
 
 ---
 

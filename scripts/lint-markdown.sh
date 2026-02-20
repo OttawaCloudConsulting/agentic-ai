@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Lint markdown files using markdownlint-cli2.
@@ -32,7 +33,7 @@ done
 if command -v markdownlint-cli2 &>/dev/null; then
   LINT_CMD="markdownlint-cli2"
 else
-  LINT_CMD="npx --yes markdownlint-cli2"
+  LINT_CMD="npx --yes markdownlint-cli2@0.21.0"
 fi
 
 if [[ -n "$TARGET_FILE" ]]; then

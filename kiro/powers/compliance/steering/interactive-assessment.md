@@ -234,7 +234,7 @@ For each control, classify the implementation responsibility:
 | **AWS Inherited** | Fully provided by AWS, no customer action needed | PE-* (Physical), data center security |
 | **AWS Shared** | AWS provides the capability, customer must configure it | SC-28: AWS provides S3 encryption, customer must enable it |
 | **Customer Implemented** | Entirely the customer's responsibility | AC-2: Account management within the application |
-| **GC Org-level** | Implemented at the GC organization/department level, not per-project | AT-*(Security Training), PS-* (Personnel Security) |
+| **GC Org-level** | Implemented at the GC organization/department level, not per-project | AT-* (Security Training), PS-* (Personnel Security) |
 
 ### Step 2.1 — Map Each Control
 
