@@ -35,12 +35,9 @@ agentic-ai/
 │   ├── SKILLS.md                      ← skill catalog and usage guide
 │   ├── RULES.md                       ← rules catalog and usage guide
 │   └── ARCHITECTURE_AND_DESIGN.md     ← Kiro conversion architecture
-├── working/                           ← active development workspace (scripts, PRD, progress)
+├── working/                           ← scratch space for active development
 ├── tests/                             ← test fixtures
 └── .claude/                           ← local settings for this repo only
-    ├── commands/                      ← skills active in this repo (create-prd, start-feature)
-    ├── rules/                         ← rules active in this repo (defensive-protocol)
-    └── skills/                        ← skills active in this repo (skill-creator)
 ```
 
 ## Content Model
