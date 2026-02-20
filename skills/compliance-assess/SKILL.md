@@ -68,6 +68,7 @@ Write `docs/compliance/phase1-discovery.md` using the template in references/pha
 ### 1.5 — User Checkpoint
 
 Present the Phase 1 summary and ask:
+
 - "Does this accurately represent your architecture?"
 - "Any out-of-band security controls not visible in code (SCPs, SSO, manual configs)?"
 
@@ -93,6 +94,7 @@ Present posture breakdown and uncertain controls. Ask: "Any controls where you h
 For every control marked Not Implemented or Partially Implemented, produce a risk-rated remediation entry. See references/phase-templates.md for the gap entry format and risk rating criteria.
 
 Write:
+
 - `docs/compliance/phase3-gap-analysis.md` — ordered by risk rating, then effort
 - `docs/compliance/assessment-summary.md` — executive summary
 

@@ -14,6 +14,7 @@ For CDK or Terraform projects, use the technology-specific powers (`cdk-workflow
 ## Available Workflows
 
 ### Documentation Refresh
+
 Update README.md and docs/ARCHITECTURE.md to reflect the current project structure, components, configuration, and dependencies.
 
 See `steering/docs-refresh.md` for the complete workflow.
@@ -21,6 +22,7 @@ See `steering/docs-refresh.md` for the complete workflow.
 ## Onboarding
 
 When first activated, verify:
+
 1. The workspace has a README.md and/or docs/ARCHITECTURE.md to update
 2. Check for `progress.txt` and `CHANGELOG.md` for tracking context
 3. Confirm this is not a CDK or Terraform project (use the specific powers for those)

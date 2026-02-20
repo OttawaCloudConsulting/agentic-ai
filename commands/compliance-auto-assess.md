@@ -25,6 +25,7 @@ This skill dispatches the ITSG-33 / CCCS Medium compliance assessment as a sub-a
    - `subagent_type`: `"general-purpose"`
    - `description`: `"ITSG-33 compliance assessment"`
    - `prompt`: The full contents of the instructions file, followed by:
+
      ```
 
      ---

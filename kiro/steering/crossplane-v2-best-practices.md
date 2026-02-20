@@ -433,6 +433,7 @@ kubectl get xdatabase my-db -o yaml
 ```
 
 Look for:
+
 - `status.crossplane.compositionRef` — active Composition
 - `status.crossplane.compositionRevisionRef` — active revision
 - `status.crossplane.conditions` — reconciliation status

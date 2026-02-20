@@ -1,274 +1,59 @@
 # Skills Reference
 
-Skills are slash commands that provide structured workflows for common tasks. They are invoked with `/<skill-name>` in the Claude Code CLI.
+Skills are portable bundles that provide structured workflows with supporting assets (scripts, references, templates). Each skill is a directory containing a `SKILL.md` definition plus supporting files. They are invoked with `/<skill-name>` in the Claude Code CLI.
 
-**Two formats:**
-- **Commands** — single `.md` files, installed to `.claude/commands/`
-- **Skills** — bundles with `SKILL.md` + supporting artifacts (scripts, references), installed to `.claude/skills/<skill-name>/`
+For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 
 ## Quick Reference
 
-| Skill | Command | Purpose |
-|---|---|---|
-| Create PRD | `/create-prd` | Guided interview to create PRD, architecture doc, and progress file |
-| Start Feature | `/start-feature` | Begin the next feature from progress.txt |
-| Test Terraform | `/test-terraform` | Validate, plan, apply, and commit a Terraform feature |
-| Test CDK | `/test-cdk` | Validate, deploy, and commit a CDK feature |
-| Compliance Assess | `/compliance-assess` | Interactive ITSG-33 compliance assessment with user checkpoints |
-| Compliance Auto-Assess | `/compliance-auto-assess` | Automated ITSG-33 compliance assessment (runs as sub-agent) |
-| Update Docs (Terraform) | `/update-docs-terraform` | Refresh README and architecture docs for Terraform projects |
-| Update Docs | `/update-docs` | Refresh README, architecture, and testing docs |
-| Investigate | `/investigate` | Structured debugging investigation |
-| Catchup | `/catchup` | Read session state at start of a new session |
-| Handoff | `/handoff` | Save session state before ending |
+| Skill | Command | Purpose | Details |
+|---|---|---|---|
+| CDK Testing | `/cdk-testing` | Validate, scan, build, test, and deploy CDK code | [View](skills/cdk-testing.md) |
+| Terraform Testing | `/terraform-testing` | Validate, scan, plan, and deploy Terraform code | [View](skills/terraform-testing.md) |
+| Compliance Assess | `/compliance-assess` | ITSG-33 / CCCS Medium compliance assessment with user checkpoints | [View](skills/compliance-assess.md) |
+| Skill Creator | `/skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/skill-creator.md) |
 
-### Rules (Always-On)
+## How Skills Work
 
-Rules are behavioral guidelines loaded automatically via `.claude/rules/`. They are not commands and cannot be invoked. See [RULES.md](RULES.md) for full documentation.
+- Skills live in `skills/<name>/` at the repository root (drop-in source)
+- Consumers copy the entire directory to `.claude/skills/<name>/` in their target project
+- Each skill directory contains:
+  - `SKILL.md` — the skill definition with YAML frontmatter (`name`, `description`)
+  - `scripts/` — executable shell scripts (optional)
+  - `references/` — supporting documentation loaded on-demand (optional)
+- The `description` field in frontmatter includes trigger phrases so the model knows when to invoke the skill
+- Skills are invoked manually via `/<skill-name>` or automatically when the model matches trigger phrases
 
-| Rule | Purpose |
-|---|---|
-| Defensive Protocol | Defensive epistemology for agentic coding: failure handling, prediction protocols, evidence standards, autonomy boundaries. |
-| CDK Best Practices | AWS CDK guidelines: construct design, security, testing, deployment safety, anti-patterns. |
-| Terraform Best Practices | Terraform guidelines: state management, module design, security, naming, deployment safety. |
-| Crossplane Best Practices | Crossplane/Upbound guidelines: XR design, compositions, managed resources, provider config. |
-| Crossplane v2 Best Practices | Crossplane v2 specifics: namespaced XRs, spec.crossplane, Configuration packages, migration. |
-| Kubernetes Best Practices | Kubernetes guidelines: resource management, security, RBAC, networking, high availability. |
-
----
-
-## Project Lifecycle
-
-Skills follow a development lifecycle. Use them in this order for new projects:
+### Skill Bundle Structure
 
 ```
-/create-prd          Create project requirements, architecture, progress file
-    |
-/start-feature       Pick up the next feature from progress.txt
-    |
-  (implement)        Write the code
-    |
-/test-terraform      Validate, plan, apply, commit  (or /test-cdk for CDK projects)
-    |
-  (repeat)           /start-feature -> implement -> /test-*
-    |
-/update-docs-terraform   Refresh docs after features accumulate
+skills/<name>/
+├── SKILL.md                  ← skill definition (YAML frontmatter required)
+├── scripts/                  ← executable scripts (portable, auto-detect OS)
+│   └── *.sh
+└── references/               ← supporting docs (loaded by SKILL.md as needed)
+    └── *.md
 ```
 
-### Session Management
-
-```
-/catchup             Start of session: read last handoff + progress.txt
-  (work)
-/handoff             End of session: save state before closing
-```
-
----
-
-## Skill Details
-
-### `/create-prd`
-
-Guided interview to set up a new project. Asks structured questions across multiple rounds, then produces:
-
-- `prd.md` — Product requirements document
-- `docs/ARCHITECTURE_AND_DESIGN.md` — Architecture and design decisions
-- `progress.txt` — Feature tracking file
-
-**Usage:**
-```
-/create-prd
-```
-
-### `/start-feature`
-
-Reads `progress.txt` to find the next pending `[ ]` feature, marks it `[~]` (in-progress), reads `prd.md` for requirements, and reports what needs to be built.
-
-**Usage:**
-```
-/start-feature
-```
-
-### `/test-terraform`
-
-Runs all validation gates for a completed Terraform feature:
-
-1. **Gate 1 — Validation:** `terraform fmt -check`, `terraform init`, `terraform validate`, `tflint`, `tfsec`/`checkov`
-2. **Gate 2 — Plan & Apply:** `terraform plan -out=tfplan`, review diff, `terraform apply tfplan`
-3. **Gate 3 — Commit:** Update progress.txt, CHANGELOG.md, create feature docs, git commit
-
-Only invoke after finishing implementation. Does not mark a feature complete if any gate fails.
-
-**Usage:**
-```
-/test-terraform
-```
-
-### `/test-cdk`
-
-CDK equivalent of `/test-terraform`. Runs validation script, CDK deploy, and commit gates.
-
-**Usage:**
-```
-/test-cdk
-```
-
-### `/compliance-assess`
-
-Interactive ITSG-33 / CCCS Medium Cloud Profile compliance assessment. Runs in the main conversation with mandatory user checkpoints between phases:
-
-- **Phase 0:** Framework validation (self-correcting control data)
-- **Phase 1:** Architecture discovery → user checkpoint
-- **Phase 2:** Control mapping (43 controls, 8 families) → user checkpoint
-- **Phase 3:** Gap analysis with risk-rated remediation → final report
-
-Produces output files in `docs/compliance/`:
-- `phase1-discovery.md`
-- `phase2-control-mapping.md`
-- `phase3-gap-analysis.md`
-- `assessment-summary.md`
-
-**Usage:**
-```
-/compliance-assess
-/compliance-assess @path/to/project/
-```
-
-**When to use:** When you want to review and provide input between phases (e.g., adding context about org-level controls, correcting architecture assumptions).
-
-### `/compliance-auto-assess`
-
-Automated, non-interactive version of `/compliance-assess`. Dispatches the assessment as a **sub-agent** via the Task tool. Runs all phases (0 through 3) end-to-end without user checkpoints.
-
-**Usage:**
-```
-/compliance-auto-assess
-/compliance-auto-assess @path/to/project/
-```
-
-**When to use:** When you want the assessment to run autonomously without consuming main conversation context. Results are written to the same `docs/compliance/` output files.
-
-**How it works:**
-
-This skill uses a **dispatcher pattern** — the skill file (`.claude/commands/compliance-auto-assess.md`) is a short 44-line dispatcher that:
-
-1. Resolves the target directory from command arguments
-2. Reads the full assessment instructions from a separate file
-3. Passes the instructions to a sub-agent via the Task tool
-4. Returns the sub-agent's results (executive summary + output file paths)
-
-The full assessment instructions live in a separate file:
-
-```
-.claude/
-  compliance-auto-assess-instructions.md   <-- 470-line assessment instructions (not a skill)
-  commands/
-    compliance-auto-assess.md              <-- 44-line dispatcher (the skill)
-```
-
-The instructions file is intentionally placed in `.claude/` (not `.claude/commands/`) because any `.md` file in `commands/` gets registered as a skill. The instructions file is a payload for the sub-agent, not a user-invocable skill.
-
-**Modifying the assessment:** To change control tables, output templates, or assessment rules, edit `.claude/compliance-auto-assess-instructions.md` — not the dispatcher skill.
-
-### `/update-docs-terraform`
-
-Refreshes `README.md` and `docs/ARCHITECTURE_AND_DESIGN.md` to match the current state of a Terraform codebase. Run after features accumulate and docs fall behind.
-
-**Usage:**
-```
-/update-docs-terraform
-```
-
-### `/update-docs`
-
-General-purpose documentation refresh for any project type. Updates README.md, docs/ARCHITECTURE.md, and docs/TESTING.md.
-
-**Usage:**
-```
-/update-docs
-```
-
-### `/investigate`
-
-Creates a structured investigation file in `agents/investigations/` for debugging unknown issues. Tracks:
-
-- Known facts
-- Theories and hypotheses
-- Tests performed and results
-- Resolution
-
-**Usage:**
-```
-/investigate
-/investigate <description of the issue>
-```
-
-### `/catchup`
-
-Start-of-session skill. Reads `agents/memory/handoff.md` (written by `/handoff`) and `progress.txt` to orient on project state. Reports current feature status, blockers, and next steps.
-
-**Usage:**
-```
-/catchup
-```
-
-### `/handoff`
-
-End-of-session skill. Writes current state to `agents/memory/handoff.md` including:
-
-- Current feature and its status
-- Decisions made during the session
-- Blockers or open questions
-- Recommended next steps
-
-Run this before `/clear` or closing the terminal.
-
-**Usage:**
-```
-/handoff
-```
-
----
-
-## File Structure
-
-```
-.claude/
-  commands/                                  Single-file commands (each .md becomes a slash command)
-    compliance-assess.md                     Interactive compliance assessment
-    compliance-auto-assess.md                Automated compliance assessment (dispatcher)
-    catchup.md                               Session start
-    create-prd.md                            Project setup
-    handoff.md                               Session end
-    investigate.md                           Structured debugging
-    start-feature.md                         Feature workflow
-    update-docs.md                           General doc refresh
-    update-docs-cdk.md                       CDK doc refresh
-    update-docs-terraform.md                 Terraform doc refresh
-  skills/                                    Skill bundles (SKILL.md + supporting artifacts)
-    cdk-testing/
-      SKILL.md                               CDK validation + commit
-      scripts/cdk-validation.sh              Validation pipeline script
-      references/commit-workflow.md          Commit workflow reference
-    terraform-testing/
-      SKILL.md                               Terraform validation + commit
-      scripts/test-terraform.sh              Validation pipeline script
-      references/commit-workflow.md          Commit workflow reference
-  rules/                                     Always-on behavioral guidelines
-    defensive-protocol.md                    Defensive coding protocol
-  compliance-auto-assess-instructions.md     Assessment payload for sub-agent (not a skill)
-```
-
-### Frontmatter Options
-
-Skills support these frontmatter fields:
+### Frontmatter
 
 ```yaml
 ---
 name: skill-name                    # Required. The /command name.
-description: What the skill does    # Required. Shown in /skills list.
-disable-model-invocation: true      # Optional. Prevents the model from auto-invoking the skill.
+description: What the skill does    # Required. Include trigger phrases.
 ---
 ```
 
-**Note:** Rules (in `.claude/rules/`) do not use YAML frontmatter. They are pure content files.
+## Consuming Skills
+
+Copy the entire skill directory from `skills/` into `.claude/skills/` in the target repository:
+
+```bash
+# Copy a skill bundle
+cp -r skills/cdk-testing/       <target-repo>/.claude/skills/cdk-testing/
+cp -r skills/terraform-testing/  <target-repo>/.claude/skills/terraform-testing/
+cp -r skills/compliance-assess/  <target-repo>/.claude/skills/compliance-assess/
+cp -r skills/skill-creator/      <target-repo>/.claude/skills/skill-creator/
+```
+
+Skills take effect immediately on the next Claude Code conversation in that repository.

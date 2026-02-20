@@ -40,6 +40,7 @@ THEREFORE: [conclusion or STOP]
 ```
 
 **What qualifies as high-risk:**
+
 - Deleting files, branches, or data
 - Modifying database schemas or migration files
 - Changing public APIs or shared interfaces

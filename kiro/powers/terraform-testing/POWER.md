@@ -14,6 +14,7 @@ Configuration is driven by `.test-terraform.conf` in the project root. The pipel
 ## Available Workflows
 
 ### Validation Pipeline
+
 Run the full pipeline: git-secrets, fmt, init, validate, tflint, security scan (checkov or trivy), plan, and optionally apply/destroy. Includes post-test commit workflow for feature tracking.
 
 See `steering/validation-pipeline.md` for the complete workflow.
@@ -21,6 +22,7 @@ See `steering/validation-pipeline.md` for the complete workflow.
 ## Onboarding
 
 When first activated, verify:
+
 1. The pipeline script exists at `scripts/test-terraform.sh` or `tests/test-terraform.sh`
 2. Check for `.test-terraform.conf` in the project root for configuration
 3. Verify `.tf` files exist in the configured test directories

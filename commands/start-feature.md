@@ -12,6 +12,7 @@ Start work on the next feature in the project roadmap.
 ### Step 1 — Read progress.txt
 
 Read `progress.txt` and identify:
+
 - Any feature currently marked `[~]` (in progress) — if found, resume that feature
 - The next feature marked `[ ]` (pending) — if no `[~]` exists
 
@@ -20,6 +21,7 @@ If all features are marked `[x]`, report that all planned features are complete 
 ### Step 2 — Read requirements
 
 Read `prd.md` and locate the section for the identified feature. Extract:
+
 - What needs to be built
 - Acceptance criteria
 - Any dependencies on other features
@@ -27,6 +29,7 @@ Read `prd.md` and locate the section for the identified feature. Extract:
 ### Step 3 — Mark feature as in progress
 
 Update `progress.txt`:
+
 - Change the feature status from `[ ]` to `[~]`
 - Add start date to NOTES (format: `Started YYYY-MM-DD`)
 

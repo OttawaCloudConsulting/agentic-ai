@@ -12,6 +12,7 @@ Provides always-on behavioral guidance for safe, observable development. Enforce
 ## Available Guidance
 
 ### Defensive Coding Protocol
+
 Core behavioral framework: prediction protocol (DOING/EXPECT/RESULT), failure response (stop/report/wait), verification cadence (3 actions then checkpoint), context management, autonomy boundaries, and Chesterton's fence.
 
 See `steering/defensive-protocol.md` for the complete protocol.
@@ -19,6 +20,7 @@ See `steering/defensive-protocol.md` for the complete protocol.
 ## Onboarding
 
 When first activated:
+
 1. Begin using the prediction protocol for any action that could fail
 2. Follow the verification cadence — checkpoint every 3 actions
 3. On any failure: stop, report, wait for user confirmation

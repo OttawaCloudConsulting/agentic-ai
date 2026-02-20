@@ -12,6 +12,7 @@ Create and maintain a structured investigation file when debugging an unknown is
 ### Step 1 — Define the investigation
 
 Ask or infer:
+
 - **What is the symptom?** (error message, unexpected behavior, deployment failure)
 - **Where was it observed?** (which file, stack, service, command)
 - **When did it start?** (after which change, deploy, or action)

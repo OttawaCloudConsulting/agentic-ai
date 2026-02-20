@@ -18,6 +18,7 @@ Create a complete project foundation through a structured interview process.
 ### Step 1 — Seed the Requirements
 
 Gather the initial project concept through focused questions:
+
 - What are you building? (1-2 sentence description)
 - What technology stack or services are involved?
 - What is the primary goal / problem being solved?
@@ -30,30 +31,35 @@ Write an initial requirements document with the gathered information.
 Conduct an iterative interview to fill out the requirements comprehensively. Cover these areas across multiple rounds of 2-4 questions each:
 
 **Round 1 — Scope and Boundaries:**
+
 - What is explicitly out of scope?
 - Constraints on regions, accounts, environments?
 - Compliance or security requirements?
 - Integration with existing infrastructure?
 
 **Round 2 — Components and Architecture:**
+
 - Major components and services?
 - How do they connect? (data flow, request flow)
 - Multi-region requirements?
 - Conditional or optional components?
 
 **Round 3 — Inputs and Outputs:**
+
 - What does the consumer configure?
 - What needs to be exposed after deployment?
 - Required vs. optional inputs?
 - Validation rules?
 
 **Round 4 — Security:**
+
 - Encryption strategy (at rest, in transit)?
 - Access control model?
 - Edge protection requirements?
 - Security headers or policies?
 
 **Round 5 — Operational Concerns:**
+
 - Logging needs?
 - Monitoring and alerting?
 - Deployment workflow?
@@ -73,6 +79,7 @@ Using the completed requirements, conduct a focused interview to create the arch
 ### Step 4 — Cross-Reference
 
 Review requirements against architecture:
+
 - Add features discovered during architecture design
 - Refine acceptance criteria based on architecture decisions
 - Update input/output definitions
@@ -81,6 +88,7 @@ Review requirements against architecture:
 ### Step 5 — Final Review
 
 Present a summary and ask:
+
 - Is anything missing or incorrect?
 - Does the feature ordering make sense?
 - Are acceptance criteria specific enough?

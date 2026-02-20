@@ -6,6 +6,7 @@ description: Create a PRD, architecture document, and progress file for a new pr
 # /create-prd — Guided Project Requirements and Design
 
 Create a complete project foundation through a structured interview process. Produces three artifacts:
+
 - `prd.md` — Product Requirements Document
 - `docs/ARCHITECTURE_AND_DESIGN.md` — Architecture and design specification
 - `progress.txt` — Discrete feature steps and phases
@@ -13,6 +14,7 @@ Create a complete project foundation through a structured interview process. Pro
 ## Prerequisites
 
 Before starting, confirm:
+
 - The working directory is the project root (or the subdirectory where the project will live)
 - No existing `prd.md` — if one exists, confirm with the user before overwriting
 
@@ -23,6 +25,7 @@ Before starting, confirm:
 Use `AskUserQuestion` to gather the initial project concept:
 
 **Questions to ask (adapt to context):**
+
 - What are you building? (1-2 sentence description)
 - What AWS services are involved? (or what technology stack?)
 - What is the primary goal / problem being solved?
@@ -58,30 +61,35 @@ Conduct an iterative interview using `AskUserQuestion` to fill out the PRD compr
 **Round structure (adapt based on project type):**
 
 **Round 1 — Scope and Boundaries:**
+
 - What is explicitly out of scope? (non-goals)
 - Are there constraints on regions, accounts, or environments?
 - Are there compliance or security requirements?
 - What existing infrastructure does this integrate with?
 
 **Round 2 — Components and Architecture:**
+
 - What are the major components / AWS resources?
 - How do they connect? (data flow, request flow)
 - Are there multi-region requirements?
 - Are there conditional or optional components?
 
 **Round 3 — Inputs and Outputs:**
+
 - What does the consumer configure? (input variables)
 - What needs to be exposed after deployment? (outputs)
 - Are there required vs. optional inputs?
 - What validation rules should inputs have?
 
 **Round 4 — Security:**
+
 - What is the encryption strategy (at rest, in transit)?
 - What access control model applies?
 - Are there edge protection requirements (WAF, Shield)?
 - What security headers or policies are needed?
 
 **Round 5 — Operational Concerns:**
+
 - Is logging needed? (access logs, audit trails)
 - What monitoring / alerting is expected?
 - What is the deployment workflow? (single apply, multi-phase, etc.)
@@ -100,15 +108,18 @@ Using the completed PRD as the foundation, conduct a focused interview using `As
 **Interview areas (adapt to project type):**
 
 **Architecture Decisions:**
+
 - Present key design decisions implied by the PRD and ask the user to confirm or override
 - For each decision, capture: what was decided, what alternatives exist, and why this choice was made
 - Number decisions sequentially (Decision #1, #2, ...) for cross-referencing
 
 **Component Design:**
+
 - For each major component in the PRD, ask about implementation specifics not covered in the PRD
 - Ask about resource naming conventions, tagging strategy, dependency ordering
 
 **Security Review:**
+
 - Present relevant AWS security best practices for the services involved
 - Ask which best practices to incorporate into the design vs. leave as consumer responsibility
 - Categorize as: Already Addressed, Added to Design, Consumer Responsibility
@@ -210,6 +221,7 @@ Generate `progress.txt` from the finalized PRD. Every feature in the PRD becomes
 ```
 
 **Rules for progress.txt:**
+
 - Feature numbering matches the PRD (Feature 1, Feature 2, ...)
 - If features have phases (e.g., 2.1, 2.2), use sub-numbering
 - All features start as `[ ]` (pending)

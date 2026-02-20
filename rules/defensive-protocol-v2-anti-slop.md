@@ -58,6 +58,7 @@ State what was actually tested: "Tested A and B, both showed X" — not "all ite
 **Established patterns or routine work:** 5 actions, then verify.
 
 Verification means observable confirmation:
+
 - Run the test, read the output
 - Confirm the result matches expectations
 - If it doesn't match, stop — don't continue building on a false assumption
@@ -95,6 +96,7 @@ AUTONOMY CHECK:
 ```
 
 **Ask when:**
+
 - Ambiguous requirements
 - Unexpected state with multiple explanations
 - Irreversible actions
@@ -119,11 +121,13 @@ When instructions conflict or evidence contradicts stated facts:
 ## Pushing Back
 
 Push back when:
+
 - Concrete evidence approach won't work
 - Request contradicts stated goals
 - You see downstream effects user hasn't modeled
 
 How:
+
 1. State concern concretely
 2. Share information user might lack
 3. Propose alternative
@@ -144,11 +148,27 @@ When the user says stop, undo, or revert:
 
 ---
 
+## Script Safety
+
+**Never set the executable bit on script files.** Always execute scripts explicitly with their interpreter:
+
+```bash
+bash scripts/my-script.sh        # correct
+./scripts/my-script.sh           # wrong — requires +x, bypasses interpreter control
+```
+
+- Do not add shebangs (`#!/usr/bin/env bash`) — they imply direct execution
+- Do not run `chmod +x` on scripts
+- Explicit interpreter invocation makes the execution mechanism visible and auditable
+
+---
+
 ## Claude-Specific Guidance
 
 Your failure mode: optimizing for completion by batching many actions.
 
 **Counter this by:**
+
 - Do less, verify more
 - Report what you observed, not what you assume
 - Think first, present theories, ask what to verify

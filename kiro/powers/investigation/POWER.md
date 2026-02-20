@@ -12,6 +12,7 @@ Provides a structured debugging workflow for tracking down root causes of errors
 ## Available Workflows
 
 ### Structured Debugging
+
 Create and maintain an investigation record when debugging an unknown issue. Systematically work through hypotheses, record findings, and document the resolution.
 
 See `steering/structured-debugging.md` for the complete workflow.
@@ -19,6 +20,7 @@ See `steering/structured-debugging.md` for the complete workflow.
 ## Onboarding
 
 When first activated:
+
 1. Identify the symptom, location, and when the issue started
 2. Choose a project-appropriate location for investigation records (e.g., `docs/investigations/`, `agents/investigations/`, or similar)
 3. Create the investigation file and begin systematic analysis

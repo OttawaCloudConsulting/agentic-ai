@@ -37,6 +37,7 @@ Fetch the ITSG-33 Annex 3A page to verify the control families and IDs:
 2. Compare the control IDs and names listed in the Phase 2 control family tables against the official catalogue
 
 What to check:
+
 - Every control ID used in the assessment exists in ITSG-33 Annex 3A
 - Control names match (e.g., AC-2 is "Account Management")
 - No fabricated control IDs
@@ -49,6 +50,7 @@ If any differences are found:
 2. Use corrected control data for the rest of the assessment
 
 If no differences are found:
+
 - Report: "Phase 0 complete — all controls match official sources."
 
 ### Step 0.3 — Proceed
@@ -76,6 +78,7 @@ Scan the project root for technology indicators:
 Scan for security-relevant patterns:
 
 **General security patterns (all IaC):**
+
 - IAM / Access Control: policies, roles, permissions, RBAC, auth middleware
 - Encryption: KMS keys, TLS configs, encryption-at-rest settings, certificate management
 - Logging / Auditing: CloudTrail, CloudWatch, access logs, audit trails
@@ -97,6 +100,7 @@ Scan for security-relevant patterns:
 ### Step 1.3 — Read Architecture Docs
 
 Search for and read architecture documentation:
+
 - `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `ARCHITECTURE.md`, `README.md`
 - Any `docs/*.md` files describing system design
 - `cdk.json` context or provider configuration for deployment details
@@ -105,6 +109,7 @@ Search for and read architecture documentation:
 ### Step 1.4 — Produce Phase 1 Output
 
 Write `docs/compliance/phase1-discovery.md` with:
+
 - Project name, assessment date, detected tech stack
 - System architecture narrative derived from code and docs analysis
 - Components identified (component, type, files, security relevance)
@@ -116,6 +121,7 @@ Write `docs/compliance/phase1-discovery.md` with:
 ### Step 1.5 — User Checkpoint
 
 Present the Phase 1 summary and ask:
+
 - "Does this accurately represent your architecture?"
 - "Are there components I missed?"
 - "Any out-of-band security controls not visible in code (e.g., AWS Organizations SCPs, SSO, manual configs)?"
@@ -137,6 +143,7 @@ When in doubt about a control's description or applicability, verify against the
 Map these 8 control families:
 
 #### AC — Access Control
+
 | Control | Description | Applicability |
 |---|---|---|
 | AC-2 | Account Management | How user/service accounts are created, managed, disabled |
@@ -149,6 +156,7 @@ Map these 8 control families:
 | AC-20 | Use of External Information Systems | Third-party integrations, external dependencies |
 
 #### AU — Audit and Accountability
+
 | Control | Description | Applicability |
 |---|---|---|
 | AU-2 | Auditable Events | What events are logged (CloudTrail, CloudWatch, access logs) |
@@ -160,6 +168,7 @@ Map these 8 control families:
 | AU-12 | Audit Generation | Which components generate audit records |
 
 #### CM — Configuration Management
+
 | Control | Description | Applicability |
 |---|---|---|
 | CM-2 | Baseline Configuration | IaC templates, golden images, config-as-code |
@@ -169,6 +178,7 @@ Map these 8 control families:
 | CM-8 | Information System Component Inventory | Asset tracking, resource tagging |
 
 #### CP — Contingency Planning
+
 | Control | Description | Applicability |
 |---|---|---|
 | CP-7 | Alternate Processing Site | Multi-AZ, cross-region, DR strategy |
@@ -176,6 +186,7 @@ Map these 8 control families:
 | CP-10 | Information System Recovery and Reconstitution | Recovery procedures, RTO/RPO, IaC redeployment |
 
 #### IA — Identification and Authentication
+
 | Control | Description | Applicability |
 |---|---|---|
 | IA-2 | Identification and Authentication (Organizational Users) | SSO, MFA, IAM Identity Center |
@@ -185,6 +196,7 @@ Map these 8 control families:
 | IA-8 | Identification and Authentication (Non-Organizational Users) | External user auth, federation |
 
 #### SA — System and Services Acquisition
+
 | Control | Description | Applicability |
 |---|---|---|
 | SA-3 | System Development Life Cycle | SDLC process, pipeline stages, testing |
@@ -194,6 +206,7 @@ Map these 8 control families:
 | SA-11 | Developer Security Testing | SAST, DAST, dependency scanning, unit tests |
 
 #### SC — System and Communications Protection
+
 | Control | Description | Applicability |
 |---|---|---|
 | SC-7 | Boundary Protection | VPC, subnets, security groups, WAF, API Gateway |
@@ -203,6 +216,7 @@ Map these 8 control families:
 | SC-28 | Protection of Information at Rest | S3 encryption, RDS encryption, EBS encryption |
 
 #### SI — System and Information Integrity
+
 | Control | Description | Applicability |
 |---|---|---|
 | SI-2 | Flaw Remediation | Patching strategy, dependency updates, vulnerability management |
@@ -220,7 +234,7 @@ For each control, classify the implementation responsibility:
 | **AWS Inherited** | Fully provided by AWS, no customer action needed | PE-* (Physical), data center security |
 | **AWS Shared** | AWS provides the capability, customer must configure it | SC-28: AWS provides S3 encryption, customer must enable it |
 | **Customer Implemented** | Entirely the customer's responsibility | AC-2: Account management within the application |
-| **GC Org-level** | Implemented at the GC organization/department level, not per-project | AT-* (Security Training), PS-* (Personnel Security) |
+| **GC Org-level** | Implemented at the GC organization/department level, not per-project | AT-*(Security Training), PS-* (Personnel Security) |
 
 ### Step 2.1 — Map Each Control
 
@@ -234,6 +248,7 @@ For every control in the families above, determine:
 ### Step 2.2 — Produce Phase 2 Output
 
 Write `docs/compliance/phase2-control-mapping.md` with:
+
 - Project name, assessment date, profile, control families
 - Posture summary (status counts and percentages)
 - Inheritance summary (category counts)
@@ -242,6 +257,7 @@ Write `docs/compliance/phase2-control-mapping.md` with:
 ### Step 2.3 — User Checkpoint
 
 Present the Phase 2 summary:
+
 - Control posture breakdown (Implemented / Partial / Not Implemented / N/A counts)
 - Any controls where the assessment was uncertain
 - Ask: "Any controls where you have additional context I should factor in?"
@@ -275,6 +291,7 @@ For every control marked Not Implemented or Partially Implemented, produce a ris
 ### Step 3.2 — Produce Phase 3 Outputs
 
 Write `docs/compliance/phase3-gap-analysis.md` with:
+
 - Risk summary (counts by rating)
 - Remediation priority (ordered by risk rating, then effort)
 - Gap entries with full detail
@@ -282,6 +299,7 @@ Write `docs/compliance/phase3-gap-analysis.md` with:
 ### Step 3.3 — Executive Summary
 
 Write `docs/compliance/assessment-summary.md` with:
+
 - Compliance posture metrics
 - Risk dashboard
 - Top 5 priority remediations
@@ -291,6 +309,7 @@ Write `docs/compliance/assessment-summary.md` with:
 ### Step 3.4 — Final Report
 
 Present the executive summary and note:
+
 - Total compliance posture percentage
 - Number and severity of gaps
 - Top recommended actions

@@ -30,9 +30,11 @@ kiro/
 ## Installing Powers
 
 1. Copy the desired power directory into your project:
+
    ```
    cp -r kiro/powers/<power-name> <your-project>/.kiro/powers/<power-name>
    ```
+
 2. In Kiro IDE: Powers panel > Add power from Local Path > select the copied directory
 3. The power activates automatically when you mention relevant keywords
 
@@ -46,6 +48,7 @@ cp kiro/steering/<file>.md <your-project>/.kiro/steering/
 ```
 
 Steering files load automatically based on their inclusion mode:
+
 - `always` — loaded in every interaction
 - `auto` — loaded when conversation context matches the file's description
 
