@@ -1,0 +1,82 @@
+# Progress: Portable Terraform Testing Script
+# Source: prd.md + ARCHITECTURE_AND_DESIGN.md
+# Spec: ARCHITECTURE_AND_DESIGN.md is the authoritative design reference
+
+## Features
+
+[x] Feature 1: Configuration and Directory Resolution
+    - Shell-sourceable .test-terraform.conf loader with precedence (config < env < CLI)
+    - CLI flag parsing (--target, --no-plan, --deploy, --deploy-destroy, --profile, --soft-fail, --scanner, --output-dir, --help)
+    - Pre-validate all TF_TEST_DIRS exist and contain .tf files
+    - CWD fallback when no config and no --target
+    NOTES: Started 2026-02-14. Completed 2026-02-14. Fixed set -e compatibility with conditional patterns (use if/then instead of && short-circuit). Fixed set -u with empty arrays (use ${arr[@]+"${arr[@]}"} pattern).
+
+[x] Feature 2: Tool Detection and Auto-Install
+    - Detect terraform (required), git-secrets, tflint, checkov, trivy (optional)
+    - OS detection (macOS/Debian/RHEL) for install method selection
+    - Auto-install via brew, apt-get, dnf/yum, pip
+    - Clear status messages: installed, skipped, or failed
+    NOTES: Started 2026-02-14. Completed 2026-02-14.
+
+[x] Feature 3: AWS Credential Detection
+    - --profile flag and config file AWS_PROFILE support
+    - Auto-detect: CLI profile, IAM role, env var keys, OIDC
+    - Credential source logging for debugging
+    - Check runs before deploy steps only
+    NOTES: Started 2026-02-14. Completed 2026-02-14.
+
+[x] Feature 4: Validation Pipeline — Secrets Scanning
+    - git-secrets scan from project root
+    - Fail-fast on detection
+    - Skip with warning if tool unavailable
+    NOTES: Started 2026-02-14. Completed 2026-02-14.
+
+[x] Feature 5: Validation Pipeline — Format Check
+    - terraform fmt -check -recursive from project root
+    - Fail-fast with fix instructions
+    NOTES: Started 2026-02-14. Completed 2026-02-14.
+
+[x] Feature 6: Validation Pipeline — Init and Validate
+    - terraform init -backend=false -input=false per directory
+    - terraform validate per directory
+    - Per-directory pass/fail reporting
+    - Fail-fast on first failure with full error output
+    NOTES: Started 2026-02-14. Completed 2026-02-14. Uses terraform -chdir for clean directory targeting.
+
+[x] Feature 7: Validation Pipeline — Linting
+    - tflint with configurable TFLINT_CONFIG path or auto-detect
+    - tflint --init before scanning
+    - Findings are non-blocking warnings
+    - Skip with warning if tool unavailable
+    NOTES: Started 2026-02-14. Completed 2026-02-14.
+
+[x] Feature 8: Validation Pipeline — Security Scanning
+    - Scanner toggle: checkov (default) or trivy via --scanner flag / TF_SCANNER config
+    - Only one scanner active per run
+    - JUnit XML and SARIF report output to $TF_OUTPUT_DIR
+    - Default: findings cause failure. --soft-fail: findings are warnings
+    - Skip with warning if selected scanner unavailable
+    NOTES: Started 2026-02-14. Completed 2026-02-14. Dirname uses slash-to-dash for nested paths (e.g., modules/vpc → modules-vpc).
+
+[x] Feature 9: Plan Pipeline
+    - terraform plan against TF_DEPLOY_DIRS only
+    - Skipped with --no-plan
+    - terraform init (without -backend=false) with local state
+    - Plan output saved to $TF_OUTPUT_DIR/<dirname>.tfplan
+    - Fail-fast on plan failure
+    NOTES: Started 2026-02-14. Completed 2026-02-14. Plan file uses absolute path to avoid -chdir relative path issues.
+
+[x] Feature 10: Deploy Pipeline
+    - --deploy: plan + apply, resources left deployed
+    - --deploy-destroy: plan + apply + pause + destroy
+    - TTY: interactive prompt. No TTY: timed wait (TF_DESTROY_TIMEOUT)
+    - Credential validation (Feature 3) must pass before deploy
+    - Plan file cleanup after apply
+    NOTES: Started 2026-02-14. Completed 2026-02-14.
+
+[x] Feature 11: Output and Reporting
+    - Color output (green/yellow/red) with pass/warn/fail counters
+    - Summary line: Results: N passed, N warnings, N failed
+    - Exit codes 0-7 per architecture spec
+    - Security reports and plan files in $TF_OUTPUT_DIR
+    NOTES: Started 2026-02-14. Completed 2026-02-14. Output helpers and counters were scaffolded in Feature 1; exit codes wired across Features 4-10.

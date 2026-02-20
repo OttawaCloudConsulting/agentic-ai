@@ -245,7 +245,7 @@ get_server_install_cmd() {
       printf '%s' "awslabs-aws-documentation-mcp-server -s project -- uvx awslabs.aws-documentation-mcp-server@latest"
       ;;
     awslabs-diagram-mcp-server)
-      printf '%s' "awslabs-diagram-mcp-server -s project -- uvx awslabs.diagram-mcp-server@latest"
+      printf '%s' "awslabs-diagram-mcp-server -s project -- uvx awslabs.aws-diagram-mcp-server@latest"
       ;;
     awslabs-iac-mcp-server)
       printf '%s' "awslabs-iac-mcp-server -s project -- uvx awslabs.iac-mcp-server@latest"

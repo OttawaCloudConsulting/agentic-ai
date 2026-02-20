@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "kubernetes-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "kubernetes-mcp-server@latest"
+      ],
+      "env": {}
+    },
+    "controlplane-mcp-server": {
+      "type": "http",
+      "url": "docker"
+    }
+  }
+}

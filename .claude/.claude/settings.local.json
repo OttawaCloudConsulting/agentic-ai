@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash /Users/christian/git-repos/OCC-github/agentic-ai/working/test-terraform.sh --no-plan)",
+      "Bash(bash -x /Users/christian/git-repos/OCC-github/agentic-ai/working/test-terraform.sh --no-plan)",
+      "Bash(bash /Users/christian/git-repos/OCC-github/agentic-ai/working/test-terraform.sh --target modules/vpc --no-plan)",
+      "Bash(bash /Users/christian/git-repos/OCC-github/agentic-ai/working/test-terraform.sh --deploy --profile dev)",
+      "Bash(bash /Users/christian/git-repos/OCC-github/agentic-ai/working/test-terraform.sh --deploy --no-plan)",
+      "Bash(bash /Users/christian/git-repos/OCC-github/agentic-ai/working/test-terraform.sh --scanner invalid)",
+      "Bash(bash /Users/christian/git-repos/OCC-github/agentic-ai/working/test-terraform.sh --target nonexistent)",
+      "Bash(TF_SCANNER=trivy bash:*)"
+    ]
+  }
+}
