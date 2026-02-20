@@ -7,6 +7,7 @@ Drop-in Kiro configurations for infrastructure-as-code projects. Contains powers
 ```
 kiro/
 ├── powers/                    # Keyword-activated workflow bundles
+│   ├── defensive-protocol/    # Defensive coding practices
 │   ├── project-lifecycle/     # Feature start, PRD creation
 │   ├── terraform-workflow/    # Terraform validation and docs
 │   ├── cdk-workflow/          # CDK validation and docs
@@ -52,10 +53,10 @@ Steering files load automatically based on their inclusion mode:
 
 | Project Type | Powers | Steering |
 |-------------|--------|----------|
-| Terraform | project-lifecycle, terraform-workflow, terraform-testing, documentation, investigation, compliance | defensive-protocol, terraform-best-practices |
-| CDK | project-lifecycle, cdk-workflow, documentation, investigation, compliance | defensive-protocol, cdk-best-practices |
-| Kubernetes | project-lifecycle, documentation, investigation | defensive-protocol, kubernetes-best-practices |
-| Crossplane | project-lifecycle, documentation, investigation | defensive-protocol, crossplane-best-practices, crossplane-v2-best-practices |
+| Terraform | defensive-protocol, project-lifecycle, terraform-workflow, terraform-testing, documentation, investigation, compliance | terraform-best-practices |
+| CDK | defensive-protocol, project-lifecycle, cdk-workflow, documentation, investigation, compliance | cdk-best-practices |
+| Kubernetes | defensive-protocol, project-lifecycle, documentation, investigation | kubernetes-best-practices |
+| Crossplane | defensive-protocol, project-lifecycle, documentation, investigation | crossplane-best-practices, crossplane-v2-best-practices |
 
 ## Relationship to Claude Code Content
 

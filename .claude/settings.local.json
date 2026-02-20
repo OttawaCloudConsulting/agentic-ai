@@ -16,7 +16,27 @@
       "Bash(claude mcp remove --help:*)",
       "WebFetch(domain:www.npmjs.com)",
       "Bash(shellcheck:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(claude mcp add test-server-tmp -s project -- echo hello)",
+      "Bash(claude mcp remove:*)",
+      "Bash(claude mcp add:*)",
+      "mcp__aws-knowledge-mcp__aws___search_documentation",
+      "mcp__awslabs-aws-documentation-mcp-server__search_documentation",
+      "mcp__aws-knowledge-mcp__aws___read_documentation",
+      "WebFetch(domain:blog.upbound.io)",
+      "WebFetch(domain:docs.crossplane.io)",
+      "WebFetch(domain:learnkube.com)",
+      "Bash(AWS_ACCESS_KEY_ID=\"test123\" bash:*)",
+      "Bash(AWS_ACCESS_KEY_ID=\"AKIAIOSFODNN7EXAMPLE\" bash:*)",
+      "Bash(python3:*)",
+      "WebFetch(domain:builder.aws.com)",
+      "WebFetch(domain:kiro.dev)",
+      "Bash(gh pr:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "kubernetes-mcp-server",
+    "controlplane-mcp-server"
+  ]
 }

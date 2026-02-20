@@ -27,6 +27,7 @@ cp kiro/steering/<file>.md <your-project>/.kiro/steering/
 | Source | `rules/defensive-protocol.md` |
 | Inclusion | `always` |
 | Related Powers | investigation |
+| Note | **Also available as a power** at `powers/defensive-protocol/` — use the power if the standalone steering file does not import in your environment |
 
 Defensive epistemology for agentic coding. Core behavioral guidelines: prediction protocol (DOING/EXPECT/RESULT), failure response (stop/report/wait), verification cadence, autonomy boundaries, investigation protocol, Chesterton's fence, and contradiction handling. Loaded in every interaction to enforce safe, observable development practices.
 

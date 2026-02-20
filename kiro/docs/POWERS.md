@@ -14,6 +14,17 @@ Then in Kiro IDE: Powers panel > Add power from Local Path > select the copied d
 
 ## Powers
 
+### defensive-protocol
+
+| Field | Value |
+|-------|-------|
+| Source | `rules/defensive-protocol.md` |
+| Keywords | defensive, verification, failure handling, checkpoint, predict |
+| Steering | `defensive-protocol.md` |
+| Related Steering | — |
+
+Defensive epistemology for agentic coding. Core behavioral framework: prediction protocol (DOING/EXPECT/RESULT), failure response (stop/report/wait), verification cadence (3 actions then checkpoint), context management, autonomy boundaries, Chesterton's fence, and contradiction handling. Enforces safe, observable development practices.
+
 ### project-lifecycle
 
 | Field | Value |
