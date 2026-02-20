@@ -1,85 +1,28 @@
-# Progress: Kiro Powers & Steering Conversion
-# Source: prd.md + ARCHITECTURE_AND_DESIGN.md
-# Spec: docs/ARCHITECTURE_AND_DESIGN.md is the authoritative design reference
+# Progress: Command-to-Skill Conversions
+# Source: prd.md
+# Spec: prd.md is the authoritative reference
 
 ## Features
 
-[x] Feature 1: Kiro Directory Scaffold
-    - Create kiro/ directory structure (powers/, steering/, docs/)
-    - Create all power subdirectories with steering/ subdirs
-    - Create kiro/README.md with installation instructions and content overview
-    NOTES: Started 2026-02-17. Completed 2026-02-17.
+[x] Feature 1: Convert compliance-assess to skill
+    - Extract ITSG-33 control tables to references/itsg33-controls.md
+    - Extract phase output templates to references/phase-templates.md
+    - Extract official reference URLs to references/official-references.md
+    - Write lean SKILL.md (<200 lines) with workflow and phase instructions
+    - Delete commands/compliance-assess.md
+    NOTES: Started 2026-02-20. Completed 2026-02-20. SKILL.md=115 lines (target <200).
 
-[x] Feature 2: Steering File Conversion — Defensive Protocol
-    - Convert rules/defensive-protocol.md to kiro/steering/defensive-protocol.md
-    - Add YAML frontmatter with inclusion: always
-    - Adapt Claude-specific language to tool-agnostic terminology
-    - Preserve all substantive guidance sections
-    NOTES: Started 2026-02-17. Completed 2026-02-17. Removed Handoff Protocol section, replaced Claude-specific with Agent-specific, genericized file paths.
+[x] Feature 2: Merge test-terraform command into terraform-testing skill
+    - Merge commands/test-terraform.md content into skills/terraform-testing/SKILL.md
+    - Create references/commit-workflow.md with Gate 3 commit workflow
+    - Ensure no information lost from either source
+    - Delete commands/test-terraform.md
+    NOTES: Started 2026-02-20. Completed 2026-02-20. SKILL.md=128 lines.
 
-[x] Feature 3: Steering File Conversion — Tech-Specific Rules
-    - Convert 5 tech rules to kiro/steering/ with inclusion: auto frontmatter
-    - Each file gets name (lowercase-hyphenated) and description fields
-    - Files: terraform, cdk, kubernetes, crossplane, crossplane-v2 best practices
-    - Minimal content adaptation (already tool-agnostic)
-    NOTES: Started 2026-02-17. Completed 2026-02-17. All 5 files created with auto inclusion mode.
-
-[x] Feature 4: Power — project-lifecycle
-    - Create POWER.md with keywords: feature, prd, requirements, spec
-    - Create steering/feature-start.md (adapted from start-feature command)
-    - Create steering/prd-creation.md (adapted from create-prd command)
-    - Adapt to Kiro specs/tasks instead of progress.txt
-    NOTES: Started 2026-02-17. Completed 2026-02-17.
-
-[x] Feature 5: Power — terraform-workflow
-    - Create POWER.md with keywords: terraform plan, terraform apply, tfvars
-    - Create steering/terraform-validation.md (from test-terraform)
-    - Create steering/terraform-docs-update.md (from update-docs-terraform)
-    - Rewrite from tool-calling instructions to workflow guidance
-    NOTES: Started 2026-02-17. Completed 2026-02-17.
-
-[x] Feature 6: Power — cdk-workflow
-    - Create POWER.md with keywords: cdk deploy, cdk synth, cdk test
-    - Create steering/cdk-validation.md (from test-cdk)
-    - Create steering/cdk-docs-update.md (from update-docs-cdk)
-    - Rewrite from tool-calling instructions to workflow guidance
-    NOTES: Started 2026-02-17. Completed 2026-02-17.
-
-[x] Feature 7: Power — compliance
-    - Create POWER.md with keywords: compliance, ITSG-33, CCCS, security controls
-    - Create steering/interactive-assessment.md (from compliance-assess)
-    - Create steering/automated-assessment.md (from compliance-auto-assess)
-    - Adapt to Kiro patterns
-    NOTES: Started 2026-02-17. Completed 2026-02-17.
-
-[x] Feature 8: Power — documentation
-    - Create POWER.md with keywords: update docs, refresh readme, documentation
-    - Create steering/docs-refresh.md (from update-docs)
-    - Adapt to Kiro patterns
-    NOTES: Started 2026-02-17. Completed 2026-02-17.
-
-[x] Feature 9: Power — investigation
-    - Create POWER.md with keywords: debug, investigate, troubleshoot
-    - Create steering/structured-debugging.md (from investigate)
-    - Adapt agents/investigations/ file convention to Kiro-native approach
-    NOTES: Started 2026-02-17. Completed 2026-02-17.
-
-[x] Feature 10: Power — terraform-testing
-    - Create POWER.md with keywords: terraform validate, tflint, checkov, trivy
-    - Create steering/validation-pipeline.md (from skills/terraform-testing)
-    - Preserve validation pipeline stages in steering guidance
-    NOTES: Started 2026-02-17. Completed 2026-02-17.
-
-[x] Feature 11: Reference Documentation
-    - Create kiro/docs/POWERS.md listing all 7 powers with details
-    - Create kiro/docs/STEERING.md listing all 6 steering files with details
-    - Include consumer installation model in both docs
-    - Cross-reference related powers and steering files
-    NOTES: Started 2026-02-17. Completed 2026-02-17.
-
-[x] Feature 12: Consumer Installation Guide
-    - Update kiro/README.md with comprehensive installation instructions
-    - Document power installation (copy + local path install)
-    - Document steering installation (copy to .kiro/steering/)
-    - List recommended content per project type (terraform, cdk, k8s, crossplane)
-    NOTES: Started 2026-02-17. Completed 2026-02-17. README created in Feature 1 already covered all criteria.
+[x] Feature 3: Create cdk-testing skill
+    - Create skills/cdk-testing/ directory structure
+    - Write SKILL.md modeled on terraform-testing pattern
+    - Create scripts/cdk-validation.sh based on working/cdk-validation.sh
+    - Create references/commit-workflow.md with CDK-adapted Gate 3 workflow
+    - Delete commands/test-cdk.md
+    NOTES: Started 2026-02-20. Completed 2026-02-20. SKILL.md=100 lines.

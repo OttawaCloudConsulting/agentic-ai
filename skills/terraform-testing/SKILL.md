@@ -7,12 +7,19 @@ description: Run Terraform validation, security scanning, planning, and deployme
 
 Portable Terraform validation and deployment pipeline. Runs git-secrets, fmt, init, validate, tflint, security scanning (checkov/trivy), plan, and optionally apply/destroy via a single shell script.
 
+## Prerequisites
+
+Before running, ensure:
+- Feature code is complete
+- Feature is marked `[~]` (in progress) in `progress.txt`
+- You know which feature number you're completing (e.g., 2.1)
+
 ## Workflow
 
-1. Run the test script (`scripts/test-terraform.sh`)
+1. Run the test script (Gates 1 & 2)
 2. Review output — all critical steps must pass
 3. If deploy mode: review plan output before apply proceeds
-4. On success: update progress tracking and commit
+4. On success: run commit workflow (Gate 3) — see references/commit-workflow.md
 
 ## Running the Script
 
@@ -86,16 +93,11 @@ The script auto-detects OS (macOS, Debian, RHEL) and installs missing tools auto
   - Checkov: `# checkov:skip=CKV_AWS_XX:Reason` inline comment
   - Trivy: `.trivyignore` file or `# trivy:ignore:AVD-AWS-XXXX` inline comment
 
-## Post-Test Commit Workflow
+Document suppression decisions in feature documentation or commit messages.
 
-After all gates pass, complete these steps:
+## Post-Test Commit
 
-1. Update `progress.txt` — change feature from `[~]` to `[x]`, add completion date
-2. Update `CHANGELOG.md` — add entry: `## [Feature X.Y] — YYYY-MM-DD`
-3. Create `docs/FEATURE_X.Y.md` if it doesn't exist
-4. Stage files individually (never `git add .`)
-5. Commit: `feat: X.Y — [Brief description]`
-6. Do NOT push
+After all gates pass, follow the commit workflow in references/commit-workflow.md.
 
 ## Output Format
 
@@ -111,4 +113,16 @@ GATE 1 & 2 — Validation, Plan & Apply: PASS
   Apply: completed successfully
 
 GATE 3 — Commit: PASS (committed as feat: X.Y — ...)
+
+All gates passed. Feature X.Y is complete.
 ```
+
+## Important Rules
+
+- **Sequential execution:** Never skip a gate or run gates in parallel
+- **Stop on failure:** If any gate fails, stop immediately and report
+- **No silent errors:** Always show the actual error output
+- **Explicit staging:** Stage each file by name, never use wildcards
+- **Local commits only:** Never push to remote
+- **Plan before apply:** Never run `terraform apply` without reviewing plan output first
+- **Feature documentation required:** Create docs/FEATURE_X.Y.md before committing
