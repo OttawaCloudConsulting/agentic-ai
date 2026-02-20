@@ -30,7 +30,7 @@ agentic-ai/
     │   ├── terraform-best-practices.md
     │   ├── cdk-best-practices.md
     │   ├── kubernetes-best-practices.md
-    │   ├── crossplane-best-practices.md
+    │   ├── crossplane-v1-best-practices.md
     │   └── crossplane-v2-best-practices.md
     ├── docs/
     │   ├── POWERS.md
@@ -123,7 +123,7 @@ Plain markdown. No frontmatter needed — these are loaded by the power's POWER.
 | 2 | terraform-best-practices.md | rules/terraform-best-practices.md | auto | Terraform HCL best practices for module design, state management, and deployment safety |
 | 3 | cdk-best-practices.md | rules/cdk-best-practices.md | auto | AWS CDK best practices for construct design, security, and testing |
 | 4 | kubernetes-best-practices.md | rules/kubernetes-best-practices.md | auto | Kubernetes resource management, security, and production readiness |
-| 5 | crossplane-best-practices.md | rules/crossplane-best-practices.md | auto | Crossplane XR design, compositions, and provider configuration |
+| 5 | crossplane-v1-best-practices.md | rules/crossplane-v1-best-practices.md | auto | Crossplane XR design, compositions, and provider configuration |
 | 6 | crossplane-v2-best-practices.md | rules/crossplane-v2-best-practices.md | auto | Crossplane v2 breaking changes, namespaced resources, and migration patterns |
 
 ## Design Decisions
@@ -246,7 +246,7 @@ kiro/
 │   ├── terraform-best-practices.md
 │   ├── cdk-best-practices.md
 │   ├── kubernetes-best-practices.md
-│   ├── crossplane-best-practices.md
+│   ├── crossplane-v1-best-practices.md
 │   └── crossplane-v2-best-practices.md
 └── docs/
     ├── POWERS.md

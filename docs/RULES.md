@@ -9,7 +9,7 @@ Rules are always-on behavioral guidelines loaded automatically via `.claude/rule
 | Defensive Protocol | `rules/defensive-protocol.md` | Defensive epistemology for agentic coding: failure handling, prediction protocols, evidence standards |
 | CDK Best Practices | `rules/cdk-best-practices.md` | AWS CDK guidelines: construct design, security, testing, deployment safety, anti-patterns |
 | Terraform Best Practices | `rules/terraform-best-practices.md` | Terraform guidelines: state management, module design, security, naming, deployment safety |
-| Crossplane Best Practices | `rules/crossplane-best-practices.md` | Crossplane/Upbound guidelines: XR design, compositions, managed resources, provider config |
+| Crossplane v1 Best Practices | `rules/crossplane-v1-best-practices.md` | Crossplane/Upbound guidelines: XR design, compositions, managed resources, provider config |
 | Crossplane v2 Best Practices | `rules/crossplane-v2-best-practices.md` | Crossplane v2 specifics: namespaced XRs, spec.crossplane, Configuration packages, migration |
 | Kubernetes Best Practices | `rules/kubernetes-best-practices.md` | Kubernetes guidelines: resource management, security, RBAC, networking, high availability |
 
@@ -193,9 +193,9 @@ This rule synthesizes guidance from:
 
 ---
 
-### Crossplane Best Practices
+### Crossplane v1 Best Practices
 
-**File:** `rules/crossplane-best-practices.md`
+**File:** `rules/crossplane-v1-best-practices.md`
 **Scope:** Crossplane and Upbound projects
 **Core principle:** Prevent composition errors, state corruption, API breakage, and resource leaks through correct Crossplane patterns.
 
@@ -382,7 +382,7 @@ To use a rule in a target project, copy the file from `rules/` into `.claude/rul
 cp rules/defensive-protocol.md             <target-repo>/.claude/rules/
 cp rules/cdk-best-practices.md             <target-repo>/.claude/rules/
 cp rules/terraform-best-practices.md       <target-repo>/.claude/rules/
-cp rules/crossplane-best-practices.md      <target-repo>/.claude/rules/
+cp rules/crossplane-v1-best-practices.md      <target-repo>/.claude/rules/
 cp rules/crossplane-v2-best-practices.md   <target-repo>/.claude/rules/
 cp rules/kubernetes-best-practices.md      <target-repo>/.claude/rules/
 ```
@@ -396,6 +396,6 @@ Rules take effect immediately on the next Claude Code conversation in that repos
 | Any project | `defensive-protocol.md` |
 | AWS CDK projects | `defensive-protocol.md` + `cdk-best-practices.md` |
 | Terraform projects | `defensive-protocol.md` + `terraform-best-practices.md` |
-| Crossplane v1 projects | `defensive-protocol.md` + `crossplane-best-practices.md` + `kubernetes-best-practices.md` |
-| Crossplane v2 projects | `defensive-protocol.md` + `crossplane-best-practices.md` + `crossplane-v2-best-practices.md` + `kubernetes-best-practices.md` |
+| Crossplane v1 projects | `defensive-protocol.md` + `crossplane-v1-best-practices.md` + `kubernetes-best-practices.md` |
+| Crossplane v2 projects | `defensive-protocol.md` + `crossplane-v1-best-practices.md` + `crossplane-v2-best-practices.md` + `kubernetes-best-practices.md` |
 | Kubernetes projects | `defensive-protocol.md` + `kubernetes-best-practices.md` |

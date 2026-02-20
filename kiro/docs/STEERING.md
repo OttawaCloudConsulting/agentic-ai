@@ -64,11 +64,11 @@ CDK guidelines: construct design (L1/L2/L3), stack architecture, resource identi
 
 Kubernetes guidelines: resource management (requests/limits/QoS), health probes, PDBs, security (pod security, RBAC, network policies), application lifecycle, high availability, labels, observability, image security, namespace organization, and cluster hardening.
 
-### crossplane-best-practices.md
+### crossplane-v1-best-practices.md
 
 | Field | Value |
 |-------|-------|
-| Source | `rules/crossplane-best-practices.md` |
+| Source | `rules/crossplane-v1-best-practices.md` |
 | Inclusion | `auto` |
 | Description | Crossplane XR design, compositions, and provider configuration |
 | Related Powers | — |

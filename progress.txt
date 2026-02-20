@@ -1,0 +1,37 @@
+# Progress: Rules Template Corrective Actions
+# Source: prd.md + docs/rules/ARCHITECTURE_AND_DESIGN.md
+# Spec: docs/rules/ARCHITECTURE_AND_DESIGN.md is the authoritative design reference
+
+## Features
+
+[x] Feature 1: Rename Crossplane v1 Rules File
+    - Rename crossplane-best-practices.md to crossplane-v1-best-practices.md
+    - Update title and description inside file to reference v1 explicitly
+    - Verify no other files reference the old filename
+    NOTES: Started 2026-02-20. Completed 2026-02-20. Updated references in docs/RULES.md, docs/ARCHITECTURE_AND_DESIGN.md, kiro/README.md, kiro/docs/STEERING.md. Kiro steering file (kiro/steering/crossplane-best-practices.md) left unchanged — out of scope.
+
+[x] Feature 2: Defensive Protocol v2 — Anti-Slop Discipline
+    - Create rules/defensive-protocol-v2-anti-slop.md
+    - Include: core principle, failure response, confusion response, evidence standards, error handling, autonomy boundaries, contradiction handling, pushing back, stop/undo/revert, Claude-specific guidance, second-order effects
+    - Verification cadence: contextual 3 risky / 5 routine
+    - Generic path references only (no agents/memory/ paths)
+    - Self-contained, no cross-references to sibling files
+    NOTES: Started 2026-02-20. Completed 2026-02-20.
+
+[x] Feature 3: Defensive Protocol v2 — Epistemology
+    - Create rules/defensive-protocol-v2-epistemology.md
+    - Include: prediction protocol (tiered), investigation protocol, root cause analysis, Chesterton's fence, abstraction timing, codebase navigation
+    - Tiered prediction: one-liner for routine, full DOING/EXPECT for high-risk
+    - Explicitly enumerate what qualifies as high-risk
+    - Generic path references for investigation files
+    - Self-contained, no cross-references to sibling files
+    NOTES: Started 2026-02-20. Completed 2026-02-20.
+
+[x] Feature 4: Defensive Protocol v2 — Session Management
+    - Create rules/defensive-protocol-v2-session-management.md
+    - Include: checkpoint mechanism, context window management, handoff protocol, irreversible actions
+    - Zero hardcoded file paths
+    - Handoff captures: state of work, blockers, open questions, recommendations, files touched
+    - Preserve context window degradation signals list
+    - Self-contained, no cross-references to sibling files
+    NOTES: Started 2026-02-20. Completed 2026-02-20.

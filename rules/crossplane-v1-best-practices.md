@@ -1,6 +1,6 @@
-# Crossplane Best Practices
+# Crossplane v1 Best Practices
 
-> Guidelines for generating correct, safe, and maintainable Crossplane infrastructure code. Prevents composition errors, state corruption, API breakage, and resource leaks.
+> Guidelines for generating correct, safe, and maintainable Crossplane v1 infrastructure code. Targets Crossplane v1 projects — for v2, use crossplane-v2-best-practices. Prevents composition errors, state corruption, API breakage, and resource leaks.
 
 ## XR (Composite Resource) Design
 

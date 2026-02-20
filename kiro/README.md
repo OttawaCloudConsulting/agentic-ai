@@ -20,7 +20,7 @@ kiro/
 │   ├── terraform-best-practices.md
 │   ├── cdk-best-practices.md
 │   ├── kubernetes-best-practices.md
-│   ├── crossplane-best-practices.md
+│   ├── crossplane-v1-best-practices.md
 │   └── crossplane-v2-best-practices.md
 └── docs/
     ├── POWERS.md              # Powers reference guide
