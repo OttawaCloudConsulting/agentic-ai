@@ -31,7 +31,9 @@
       "Bash(python3:*)",
       "WebFetch(domain:builder.aws.com)",
       "WebFetch(domain:kiro.dev)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(gh api:*)",
+      "Bash(npm view:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
