@@ -5,6 +5,7 @@ Execute the full validation and deployment pipeline for Terraform code. All gate
 ## Prerequisites
 
 Before running this workflow, ensure:
+
 - Feature code is complete
 - The feature is marked `[~]` (in progress) in `progress.txt`
 - You know which feature number is being completed (e.g., 2.1)

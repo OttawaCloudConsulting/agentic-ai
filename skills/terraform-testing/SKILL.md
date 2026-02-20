@@ -10,6 +10,7 @@ Portable Terraform validation and deployment pipeline. Runs git-secrets, fmt, in
 ## Prerequisites
 
 Before running, ensure:
+
 - Feature code is complete
 - Feature is marked `[~]` (in progress) in `progress.txt`
 - You know which feature number you're completing (e.g., 2.1)

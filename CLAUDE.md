@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A library of drop-in agentic AI configurations for Claude Code and Kiro: commands, skills, rules, project kits, and powers. No runtime code. Content is copied into other repositories where it is consumed.
 
+## Common Commands
+
+```bash
+# Lint markdown (primary quality check for this content-only repo)
+bash scripts/lint-markdown.sh -r          # all *.md recursively
+bash scripts/lint-markdown.sh README.md   # single file
+bash scripts/lint-markdown.sh --no-fix    # report only, no auto-fix
+```
+
+No build step, test suite, or runtime code. Markdown linting is the only CI-equivalent check.
+
 ## Structure
 
 ```
@@ -17,11 +28,7 @@ agentic-ai/
 │       ├── SKILL.md                   ← skill definition with frontmatter
 │       └── scripts/                   ← supporting shell scripts
 ├── rules/                             ← always-on behavioral guidelines (not commands)
-├── prompts/                           ← self-contained project kits
-│   └── <project-type>/
-│       ├── CLAUDE.md                  ← project rules template
-│       ├── commands/                  ← project-specific commands (if any)
-│       └── CLAUDE_CODE_USER_GUIDE.md  ← optional developer guide
+├── scripts/                           ← repo tooling (lint-markdown.sh)
 ├── kiro/                              ← Kiro-native equivalents (powers + steering)
 │   ├── powers/                        ← keyword-activated workflow bundles
 │   │   └── <power-name>/
@@ -31,12 +38,12 @@ agentic-ai/
 │   └── docs/                          ← Kiro reference docs (POWERS.md, STEERING.md)
 ├── agentic-engineering/               ← strategic workflow reference (diagram + docs)
 ├── mcp/                               ← MCP server project (has own README + architecture)
-├── docs/                              ← reference documentation for this repo
+├── docs/                              ← generated reference documentation
 │   ├── SKILLS.md                      ← skill catalog and usage guide
 │   ├── RULES.md                       ← rules catalog and usage guide
-│   └── ARCHITECTURE_AND_DESIGN.md     ← Kiro conversion architecture
-├── working/                           ← scratch space for active development
-├── tests/                             ← test fixtures
+│   └── COMMANDS.md                    ← command catalog and usage guide
+├── external_sources/                  ← external reference material
+├── temp/                              ← temporary working files
 └── .claude/                           ← local settings for this repo only
 ```
 
@@ -49,8 +56,6 @@ agentic-ai/
 | `commands/*.md` | Standalone commands (catchup, handoff, investigate, etc.) | `.claude/commands/` |
 | `skills/<name>/` | Skill bundles (SKILL.md + scripts) | `.claude/skills/<name>/` |
 | `rules/*.md` | Always-on behavioral guidelines | `.claude/rules/` |
-| `prompts/<type>/CLAUDE.md` | Project rules template | repo root |
-| `prompts/<type>/CLAUDE_CODE_USER_GUIDE.md` | Developer workflow guide | repo root or `docs/` |
 
 ### Kiro Content
 
@@ -61,19 +66,13 @@ agentic-ai/
 
 ### Relationship
 
-Claude Code and Kiro content are parallel — same concepts, different formats. Commands/skills become Kiro powers (grouped by concern). Rules become Kiro steering files (with YAML frontmatter for inclusion mode). See `docs/ARCHITECTURE_AND_DESIGN.md` for the full mapping.
+Claude Code and Kiro content are parallel — same concepts, different formats. Commands/skills become Kiro powers (grouped by concern). Rules become Kiro steering files (with YAML frontmatter for inclusion mode).
 
 ### Commands vs Skills
 
 **Commands** (`commands/*.md`) are standalone markdown files. Copy directly to `.claude/commands/`.
 
 **Skills** (`skills/<name>/`) are bundles that include a `SKILL.md` (with YAML frontmatter: `name`, `description`) plus supporting scripts or assets. The SKILL.md content goes into `.claude/commands/` and scripts are copied alongside.
-
-### Kit Model
-
-Each `prompts/<project-type>/` is a **kit** — a self-contained set of files to copy into a target project. A kit may reference commands from `commands/` that the consumer also needs to copy.
-
-**To consume a kit:** copy `prompts/<project-type>/` contents into the target repo root, then copy any referenced commands from `commands/` into `.claude/commands/`. Copy any desired rules from `rules/` into `.claude/rules/`.
 
 ## Rules
 
@@ -119,12 +118,6 @@ Each `prompts/<project-type>/` is a **kit** — a self-contained set of files to
 - Requires YAML frontmatter with `inclusion` mode (`always` or `auto`)
 - `auto` mode needs `name` and `description` fields
 - Tool-agnostic language (no Claude Code-specific references)
-
-### Project Type Kits
-
-- Must contain a `CLAUDE.md` at minimum
-- Define tech stack, workflow, and skill references
-- List which commands from `commands/` the kit depends on
 
 ## Workflow
 

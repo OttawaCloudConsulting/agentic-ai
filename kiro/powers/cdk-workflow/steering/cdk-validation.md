@@ -5,6 +5,7 @@ Execute the full validation and deployment pipeline for AWS CDK code. All gates 
 ## Prerequisites
 
 Before running this workflow, ensure:
+
 - Feature code and tests are complete
 - The feature is marked `[~]` (in progress) in `progress.txt`
 - You know which feature number is being completed (e.g., 10.1)

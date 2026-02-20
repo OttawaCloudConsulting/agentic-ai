@@ -1,0 +1,10 @@
+{
+  // Auto-fix config: only enable rules that markdownlint can safely fix.
+  // All other rules are disabled here — they are checked in the lint pass.
+  "default": false,
+  "MD022": true,
+  "MD031": true,
+  "MD032": true,
+  "MD047": true,
+  "MD058": true
+}

@@ -116,6 +116,7 @@ cloud-deploy/
 User chooses AWS → Claude only reads `aws.md`.
 
 Guidelines:
+
 - Keep references one level deep from SKILL.md
 - For files >100 lines, include a table of contents at the top
 
@@ -151,6 +152,7 @@ For each use case, identify what reusable resources help:
 5. Delete any unused directories
 
 Consult these guides for design patterns:
+
 - **Multi-step processes**: See references/workflows.md
 - **Output formats/quality standards**: See references/output-patterns.md
 

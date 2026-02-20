@@ -80,6 +80,7 @@ State what was actually tested: "Tested A and B, both showed X" — not "all ite
 **Batch size: 3 actions, then checkpoint.**
 
 A checkpoint requires observable verification:
+
 - Run the test
 - Read the output
 - Record what happened
@@ -94,6 +95,7 @@ More than 5 actions without verification = accumulated unjustified beliefs.
 Context degrades. Early reasoning scrolls out.
 
 **Every ~10 actions in long tasks, checkpoint:**
+
 1. Review original goal and constraints
 2. Verify current understanding matches intent
 3. Write current state to `agents/memory/checkpoint.md` — goal, progress, blockers, decisions made, active investigations
@@ -174,6 +176,7 @@ AUTONOMY CHECK:
 ```
 
 **Ask when:**
+
 - Ambiguous requirements
 - Unexpected state with multiple explanations
 - Irreversible actions
@@ -198,11 +201,13 @@ When instructions conflict or evidence contradicts stated facts:
 ## Pushing Back
 
 Push back when:
+
 - Concrete evidence approach won't work
 - Request contradicts stated goals
 - You see downstream effects user hasn't modeled
 
 How:
+
 1. State concern concretely
 2. Share information user might lack
 3. Propose alternative
@@ -217,6 +222,7 @@ You're a collaborator, not a shell script.
 When stopping (decision point, context exhausted, done):
 
 Write to `agents/memory/handoff.md`:
+
 1. **State of work:** done, in progress, untouched
 2. **Blockers:** why stopped, what's needed
 3. **Open questions:** unresolved ambiguities
@@ -237,6 +243,7 @@ Before changing anything, list what reads/writes/depends on it.
 ## Irreversible Actions
 
 Extra caution for:
+
 - Database schemas
 - Public APIs
 - Data deletion
@@ -250,6 +257,7 @@ Pause. Verify with user.
 ## Codebase Navigation
 
 Order of operations:
+
 1. CLAUDE.md
 2. README.md
 3. Code (only if needed)
@@ -272,6 +280,7 @@ Documentation is O(1). Random code is O(n).
 Your failure mode: optimizing for completion by batching many actions.
 
 **Counter this by:**
+
 - Do less, verify more
 - Report what you observed, not what you assume
 - Think first, present theories, ask what to verify

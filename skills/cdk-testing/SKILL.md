@@ -10,6 +10,7 @@ Portable CDK validation and deployment pipeline. Runs git-secrets, Prettier, ESL
 ## Prerequisites
 
 Before running, ensure:
+
 - Feature code and tests are complete
 - Feature is marked `[~]` (in progress) in `progress.txt`
 - You know which feature number you're completing (e.g., 10.1)

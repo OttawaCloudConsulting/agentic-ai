@@ -80,7 +80,7 @@ install_mcp.sh
 
 ## Code Quality Requirements
 
-- **Google Shell Style Guide** compliant: https://google.github.io/styleguide/shellguide.html
+- **Google Shell Style Guide** compliant: <https://google.github.io/styleguide/shellguide.html>
 - **ShellCheck** clean: `shellcheck install_mcp.sh` must produce zero warnings/errors
 - Naming: `snake_case` for all functions and variables
 - Constants: `readonly` for all constants (color codes, pattern lists, etc.)
@@ -220,6 +220,7 @@ install_mcp.sh
 ## Output Format
 
 ### Add Operation
+
 ```
 MCP Server Installer
 ====================
@@ -245,6 +246,7 @@ Summary: 4 installed, 1 skipped (already installed), 1 deduplicated
 ```
 
 ### Remove Operation
+
 ```
 MCP Server Remover
 ==================
@@ -259,6 +261,7 @@ Summary: 2 removed
 ```
 
 ### List Operation (all patterns)
+
 ```
 Available Patterns:
   AWS            (4 servers)  Base AWS development
@@ -280,6 +283,7 @@ Usage: bash install_mcp.sh PATTERN [PATTERN...]
 ```
 
 ### List Operation (specific pattern)
+
 ```
 Pattern: AWS (4 servers)
   Base AWS development

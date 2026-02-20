@@ -11,6 +11,7 @@ When the user asks to start a new feature, begin the next feature, or resume wor
 ### 1. Identify the Feature
 
 Read the project's feature tracking (Kiro specs, task list, or progress file) and identify:
+
 - Any feature currently in progress — if found, resume that feature
 - The next pending feature — if nothing is in progress
 
@@ -19,6 +20,7 @@ If all features are complete, report that and stop.
 ### 2. Read Requirements
 
 Locate the requirements for the identified feature. Extract:
+
 - What needs to be built
 - Acceptance criteria
 - Dependencies on other features

@@ -27,6 +27,7 @@ Context degrades over long sessions. Early reasoning scrolls out and assumptions
 4. If unclear on anything, stop and ask the user
 
 **Degradation signals — watch for these in your own output:**
+
 - Sloppy or repetitive output
 - Uncertain about the original goal
 - Repeating work already done

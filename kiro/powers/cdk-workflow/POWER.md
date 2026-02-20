@@ -12,11 +12,13 @@ Provides end-to-end workflows for AWS CDK projects covering validation, deployme
 ## Available Workflows
 
 ### Validate and Deploy
+
 Run sequential validation gates (git-secrets, prettier, eslint, typescript build, security scans) followed by `cdk deploy`, then update tracking and commit.
 
 See `steering/cdk-validation.md` for the complete workflow.
 
 ### Documentation Update
+
 Refresh README.md, docs/ARCHITECTURE.md, and docs/TESTING.md to match the current state of CDK stacks, constructs, and test suites. Use after completing features, before creating a PR, or when documentation feels stale.
 
 See `steering/cdk-docs-update.md` for the complete workflow.
@@ -24,6 +26,7 @@ See `steering/cdk-docs-update.md` for the complete workflow.
 ## Onboarding
 
 When first activated, verify:
+
 1. The workspace contains `cdk.json`
 2. A validation script exists at `scripts/cdk-validation.sh`
 3. Check for `progress.txt` and `CHANGELOG.md` for tracking workflows
