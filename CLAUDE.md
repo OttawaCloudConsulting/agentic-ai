@@ -47,7 +47,7 @@ agentic-ai/
 | Path | Contains | Drop-in target |
 |---|---|---|
 | `commands/*.md` | Standalone commands (catchup, handoff, investigate, etc.) | `.claude/commands/` |
-| `skills/<name>/` | Skill bundles (SKILL.md + scripts) | `.claude/commands/` + project scripts |
+| `skills/<name>/` | Skill bundles (SKILL.md + scripts) | `.claude/skills/<name>/` |
 | `rules/*.md` | Always-on behavioral guidelines | `.claude/rules/` |
 | `prompts/<type>/CLAUDE.md` | Project rules template | repo root |
 | `prompts/<type>/CLAUDE_CODE_USER_GUIDE.md` | Developer workflow guide | repo root or `docs/` |

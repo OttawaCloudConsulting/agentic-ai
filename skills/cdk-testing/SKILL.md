@@ -22,17 +22,17 @@ Before running, ensure:
 
 ## Gate 1 — Validation Script
 
-The script lives at `scripts/cdk-validation.sh` relative to this skill directory. Copy or reference it from the target project.
+The script is bundled with this skill at `.claude/skills/cdk-testing/scripts/cdk-validation.sh`.
 
 ```bash
 # Default
-bash scripts/cdk-validation.sh
+bash .claude/skills/cdk-testing/scripts/cdk-validation.sh
 
 # Specific AWS profile
-AWS_PROFILE=dev-account bash scripts/cdk-validation.sh
+AWS_PROFILE=dev-account bash .claude/skills/cdk-testing/scripts/cdk-validation.sh
 
 # Skip npm audit
-bash scripts/cdk-validation.sh --skip-audit
+bash .claude/skills/cdk-testing/scripts/cdk-validation.sh --skip-audit
 ```
 
 ### Pipeline Steps
@@ -64,7 +64,7 @@ npx cdk deploy --all --profile dev-account --require-approval never
 
 ## Gate 3 — Commit
 
-Only execute if Gates 1-2 both passed. Follow the commit workflow in references/commit-workflow.md.
+Only execute if Gates 1-2 both passed. Follow the commit workflow in `.claude/skills/cdk-testing/references/commit-workflow.md`.
 
 ## Output Format
 

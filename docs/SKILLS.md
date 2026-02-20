@@ -1,6 +1,10 @@
 # Skills Reference
 
-Skills are slash commands that provide structured workflows for common tasks. They are defined as markdown files in `.claude/commands/` and invoked with `/<skill-name>` in the Claude Code CLI.
+Skills are slash commands that provide structured workflows for common tasks. They are invoked with `/<skill-name>` in the Claude Code CLI.
+
+**Two formats:**
+- **Commands** — single `.md` files, installed to `.claude/commands/`
+- **Skills** — bundles with `SKILL.md` + supporting artifacts (scripts, references), installed to `.claude/skills/<skill-name>/`
 
 ## Quick Reference
 
@@ -230,7 +234,7 @@ Run this before `/clear` or closing the terminal.
 
 ```
 .claude/
-  commands/                                  Skills directory (all .md files here become skills)
+  commands/                                  Single-file commands (each .md becomes a slash command)
     compliance-assess.md                     Interactive compliance assessment
     compliance-auto-assess.md                Automated compliance assessment (dispatcher)
     catchup.md                               Session start
@@ -238,11 +242,18 @@ Run this before `/clear` or closing the terminal.
     handoff.md                               Session end
     investigate.md                           Structured debugging
     start-feature.md                         Feature workflow
-    test-cdk.md                              CDK validation + commit
-    test-terraform.md                        Terraform validation + commit
     update-docs.md                           General doc refresh
     update-docs-cdk.md                       CDK doc refresh
     update-docs-terraform.md                 Terraform doc refresh
+  skills/                                    Skill bundles (SKILL.md + supporting artifacts)
+    cdk-testing/
+      SKILL.md                               CDK validation + commit
+      scripts/cdk-validation.sh              Validation pipeline script
+      references/commit-workflow.md          Commit workflow reference
+    terraform-testing/
+      SKILL.md                               Terraform validation + commit
+      scripts/test-terraform.sh              Validation pipeline script
+      references/commit-workflow.md          Commit workflow reference
   rules/                                     Always-on behavioral guidelines
     defensive-protocol.md                    Defensive coding protocol
   compliance-auto-assess-instructions.md     Assessment payload for sub-agent (not a skill)

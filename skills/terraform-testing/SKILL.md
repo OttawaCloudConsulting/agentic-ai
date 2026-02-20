@@ -23,34 +23,34 @@ Before running, ensure:
 
 ## Running the Script
 
-The script lives at `scripts/test-terraform.sh` relative to this skill directory. Copy or reference it from the target project.
+The script is bundled with this skill at `.claude/skills/terraform-testing/scripts/test-terraform.sh`.
 
 ### Common Invocations
 
 ```bash
 # Validate only (no plan, no deploy)
-bash scripts/test-terraform.sh --no-plan
+bash .claude/skills/terraform-testing/scripts/test-terraform.sh --no-plan
 
 # Validate + plan (default)
-bash scripts/test-terraform.sh
+bash .claude/skills/terraform-testing/scripts/test-terraform.sh
 
 # Validate specific directory
-bash scripts/test-terraform.sh --target modules/vpc
+bash .claude/skills/terraform-testing/scripts/test-terraform.sh --target modules/vpc
 
 # Validate + plan + apply
-bash scripts/test-terraform.sh --deploy
+bash .claude/skills/terraform-testing/scripts/test-terraform.sh --deploy
 
 # Validate + plan + apply + destroy (ephemeral test)
-bash scripts/test-terraform.sh --deploy-destroy
+bash .claude/skills/terraform-testing/scripts/test-terraform.sh --deploy-destroy
 
 # Use specific AWS profile
-bash scripts/test-terraform.sh --deploy --profile dev-account
+bash .claude/skills/terraform-testing/scripts/test-terraform.sh --deploy --profile dev-account
 
 # Security findings as warnings (don't fail)
-bash scripts/test-terraform.sh --soft-fail
+bash .claude/skills/terraform-testing/scripts/test-terraform.sh --soft-fail
 
 # Use trivy instead of checkov
-bash scripts/test-terraform.sh --scanner trivy
+bash .claude/skills/terraform-testing/scripts/test-terraform.sh --scanner trivy
 ```
 
 ### Configuration
@@ -97,7 +97,7 @@ Document suppression decisions in feature documentation or commit messages.
 
 ## Post-Test Commit
 
-After all gates pass, follow the commit workflow in references/commit-workflow.md.
+After all gates pass, follow the commit workflow in `.claude/skills/terraform-testing/references/commit-workflow.md`.
 
 ## Output Format
 
