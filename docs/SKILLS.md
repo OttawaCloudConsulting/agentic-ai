@@ -12,6 +12,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | Terraform Testing | `/terraform-testing` | Validate, scan, plan, and deploy Terraform code | [View](skills/terraform-testing.md) |
 | Compliance Assess | `/compliance-assess` | ITSG-33 / CCCS Medium compliance assessment with user checkpoints | [View](skills/compliance-assess.md) |
 | Skill Creator | `/skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/skill-creator.md) |
+| Rule Creator | `/rule-creator` | Interactive rule generation with documentation and catalog updates | [View](skills/rule-creator.md) |
 
 ## How Skills Work
 
@@ -54,6 +55,7 @@ cp -r skills/cdk-testing/       <target-repo>/.claude/skills/cdk-testing/
 cp -r skills/terraform-testing/  <target-repo>/.claude/skills/terraform-testing/
 cp -r skills/compliance-assess/  <target-repo>/.claude/skills/compliance-assess/
 cp -r skills/skill-creator/      <target-repo>/.claude/skills/skill-creator/
+cp -r skills/rule-creator/       <target-repo>/.claude/skills/rule-creator/
 ```
 
 Skills take effect immediately on the next Claude Code conversation in that repository.
