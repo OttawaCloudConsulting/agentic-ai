@@ -21,7 +21,7 @@ Establishes and monitors the organization's cybersecurity risk management strate
 |---|---|---|
 | GV.OC-01 | The organizational mission is understood and informs cybersecurity risk management | PM-11, SA-2 |
 | GV.OC-02 | Internal and external stakeholders are understood, and their needs and expectations regarding cybersecurity risk management are understood and considered | PM-2, PM-11 |
-| GV.OC-03 | Legal, regulatory, and contractual requirements regarding cybersecurity — including privacy and civil liberties obligations — are understood and managed | -13, PL-1, SA-9 |
+| GV.OC-03 | Legal, regulatory, and contractual requirements regarding cybersecurity — including privacy and civil liberties obligations — are understood and managed | PM-13, PL-1, SA-9 |
 | GV.OC-04 | Critical objectives, capabilities, and services that stakeholders depend on or expect from the organization are understood and communicated | PM-11, SA-14, RA-9 |
 | GV.OC-05 | Outcomes, capabilities, and services that the organization depends on are understood and communicated | PM-11, RA-9, SA-12 |
 

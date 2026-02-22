@@ -1,8 +1,8 @@
-# PRD: Compliance Assessment Skill Suite — ITSG & NIST/FedRAMP
+# PRD: Compliance Assessment Skill Suite — ITSG, NIST/FedRAMP & CSF
 
 ## Summary
 
-Two discrete skill updates to the compliance-assess skill suite. Feature 1 renames and rebrands the existing `compliance-assess` skill as a clearly Canadian/ITSG-specific tool. Feature 2 creates a parallel new skill (`nist-fedramp-assessment`) targeting USA-based NIST SP 800-53 Rev 5 and FedRAMP Moderate for AWS cloud workloads.
+Three discrete skill updates to the compliance-assess skill suite. Feature 1 renames and rebrands the existing `compliance-assess` skill as a clearly Canadian/ITSG-specific tool. Feature 2 creates a parallel new skill (`nist-fedramp-assessment`) targeting USA-based NIST SP 800-53 Rev 5 and FedRAMP Moderate for AWS cloud workloads. Feature 3 creates a new skill (`nist-csf-assessment`) for NIST Cybersecurity Framework 2.0 outcome-based assessments.
 
 ## Goals
 
@@ -16,7 +16,7 @@ Two discrete skill updates to the compliance-assess skill suite. Feature 1 renam
 - No changes to the compliance assessment workflow logic — only naming, branding, and content updates for Feature 1
 - Not targeting DoD IL2/IL4 or FedRAMP High
 - Not building a tool or automation — both skills are Claude Code prompt-driven workflows
-- Not modifying skills other than compliance-assess and the new nist-fedramp-assessment
+- Not modifying skills other than compliance-assess, nist-fedramp-assessment, and nist-csf-assessment
 
 ## Features
 

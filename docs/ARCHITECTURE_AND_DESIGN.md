@@ -1,4 +1,4 @@
-# Architecture and Design: Compliance Assessment Skill Suite — ITSG & NIST/FedRAMP
+# Architecture and Design: Compliance Assessment Skill Suite — ITSG, NIST/FedRAMP & CSF
 
 ## Overview
 
@@ -40,7 +40,7 @@ agentic-ai/docs/
 └── SKILLS.md                         ← Updated catalog (Features 1, 2 & 3)
 ```
 
-## Workflow (Both Skills — 4 Phases)
+## Workflow (All Three Skills — 4 Phases)
 
 ```
 Phase 0: Framework Validation

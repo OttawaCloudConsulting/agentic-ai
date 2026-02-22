@@ -8,7 +8,7 @@
 ## FedRAMP
 
 - [FedRAMP.gov — Documents and Templates](https://www.fedramp.gov/documents-templates/)
-- [FedRAMP Moderate Baseline](https://www.fedramp.gov/documents-templates/)
+- [FedRAMP Moderate Baseline](https://www.fedramp.gov/baselines/)
 
 ## AWS
 
