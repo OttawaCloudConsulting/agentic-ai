@@ -26,9 +26,15 @@ Output templates for each phase of the ITSG-33 compliance assessment. All output
 
 ### AWS Services Detected
 
-| Service | Usage | Configuration Source |
-|---|---|---|
-| [e.g., Route53] | DNS hosting | configs/*.yaml |
+| Service | Usage | Configuration Source | Region |
+|---|---|---|---|
+| [e.g., Route53] | DNS hosting | configs/*.yaml | ca-central-1 |
+
+### Data Residency
+
+| Resource | Region | Protected B Eligible | Notes |
+|---|---|---|---|
+| [e.g., S3 bucket] | ca-central-1 | Yes | GC data residency requirement met |
 
 ### Data Flows
 
@@ -53,6 +59,8 @@ Output templates for each phase of the ITSG-33 compliance assessment. All output
 **Project:** [repo name]
 **Assessed:** YYYY-MM-DD
 **Profile:** CCCS Medium Cloud — Technical Controls
+**Jurisdiction:** Canadian GC — Protected B data classification
+**Data Residency:** ca-central-1 (default); flag any resources outside Canadian AWS regions
 **Control Families:** AC, AU, CM, CP, IA, SA, SC, SI
 
 ## Posture Summary

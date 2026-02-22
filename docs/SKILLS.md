@@ -10,7 +10,9 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 |---|---|---|---|
 | CDK Testing | `/cdk-testing` | Validate, scan, build, test, and deploy CDK code | [View](skills/cdk-testing.md) |
 | Terraform Testing | `/terraform-testing` | Validate, scan, plan, and deploy Terraform code | [View](skills/terraform-testing.md) |
-| Compliance Assess | `/compliance-assess` | ITSG-33 / CCCS Medium compliance assessment with user checkpoints | [View](skills/compliance-assess.md) |
+| ITSG Assessment | `/itsg-assessment` | ITSG-33 / CCCS Medium compliance assessment for Canadian GC cloud workloads handling Protected B data, with user checkpoints | [View](skills/itsg-assessment.md) |
+| NIST FedRAMP Assessment | `/nist-fedramp-assessment` | NIST SP 800-53 Rev 5 / FedRAMP Moderate compliance assessment for US cloud workloads with dual inheritance model and FedRAMP ATO readiness | [View](skills/nist-fedramp-assessment.md) |
+| NIST CSF Assessment | `/nist-csf-assessment` | NIST CSF 2.0 outcome-based assessment across all 6 Functions with AWS evidence mapping, 800-53 informative references, and self-updating Phase 0 that always validates against the latest published CSF version | [View](skills/nist-csf-assessment.md) |
 | Skill Creator | `/skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/skill-creator.md) |
 | Rule Creator | `/rule-creator` | Interactive rule generation with documentation and catalog updates | [View](skills/rule-creator.md) |
 
@@ -53,8 +55,10 @@ Copy the entire skill directory from `skills/` into `.claude/skills/` in the tar
 # Copy a skill bundle
 cp -r skills/cdk-testing/       <target-repo>/.claude/skills/cdk-testing/
 cp -r skills/terraform-testing/  <target-repo>/.claude/skills/terraform-testing/
-cp -r skills/compliance-assess/  <target-repo>/.claude/skills/compliance-assess/
-cp -r skills/skill-creator/      <target-repo>/.claude/skills/skill-creator/
+cp -r skills/itsg-assessment/           <target-repo>/.claude/skills/itsg-assessment/
+cp -r skills/nist-fedramp-assessment/   <target-repo>/.claude/skills/nist-fedramp-assessment/
+cp -r skills/nist-csf-assessment/       <target-repo>/.claude/skills/nist-csf-assessment/
+cp -r skills/skill-creator/             <target-repo>/.claude/skills/skill-creator/
 cp -r skills/rule-creator/       <target-repo>/.claude/skills/rule-creator/
 ```
 
