@@ -1,0 +1,53 @@
+# Progress: [Project Title]
+# Source: prd.md + docs/ARCHITECTURE_AND_DESIGN.md
+# Spec: docs/ARCHITECTURE_AND_DESIGN.md is the authoritative design reference
+# Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
+
+## Features
+
+[ ] Feature 1: [Title]
+    - [Key deliverable from acceptance criteria]
+    - [Key deliverable from acceptance criteria]
+    NOTES:
+
+[ ] Feature 2: [Title]
+    - [Key deliverable]
+    - [Key deliverable]
+    NOTES:
+
+
+# ─── VARIANTS ─────────────────────────────────────────────────────────────────
+#
+# Multi-phase projects: Feature 1 = architecture; phases start at Feature 2.x, 3.x, ...
+#
+# [ ] Feature 1: Architecture and Design
+#     - docs/ARCHITECTURE_AND_DESIGN.md complete and reviewed
+#     NOTES:
+#
+# ## Phase 1: [Phase Name]
+#
+# [ ] Feature 2.1: [Title]
+#     - [Deliverable]
+#     NOTES:
+#
+# [ ] Feature 2.2: [Title]
+#     - [Deliverable]
+#     NOTES:
+#
+# ## Phase 2: [Phase Name]
+#
+# [ ] Feature 3.1: [Title]
+#     NOTES:
+#
+#
+# NOTES field conventions (for completed features):
+#
+#   NOTES: Started YYYY-MM-DD.
+#          CODE COMPLETE: [files changed, test count, validate/fmt pass].
+#          APPLY RESULT: [resource counts, key behaviors observed].
+#          Completed YYYY-MM-DD.
+#
+#   Cross-reference pattern (link to related artifacts):
+#   NOTES: See Design Decision #N in docs/ARCHITECTURE_AND_DESIGN.md.
+#          Investigation: agents/investigations/[topic].md
+# ──────────────────────────────────────────────────────────────────────────────

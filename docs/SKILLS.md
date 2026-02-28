@@ -15,6 +15,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | NIST CSF Assessment | `/nist-csf-assessment` | NIST CSF 2.0 outcome-based assessment across all 6 Functions with AWS evidence mapping, 800-53 informative references, and self-updating Phase 0 that always validates against the latest published CSF version | [View](skills/nist-csf-assessment.md) |
 | Create PRD | `/create-prd` | Guided interview to produce a PRD, architecture document, and progress file for a new project | [View](skills/create-prd.md) |
 | Skill Creator | `/skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/skill-creator.md) |
+| Skill Refactor | `/skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/skill-refactor.md) |
 | Rule Creator | `/rule-creator` | Interactive rule generation with documentation and catalog updates | [View](skills/rule-creator.md) |
 
 ## How Skills Work
@@ -61,6 +62,7 @@ cp -r skills/nist-fedramp-assessment/   <target-repo>/.claude/skills/nist-fedram
 cp -r skills/nist-csf-assessment/       <target-repo>/.claude/skills/nist-csf-assessment/
 cp -r skills/create-prd/                <target-repo>/.claude/skills/create-prd/
 cp -r skills/skill-creator/             <target-repo>/.claude/skills/skill-creator/
+cp -r skills/skill-refactor/            <target-repo>/.claude/skills/skill-refactor/
 cp -r skills/rule-creator/              <target-repo>/.claude/skills/rule-creator/
 ```
 

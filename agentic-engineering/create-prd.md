@@ -27,9 +27,9 @@ Use `AskUserQuestion` to gather the initial project concept:
 **Questions to ask (adapt to context):**
 
 - What are you building? (1-2 sentence description)
-- What AWS services are involved? (or what technology stack?)
+- What is the technology stack? (languages, frameworks, services, platforms)
 - What is the primary goal / problem being solved?
-- Is this a reusable module, a standalone deployment, or something else?
+- Is this a reusable library or module, a standalone application, a service, or something else?
 
 Write an initial `prd.md` with the information gathered:
 
@@ -63,21 +63,21 @@ Conduct an iterative interview using `AskUserQuestion` to fill out the PRD compr
 **Round 1 — Scope and Boundaries:**
 
 - What is explicitly out of scope? (non-goals)
-- Are there constraints on regions, accounts, or environments?
+- Are there constraints on environments, platforms, or deployment targets?
 - Are there compliance or security requirements?
-- What existing infrastructure does this integrate with?
+- What existing systems or services does this integrate with?
 
 **Round 2 — Components and Architecture:**
 
-- What are the major components / AWS resources?
+- What are the major components or services?
 - How do they connect? (data flow, request flow)
-- Are there multi-region requirements?
+- Are there geographic distribution or redundancy requirements?
 - Are there conditional or optional components?
 
 **Round 3 — Inputs and Outputs:**
 
-- What does the consumer configure? (input variables)
-- What needs to be exposed after deployment? (outputs)
+- What does the consumer or caller configure? (parameters, configuration, inputs)
+- What needs to be exposed or returned after deployment? (outputs, endpoints, connection strings)
 - Are there required vs. optional inputs?
 - What validation rules should inputs have?
 
@@ -85,21 +85,21 @@ Conduct an iterative interview using `AskUserQuestion` to fill out the PRD compr
 
 - What is the encryption strategy (at rest, in transit)?
 - What access control model applies?
-- Are there edge protection requirements (WAF, Shield)?
+- Are there edge protection or traffic filtering requirements?
 - What security headers or policies are needed?
 
 **Round 5 — Operational Concerns:**
 
 - Is logging needed? (access logs, audit trails)
 - What monitoring / alerting is expected?
-- What is the deployment workflow? (single apply, multi-phase, etc.)
+- What is the deployment workflow? (e.g., single step, multi-phase, manual approval gates, CI/CD pipeline)
 - Are there cost considerations or constraints?
 
 After each round, update `prd.md` with the new information. Show the user what was added and confirm before proceeding to the next round.
 
 Continue rounds until the user indicates the PRD is comprehensive enough, or all areas above have been covered.
 
-**Important:** The PRD should reach a quality level comparable to the existing project PRDs — specific acceptance criteria per feature, clear input/output tables, explicit architecture decisions.
+**Important:** The PRD should have specific acceptance criteria per feature, clear configuration and output tables, and explicit architecture decisions.
 
 ### Step 3 — Architecture and Design Document
 
@@ -116,11 +116,11 @@ Using the completed PRD as the foundation, conduct a focused interview using `As
 **Component Design:**
 
 - For each major component in the PRD, ask about implementation specifics not covered in the PRD
-- Ask about resource naming conventions, tagging strategy, dependency ordering
+- Ask about naming conventions, versioning strategy, dependency ordering
 
 **Security Review:**
 
-- Present relevant AWS security best practices for the services involved
+- Present relevant security best practices for the technologies involved
 - Ask which best practices to incorporate into the design vs. leave as consumer responsibility
 - Categorize as: Already Addressed, Added to Design, Consumer Responsibility
 
@@ -138,11 +138,11 @@ Create `docs/ARCHITECTURE_AND_DESIGN.md` with sections appropriate to the projec
 ## Request Flow / Data Flow
 [Step-by-step description of how data moves through the system]
 
-## Resource Inventory
-[Table: #, Resource, Terraform Type / Service, Region, Purpose]
+## Component Inventory
+[Table: #, Component, Type / Technology, Purpose]
 
-## Region Strategy
-[If multi-region — which resources go where and why]
+## Distribution Strategy
+[If components are distributed across locations, environments, or clusters — what goes where and why]
 
 ## Security Model
 ### Encryption
@@ -150,9 +150,9 @@ Create `docs/ARCHITECTURE_AND_DESIGN.md` with sections appropriate to the projec
 ### Edge Protection (if applicable)
 
 ## File Organization
-[Module / project directory structure]
+[Project directory structure]
 
-## Input Variables
+## Configuration Interface
 ### Required
 ### Optional (grouped by concern)
 
@@ -162,13 +162,13 @@ Create `docs/ARCHITECTURE_AND_DESIGN.md` with sections appropriate to the projec
 [Numbered table: #, Decision, Rationale]
 
 ## Deployment Workflow
-[How the infrastructure is deployed — single apply, multi-phase, etc.]
+[How the system is deployed — single step, phased rollout, CI/CD pipeline, etc.]
 
 ## Out of Scope
 [Expanded from PRD non-goals with rationale]
 
 ## Dependency Graph
-[Text-based graph showing resource dependencies and creation order]
+[Text-based graph showing component dependencies and initialization order]
 ```
 
 **Not every section applies to every project.** Omit sections that are irrelevant. Add sections that are needed but not listed above.
@@ -179,9 +179,9 @@ After the architecture document is complete, review the PRD against it:
 
 1. **Read both documents** — identify any new information from the architecture interview that should be reflected in the PRD.
 2. **Update the PRD** with:
-   - New features discovered during architecture design (e.g., logging, security headers, conditional resources)
+   - New features discovered during architecture design (e.g., logging, security hardening, conditional components)
    - Refined acceptance criteria based on architecture decisions
-   - Updated input/output tables if the architecture added or changed variables
+   - Updated configuration and output tables if the architecture added or changed parameters
    - Updated architecture section with the final component list
 3. **Show the user the changes** and confirm they are correct.
 
@@ -238,8 +238,8 @@ Present a final summary:
 PROJECT SETUP COMPLETE: [Project Title]
 
 ARTIFACTS CREATED:
-- prd.md — [N] features, [M] input variables, [K] outputs
-- docs/ARCHITECTURE_AND_DESIGN.md — [N] design decisions, [M] resources
+- prd.md — [N] features, [M] configuration parameters, [K] outputs
+- docs/ARCHITECTURE_AND_DESIGN.md — [N] design decisions, [M] components
 - progress.txt — [N] features tracked
 
 FIRST FEATURE:
@@ -254,8 +254,8 @@ Run /start-feature to begin implementation.
 - **One round of questions at a time.** Never dump all questions on the user at once. Group into focused rounds of 2-4 questions.
 - **Show work after each step.** After updating a document, tell the user what was added or changed.
 - **Confirm before overwriting.** If `prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`, or `progress.txt` already exist, ask before replacing.
-- **Adapt to the project.** Not all projects are Terraform modules. Adjust terminology, sections, and question topics to match the technology and project type.
+- **Adapt to the project.** Adjust terminology, sections, and question topics to match the technology and project type. Not every project has infrastructure, regions, or configurable inputs in the traditional sense.
 - **Quality bar is high.** The output documents should be detailed enough that another developer (or Claude session) can implement the project from them without further clarification.
-- **Cross-reference everything.** The PRD, architecture doc, and progress file must be internally consistent. Feature numbers, variable names, and component names should match across all three documents.
+- **Cross-reference everything.** The PRD, architecture doc, and progress file must be internally consistent. Feature numbers, parameter names, and component names should match across all three documents.
 - **Do not begin implementation.** This skill produces planning documents only. After completing, the user runs `/start-feature` to begin building.
 - **Ensure `docs/` directory exists** before writing `ARCHITECTURE_AND_DESIGN.md`. Create it if needed.

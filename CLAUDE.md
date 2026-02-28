@@ -15,6 +15,8 @@ bash scripts/lint-markdown.sh README.md   # single file
 bash scripts/lint-markdown.sh --no-fix    # report only, no auto-fix
 ```
 
+The script runs two passes: auto-fix safe rules first, then strict enforcement. `--no-fix` skips the first pass.
+
 No build step, test suite, or runtime code. Markdown linting is the only CI-equivalent check.
 
 ## Structure
@@ -38,7 +40,7 @@ agentic-ai/
 │   └── docs/                          ← Kiro reference docs (POWERS.md, STEERING.md)
 ├── agentic-engineering/               ← strategic workflow reference (diagram + docs)
 ├── mcp/                               ← MCP server project (has own README + architecture)
-├── docs/                              ← generated reference documentation
+├── docs/                              ← generated reference catalogs (keep in sync)
 │   ├── SKILLS.md                      ← skill catalog and usage guide
 │   ├── RULES.md                       ← rules catalog and usage guide
 │   └── COMMANDS.md                    ← command catalog and usage guide
@@ -96,6 +98,8 @@ Claude Code and Kiro content are parallel — same concepts, different formats. 
 
 - `SKILL.md` requires YAML frontmatter (`name`, `description`)
 - `description` should include trigger phrases for model invocation
+- `disable-model-invocation: true` prevents auto-triggering (use for interactive skills)
+- Keep SKILL.md under ~500 lines; split larger content into `references/` files with clear "when to read" notes
 - Scripts in `scripts/` — portable, auto-detect OS, install missing tools
 - Document configuration options (env vars, config files, CLI flags)
 
@@ -127,3 +131,4 @@ The user describes what they need. Claude generates the content. The user review
 
 - Work on `dev`, merge to `main` when stable
 - `git add .` forbidden — add files individually
+- Conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`
