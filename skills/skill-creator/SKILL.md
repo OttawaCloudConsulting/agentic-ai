@@ -155,7 +155,29 @@ Consult these guides for design patterns:
 
 - **Multi-step processes**: See references/workflows.md
 - **Output formats/quality standards**: See references/output-patterns.md
+- **Refactor review protocol**: See references/refactor-protocol.md
+- **Anthropic best practices**: See references/anthropic-best-practices.md
 
-### 4. Iterate
+### 4. Refactor Review
+
+After building the initial skill, run a structured review before finalizing. See `references/refactor-protocol.md` for the full protocol including sub-agent prompt templates, output formats, and AskUserQuestion schemas.
+
+**Step sequence:**
+
+1. Launch two parallel sub-agents:
+   - **Critique agent** — evaluates against this skill's internal quality standards (conciseness, degrees of freedom, progressive disclosure, structure)
+   - **Red-team agent** — evaluates against `references/anthropic-best-practices.md` (naming, frontmatter, trigger quality, instruction quality, error handling)
+
+2. Write outputs to `temp/<skill-name>/critique/feedback.md` and `temp/<skill-name>/red-team/feedback.md`
+
+3. Compile both into `temp/<skill-name>/refactor/review-summary.md` and present the path to the user
+
+4. **Approval gate** — ask the user (via AskUserQuestion) whether to proceed with refactoring. If declined or deferred, skip to Iterate.
+
+5. If approved: use AskUserQuestion to gather which changes to apply and any new requirements
+
+6. Launch a **refactor agent** to apply approved changes in-place; log decisions to `temp/<skill-name>/refactor/decisions.md`
+
+### 5. Iterate
 
 Use the skill on real tasks, notice struggles, update SKILL.md and resources, repeat.
