@@ -15,6 +15,8 @@ Guide for creating and updating skills — modular packages that extend Claude w
 | `SKILL.md` | Skill definition with core principles, structural conventions, creation workflow, and resource organization patterns |
 | `references/workflows.md` | Patterns for sequential and conditional workflows within skills |
 | `references/output-patterns.md` | Patterns for template-based and example-based output quality in skills |
+| `references/anthropic-best-practices.md` | Distilled Anthropic official best practices for red-teaming skills — naming rules, frontmatter requirements, trigger quality, progressive disclosure, instruction quality, file structure, common failure modes, and severity classification |
+| `references/refactor-protocol.md` | Full protocol for the Refactor Review stage — critique and red-team agent templates, review structure, approval gates, and decision logging |
 | `LICENSE.txt` | Apache License 2.0 |
 
 ## Usage
@@ -56,7 +58,20 @@ For each use case, identify what reusable resources help:
    - Use imperative/infinitive form throughout
 5. Delete any unused directories
 
-### 4. Iterate
+### 4. Refactor Review
+
+1. Launch two parallel sub-agents:
+   - **Critique agent:** Evaluates against internal quality standards (conciseness, degrees of freedom, progressive disclosure, structure)
+   - **Red-team agent:** Evaluates against `references/anthropic-best-practices.md` (naming, frontmatter, trigger quality, instruction quality, error handling)
+2. Write outputs to `temp/<skill-name>/critique/feedback.md` and `temp/<skill-name>/red-team/feedback.md`
+3. Compile both into `temp/<skill-name>/refactor/review-summary.md`
+4. Present approval gate via user question
+5. If approved, gather refactor requirements via user question, then launch refactor agent
+6. Log all decisions to `temp/<skill-name>/refactor/decisions.md`
+
+See `references/refactor-protocol.md` for the full protocol including agent prompt templates, review structure, and decision logging patterns.
+
+### 5. Iterate
 
 Use the skill on real tasks, notice struggles, update SKILL.md and resources, repeat.
 
