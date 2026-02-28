@@ -2,6 +2,13 @@
 
 Structural templates extracted from existing rules. Use these as blueprints when generating new rules.
 
+## Contents
+
+- [Infrastructure Best Practices Pattern](#infrastructure-best-practices-pattern) — structure and key patterns for technology rules
+- [Behavioral/Process Rule Pattern](#behavioralprocess-rule-pattern) — structure and key patterns for protocol rules
+- [Common Elements](#common-elements) — title, separators, code examples, bold lead pattern, bad practices table
+- [File Naming](#file-naming) — naming conventions for rule files
+
 ## Infrastructure Best Practices Pattern
 
 Used by: `cdk-best-practices.md`, `terraform-best-practices.md`, `crossplane-v1-best-practices.md`, `crossplane-v2-best-practices.md`, `kubernetes-best-practices.md`.

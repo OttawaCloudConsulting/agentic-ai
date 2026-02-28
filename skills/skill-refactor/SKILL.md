@@ -44,15 +44,37 @@ Merge both feedback files into `temp/<skill-name>/refactor/review-summary.md`. P
 
 ### 4. Approval gate
 
-Use AskUserQuestion. Options: proceed with refactor, keep as-is, defer. If declined or deferred, log to `decisions.md` and stop.
+Ask the user directly with these options: proceed with refactor, keep as-is, defer. If declined or deferred, log to `decisions.md` and stop.
 
 ### 5. Requirements gathering
 
-Use AskUserQuestion (up to 3 questions): which change categories to apply, any new requirements, refactor depth (targeted vs full rewrite). Log all answers to `temp/<skill-name>/refactor/decisions.md`.
+Ask the user up to 3 questions: which change categories to apply, any new requirements, refactor depth (targeted vs full rewrite). Log all answers to `temp/<skill-name>/refactor/decisions.md`.
 
 ### 6. Refactor agent
 
 Apply approved changes in-place to the skill files. Preserve sections not flagged for change in targeted refactors. Log implementation notes to `decisions.md`. Read `references/refactor-protocol.md` for the prompt template.
+
+## Error Handling
+
+- **Path does not exist**: Stop and report. Ask the user to provide a valid skill path.
+- **SKILL.md missing**: Stop and report. The directory is not a valid skill.
+- **Malformed frontmatter in target skill**: Flag as a critical finding in the critique feedback. Do not skip the review.
+- **Conflicting recommendations between critique and red-team agents**: Include both perspectives in the review summary. Let the user decide during the approval gate.
+- **Temp directory write failure**: Stop and report the error. Do not proceed without written artifacts.
+
+## Example
+
+```
+User: "refactor skills/skill-refactor/"
+
+1. Locate skill  -> reads skills/skill-refactor/SKILL.md + references/
+2. Sub-agents     -> writes temp/skill-refactor/critique/feedback.md
+                     writes temp/skill-refactor/red-team/feedback.md
+3. Review summary -> writes temp/skill-refactor/refactor/review-summary.md
+4. Approval gate  -> asks user: proceed / keep as-is / defer
+5. Requirements   -> asks user: change scope, new requirements, depth
+6. Refactor       -> applies approved changes in-place
+```
 
 ## Constraints
 

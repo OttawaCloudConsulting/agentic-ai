@@ -1,6 +1,6 @@
 # Refactor Review Protocol
 
-Full protocol for the Refactor Review stage. Claude follows this when executing Step 4 of the skill-creator workflow.
+Full protocol for the Refactor Review stage. Claude follows this when executing the skill-refactor workflow.
 
 ---
 
@@ -214,7 +214,7 @@ Present this file path to the user and tell them to review it before approving.
 
 After presenting the review summary, ask the user for approval before making any changes.
 
-Use AskUserQuestion:
+Ask the user directly:
 
 ```
 Question: "The refactor review is complete. Review temp/<skill-name>/refactor/review-summary.md.
@@ -234,7 +234,7 @@ If the user declines or needs more time: record the decision in `decisions.md` a
 
 After approval, gather specific requirements before refactoring.
 
-Use AskUserQuestion with up to 3 questions:
+Ask the user up to 3 questions:
 
 **Question 1 — Change scope:**
 

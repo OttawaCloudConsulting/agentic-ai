@@ -1,26 +1,28 @@
 ---
 name: terraform-testing
-description: Run Terraform validation, security scanning, planning, and deployment testing. Use when the user asks to test Terraform code, validate Terraform configurations, run Terraform checks, or deploy Terraform to a dev environment. Triggers on requests like "test terraform", "validate my terraform", "run terraform checks", "deploy terraform to dev", or "/test-terraform".
+description: Run Terraform validation, security scanning, planning, and deployment testing for .tf and .tfvars files. Use when the user asks to test Terraform code, validate Terraform configurations, run Terraform checks, or deploy Terraform to a dev environment. Triggers on requests like "test terraform", "validate my terraform", "run terraform checks", "deploy terraform to dev", or "/test-terraform". Do NOT use for CloudFormation, Pulumi, CDK, or non-Terraform infrastructure code.
 ---
 
 # Terraform Testing
 
 Portable Terraform validation and deployment pipeline. Runs git-secrets, fmt, init, validate, tflint, security scanning (checkov/trivy), plan, and optionally apply/destroy via a single shell script.
 
+## Critical Rules
+
+- **Sequential execution:** Never skip a step or run steps in parallel
+- **Stop on failure:** If any critical step fails, stop immediately and report
+- **No silent errors:** Always show the actual error output
+- **Plan before apply:** Never run `terraform apply` without reviewing plan output first
+
 ## Prerequisites
 
-Before running, ensure:
-
-- Feature code is complete
-- Feature is marked `[~]` (in progress) in `progress.txt`
-- You know which feature number you're completing (e.g., 2.1)
+Before running, ensure Terraform code is ready for validation.
 
 ## Workflow
 
-1. Run the test script (Gates 1 & 2)
+1. Run the test script
 2. Review output — all critical steps must pass
 3. If deploy mode: review plan output before apply proceeds
-4. On success: run commit workflow (Gate 3) — see references/commit-workflow.md
 
 ## Running the Script
 
@@ -94,16 +96,12 @@ The script auto-detects OS (macOS, Debian, RHEL) and installs missing tools auto
   - Checkov: `# checkov:skip=CKV_AWS_XX:Reason` inline comment
   - Trivy: `.trivyignore` file or `# trivy:ignore:AVD-AWS-XXXX` inline comment
 
-Document suppression decisions in feature documentation or commit messages.
-
-## Post-Test Commit
-
-After all gates pass, follow the commit workflow in `.claude/skills/terraform-testing/references/commit-workflow.md`.
+Document suppression decisions in commit messages or project documentation.
 
 ## Output Format
 
 ```text
-GATE 1 & 2 — Validation, Plan & Apply: PASS
+Terraform Testing: PASS
   - git-secrets: passed
   - terraform fmt: passed
   - terraform init: passed
@@ -112,18 +110,18 @@ GATE 1 & 2 — Validation, Plan & Apply: PASS
   - checkov: completed with warnings (or passed)
   Plan: 3 to add, 0 to change, 0 to destroy
   Apply: completed successfully
-
-GATE 3 — Commit: PASS (committed as feat: X.Y — ...)
-
-All gates passed. Feature X.Y is complete.
 ```
 
-## Important Rules
+## Example
 
-- **Sequential execution:** Never skip a gate or run gates in parallel
-- **Stop on failure:** If any gate fails, stop immediately and report
-- **No silent errors:** Always show the actual error output
-- **Explicit staging:** Stage each file by name, never use wildcards
-- **Local commits only:** Never push to remote
-- **Plan before apply:** Never run `terraform apply` without reviewing plan output first
-- **Feature documentation required:** Create docs/FEATURE_X.Y.md before committing
+User says: "test my terraform"
+
+1. Run the script in validate+plan mode:
+
+   ```bash
+   bash .claude/skills/terraform-testing/scripts/test-terraform.sh
+   ```
+
+2. Script executes steps 1-7 (git-secrets through terraform plan).
+3. All steps pass. Output shows plan summary: `2 to add, 0 to change, 0 to destroy`.
+4. Report results to user.

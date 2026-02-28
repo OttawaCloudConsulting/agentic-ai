@@ -1,6 +1,8 @@
-# Gate 3 — Commit Workflow
+# Gate 3 -- Commit Workflow
 
 Only execute after all validation and deployment gates pass.
+
+**Customization note:** The steps below reference `progress.txt`, `CHANGELOG.md`, and `docs/FEATURE_X.Y.md`. These are example project conventions. Adapt file names, feature numbering, and tracking mechanisms to match your project.
 
 ## Steps
 
@@ -12,12 +14,12 @@ Only execute after all validation and deployment gates pass.
 
 3. **Update `CHANGELOG.md`:**
    - Add entry for the completed feature
-   - Format: `## [Feature X.Y] — YYYY-MM-DD` with brief summary
+   - Format: `## [Feature X.Y] -- YYYY-MM-DD` with brief summary
 
-4. **Create feature documentation** at `docs/FEATURE_X.Y.md` (if it doesn't exist). Adapt sections to the feature type — not every section applies:
+4. **Create feature documentation** at `docs/FEATURE_X.Y.md` (if it doesn't exist). Adapt sections to the feature type -- not every section applies:
 
    ```markdown
-   # Feature X.Y — [Title]
+   # Feature X.Y -- [Title]
 
    ## Summary
    [1-2 sentences: what was built and why]
@@ -28,7 +30,7 @@ Only execute after all validation and deployment gates pass.
    | `path/to/file` | What changed |
 
    ## Configuration
-   [If new config params were added — parameter name, default, description]
+   [If new config params were added -- parameter name, default, description]
 
    ## Tests Added
    [List new test names and what they verify. Include test count delta.]
@@ -43,8 +45,8 @@ Only execute after all validation and deployment gates pass.
    **Guidelines:**
    - Infrastructure features: emphasize Decisions, Verification (AWS CLI commands)
    - Config features: emphasize Configuration table, Files Changed
-   - Refactoring features: minimal — just Summary and Files Changed
-   - Keep it factual and concise — not a tutorial, just a record
+   - Refactoring features: minimal -- just Summary and Files Changed
+   - Keep it factual and concise -- not a tutorial, just a record
 
 5. **Stage files individually** (never use `git add .` or `git add -A`):
    - Feature code files (lib/, lambda/, bin/)
@@ -55,11 +57,11 @@ Only execute after all validation and deployment gates pass.
    - Any other files explicitly modified for this feature
 
 6. **Commit locally:**
-   - Format: `feat: X.Y — [Brief description from progress.txt]`
-   - Do NOT push — commits are local only
+   - Format: `feat: X.Y -- [Brief description from progress.txt]`
+   - Do NOT push -- commits are local only
 
 ## Output Format
 
 ```text
-GATE 3 — Commit: PASS (committed as feat: X.Y — ...)
+GATE 3 -- Commit: PASS (committed as feat: X.Y -- ...)
 ```

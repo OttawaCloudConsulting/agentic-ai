@@ -6,18 +6,16 @@
 
 ## Description
 
-Guide for creating and updating skills — modular packages that extend Claude with specialized knowledge, workflows, and tools. This meta-skill encodes the design principles, structural conventions, and workflow patterns needed to produce high-quality skills. It transforms the process of skill creation from ad-hoc authoring into a structured methodology with clear quality gates.
+Create skills — modular packages that extend Claude with specialized knowledge, workflows, and tools. Skills transform Claude from a general-purpose agent into a domain specialist equipped with procedural knowledge no model fully possesses. Covers the full lifecycle: creation, structured review, and iteration.
 
 ## Bundle Contents
 
 | File | Purpose |
 |---|---|
-| `SKILL.md` | Skill definition with core principles, structural conventions, creation workflow, and resource organization patterns |
-| `references/workflows.md` | Patterns for sequential and conditional workflows within skills |
+| `SKILL.md` | Skill definition with core principles, structural conventions, creation workflow, workflow patterns, and resource organization patterns |
 | `references/output-patterns.md` | Patterns for template-based and example-based output quality in skills |
 | `references/anthropic-best-practices.md` | Distilled Anthropic official best practices for red-teaming skills — naming rules, frontmatter requirements, trigger quality, progressive disclosure, instruction quality, file structure, common failure modes, and severity classification |
 | `references/refactor-protocol.md` | Full protocol for the Refactor Review stage — critique and red-team agent templates, review structure, approval gates, and decision logging |
-| `LICENSE.txt` | Apache License 2.0 |
 
 ## Usage
 
@@ -53,27 +51,32 @@ For each use case, identify what reusable resources help:
 2. Implement scripts, references, and assets identified in step 2
 3. Test scripts by running them
 4. Write SKILL.md:
-   - Frontmatter with clear `name` and `description`
+   - Frontmatter with clear `name` and `description` (include trigger phrases)
    - Body with workflow guidance and references to bundled resources
    - Use imperative/infinitive form throughout
 5. Delete any unused directories
 
+Consult these guides based on the skill type:
+
+- **Output formats or quality standards**: See `references/output-patterns.md`
+- **Anthropic naming/structure conventions**: See `references/anthropic-best-practices.md`
+- **Workflow patterns**: See "Workflow Patterns" section below
+
 ### 4. Refactor Review
 
-1. Launch two parallel sub-agents:
-   - **Critique agent:** Evaluates against internal quality standards (conciseness, degrees of freedom, progressive disclosure, structure)
-   - **Red-team agent:** Evaluates against `references/anthropic-best-practices.md` (naming, frontmatter, trigger quality, instruction quality, error handling)
-2. Write outputs to `temp/<skill-name>/critique/feedback.md` and `temp/<skill-name>/red-team/feedback.md`
-3. Compile both into `temp/<skill-name>/refactor/review-summary.md`
-4. Present approval gate via user question
-5. If approved, gather refactor requirements via user question, then launch refactor agent
-6. Log all decisions to `temp/<skill-name>/refactor/decisions.md`
+Run a structured review before finalizing. See `references/refactor-protocol.md` for the full protocol including sub-agent prompt templates, output formats, and approval gates.
 
-See `references/refactor-protocol.md` for the full protocol including agent prompt templates, review structure, and decision logging patterns.
+In short: launch parallel critique and red-team agents, compile feedback, get user approval, then apply approved changes.
 
 ### 5. Iterate
 
 Use the skill on real tasks, notice struggles, update SKILL.md and resources, repeat.
+
+## Critical Constraints
+
+- Keep SKILL.md under 500 lines. Move overflow to `references/`.
+- No auxiliary files (README.md, CHANGELOG.md, LICENSE.txt, INSTALLATION_GUIDE.md). Only files an AI agent needs to do the job.
+- Information lives in either SKILL.md or references — not both.
 
 ## Core Design Principles
 
@@ -85,11 +88,9 @@ The context window is a public good. Claude is already very smart — only add c
 
 Match specificity to the task's fragility:
 
-| Level | Format | When to Use |
-|---|---|---|
-| High freedom | Text instructions | Multiple valid approaches, context-dependent decisions |
-| Medium freedom | Pseudocode / parameterized scripts | Preferred pattern exists, some variation acceptable |
-| Low freedom | Specific scripts, few parameters | Fragile operations, consistency critical, exact sequence required |
+- **High freedom** (text instructions): Multiple valid approaches, context-dependent decisions
+- **Medium freedom** (pseudocode/parameterized scripts): Preferred pattern exists, some variation acceptable
+- **Low freedom** (specific scripts, few parameters): Fragile operations, consistency critical, exact sequence required
 
 ### Progressive Disclosure
 
@@ -139,25 +140,22 @@ Documentation loaded into context as needed. Keeps SKILL.md lean. Information sh
 
 Files used in output, not loaded into context. Templates, images, icons, boilerplate code, fonts.
 
-### What Not to Include
-
-No auxiliary documentation (README.md, CHANGELOG.md, INSTALLATION_GUIDE.md, etc.). The skill contains only what an AI agent needs to do the job.
-
 ## Reference Organization Patterns
 
-### Pattern 1: High-level Guide with References
+**Pattern 1: High-level guide with references**
 
 ```markdown
 ## Advanced features
+
 - **Form filling**: See references/forms.md for complete guide
 - **API reference**: See references/api.md for all methods
 ```
 
 Claude loads reference files only when needed.
 
-### Pattern 2: Domain-specific Organization
+**Pattern 2: Domain-specific organization**
 
-```
+```text
 skill-name/
 ├── SKILL.md (overview and navigation)
 └── references/
@@ -166,11 +164,11 @@ skill-name/
     └── product.md
 ```
 
-User asks about sales metrics, so Claude only reads `sales.md`.
+User asks about sales metrics — Claude only reads `sales.md`.
 
-### Pattern 3: Variant-specific Organization
+**Pattern 3: Variant-specific organization**
 
-```
+```text
 cloud-deploy/
 ├── SKILL.md (workflow + provider selection)
 └── references/
@@ -179,9 +177,9 @@ cloud-deploy/
     └── azure.md
 ```
 
-User chooses AWS, so Claude only reads `aws.md`.
+User chooses AWS — Claude only reads `aws.md`.
 
-**Guidelines:**
+Guidelines:
 
 - Keep references one level deep from SKILL.md
 - For files >100 lines, include a table of contents at the top
@@ -200,15 +198,68 @@ For skills where output quality depends on seeing examples, provide input/output
 
 ## Workflow Patterns
 
-From `references/workflows.md`:
-
 ### Sequential Workflows
 
-For complex tasks, break operations into clear, sequential steps. Provide an overview of the process towards the beginning of SKILL.md.
+For complex tasks, break operations into clear, sequential steps. Give Claude an overview early in SKILL.md:
+
+```markdown
+Filling a PDF form involves these steps:
+
+1. Analyze the form (run analyze_form.py)
+2. Create field mapping (edit fields.json)
+3. Validate mapping (run validate_fields.py)
+4. Fill the form (run fill_form.py)
+5. Verify output (run verify_output.py)
+```
 
 ### Conditional Workflows
 
-For tasks with branching logic, guide Claude through decision points with explicit "Creating new content?" vs "Editing existing content?" branches.
+For tasks with branching logic, guide Claude through decision points:
+
+```markdown
+1. Determine the modification type:
+   **Creating new content?** — Follow "Creation workflow" below
+   **Editing existing content?** — Follow "Editing workflow" below
+
+2. Creation workflow: [steps]
+3. Editing workflow: [steps]
+```
+
+## Troubleshooting
+
+| Problem | Response |
+|---|---|
+| User gives vague requirements | Ask clarifying questions in step 1 before proceeding. Do not guess. |
+| Script fails during testing | Fix the script before writing SKILL.md. Do not document broken scripts. |
+| Generated SKILL.md exceeds 500 lines | Move detailed content to `references/`. Keep only workflow and navigation in SKILL.md. |
+| Refactor agents produce conflicting feedback | Prioritize critical items from both. Present conflicts to user for resolution. |
+| Unclear which reference pattern fits | Default to Pattern 1 (high-level guide with references). Split by domain or variant only when the skill has distinct, independent sub-topics. |
+
+## Example
+
+User says: "Create a skill for rotating PDF pages."
+
+Result:
+
+```text
+pdf-rotator/
+├── SKILL.md
+└── scripts/
+    └── rotate.py
+```
+
+Frontmatter:
+
+```yaml
+---
+name: pdf-rotator
+description: >-
+  Rotate pages in PDF files. Use when users say "rotate PDF", "turn PDF pages",
+  "fix PDF orientation", or need to change page rotation in a PDF document.
+---
+```
+
+Body covers: reading the input PDF, selecting pages, calling `scripts/rotate.py`, verifying output. Scripts handle the deterministic rotation logic. No references needed for a focused, single-purpose skill.
 
 ## When to Use
 

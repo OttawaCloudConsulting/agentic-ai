@@ -2,11 +2,11 @@
 
 **Source:** `skills/create-prd/`
 **Command:** `/create-prd`
-**Activation:** Manual — invoked via slash command or trigger phrase matching (e.g., "create a PRD", "start a new project", "build a project plan", "set up a new project from scratch")
+**Activation:** Manual only (`disable-model-invocation: true`) — invoked via slash command. Not auto-triggered by conversational phrases.
 
 ## Description
 
-Guided skill for producing a complete project foundation through structured interview. Conducts five PRD interview rounds followed by an architecture design interview, then generates three artifacts: a Product Requirements Document, an Architecture and Design specification, and a progress tracking file. The interview is incremental — questions are grouped into rounds of 2–4, the user sees what was written after each round, and the documents are refined through a cross-reference and final review pass before the progress file is generated.
+Guided skill for producing a complete project foundation through structured interview. Conducts five PRD interview rounds followed by an architecture design interview, then generates three artifacts: a Product Requirements Document, an Architecture and Design specification, and a progress tracking file. The interview is incremental — questions are grouped into rounds of 2--4, the user sees what was written after each round, and the documents are refined through a cross-reference and final review pass before the progress file is generated. Terminology and sections adapt to the project's technology stack.
 
 ## Bundle Contents
 
@@ -44,9 +44,11 @@ Conducts five interview rounds in order, updating `prd.md` after each:
 | 4 — Security | Encryption, access control, edge protection, security headers | Risk Assessment (security) |
 | 5 — Operational | Logging, monitoring, deployment workflow, cost constraints | Risk Assessment (operational), Future Enhancements |
 
+**Quality bar:** The PRD must have specific acceptance criteria per feature and clear configuration and output tables. Design decisions belong in the architecture document (Step 3).
+
 ### Step 3 — Architecture and Design Document
 
-Interviews on Architecture Decisions, Component Design, File Organization, Deployment Workflow, Security Review, and Risks/External Dependencies. Writes `docs/ARCHITECTURE_AND_DESIGN.md`.
+Interviews on Architecture Decisions, Component Design, File Organization (skip for single-file scripts), Deployment Workflow (include when non-trivial), Security Review, and Risks/External Dependencies (include when external coupling exists). Writes `docs/ARCHITECTURE_AND_DESIGN.md`. Irrelevant template sections are omitted; sections the project needs that are not in the template are added.
 
 **Quality bar:** Target 10–20 Design Decisions. Shallow decision tables are the most common quality gap.
 
@@ -77,11 +79,19 @@ Presents a summary: artifact names, feature count, configuration parameter count
 ## Rules
 
 - **One round at a time.** Questions are grouped; the user is never shown all questions at once.
-- **Show work after each step.** The user sees what was written before the next step begins.
-- **Confirm before overwriting.** All three output files are checked in Prerequisites.
+- **Show work after each step.** The user sees what was added or changed before the next step begins.
+- **Confirm before overwriting.** All three output files are checked in Prerequisites; the user confirms before any existing file is replaced.
+- **Adapt to the project.** Terminology, sections, and questions adjust to match the technology stack.
 - **Design decisions belong in the architecture doc.** The PRD does not have a Design Decisions section.
 - **Cross-reference everything.** Feature numbers, parameter names, and component names must match across all three documents.
 - **No implementation.** This skill produces planning documents only.
+
+## Error Handling
+
+- **Interrupted interview:** Saves progress to artifacts created so far. On re-invocation, detects existing files and offers to resume from the last completed step.
+- **Vague or contradictory answers:** Asks a clarifying follow-up rather than guessing. Unresolved ambiguity is recorded in the PRD Risk Assessment table.
+- **Project does not fit templates:** Irrelevant template sections are omitted; needed sections not in the template are added. States what was omitted and why.
+- **User wants to skip a round:** Allowed. The skipped round is recorded in `prd.md` as a comment so a future session can revisit it.
 
 ## When to Use
 
