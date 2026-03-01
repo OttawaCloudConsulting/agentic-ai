@@ -10,7 +10,7 @@ Expand from the PRD summary. This section should stand alone as a complete descr
 ## Component Diagram
 
 <!-- Use the format that best fits the project:
-     - ASCII/Unicode boxes for infrastructure (CloudFront → S3, VPC topology)
+     - ASCII/Unicode boxes for infrastructure or network topology
      - Mermaid flowchart for service interaction diagrams
      - Text tree for script/module structure -->
 
@@ -29,7 +29,7 @@ Expand from the PRD summary. This section should stand alone as a complete descr
 
 <!-- Column selection: always include #, Resource/Component, Type/Technology.
      Add Region if multi-region. Add Quantity if resources are created in multiples.
-     Use "Terraform Type" or "CDK Construct" instead of "Type" for IaC projects. -->
+     Adapt column headers to the project (e.g., "Terraform Type" for IaC, "Service" for microservices). -->
 
 | # | Component | Type / Technology | Purpose |
 |---|-----------|-------------------|---------|
@@ -43,15 +43,15 @@ Expand from the PRD summary. This section should stand alone as a complete descr
 
 ### Access Control
 
-[IAM policies, bucket policies, role trust relationships, or equivalent.]
+[Authentication and authorization strategy. Role-based access, API keys, OAuth, or equivalent.]
 
 ### Edge Protection
 
-<!-- Include if applicable: WAF, Shield, CloudFront geo-restriction, security groups. -->
+<!-- Include if applicable: WAF, rate limiting, geo-restriction, firewall rules, security groups. -->
 
 ### Audit and Logging
 
-<!-- Include if the project produces audit trails, access logs, or CloudTrail events. -->
+<!-- Include if the project produces audit trails, access logs, or event records. -->
 
 ### Response Headers
 
@@ -61,17 +61,17 @@ Expand from the PRD summary. This section should stand alone as a complete descr
 
 ```
 project-root/
-├── file.tf          # What this file contains
-├── other-file.tf    # What this file contains
+├── file.ext         # What this file contains
+├── other-file.ext   # What this file contains
 └── subdir/
-    └── nested.tf    # What this file contains
+    └── nested.ext   # What this file contains
 ```
 
 ## Configuration
 
-<!-- Include for projects that expose configurable inputs (Terraform modules, CDK constructs,
-     CLI tools, libraries). Split Required and Optional. Group Optional by concern.
-     Use "Variable" instead of "Parameter" in the column header for IaC projects if preferred. -->
+<!-- Include for projects that expose configurable inputs (modules, libraries, CLI tools,
+     services). Split Required and Optional. Group Optional by concern.
+     Adapt column headers to the project (e.g., "Variable" for IaC, "Flag" for CLI tools). -->
 
 ### Required
 
@@ -107,14 +107,14 @@ project-root/
 
 <!-- Use the pattern that matches the project's deployment model:
 
-     PHASED (for two-phase deploys, e.g. ACM cert validation before CloudFront association):
-       Phase 1: [First apply — what gets created, what stays unconfigured]
-       Phase 2: [Manual step] → [Second apply — what gets wired up]
+     PHASED (for multi-phase deploys with intermediate manual steps):
+       Phase 1: [What gets created or configured]
+       Phase 2: [Manual step] → [What gets wired up or finalized]
 
      STEP-BY-STEP (for standard linear deploys):
        1. Prerequisites
-       2. terraform init / cdk bootstrap
-       3. Plan / synth
+       2. Initialize / bootstrap
+       3. Plan / preview
        4. Apply / deploy
        5. Smoke test
 
@@ -123,7 +123,7 @@ project-root/
 
 ## Dependency Graph
 
-<!-- Include for infrastructure projects or when component initialization order matters.
+<!-- Include when component initialization or build order matters.
      Show both logical dependencies and initialization sequence. -->
 
 ```

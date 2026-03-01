@@ -13,8 +13,7 @@ Portable Terraform validation and deployment pipeline. Runs a gated sequence of 
 | File | Purpose |
 |---|---|
 | `SKILL.md` | Skill definition with pipeline overview, configuration reference, and invocation examples |
-| `scripts/test-terraform.sh` | Shell script implementing the full 9-step validation and deployment pipeline |
-| `references/commit-workflow.md` | Step-by-step commit procedure executed after all gates pass (Gate 3) |
+| `scripts/test-terraform.sh` | Shell script implementing the full validation and deployment pipeline |
 
 ## Usage
 
@@ -57,26 +56,27 @@ bash .claude/skills/terraform-testing/scripts/test-terraform.sh --output-dir ./r
 
 ## Workflow
 
-The skill executes three sequential gates. Each gate must pass before the next begins.
+1. Run the test script
+2. Review output — all critical steps must pass
+3. If deploy mode: review plan output before apply proceeds
 
-### Gates 1 and 2 — Validation, Plan, and Deploy
+### Pipeline Steps
 
 Runs `test-terraform.sh`, which executes these steps in order:
 
 | Step | Tool | Critical | Purpose |
 |---|---|---|---|
-| 0 | Tool detection | Yes | Auto-detect OS, find or install required tools |
 | 1 | git-secrets | Yes | Scan for hardcoded secrets |
 | 2 | terraform fmt | Yes | Check HCL formatting |
-| 3 | terraform init | Yes | Initialize providers (with `-backend=false` for validation) |
-| 4 | terraform validate | Yes | Syntax and consistency check |
-| 5 | tflint | Yes | Provider-aware linting (with optional `.tflint.hcl` config) |
-| 6 | checkov/trivy | No | Security scanning (warnings by default, configurable) |
-| 7 | terraform plan | Yes | Generate deployment plan (skipped with `--no-plan`) |
-| 8 | terraform apply | Yes | Deploy resources (only with `--deploy` or `--deploy-destroy`) |
-| 9 | terraform destroy | Yes | Teardown resources (only with `--deploy-destroy`) |
+| 3 | terraform init | Yes | Initialize providers |
+| 4 | terraform validate | Yes | Syntax and consistency |
+| 5 | tflint | Yes | Provider-aware linting |
+| 6 | checkov/trivy | No | Security scanning (warnings) |
+| 7 | terraform plan | Yes | Generate deployment plan |
+| 8 | terraform apply | Yes | Deploy (only with `--deploy`) |
+| 9 | terraform destroy | Yes | Teardown (only with `--deploy-destroy`) |
 
-The script auto-detects OS (macOS, Debian, RHEL) and attempts to install missing tools automatically. Terraform is required; all other tools are optional and skipped if unavailable.
+The script auto-detects OS (macOS, Debian, RHEL) and installs missing tools automatically. Terraform is required; all other tools are optional and skipped if unavailable.
 
 **Directory handling:** The script validates all configured directories before running any pipeline steps. It supports multiple validate directories and separate deploy-eligible directories, configured via `.test-terraform.conf` or CLI flags.
 
@@ -89,21 +89,10 @@ The script auto-detects OS (macOS, Debian, RHEL) and attempts to install missing
 **Pass criteria:** All critical steps pass (exit code 0).
 **On failure:** Stop immediately. Report which step failed with actionable fix guidance.
 
-### Gate 3 — Commit Workflow
-
-Executes only after all validation and deployment gates pass. Follows the procedure in `references/commit-workflow.md`:
-
-1. Read `progress.txt` to identify the current in-progress feature (marked `[~]`)
-2. Update `progress.txt` — change `[~]` to `[x]`, add completion date
-3. Update `CHANGELOG.md` — add entry for the completed feature
-4. Create feature documentation at `docs/FEATURE_X.Y.md` with sections adapted to the feature type (summary, files changed, configuration, validation/plan summary, decisions, verification)
-5. Stage files individually (never `git add .` or `git add -A`)
-6. Commit locally with format `feat: X.Y — [Brief description]` — never push
-
 ### Output Format
 
 ```text
-GATE 1 & 2 — Validation, Plan & Apply: PASS
+Terraform Testing: PASS
   - git-secrets: passed
   - terraform fmt: passed
   - terraform init: passed
@@ -112,19 +101,13 @@ GATE 1 & 2 — Validation, Plan & Apply: PASS
   - checkov: completed with warnings (or passed)
   Plan: 3 to add, 0 to change, 0 to destroy
   Apply: completed successfully
-
-GATE 3 — Commit: PASS (committed as feat: X.Y — ...)
-
-All gates passed. Feature X.Y is complete.
 ```
 
 ## When to Use
 
-- After completing a feature in a Terraform project
 - When you need to validate Terraform code before deployment
-- When you want a single command to run the full validate-plan-deploy-commit cycle
+- When you want a single command to run the full validate-plan-deploy cycle
 - For ephemeral infrastructure testing with `--deploy-destroy`
-- When a feature is marked `[~]` in `progress.txt` and ready for completion
 
 ## When Not to Use
 

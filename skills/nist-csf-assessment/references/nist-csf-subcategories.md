@@ -9,6 +9,15 @@ Phase 0 of the nist-csf-assessment skill validates the version recorded in this 
 
 800-53 informative references in this file are native to CSF 2.0. They map each subcategory outcome to the corresponding NIST SP 800-53 Rev 5 controls.
 
+## Contents
+
+- [GV — Govern](#gv--govern) (OC, RM, RR, PO, OV, SC)
+- [ID — Identify](#id--identify) (AM, RA, IM)
+- [PR — Protect](#pr--protect) (AA, AT, DS, PS, IR)
+- [DE — Detect](#de--detect) (CM, AE)
+- [RS — Respond](#rs--respond) (MA, AN, CO, MI)
+- [RC — Recover](#rc--recover) (RP, CO)
+
 ---
 
 ## GV — Govern

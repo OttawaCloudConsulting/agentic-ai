@@ -1,17 +1,28 @@
 ---
 name: skill-creator
-description: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.
+description: >-
+  Guide for creating effective skills. Use when users say "create a skill",
+  "build a new skill", "make a skill for", "write a skill that", "new SKILL.md",
+  or want to update an existing skill. Covers the full lifecycle: creation,
+  structured review, and iteration.
+license: Apache-2.0
 ---
 
 # Skill Creator
 
-Create skills — modular packages that extend Claude with specialized knowledge, workflows, and tools. Skills transform Claude from a general-purpose agent into a domain specialist equipped with procedural knowledge no model fully possesses.
+Create skills -- modular packages that extend Claude with specialized knowledge, workflows, and tools. Skills transform Claude from a general-purpose agent into a domain specialist equipped with procedural knowledge no model fully possesses.
+
+## Critical Constraints
+
+- Keep SKILL.md under 500 lines. Move overflow to `references/`.
+- No auxiliary files (README.md, CHANGELOG.md, LICENSE.txt, INSTALLATION_GUIDE.md). Only files an AI agent needs to do the job.
+- Information lives in either SKILL.md or references -- not both.
 
 ## Core Principles
 
 ### Concise is Key
 
-The context window is a public good. Claude is already very smart — only add context Claude doesn't already have. Challenge each line: "Does this justify its token cost?"
+The context window is a public good. Claude is already very smart -- only add context Claude doesn't already have. Challenge each line: "Does this justify its token cost?"
 
 Prefer concise examples over verbose explanations.
 
@@ -27,15 +38,15 @@ Match specificity to the task's fragility:
 
 Skills load in three tiers to manage context efficiently:
 
-1. **Metadata** (name + description) — always in context (~100 words)
-2. **SKILL.md body** — loaded when skill triggers (<500 lines)
-3. **Bundled resources** — loaded as needed by Claude
+1. **Metadata** (name + description) -- always in context (~100 words)
+2. **SKILL.md body** -- loaded when skill triggers (<500 lines)
+3. **Bundled resources** -- loaded as needed by Claude
 
-Keep SKILL.md under 500 lines. Split content into reference files when approaching this limit. Always reference split-out files from SKILL.md with clear guidance on when to read them.
+Split content into reference files when approaching the 500-line limit. Always reference split-out files from SKILL.md with clear guidance on when to read them.
 
 ## Skill Structure
 
-```
+```text
 skill-name/
 ├── SKILL.md              (required)
 ├── scripts/              (optional) Executable code for deterministic tasks
@@ -55,7 +66,7 @@ description: What the skill does and when to use it. Include trigger phrases.
 ```
 
 - `name`: kebab-case, max 64 characters
-- `description`: Primary triggering mechanism. Include both what the skill does AND specific scenarios/triggers. All "when to use" information goes here — the body only loads after triggering.
+- `description`: Primary triggering mechanism. Include both what the skill does AND specific scenarios/triggers. All "when to use" information goes here -- the body only loads after triggering.
 
 **Body** (Markdown): Instructions and guidance for using the skill and its resources.
 
@@ -65,7 +76,7 @@ Executable code (Python/Bash/etc.) for tasks that are repeatedly rewritten or ne
 
 ### references/
 
-Documentation loaded into context as needed. Keeps SKILL.md lean. Information should live in either SKILL.md or references, not both.
+Documentation loaded into context as needed. Keeps SKILL.md lean.
 
 Best practice: if reference files are large (>10k words), include grep search patterns in SKILL.md.
 
@@ -73,16 +84,13 @@ Best practice: if reference files are large (>10k words), include grep search pa
 
 Files used in output, not loaded into context. Templates, images, icons, boilerplate code, fonts.
 
-### What Not to Include
-
-No auxiliary documentation (README.md, CHANGELOG.md, INSTALLATION_GUIDE.md, etc.). The skill contains only what an AI agent needs to do the job.
-
 ## Reference Organization Patterns
 
 **Pattern 1: High-level guide with references**
 
 ```markdown
 ## Advanced features
+
 - **Form filling**: See references/forms.md for complete guide
 - **API reference**: See references/api.md for all methods
 ```
@@ -91,7 +99,7 @@ Claude loads reference files only when needed.
 
 **Pattern 2: Domain-specific organization**
 
-```
+```text
 skill-name/
 ├── SKILL.md (overview and navigation)
 └── references/
@@ -100,11 +108,11 @@ skill-name/
     └── product.md
 ```
 
-User asks about sales metrics → Claude only reads `sales.md`.
+User asks about sales metrics -- Claude only reads `sales.md`.
 
 **Pattern 3: Variant-specific organization**
 
-```
+```text
 cloud-deploy/
 ├── SKILL.md (workflow + provider selection)
 └── references/
@@ -113,7 +121,7 @@ cloud-deploy/
     └── azure.md
 ```
 
-User chooses AWS → Claude only reads `aws.md`.
+User chooses AWS -- Claude only reads `aws.md`.
 
 Guidelines:
 
@@ -136,9 +144,9 @@ Skip only when usage patterns are already clearly understood.
 
 For each use case, identify what reusable resources help:
 
-- **Repeated code** → `scripts/` (e.g., `scripts/rotate_pdf.py`)
-- **Repeated discovery** → `references/` (e.g., `references/schema.md`)
-- **Repeated boilerplate** → `assets/` (e.g., `assets/hello-world/`)
+- **Repeated code** -- `scripts/` (e.g., `scripts/rotate_pdf.py`)
+- **Repeated discovery** -- `references/` (e.g., `references/schema.md`)
+- **Repeated boilerplate** -- `assets/` (e.g., `assets/hello-world/`)
 
 ### 3. Build the Skill
 
@@ -146,38 +154,88 @@ For each use case, identify what reusable resources help:
 2. Implement scripts, references, and assets identified in step 2
 3. Test scripts by running them
 4. Write SKILL.md:
-   - Frontmatter with clear `name` and `description`
+   - Frontmatter with clear `name` and `description` (include trigger phrases)
    - Body with workflow guidance and references to bundled resources
    - Use imperative/infinitive form throughout
 5. Delete any unused directories
 
-Consult these guides for design patterns:
+Consult these guides based on the skill type:
 
-- **Multi-step processes**: See references/workflows.md
-- **Output formats/quality standards**: See references/output-patterns.md
-- **Refactor review protocol**: See references/refactor-protocol.md
-- **Anthropic best practices**: See references/anthropic-best-practices.md
+- **Output formats or quality standards**: See references/output-patterns.md
+- **Anthropic naming/structure conventions**: See references/anthropic-best-practices.md
+- **Workflow patterns**: See "Workflow Patterns" section below
 
 ### 4. Refactor Review
 
-After building the initial skill, run a structured review before finalizing. See `references/refactor-protocol.md` for the full protocol including sub-agent prompt templates, output formats, and AskUserQuestion schemas.
+Run a structured review before finalizing. See `references/refactor-protocol.md` for the full protocol including sub-agent prompt templates, output formats, and approval gates.
 
-**Step sequence:**
-
-1. Launch two parallel sub-agents:
-   - **Critique agent** — evaluates against this skill's internal quality standards (conciseness, degrees of freedom, progressive disclosure, structure)
-   - **Red-team agent** — evaluates against `references/anthropic-best-practices.md` (naming, frontmatter, trigger quality, instruction quality, error handling)
-
-2. Write outputs to `temp/<skill-name>/critique/feedback.md` and `temp/<skill-name>/red-team/feedback.md`
-
-3. Compile both into `temp/<skill-name>/refactor/review-summary.md` and present the path to the user
-
-4. **Approval gate** — ask the user (via AskUserQuestion) whether to proceed with refactoring. If declined or deferred, skip to Iterate.
-
-5. If approved: use AskUserQuestion to gather which changes to apply and any new requirements
-
-6. Launch a **refactor agent** to apply approved changes in-place; log decisions to `temp/<skill-name>/refactor/decisions.md`
+In short: launch parallel critique and red-team agents, compile feedback, get user approval, then apply approved changes.
 
 ### 5. Iterate
 
 Use the skill on real tasks, notice struggles, update SKILL.md and resources, repeat.
+
+## Workflow Patterns
+
+### Sequential Workflows
+
+For complex tasks, break operations into clear, sequential steps. Give Claude an overview early in SKILL.md:
+
+```markdown
+Filling a PDF form involves these steps:
+
+1. Analyze the form (run analyze_form.py)
+2. Create field mapping (edit fields.json)
+3. Validate mapping (run validate_fields.py)
+4. Fill the form (run fill_form.py)
+5. Verify output (run verify_output.py)
+```
+
+### Conditional Workflows
+
+For tasks with branching logic, guide Claude through decision points:
+
+```markdown
+1. Determine the modification type:
+   **Creating new content?** -- Follow "Creation workflow" below
+   **Editing existing content?** -- Follow "Editing workflow" below
+
+2. Creation workflow: [steps]
+3. Editing workflow: [steps]
+```
+
+## Troubleshooting
+
+| Problem | Response |
+|---|---|
+| User gives vague requirements | Ask clarifying questions in step 1 before proceeding. Do not guess. |
+| Script fails during testing | Fix the script before writing SKILL.md. Do not document broken scripts. |
+| Generated SKILL.md exceeds 500 lines | Move detailed content to `references/`. Keep only workflow and navigation in SKILL.md. |
+| Refactor agents produce conflicting feedback | Prioritize critical items from both. Present conflicts to user for resolution. |
+| Unclear which reference pattern fits | Default to Pattern 1 (high-level guide with references). Split by domain or variant only when the skill has distinct, independent sub-topics. |
+
+## Example
+
+User says: "Create a skill for rotating PDF pages."
+
+Result:
+
+```text
+pdf-rotator/
+├── SKILL.md
+└── scripts/
+    └── rotate.py
+```
+
+Frontmatter:
+
+```yaml
+---
+name: pdf-rotator
+description: >-
+  Rotate pages in PDF files. Use when users say "rotate PDF", "turn PDF pages",
+  "fix PDF orientation", or need to change page rotation in a PDF document.
+---
+```
+
+Body covers: reading the input PDF, selecting pages, calling `scripts/rotate.py`, verifying output. Scripts handle the deterministic rotation logic. No references needed for a focused, single-purpose skill.

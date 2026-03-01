@@ -1,6 +1,6 @@
 ---
 name: create-prd
-description: Create a PRD, architecture document, and progress file for a new project through guided interview. Use when starting a new project or blueprint from scratch.
+description: Create a PRD, architecture document, and progress file for a new project through guided interview. Use when starting a new project, planning a new feature, writing requirements, scoping a project, or creating project documentation from scratch.
 disable-model-invocation: true
 ---
 
@@ -11,6 +11,16 @@ Create a complete project foundation through a structured interview process. Pro
 - `prd.md` — Product Requirements Document
 - `docs/ARCHITECTURE_AND_DESIGN.md` — Architecture and design specification
 - `progress.txt` — Discrete feature steps and phases
+
+## Rules
+
+- **One round at a time.** Never dump all questions on the user at once.
+- **Show work after each step.** Tell the user what was added or changed.
+- **Confirm before overwriting.** Do not skip the overwrite check in Prerequisites.
+- **Adapt to the project.** Adjust terminology, sections, and questions to match the technology.
+- **Do not begin implementation.** This skill produces planning documents only.
+- **Cross-reference everything.** Feature numbers, parameter names, and component names must match
+  across all three documents.
 
 ## Prerequisites
 
@@ -58,7 +68,14 @@ Read `references/interview-guide.md` for the architecture interview areas.
 Read `assets/architecture-template.md` for the document structure.
 
 Use Bash (`mkdir -p docs`) to ensure `docs/` exists. Conduct a focused interview using
-`AskUserQuestion` covering Architecture Decisions, Component Design, and Security Review.
+`AskUserQuestion` covering these areas from the interview guide:
+
+- Architecture Decisions (always)
+- Component Design (always)
+- File Organization (always for multi-file projects; skip for single-file scripts)
+- Deployment Workflow (include when deployment is non-trivial)
+- Risks and External Dependencies (include when external coupling exists)
+- Security Review (always)
 
 Use the Write tool to create `docs/ARCHITECTURE_AND_DESIGN.md`. Omit sections that are
 irrelevant to the project; add sections needed but not in the template. Read the file back
@@ -132,11 +149,14 @@ FIRST FEATURE:
 Run /start-feature to begin implementation.
 ```
 
-## Rules
+## Error Handling
 
-- **One round at a time.** Never dump all questions on the user at once.
-- **Show work after each step.** Tell the user what was added or changed.
-- **Confirm before overwriting.** Checked in Prerequisites — do not skip this for any of the three output files.
-- **Adapt to the project.** Adjust terminology, sections, and questions to match the technology.
-- **Do not begin implementation.** This skill produces planning documents only.
-- **Cross-reference everything.** Feature numbers, parameter names, and component names must match across all three documents.
+- **Interrupted interview:** If the user stops mid-interview, save progress to the artifacts
+  created so far. On re-invocation, detect existing files and offer to resume from the last
+  completed step rather than starting over.
+- **Vague or contradictory answers:** Ask a clarifying follow-up. Do not guess intent or fill in
+  placeholders. If the user cannot clarify, record the ambiguity in the PRD Risk Assessment table.
+- **Project does not fit templates:** Omit irrelevant template sections. Add sections the project
+  needs that are not in the template. State what was omitted and why.
+- **User wants to skip a round:** Allow it. Record the skipped round in prd.md as a comment so a
+  future session can revisit it.

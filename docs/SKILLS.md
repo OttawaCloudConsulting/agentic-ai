@@ -12,7 +12,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | Terraform Testing | `/terraform-testing` | Validate, scan, plan, and deploy Terraform code | [View](skills/terraform-testing.md) |
 | ITSG Assessment | `/itsg-assessment` | ITSG-33 / CCCS Medium compliance assessment for Canadian GC cloud workloads handling Protected B data, with user checkpoints | [View](skills/itsg-assessment.md) |
 | NIST FedRAMP Assessment | `/nist-fedramp-assessment` | NIST SP 800-53 Rev 5 / FedRAMP Moderate compliance assessment for US cloud workloads with dual inheritance model and FedRAMP ATO readiness | [View](skills/nist-fedramp-assessment.md) |
-| NIST CSF Assessment | `/nist-csf-assessment` | NIST CSF 2.0 outcome-based assessment across all 6 Functions with AWS evidence mapping, 800-53 informative references, and self-updating Phase 0 that always validates against the latest published CSF version | [View](skills/nist-csf-assessment.md) |
+| NIST CSF Assessment | `/nist-csf-assessment` | NIST CSF 2.0 outcome-based assessment across all 6 Functions with platform-agnostic evidence mapping, 800-53 informative references, and self-updating Phase 0 that always validates against the latest published CSF version | [View](skills/nist-csf-assessment.md) |
 | Create PRD | `/create-prd` | Guided interview to produce a PRD, architecture document, and progress file for a new project | [View](skills/create-prd.md) |
 | Skill Creator | `/skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/skill-creator.md) |
 | Skill Refactor | `/skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/skill-refactor.md) |
@@ -28,6 +28,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
   - `references/` — supporting documentation loaded on-demand (optional)
 - The `description` field in frontmatter includes trigger phrases so the model knows when to invoke the skill
 - Skills are invoked manually via `/<skill-name>` or automatically when the model matches trigger phrases
+- Set `disable-model-invocation: true` in frontmatter to prevent auto-triggering (use for interactive or destructive skills)
 
 ### Skill Bundle Structure
 
@@ -46,6 +47,9 @@ skills/<name>/
 ---
 name: skill-name                    # Required. The /command name.
 description: What the skill does    # Required. Include trigger phrases.
+disable-model-invocation: true      # Optional. Prevents auto-triggering.
+compatibility: node>=18, npm, git   # Optional. Documents runtime requirements.
+license: Apache-2.0                 # Optional. License identifier.
 ---
 ```
 
