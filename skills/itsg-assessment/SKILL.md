@@ -1,6 +1,7 @@
 ---
 name: itsg-assessment
-description: Map project architecture to ITSG-33 / CCCS Medium Cloud Profile security controls for Canadian GC cloud workloads handling Protected B data. Produces a phased compliance assessment with AWS control inheritance and risk-rated gap analysis. Use when asked to assess ITSG, run a CCCS Medium compliance check, evaluate Canadian cloud compliance, map ITSG-33 controls, perform a GC cloud security assessment, or check Protected B data handling requirements. Do NOT use for FedRAMP, NIST CSF, SOC 2, or non-Canadian compliance frameworks.
+description: Map project architecture to ITSG-33 / CCCS Medium Cloud Profile security controls for Canadian GC cloud workloads handling Protected B data. Produces a phased compliance assessment with AWS control inheritance and risk-rated gap analysis. Use when asked to assess ITSG, run a CCCS Medium compliance check, evaluate Canadian cloud compliance, map ITSG-33 controls, perform a GC cloud security assessment, or check Protected B data handling requirements. Do NOT use for FedRAMP, NIST CSF, SOC 2, PBMM standalone reviews, TBS cloud profile assessments, or other non-ITSG-33 compliance frameworks.
+compatibility: "AWS workloads in Canadian regions (ca-central-1, ca-west-1). Requires network access for Phase 0 control validation."
 ---
 
 # ITSG-33 / CCCS Medium Compliance Assessment
@@ -14,22 +15,12 @@ These rules govern all phases. Read before starting any assessment work.
 - **Evidence over assumption**: Every "Implemented" status must cite a file path or pattern. If no evidence, mark "Not Implemented" or ask.
 - **Don't inflate compliance**: When uncertain, mark "Partially Implemented" with notes.
 - **Respect inheritance**: Many controls are AWS-inherited or GC Org-level. Don't mark these as gaps.
-- **Canadian jurisdiction**: This skill applies exclusively to ITSG-33 / CCCS Medium — not NIST FedRAMP or other frameworks.
 - **Protected B data classification**: Flag any handling of Protected B data without explicit encryption, access control, and residency controls.
 - **GC data residency**: Data residency defaults to ca-central-1. Flag resources deployed outside Canadian AWS regions (ca-central-1, ca-west-1).
 - **CCCS guidance**: Apply CCCS Medium Cloud Profile control selection as defined in ITSP.50.103 Annex B. Follow CCCS guidance when interpreting control applicability.
 - **No fabricated controls**: Only map controls from ITSG-33. Verify against official sources when uncertain.
 - **Phase checkpoints are mandatory**: Always pause between phases for user input.
 - **Smart re-run is default**: If previous outputs exist, offer smart re-run first.
-
-## Example
-
-User: "Run an ITSG-33 compliance assessment on this CDK project."
-
-1. Phase 0 — Validate controls against official ITSG-33 sources
-2. Phase 1 — Scan `cdk.json`, `lib/`, pipeline definitions; identify AWS services, data residency, trust boundaries; write `docs/compliance/phase1-discovery.md`; checkpoint with user
-3. Phase 2 — Map each control from `references/itsg33-controls.md` against discovered architecture; classify inheritance; write `docs/compliance/phase2-control-mapping.md`; checkpoint with user
-4. Phase 3 — Produce risk-rated gap entries for unimplemented controls; write `docs/compliance/phase3-gap-analysis.md` and `docs/compliance/assessment-summary.md`
 
 ## Output
 
@@ -44,12 +35,21 @@ All output goes to `docs/compliance/`. Create the directory if it doesn't exist.
 
 Before writing any phase output, read `references/phase-templates.md` for the required format.
 
+## Example
+
+User: "Run an ITSG-33 compliance assessment on this CDK project."
+
+1. Phase 0 — Validate controls against official ITSG-33 sources
+2. Phase 1 — Scan `cdk.json`, `lib/`, pipeline definitions; identify AWS services, data residency, trust boundaries; write `docs/compliance/phase1-discovery.md`; checkpoint with user
+3. Phase 2 — Map each control from `references/itsg33-controls.md` against discovered architecture; classify inheritance; write `docs/compliance/phase2-control-mapping.md`; checkpoint with user
+4. Phase 3 — Produce risk-rated gap entries for unimplemented controls; write `docs/compliance/phase3-gap-analysis.md` and `docs/compliance/assessment-summary.md`
+
 ## Smart Re-run
 
 Before starting any phase, check if previous phase outputs exist. If they do:
 
 1. Read the existing output and compare against current project state (file modification times, git diff)
-2. If significant changes detected, re-run that phase
+2. If changes detected (any IaC file modified since the phase output was written, or any new AWS service added to the codebase), re-run that phase
 3. If no changes, report "Phase N output is current — skipping"
 4. Always ask: "Previous assessment found. Re-run from scratch or smart re-run?"
 
@@ -68,29 +68,22 @@ Runs first, before any assessment work. Validates control data against official 
 
 ### 1.1 — Detect Tech Stack
 
-Scan the project root for technology indicators:
+Detect the IaC framework in use — this determines search terms in Phase 1.2:
 
-| Indicator | Detection |
+| IaC Framework | Indicator |
 |---|---|
-| **Language** | `package.json`, `requirements.txt`/`pyproject.toml`, `go.mod`, `Cargo.toml`, `pom.xml`/`build.gradle` |
-| **IaC** | `cdk.json` (CDK), `*.tf` (Terraform/OpenTofu), `template.yaml` (CloudFormation/SAM), Crossplane `*.yaml` |
-| **Containers** | `Dockerfile`, `docker-compose.yml` |
-| **CI/CD** | `.github/workflows/`, `buildspec.yml`, `.gitlab-ci.yml`, `Jenkinsfile` |
+| **CDK** | `cdk.json`, `lib/*.ts` or `lib/*.py` with CDK constructs |
+| **Terraform / OpenTofu** | `*.tf` files |
+| **CloudFormation / SAM** | `template.yaml` or `template.json` |
+| **Crossplane** | `*.yaml` with `apiVersion: aws.upbound.io` or similar |
+
+Also note language runtime and CI/CD platform for context, but do not let them drive control mapping.
 
 ### 1.2 — Analyze Codebase
 
-Search for security-relevant patterns in the codebase. For each category, search for the indicated terms and constructs:
+Search for security-relevant patterns across these categories: IAM / Access Control, Encryption, Logging / Auditing, Network, Data Protection, Backup / Recovery.
 
-| Category | What to search for |
-|---|---|
-| **IAM / Access Control** | IAM policy documents, role definitions, `iam.Role`, `iam.Policy`, `aws_iam_*`, `Effect: Allow/Deny`, resource policies |
-| **Encryption** | KMS key references, `encryption`, `kms`, `SSEAlgorithm`, TLS/HTTPS configuration, certificate resources |
-| **Logging / Auditing** | CloudTrail, CloudWatch Logs, access logging, `log_group`, `Trail`, audit configuration |
-| **Network** | VPC definitions, security groups, NACLs, subnet configurations, `cidr`, WAF rules, API Gateway |
-| **Data Protection** | S3 bucket policies, `block_public_access`, versioning, DynamoDB encryption, RDS encryption settings |
-| **Backup / Recovery** | Backup plans, snapshot policies, retention settings, cross-region replication |
-
-Adapt search terms to the detected IaC framework (e.g., CDK constructs vs Terraform resource types vs CloudFormation resource names).
+Adapt search terms to the detected IaC framework (CDK constructs, Terraform resource types, or CloudFormation resource names).
 
 If no IaC or security-relevant patterns are found, report what was searched and ask the user whether security controls exist outside the codebase.
 
@@ -141,10 +134,8 @@ Present the executive summary and top recommended actions.
 
 | Situation | Action |
 |---|---|
-| Phase 0 web fetch fails | Skip validation, use cached controls, report skip reason |
 | No IaC files detected | Report what was searched, ask user if controls exist outside codebase |
 | No architecture docs found | Proceed with code-only analysis, note reduced confidence in Phase 1 output |
-| Ambiguous control status | Mark "Partially Implemented" with notes explaining uncertainty, flag for user review at checkpoint |
 | Empty or minimal project | Report insufficient evidence for assessment, ask user for additional context before proceeding |
 
 ## References

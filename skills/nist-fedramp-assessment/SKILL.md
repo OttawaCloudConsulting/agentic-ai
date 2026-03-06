@@ -1,6 +1,7 @@
 ---
 name: nist-fedramp-assessment
-description: Map AWS project architecture to NIST SP 800-53 Rev 5 / FedRAMP Moderate security controls. Produces a phased compliance assessment (4 output documents) with AWS shared responsibility inheritance and risk-rated gap analysis. Use when asked to assess FedRAMP compliance, run a NIST 800-53 control mapping, check FedRAMP Moderate controls, evaluate FedRAMP posture, perform a NIST assessment, or assess for FedRAMP ATO readiness. Do NOT use for NIST CSF assessments, ITSG-33 assessments, FedRAMP High or Low baselines, or non-AWS cloud environments.
+compatibility: "AWS workloads; US regions (us-east-1, us-west-2); FedRAMP Moderate baseline"
+description: Map AWS project architecture to NIST SP 800-53 Rev 5 / FedRAMP Moderate security controls. Produces a phased compliance assessment (4 output documents) with AWS shared responsibility inheritance and risk-rated gap analysis. Use when asked to assess FedRAMP compliance, run a NIST 800-53 control mapping, check FedRAMP Moderate controls, evaluate FedRAMP posture, perform a NIST 800-53 assessment, or assess for FedRAMP ATO readiness. Do NOT use for NIST CSF assessments, ITSG-33 assessments, FedRAMP High or Low baselines, or non-AWS cloud environments.
 ---
 
 # NIST SP 800-53 / FedRAMP Moderate Compliance Assessment
@@ -20,14 +21,23 @@ All output goes to `docs/compliance/`. Create the directory if it doesn't exist.
 
 Before writing any phase output, read references/phase-templates.md for the required output structure and field definitions.
 
+## Smart Re-run
+
+Before starting any phase, check if previous phase outputs exist. If they do:
+
+1. Read the existing output and compare against current project state (file modification times, git diff)
+2. If significant changes detected, re-run that phase
+3. If no changes, report "Phase N output is current — skipping"
+4. Always ask: "Previous assessment found. Re-run from scratch or smart re-run?"
+
 ## Critical Rules
 
 - **Evidence over assumption**: Every "Implemented" status must cite a file path or pattern. If no evidence, mark "Not Implemented" or ask.
 - **Don't inflate compliance**: When uncertain, mark "Partially Implemented" with notes.
 - **No fabricated controls**: Only map controls from the FedRAMP Moderate baseline in references/nist-fedramp-controls.md. Verify against official sources when uncertain.
-- **Dual inheritance model**: Note both FedRAMP Moderate CRM (AWS P-ATO) AND generic NIST 800-53 shared responsibility. AWS maintains a FedRAMP Moderate P-ATO; the Customer Responsibility Matrix (CRM) defines which controls are inherited vs. shared. For non-FedRAMP NIST assessments, apply generic shared responsibility.
-- **USA context**: This skill applies to US-based AWS workloads subject to FISMA and FedRAMP requirements. Default AWS regions are us-east-1 and us-west-2. Flag resources deployed outside US regions when data residency is relevant. Apply CUI (Controlled Unclassified Information) data classification standards where applicable.
-- **FedRAMP ATO relevance**: When the target has or is pursuing a FedRAMP ATO, reference the AWS Audit Manager FedRAMP Moderate framework for the current CRM. Note FISMA alignment where applicable.
+- **Dual inheritance model**: Apply both FedRAMP Moderate CRM (AWS P-ATO) and generic NIST 800-53 shared responsibility. For non-FedRAMP NIST assessments, apply generic shared responsibility only.
+- **USA context**: Applies to US-based AWS workloads. Flag resources deployed outside US regions when data residency is relevant.
+- **FedRAMP ATO relevance**: When the target has or is pursuing a FedRAMP ATO, reference the AWS Audit Manager FedRAMP Moderate framework for the current CRM.
 - **Phase checkpoints are mandatory**: Always pause between phases for user input.
 - **Smart re-run is default**: If previous outputs exist, offer smart re-run first.
 
@@ -41,15 +51,6 @@ Before writing any phase output, read references/phase-templates.md for the requ
 | Empty or minimal codebase | Report "Insufficient codebase for meaningful assessment." Ask user whether to proceed with manual input or stop. |
 | Ambiguous control status | Mark "Partially Implemented" with notes explaining the ambiguity. Never guess. |
 
-## Smart Re-run
-
-Before starting any phase, check if previous phase outputs exist. If they do:
-
-1. Read the existing output and compare against current project state (file modification times, git diff)
-2. If significant changes detected, re-run that phase
-3. If no changes, report "Phase N output is current — skipping"
-4. Always ask: "Previous assessment found. Re-run from scratch or smart re-run?"
-
 ## Phase 0 — Framework Validation
 
 Runs first, before any assessment work. Validates control data against official sources.
@@ -61,6 +62,8 @@ Runs first, before any assessment work. Validates control data against official 
 5. If no differences: report "Phase 0 complete — all controls match official sources"
 
 **Fallback:** If either URL is unreachable or returns unparseable content, skip validation for that source. Warn the user which source could not be verified and proceed using the cached control data in references/nist-fedramp-controls.md. Do not block the assessment.
+
+If official source URLs change or are uncertain, read references/official-references.md for current authoritative links before retrying.
 
 ## Phase 1 — Architecture Discovery
 
@@ -79,7 +82,7 @@ Scan the project root for technology indicators:
 
 Scan for security-relevant patterns: IAM/access control, encryption, logging/auditing, network, data protection, backup/recovery, configuration management, incident response.
 
-For IaC-specific detection patterns (CDK, Terraform, CloudFormation, Crossplane), adapt scanning to the detected tech stack.
+For IaC-specific detection patterns, apply these defaults: CDK — scan `lib/**/*.ts` for L2/L3 constructs; Terraform — scan `*.tf` for `resource` and `data` blocks; CloudFormation/SAM — scan `template.yaml` for `Properties`; Crossplane — scan `*.yaml` for `apiVersion: aws.crossplane.io`.
 
 ### 1.3 — Read Architecture Docs
 
@@ -100,13 +103,7 @@ Wait for confirmation before Phase 2.
 
 ## Phase 2 — Control Mapping
 
-Before starting this phase, read references/nist-fedramp-controls.md for the control families and IDs to map. For every control, determine:
-
-1. **Status**: Implemented / Partially Implemented / Not Implemented / Not Applicable
-2. **Inheritance**: AWS FedRAMP Inherited / AWS FedRAMP Shared / Customer Implemented / Organization-Level
-3. **Evidence**: Specific file paths, line numbers, resource configurations
-4. **Notes**: Caveats, assumptions, dependencies
-5. **FedRAMP ATO Note**: Whether the control is covered under AWS P-ATO (FedRAMP Moderate), customer-documented in SSP, or not applicable to the authorization boundary
+Before starting this phase, read references/nist-fedramp-controls.md for the control families and IDs to map. Read references/phase-templates.md "Phase 2" section for required field definitions (Status, Inheritance, Evidence, Notes, FedRAMP ATO Note) and output structure.
 
 Before writing output, read references/phase-templates.md "Phase 2" section for required fields. Write `docs/compliance/phase2-nist-mapping.md`.
 

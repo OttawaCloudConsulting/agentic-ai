@@ -6,6 +6,19 @@ Source: The Complete Guide to Building Skills for Claude (Anthropic, 2026)
 
 ---
 
+## Contents
+
+- [Naming Rules](#naming-rules)
+- [Frontmatter Requirements](#frontmatter-requirements)
+- [Trigger Quality Checklist](#trigger-quality-checklist)
+- [Progressive Disclosure](#progressive-disclosure)
+- [Instruction Quality](#instruction-quality)
+- [File Structure Conventions](#file-structure-conventions)
+- [Common Failure Modes](#common-failure-modes)
+- [Severity Classification for Gaps](#severity-classification-for-gaps)
+
+---
+
 ## Naming Rules
 
 | Rule | Requirement |

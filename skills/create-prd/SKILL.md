@@ -1,6 +1,6 @@
 ---
 name: create-prd
-description: Create a PRD, architecture document, and progress file for a new project through guided interview. Use when starting a new project, planning a new feature, writing requirements, scoping a project, or creating project documentation from scratch.
+description: Create a PRD, architecture document, and progress file for a new project through guided interview. Use when starting a new project, planning a new feature, writing requirements, scoping a project, or creating project documentation from scratch. Phrases like "I want to plan a new project" or "help me write requirements for" are good triggers. Do NOT use for updating an existing PRD, documenting changes to an existing system, writing a technical design doc for an in-progress change, or starting implementation.
 disable-model-invocation: true
 ---
 
@@ -68,14 +68,7 @@ Read `references/interview-guide.md` for the architecture interview areas.
 Read `assets/architecture-template.md` for the document structure.
 
 Use Bash (`mkdir -p docs`) to ensure `docs/` exists. Conduct a focused interview using
-`AskUserQuestion` covering these areas from the interview guide:
-
-- Architecture Decisions (always)
-- Component Design (always)
-- File Organization (always for multi-file projects; skip for single-file scripts)
-- Deployment Workflow (include when deployment is non-trivial)
-- Risks and External Dependencies (include when external coupling exists)
-- Security Review (always)
+`AskUserQuestion` covering all areas from the interview guide.
 
 Use the Write tool to create `docs/ARCHITECTURE_AND_DESIGN.md`. Omit sections that are
 irrelevant to the project; add sections needed but not in the template. Read the file back
@@ -86,17 +79,11 @@ choice should be captured with rationale. Shallow decision tables are the most c
 
 ## Step 4 — Cross-Reference and Update PRD
 
-Read `prd.md` and `docs/ARCHITECTURE_AND_DESIGN.md`. First verify structural consistency:
+Read `prd.md` and `docs/ARCHITECTURE_AND_DESIGN.md`. Verify structural consistency: component
+names, configuration parameter names, and feature titles must match exactly across both documents.
 
-- Component names in the PRD Architecture section match the Component Inventory table
-- Configuration parameter names are identical in both documents
-- Feature titles referenced in the architecture doc match the PRD Features section
-
-Then identify content to propagate back to the PRD:
-
-- New features discovered during architecture design (logging, security hardening, conditional components)
-- Refined acceptance criteria based on architecture decisions
-- Updated configuration and output tables
+Then propagate back to the PRD any new features discovered during architecture design, refined
+acceptance criteria, and updated configuration or output tables.
 
 Use the Edit tool to apply changes to `prd.md`. Show the user what changed and confirm.
 
@@ -160,3 +147,7 @@ Run /start-feature to begin implementation.
   needs that are not in the template. State what was omitted and why.
 - **User wants to skip a round:** Allow it. Record the skipped round in prd.md as a comment so a
   future session can revisit it.
+- **Missing asset templates:** If any `assets/` file is absent (`prd-template.md`,
+  `architecture-template.md`, `progress-template.txt`), do not silently fail. Notify the user
+  which file is missing and construct the document from scratch using the section structure
+  described in the relevant step. State that no template was used.

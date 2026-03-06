@@ -1,6 +1,20 @@
 # Refactor Review Protocol
 
-Full protocol for the Refactor Review stage. Claude follows this when executing the skill-refactor workflow.
+Full protocol for the Refactor Review stage. Claude follows this when executing Step 4 of the skill-creator workflow.
+
+---
+
+## Contents
+
+- [Stage Overview](#stage-overview)
+- [Temp Directory Structure](#temp-directory-structure)
+- [Sub-agent 1: Critique Agent](#sub-agent-1-critique-agent)
+- [Sub-agent 2: Red-team Agent](#sub-agent-2-red-team-agent)
+- [Compile: Review Summary](#compile-review-summary)
+- [Approval Gate](#approval-gate)
+- [Requirements Gathering (Post-Approval)](#requirements-gathering-post-approval)
+- [Sub-agent 3: Refactor Agent](#sub-agent-3-refactor-agent)
+- [Decisions Log Template](#decisions-log-template)
 
 ---
 
@@ -214,7 +228,7 @@ Present this file path to the user and tell them to review it before approving.
 
 After presenting the review summary, ask the user for approval before making any changes.
 
-Ask the user directly:
+Use AskUserQuestion:
 
 ```
 Question: "The refactor review is complete. Review temp/<skill-name>/refactor/review-summary.md.
@@ -234,7 +248,7 @@ If the user declines or needs more time: record the decision in `decisions.md` a
 
 After approval, gather specific requirements before refactoring.
 
-Ask the user up to 3 questions:
+Use AskUserQuestion with up to 3 questions:
 
 **Question 1 — Change scope:**
 

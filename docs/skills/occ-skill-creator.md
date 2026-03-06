@@ -1,8 +1,8 @@
-# Skill Creator
+# OCC Skill Creator
 
-**Source:** `skills/skill-creator/`
-**Command:** `/skill-creator`
-**Activation:** Manual — invoked via slash command or trigger phrase matching (e.g., "create a new skill", "update an existing skill", "build a skill")
+**Source:** `skills/occ-skill-creator/`
+**Command:** `/occ-skill-creator`
+**Activation:** Manual only — invoked via `/occ-skill-creator` (auto-triggering disabled)
 
 ## Description
 
@@ -20,7 +20,7 @@ Create skills — modular packages that extend Claude with specialized knowledge
 ## Usage
 
 ```
-/skill-creator
+/occ-skill-creator
 ```
 
 Invoke when you want to create a new skill or improve an existing one. The skill guides the design process from use case analysis through implementation and iteration.

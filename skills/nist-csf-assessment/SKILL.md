@@ -1,11 +1,24 @@
 ---
 name: nist-csf-assessment
-description: Map project architecture to NIST Cybersecurity Framework (CSF) 2.0 outcomes. Produces a phased assessment at the subcategory level with cloud service evidence mapping and NIST 800-53 informative references. Always uses the latest published CSF version. Use when asked to assess CSF compliance, run a NIST CSF mapping, check Cybersecurity Framework posture, evaluate CSF 2.0 controls, or perform a cybersecurity framework assessment. Do NOT use for general security audits, penetration testing, ITSG assessments, or FedRAMP assessments — use the dedicated skills for those frameworks.
+description: Map project architecture to NIST Cybersecurity Framework (CSF) 2.0 outcomes. Produces a phased assessment at the subcategory level with cloud service evidence mapping and NIST 800-53 informative references. Always uses the latest published CSF version. Use when asked to assess CSF compliance, run a NIST CSF mapping, check Cybersecurity Framework posture, evaluate CSF 2.0 controls, or perform a cybersecurity framework assessment. Do NOT use for general security audits, penetration testing, ITSG assessments, FedRAMP assessments, or standalone NIST SP 800-53 control assessments — use the dedicated skills for those frameworks.
+compatibility: Requires live network access to nist.gov and csrc.nist.gov for Phase 0 version check. In air-gapped environments, Phase 0 will fall back to the bundled reference file version.
 ---
 
 # NIST Cybersecurity Framework (CSF) Assessment
 
-Map a project's architecture and codebase to NIST CSF 2.0 subcategory outcomes. Produces a phased, outcome-based assessment with cloud service evidence mapping, NIST 800-53 informative references, and risk-rated gap analysis. Always assesses to the latest published CSF version — Phase 0 self-updates the reference file if a newer version is available.
+Produces a risk-rated gap analysis across all CSF subcategories. Phase 0 self-updates the reference file to the latest published CSF version before assessment begins.
+
+## Critical Rules
+
+- **Evidence over assumption**: Every "Implemented" status must cite cloud service evidence or a file path. If no evidence, mark "Not Implemented" or ask.
+- **Always assess to latest CSF version**: Phase 0 self-update is mandatory — never skip it. The reference file version must match the live NIST published version before mapping begins.
+- **CSF is outcome-based, not control-catalogue**: Map to what the subcategory outcome achieves, not just whether a control ID exists. Ask: does the project achieve this security outcome?
+- **Cloud service evidence mapping**: At the subcategory level, identify which cloud services contribute to achieving each outcome. See Phase 2 for examples.
+- **800-53 informative references**: Always include them in Phase 2 output — they connect CSF outcomes to control-catalogue assessments and increase utility for teams also running NIST/FedRAMP assessments.
+- **No fabricated subcategories**: Only map subcategories from the version-validated reference file. Never invent or paraphrase subcategory IDs.
+- **Phase checkpoints are mandatory**: Always pause between phases for user input.
+- **Smart re-run is default**: If previous outputs exist, offer smart re-run first.
+- **Framework is jurisdiction-agnostic**: Do not flag regions or data classifications unless the project has explicit requirements. CSF is not limited to any jurisdiction or data classification.
 
 ## Output
 
@@ -19,18 +32,6 @@ All output goes to `docs/compliance/`. Create the directory if it doesn't exist.
 | `assessment-summary.md` | Executive summary with posture by Function |
 
 Before writing any phase output, read the corresponding template in `references/phase-templates.md`.
-
-## Important Rules
-
-- **Evidence over assumption**: Every "Implemented" status must cite cloud service evidence or a file path. If no evidence, mark "Not Implemented" or ask.
-- **Always assess to latest CSF version**: Phase 0 self-update is mandatory — never skip it. The reference file version must match the live NIST published version before mapping begins.
-- **CSF is outcome-based, not control-catalogue**: Map to what the subcategory outcome achieves, not just whether a control ID exists. Ask: does the project achieve this security outcome?
-- **Cloud service evidence mapping**: At the subcategory level, identify which cloud services contribute to achieving that outcome (e.g., GuardDuty/Defender for Cloud/Chronicle -> DE.AE-02, AWS Config/Azure Policy/GCP Asset Inventory -> ID.AM-05).
-- **800-53 informative references**: Always include them in Phase 2 output — they connect CSF outcomes to control-catalogue assessments and increase utility for teams also running NIST/FedRAMP assessments.
-- **No fabricated subcategories**: Only map subcategories from the version-validated reference file. Never invent or paraphrase subcategory IDs.
-- **Phase checkpoints are mandatory**: Always pause between phases for user input.
-- **Smart re-run is default**: If previous outputs exist, offer smart re-run first.
-- **Framework is jurisdiction-agnostic**: Do not flag regions or data classifications unless the project has explicit requirements. CSF is not limited to any jurisdiction or data classification.
 
 ## Error Handling
 
@@ -50,6 +51,15 @@ Before starting any phase, check if previous phase outputs exist. If they do:
 2. If significant changes detected, re-run that phase
 3. If no changes, report "Phase N output is current — skipping"
 4. Always ask: "Previous assessment found. Re-run from scratch or smart re-run?"
+
+## Example
+
+> User: "Run a CSF assessment on this repo."
+
+1. Phase 0 — fetches `nist.gov/cyberframework`, confirms CSF 2.0 is current, reports version
+2. Phase 1 — scans project for IaC, CI/CD, security patterns; writes `phase1-discovery.md`; pauses for user confirmation
+3. Phase 2 — maps every subcategory across all 6 Functions; writes `phase2-csf-mapping.md`; presents Function-level posture breakdown; pauses for user confirmation
+4. Phase 3 — produces risk-rated gap analysis and executive summary; writes `phase3-gap-analysis.md` and `assessment-summary.md`
 
 ## Phase 0 — Framework Version Check (SELF-UPDATING)
 
@@ -140,7 +150,5 @@ Present the executive summary and top recommended actions.
 
 - Subcategory tables: `references/nist-csf-subcategories.md` — read during Phase 2 for the full subcategory list and 800-53 mappings
 - Output format templates: `references/phase-templates.md` — read before writing any phase output
-- [NIST Cybersecurity Framework (CSF) — Landing Page](https://www.nist.gov/cyberframework)
 - [NIST CSF 2.0 Publication (CSWP 29)](https://csrc.nist.gov/pubs/cswp/29/final)
-- [CSF 2.0 Reference Tool — Subcategories and Informative References](https://csrc.nist.gov/projects/cybersecurity-framework/filters)
 - [NIST SP 800-53 Rev 5](https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final)

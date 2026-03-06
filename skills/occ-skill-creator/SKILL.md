@@ -1,16 +1,17 @@
 ---
-name: skill-creator
+name: occ-skill-creator
 description: >-
-  Guide for creating effective skills. Use when users say "create a skill",
-  "build a new skill", "make a skill for", "write a skill that", "new SKILL.md",
-  or want to update an existing skill. Covers the full lifecycle: creation,
-  structured review, and iteration.
+  Guide for creating effective skills. Use when building a new Claude skill,
+  packaging a domain workflow as a reusable skill bundle, or formalizing a
+  repeated procedure. Covers the full lifecycle: creation, structured review,
+  and iteration. Invoke explicitly with /occ-skill-creator.
+disable-model-invocation: true
 license: Apache-2.0
 ---
 
 # Skill Creator
 
-Create skills -- modular packages that extend Claude with specialized knowledge, workflows, and tools. Skills transform Claude from a general-purpose agent into a domain specialist equipped with procedural knowledge no model fully possesses.
+Create skills -- modular packages that extend Claude with specialized knowledge, workflows, and tools.
 
 ## Critical Constraints
 
@@ -97,31 +98,7 @@ Files used in output, not loaded into context. Templates, images, icons, boilerp
 
 Claude loads reference files only when needed.
 
-**Pattern 2: Domain-specific organization**
-
-```text
-skill-name/
-├── SKILL.md (overview and navigation)
-└── references/
-    ├── finance.md
-    ├── sales.md
-    └── product.md
-```
-
-User asks about sales metrics -- Claude only reads `sales.md`.
-
-**Pattern 3: Variant-specific organization**
-
-```text
-cloud-deploy/
-├── SKILL.md (workflow + provider selection)
-└── references/
-    ├── aws.md
-    ├── gcp.md
-    └── azure.md
-```
-
-User chooses AWS -- Claude only reads `aws.md`.
+Split by domain (`finance.md`, `sales.md`) or variant (`aws.md`, `gcp.md`) when sub-topics are independent and a user request will only ever need one.
 
 Guidelines:
 
@@ -152,12 +129,15 @@ For each use case, identify what reusable resources help:
 
 1. Create the skill directory structure
 2. Implement scripts, references, and assets identified in step 2
-3. Test scripts by running them
-4. Write SKILL.md:
-   - Frontmatter with clear `name` and `description` (include trigger phrases)
+
+> **Before writing SKILL.md:** Test every script by running it. Do not document broken scripts. A script that fails during testing must be fixed before proceeding.
+
+3. Write SKILL.md:
+   - Frontmatter with clear `name` and `description` — for description field quality criteria, see `references/anthropic-best-practices.md` Frontmatter Requirements and Trigger Quality Checklist sections
    - Body with workflow guidance and references to bundled resources
    - Use imperative/infinitive form throughout
-5. Delete any unused directories
+   - Verify SKILL.md stays under 500 lines; move overflow to `references/`
+4. Delete any unused directories
 
 Consult these guides based on the skill type:
 
@@ -169,7 +149,7 @@ Consult these guides based on the skill type:
 
 Run a structured review before finalizing. See `references/refactor-protocol.md` for the full protocol including sub-agent prompt templates, output formats, and approval gates.
 
-In short: launch parallel critique and red-team agents, compile feedback, get user approval, then apply approved changes.
+In short: launch parallel critique and red-team agents, compile feedback, get user approval, then apply approved changes. If the user declines, log the decision in `decisions.md` and proceed to Step 5 without changes.
 
 ### 5. Iterate
 
@@ -227,15 +207,36 @@ pdf-rotator/
     └── rotate.py
 ```
 
-Frontmatter:
+**SKILL.md** (complete):
 
-```yaml
+```markdown
 ---
 name: pdf-rotator
 description: >-
   Rotate pages in PDF files. Use when users say "rotate PDF", "turn PDF pages",
   "fix PDF orientation", or need to change page rotation in a PDF document.
 ---
-```
 
-Body covers: reading the input PDF, selecting pages, calling `scripts/rotate.py`, verifying output. Scripts handle the deterministic rotation logic. No references needed for a focused, single-purpose skill.
+# PDF Rotator
+
+Rotate one or more pages in a PDF file.
+
+## Critical Constraints
+
+- Input file must be a valid PDF. Encrypted PDFs are not supported.
+- Rotation values must be multiples of 90 (0, 90, 180, 270).
+
+## Usage
+
+1. Confirm the input file path and target pages with the user.
+2. Confirm the rotation angle (90, 180, or 270 degrees).
+3. Run: `python scripts/rotate.py --input <file> --pages <range> --degrees <angle>`
+4. Verify output by opening the result file.
+
+## Troubleshooting
+
+| Problem | Response |
+|---|---|
+| Script errors "not a valid PDF" | Confirm file is not encrypted or corrupted. |
+| Wrong pages rotated | Re-confirm page range with user (1-indexed). |
+```

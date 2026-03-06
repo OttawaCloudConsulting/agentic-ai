@@ -1,12 +1,12 @@
-# Skill Refactor
+# OCC Skill Refactor
 
-**Source:** `skills/skill-refactor/`
-**Command:** `/skill-refactor`
-**Activation:** Manual — invoked via slash command or trigger phrase matching (e.g., "refactor this skill", "review my skill", "improve skill quality", "audit skill-name", "clean up my skill")
+**Source:** `skills/occ-skill-refactor/`
+**Command:** `/occ-skill-refactor`
+**Activation:** Manual only — must be invoked explicitly via `/occ-skill-refactor` (auto-triggering disabled)
 
 ## Description
 
-Standalone refactor review for existing skills. Runs critique and red-team agents in parallel, compiles a review summary, and gates all changes behind explicit user approval. Use when asked to review, audit, improve, or refactor a skill. Do NOT use to create a new skill from scratch — use skill-creator for that.
+Standalone refactor review for existing skills. Runs critique and red-team agents in parallel, compiles a review summary, and gates all changes behind explicit user approval. Use when asked to review, audit, improve, or refactor a skill. Do NOT use to create a new skill from scratch — use occ-skill-creator for that.
 
 ## Bundle Contents
 
@@ -19,7 +19,7 @@ Standalone refactor review for existing skills. Runs critique and red-team agent
 ## Usage
 
 ```
-/skill-refactor
+/occ-skill-refactor
 ```
 
 Invoke when you want to review and improve an existing skill. Accepts either a project-bound path (`.claude/skills/<skill-name>/`) or a template path (`skills/<skill-name>/`, or any other project-relative path). If no path is provided, you will be asked which skill to refactor. The skill guides the review process from initial location through parallel critique and red-team evaluation, user approval, requirements gathering, and final refactor application.
@@ -69,12 +69,12 @@ Apply approved changes in-place to the skill files. Preserve sections not flagge
 ## Example
 
 ```text
-User: "refactor skills/skill-refactor/"
+User: /occ-skill-refactor skills/occ-skill-creator/
 
-1. Locate skill  -> reads skills/skill-refactor/SKILL.md + references/
-2. Sub-agents     -> writes temp/skill-refactor/critique/feedback.md
-                     writes temp/skill-refactor/red-team/feedback.md
-3. Review summary -> writes temp/skill-refactor/refactor/review-summary.md
+1. Locate skill  -> reads skills/occ-skill-creator/SKILL.md + references/
+2. Sub-agents     -> writes temp/occ-skill-creator/critique/feedback.md
+                     writes temp/occ-skill-creator/red-team/feedback.md
+3. Review summary -> writes temp/occ-skill-creator/refactor/review-summary.md
 4. Approval gate  -> asks user: proceed / keep as-is / defer
 5. Requirements   -> asks user: change scope, new requirements, depth
 6. Refactor       -> applies approved changes in-place
@@ -96,10 +96,10 @@ User: "refactor skills/skill-refactor/"
 
 ## When Not to Use
 
-- When creating a new skill from scratch — use skill-creator for that
+- When creating a new skill from scratch — use occ-skill-creator for that
 - When you just want to run an existing skill without reviewing it
 - When the task is a simple one-off improvement without formal review
 
 ## Related Skills and Commands
 
-- **skill-creator** — for creating new skills from scratch and guiding the initial design process
+- **occ-skill-creator** — for creating new skills from scratch and guiding the initial design process

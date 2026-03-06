@@ -1,6 +1,6 @@
 ---
 name: cdk-testing
-description: Run CDK validation, security scanning, build, test, and deployment. Use when the user asks to test CDK code, validate CDK configurations, run CDK checks, or deploy CDK to a dev environment. Triggers on requests like "test cdk", "validate my cdk", "run cdk checks", "deploy cdk to dev", or "/test-cdk". Handles TypeScript CDK projects with cdk.json and package.json. Do NOT use for CDK synth-only workflows, Python CDK projects, or non-CDK TypeScript testing.
+description: Run CDK validation, security scanning, build, test, and deployment. Use when the user asks to test CDK code, validate CDK configurations, run CDK checks, or deploy CDK to a dev environment. Triggers on requests like "test cdk", "validate my cdk", "run cdk checks", "deploy cdk to dev", or "/test-cdk". Handles TypeScript CDK projects with cdk.json and package.json. Do NOT use for CDK synth-only workflows, Python CDK projects, non-CDK TypeScript testing, or staging/production deployments.
 compatibility: Requires Node.js, npm, AWS CDK CLI (npx cdk), git-secrets (optional), and configured AWS credentials (AWS_PROFILE or environment variables).
 ---
 
@@ -19,12 +19,12 @@ Portable CDK validation and deployment pipeline. Runs git-secrets, Prettier, ESL
 
 ## Prerequisites
 
-Before running, ensure:
+Before running, confirm:
 
-- Feature code and tests are complete
-- You know which feature you are completing
+- `cdk.json` exists at the project root
+- `package.json` exists at the project root and defines `build`, `test`, and (optionally) `format:check` and `lint` scripts
 
-Adapt the items below to your project's conventions. The defaults reference a `progress.txt` tracking file and `X.Y` feature numbering scheme. Replace these with whatever tracking mechanism your project uses.
+Adapt the commit workflow references to your project's conventions. The defaults reference a `progress.txt` tracking file and `X.Y` feature numbering scheme. Replace these with whatever tracking mechanism your project uses.
 
 ## Workflow
 
@@ -67,8 +67,6 @@ The script auto-detects OS and skips tools not configured in `package.json` (for
 
 Deploy all stacks to the development environment.
 
-**WARNING:** The `--require-approval never` flag bypasses CloudFormation change review. Use this only for dev/sandbox environments. For staging or production, remove the flag or set `--require-approval broadening`.
-
 ```bash
 npx cdk deploy --all --profile dev-account --require-approval never
 ```
@@ -105,6 +103,7 @@ All gates passed. Feature complete.
 ## Failure Handling
 
 - **Critical step fails:** Script exits immediately. Fix the error and re-run.
+- **git-secrets not installed:** Secrets scanning is skipped automatically; the pipeline continues without it. If secrets scanning is required, install git-secrets before running.
 - **npm audit findings:** Reported as warnings. Review with `npm audit`.
 - **CDK deploy -- IAM permission error:** Check that the AWS profile has sufficient permissions. Run `aws sts get-caller-identity --profile <profile>` to verify the active role.
 - **CDK deploy -- bootstrap required:** Run `npx cdk bootstrap aws://<account>/<region> --profile <profile>` before deploying.
