@@ -1,0 +1,41 @@
+# Progress: Skill Benchmark Tool — Measurement Reliability
+# Source: benchmark/prd.md (Features 7–10) + benchmark/ARCHITECTURE_AND_DESIGN.md
+# Spec: benchmark/MVP-PROBLEM-STATEMENT-01.md is the authoritative implementation reference
+# Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
+#
+# Prior features (1–7, original tool) are complete. See git history for that progress.
+
+## Features
+
+[x] Feature 8: Configurable Model Selection
+    - --creation-model and --scoring-model flags added (both default: sonnet)
+    - All Phase 2 claude -p calls use $CREATION_MODEL variable
+    - All Phase 3 and Phase 4 claude -p calls use $SCORING_MODEL variable
+    - manifest.md records | Creation model | and | Scoring model | rows
+    - --help output documents both flags with defaults
+    NOTES: Started 2026-03-08. Completed 2026-03-08.
+
+[x] Feature 9: Style Adherence Rubric Dimension
+    - benchmark/rubric.md: Style adherence row added (0–3 criteria defined)
+    - benchmark/rubric.md: max score updated 18→21; scores.md template updated
+    - benchmark/rubric.md: stale output path fixed (temp/benchmark → benchmark/runs)
+    - benchmark/rubric.md: Agent Instructions generalised — no specific skill name
+    - scripts/run-benchmark.sh Phase 3: style_context injected per slot (skill content or baseline=0)
+    - scripts/run-benchmark.sh Phase 4: all /54 references updated to /63; Style adherence row in score matrix
+    - docs/benchmark-run-history.md: header updated with 63-point max and change note
+    NOTES: Started 2026-03-08. Completed 2026-03-08.
+
+[-] Feature 10: Revised bad-skill Test Fixture
+    NOTES: Skipped 2026-03-08. Empirical validation showed haiku ignores anti-quality
+    instructions and produces 52/63 output regardless (trained priors override system prompt).
+    Premise that a badly written skill produces badly scored output does not hold in practice.
+
+[-] Feature 11: Brief Hardening (Conditional)
+    PRECONDITION: Apply only if Features 8–10 do not produce PROMOTE for TC-3
+    on both sonnet and haiku creation models.
+    - benchmark/inputs/T1-simple.md: Required Conventions section added
+    - Specifies: name field value, minimum trigger phrases, example format, error handling requirements
+    - Validation: --challenger <well-designed-skill> baseline → PROMOTE with updated T1
+    NOTES: Skipped 2026-03-08. Precondition not met. occ-skill-creator vs baseline (haiku,
+    3 runs) produced PROMOTE on all runs with deltas of +9, +7, +11. Differentiation is
+    sufficient without brief hardening.
