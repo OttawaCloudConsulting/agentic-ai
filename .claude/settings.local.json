@@ -33,7 +33,14 @@
       "WebFetch(domain:kiro.dev)",
       "Bash(gh pr:*)",
       "Bash(gh api:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(tail:*)",
+      "Bash(for run in occ-creator-baseline-v1__20260308-231006 occ-creator-baseline-v2__20260308-231011 occ-creator-baseline-v3__20260308-231015)",
+      "Bash(do)",
+      "Read(//Users/christian/git-repos/OCC-github/agentic-ai/benchmark/runs/$run/**)",
+      "Bash(\\\\ for:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
