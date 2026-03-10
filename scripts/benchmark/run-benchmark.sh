@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # run-benchmark.sh — Compare two Claude Code skill definitions head-to-head.
-# Usage: bash scripts/run-benchmark.sh --challenger <skill> [options]
+# Usage: bash scripts/benchmark/run-benchmark.sh --challenger <skill> [options]
 # Drives skill creation and scoring via claude -p, then compiles results.
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # ─── resolve_skill ──────────────────────────────────────────────────────────────
 # Converts a skill reference to an absolute SKILL.md path. Does not check existence.
@@ -27,7 +27,7 @@ resolve_skill() {
 # ─── Usage ─────────────────────────────────────────────────────────────────────
 usage() {
   cat <<'EOF'
-Usage: bash scripts/run-benchmark.sh --challenger <skill> [options]
+Usage: bash scripts/benchmark/run-benchmark.sh --challenger <skill> [options]
 
 Compares two skill definitions using standardised test briefs and a scoring rubric.
 Produces a compiled results report with a threshold-based verdict.

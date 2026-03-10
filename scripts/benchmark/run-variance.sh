@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # run-variance.sh — Multi-run benchmark wrapper with statistical aggregation.
-# Usage: bash scripts/run-variance.sh --challenger <skill> [--runs N] [options]
+# Usage: bash scripts/benchmark/run-variance.sh --challenger <skill> [--runs N] [options]
 # All flags except --runs pass through to run-benchmark.sh unchanged.
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # ─── Usage ────────────────────────────────────────────────────────────────────
 usage() {
   cat <<'EOF'
-Usage: bash scripts/run-variance.sh --challenger <skill> [--runs N] [options]
+Usage: bash scripts/benchmark/run-variance.sh --challenger <skill> [--runs N] [options]
 
 Runs run-benchmark.sh N times and writes a variance-report.md with mean/stddev
 per dimension per slot, verdict distribution, and individual run results.
@@ -101,7 +101,7 @@ for i in $(seq 1 "$RUNS"); do
   VAR_LABEL="${LABEL}__var${i}"
   echo "==> Run $i / $RUNS  (label: $VAR_LABEL)"
 
-  bash "$REPO_ROOT/scripts/run-benchmark.sh" \
+  bash "$REPO_ROOT/scripts/benchmark/run-benchmark.sh" \
     --label "$VAR_LABEL" \
     "${PASSTHROUGH_ARGS[@]}" \
     2>&1 | tee "$VARIANCE_DIR/run-${i}.log"

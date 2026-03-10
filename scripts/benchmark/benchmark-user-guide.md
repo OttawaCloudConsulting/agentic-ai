@@ -31,7 +31,7 @@ To bypass this check, unset the CLAUDECODE environment variable.
 Prefix every benchmark invocation with `env -u CLAUDECODE` to unset that variable for the subprocess:
 
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --challenger occ-skill-creator --label my-run
 ```
 
@@ -60,7 +60,7 @@ Use this before promoting any skill for the first time. It compares your skill a
 **Run:**
 
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --challenger your-skill-name \
   --label your-skill-v1-baseline \
   --creation-model haiku \
@@ -90,7 +90,7 @@ Use this after editing an existing skill. It automatically extracts the version 
 **Run:**
 
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --challenger occ-skill-creator \
   --compare-main \
   --label occ-skill-creator-after-refactor
@@ -115,7 +115,7 @@ Use this to compare any two skill files regardless of git history.
 **Run:**
 
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --champion .claude/skills/occ-skill-creator \
   --challenger path/to/candidate-skill \
   --label candidate-vs-current \
@@ -143,7 +143,7 @@ Use this when a single-run result falls in the uncertain range (delta 3–6) or 
 **Run:**
 
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-variance.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-variance.sh \
   --challenger occ-skill-creator \
   --label my-skill-variance \
   --creation-model haiku \

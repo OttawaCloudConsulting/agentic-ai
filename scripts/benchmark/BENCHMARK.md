@@ -1,6 +1,6 @@
 # Benchmark Reference
 
-`scripts/run-benchmark.sh` compares two Claude Code skill definitions head-to-head. It runs both through three standardised test briefs, scores the outputs against a rubric, and produces a `decision.md` with a threshold-based verdict.
+`scripts/benchmark/run-benchmark.sh` compares two Claude Code skill definitions head-to-head. It runs both through three standardised test briefs, scores the outputs against a rubric, and produces a `decision.md` with a threshold-based verdict.
 
 For a walkthrough of common workflows, see [benchmark-user-guide.md](benchmark-user-guide.md).
 
@@ -11,15 +11,15 @@ For a walkthrough of common workflows, see [benchmark-user-guide.md](benchmark-u
 ```bash
 # Validate a new skill before first use (baseline mode)
 # --creation-model haiku widens the skill-vs-baseline gap for clearer results
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --challenger occ-skill-creator --label my-skill-v1 --creation-model haiku
 
 # Compare current work against the main branch version (git-main mode)
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --challenger occ-skill-creator --compare-main --label after-refactor
 
 # Compare two explicit skills (champion vs challenger mode)
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --champion occ-skill-creator --challenger path/to/new-skill --label head-to-head
 ```
 
@@ -135,11 +135,11 @@ The decision agent also appends one row to [`docs/benchmark-run-history.md`](ben
 
 ## Multi-Run Variance Analysis
 
-`scripts/run-variance.sh` wraps `run-benchmark.sh` and runs it N times, then aggregates the results into a statistical summary.
+`scripts/benchmark/run-variance.sh` wraps `run-benchmark.sh` and runs it N times, then aggregates the results into a statistical summary.
 
 ```bash
 # Run 3 times and report mean/stddev (baseline mode, haiku)
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-variance.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-variance.sh \
   --challenger occ-skill-creator \
   --label my-skill-baseline \
   --creation-model haiku \
@@ -158,7 +158,7 @@ All flags except `--runs` are forwarded to `run-benchmark.sh` unchanged. `--runs
 
 | File | Purpose |
 |------|---------|
-| `scripts/run-variance.sh` | Multi-run wrapper — runs N benchmarks and writes a variance-report.md |
+| `scripts/benchmark/run-variance.sh` | Multi-run wrapper — runs N benchmarks and writes a variance-report.md |
 | `benchmark/prd.md` | Product requirements — goals, features, acceptance criteria |
 | `benchmark/ARCHITECTURE_AND_DESIGN.md` | Technical design — component diagram, data flow, design decisions |
 | `benchmark/rubric.md` | Scoring rubric used by the Phase 3 scoring agent |

@@ -193,7 +193,7 @@ The six structural dimensions are necessary but not sufficient. A capable model 
 Using Sonnet for both baseline and skill-guided creation produces near-identical outputs. Sonnet's priors are too strong; the skill provides marginal lift. Haiku's weaker priors make skill guidance visible. For baseline validation specifically, `--creation-model haiku` is the right choice.
 
 **4. Single-run results are unreliable for small deltas.**
-Model non-determinism introduces 1–2 point variance per run. A delta of 3–4 from a single run might flip on a second run. Deltas of 7+ are reliable. For anything in the 3–5 range, you need multiple runs and a consistent direction — not a single number. We built `scripts/run-variance.sh` to automate this: it runs the benchmark N times, computes mean and stddev per dimension per slot, and reports a confidence-weighted recommendation (unanimous / majority / split).
+Model non-determinism introduces 1–2 point variance per run. A delta of 3–4 from a single run might flip on a second run. Deltas of 7+ are reliable. For anything in the 3–5 range, you need multiple runs and a consistent direction — not a single number. We built `scripts/benchmark/run-variance.sh` to automate this: it runs the benchmark N times, computes mean and stddev per dimension per slot, and reports a confidence-weighted recommendation (unanimous / majority / split).
 
 **5. Some things can't be tested automatically.**
 The "bad skill produces bad output" use case doesn't hold. The benchmark validates that a *good* skill produces better output than no skill — that's the meaningful question for promotion decisions. Testing the floor requires a different methodology (perhaps adversarial inputs, or human evaluation) that's out of scope for this tool.
@@ -216,7 +216,7 @@ The benchmark has three validated use cases:
 
 The benchmark is two bash scripts. No runtime dependencies beyond the `claude` CLI and standard Unix utilities.
 
-**`scripts/run-benchmark.sh`** — the core script. Takes two skills, runs them through the three briefs, scores them, and produces a `decision.md`. Every run is self-contained: its own timestamped directory, its own manifest, its own logs. Nothing overwrites anything. The score history accumulates in `docs/benchmark-run-history.md`.
+**`scripts/benchmark/run-benchmark.sh`** — the core script. Takes two skills, runs them through the three briefs, scores them, and produces a `decision.md`. Every run is self-contained: its own timestamped directory, its own manifest, its own logs. Nothing overwrites anything. The score history accumulates in `docs/benchmark-run-history.md`.
 
 ```bash
 --challenger <skill>          # required: skill under test
@@ -228,7 +228,7 @@ The benchmark is two bash scripts. No runtime dependencies beyond the `claude` C
 --threshold 3                 # minimum delta to act (default: 3/63)
 ```
 
-**`scripts/run-variance.sh`** — multi-run wrapper. Calls `run-benchmark.sh` N times and aggregates the results statistically. Produces a `variance-report.md` with mean/stddev per dimension per slot, verdict distribution, and a confidence-weighted recommendation. All flags pass through to the core script; add `--runs N` to set the count (default: 3, minimum: 2).
+**`scripts/benchmark/run-variance.sh`** — multi-run wrapper. Calls `run-benchmark.sh` N times and aggregates the results statistically. Produces a `variance-report.md` with mean/stddev per dimension per slot, verdict distribution, and a confidence-weighted recommendation. All flags pass through to the core script; add `--runs N` to set the count (default: 3, minimum: 2).
 
 ```bash
 --runs 3                      # number of benchmark runs (default: 3)
@@ -238,12 +238,12 @@ The benchmark is two bash scripts. No runtime dependencies beyond the `claude` C
 Running either script from inside Claude Code requires unsetting the nested session guard:
 
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --challenger my-skill \
   --label my-skill-baseline \
   --creation-model haiku
 
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-variance.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-variance.sh \
   --challenger my-skill \
   --label my-skill-variance \
   --creation-model haiku \
@@ -268,4 +268,4 @@ It took us two validation sessions and a few failed assumptions to get there. Th
 
 ---
 
-*`scripts/run-benchmark.sh` and `scripts/run-variance.sh` are part of the [agentic-ai](https://github.com/OCC-github/agentic-ai) library of drop-in configurations for Claude Code.*
+*`scripts/benchmark/run-benchmark.sh` and `scripts/benchmark/run-variance.sh` are part of the [agentic-ai](https://github.com/OCC-github/agentic-ai) library of drop-in configurations for Claude Code.*

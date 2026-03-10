@@ -3,7 +3,7 @@
 **Date:** 2026-03-08
 **Branch:** `development/skills-creator-refactor`
 **Git hash:** `01dfea1`
-**Script:** `scripts/run-benchmark.sh`
+**Script:** `scripts/benchmark/run-benchmark.sh`
 
 ---
 
@@ -17,7 +17,7 @@ Six test cases were defined in the test plan. All structural and CLI tests passe
 
 ## Environment Note: Nested Session Constraint
 
-Running `bash scripts/run-benchmark.sh` from within a Claude Code session fails immediately:
+Running `bash scripts/benchmark/run-benchmark.sh` from within a Claude Code session fails immediately:
 
 ```
 Error: Claude Code cannot be launched inside another Claude Code session.
@@ -28,7 +28,7 @@ To bypass this check, unset the CLAUDECODE environment variable.
 The error message itself provides the fix. All benchmark runs were executed as:
 
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh ...
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh ...
 ```
 
 This is expected behaviour, not a bug. Any CI/CD pipeline or cron-based invocation will not hit this issue since those contexts don't set `CLAUDECODE`. For interactive use from within Claude Code, the `env -u CLAUDECODE` prefix is required.
@@ -89,7 +89,7 @@ As described in [Fixture Design Findings](#fixture-design-findings) below, this 
 **Run:** `tc2-bad-baseline__20260308-181817`
 **Command:**
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --challenger benchmark/test-fixtures/bad-skill \
   --label tc2-bad-baseline \
   --threshold 3
@@ -134,7 +134,7 @@ env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
 **Run:** `tc3-good-baseline__20260308-182937`
 **Command:**
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --challenger occ-skill-creator \
   --label tc3-good-baseline \
   --threshold 3
@@ -177,7 +177,7 @@ Both runs dropped 1 point on T3 (cloud-deploy) in the same dimension (Instructio
 **Run:** `tc4-champ-vs-bad__20260308-184050`
 **Command:**
 ```bash
-env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-benchmark.sh \
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
   --champion occ-skill-creator \
   --challenger benchmark/test-fixtures/bad-skill \
   --label tc4-champ-vs-bad \
