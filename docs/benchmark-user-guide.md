@@ -11,6 +11,7 @@ Step-by-step guidance for running skill benchmarks. For a concise flags/verdicts
 - [Workflow: validating a new skill](#workflow-validating-a-new-skill)
 - [Workflow: testing a revision](#workflow-testing-a-revision)
 - [Workflow: comparing two skills directly](#workflow-comparing-two-skills-directly)
+- [Workflow: multi-run variance analysis](#workflow-multi-run-variance-analysis)
 - [Reading a decision.md](#reading-a-decisionmd)
 - [Interpreting scores](#interpreting-scores)
 - [Known limitations](#known-limitations)
@@ -130,6 +131,48 @@ Skill references accept a bare name, a directory path, or a direct `.md` path:
 ```
 
 **Interpret the verdict:** Same as git main mode — `SWITCH RECOMMENDED`, `NO CHANGE`, or `CHAMPION CONFIRMED`.
+
+---
+
+## Workflow: multi-run variance analysis
+
+Use this when a single-run result falls in the uncertain range (delta 3–6) or when you want a statistically reliable signal before a promotion decision.
+
+**When to use:** After any single-run benchmark where the delta is close to the threshold. Three runs take ~3× as long but reduce noise from model non-determinism to a reliable mean/stddev.
+
+**Run:**
+
+```bash
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-variance.sh \
+  --challenger occ-skill-creator \
+  --label my-skill-variance \
+  --creation-model haiku \
+  --runs 3
+```
+
+All `run-benchmark.sh` flags work; add `--runs N` to set the run count (default 3, minimum 2).
+
+**Output:** `benchmark/runs/variance__<label>__<timestamp>/variance-report.md`
+
+**Interpreting the variance report:**
+
+| Field | What to look at |
+|-------|----------------|
+| Verdict Distribution | How many runs agree — unanimous is most reliable |
+| Recommendation | Confidence level based on unanimity |
+| Mean delta | Positive = challenger leads. Magnitude matters more than any single run |
+| Stddev (totals) | >3 means high variance — consider more runs or check individual decisions |
+| Per-Dimension Analysis | Which dimensions are consistent vs noisy across runs |
+
+**Confidence levels:**
+
+| Recommendation label | Meaning |
+|---------------------|---------|
+| Unanimous | All N runs agree — act on the verdict |
+| Majority | >50% agree — likely correct; review minority runs |
+| Split | No majority — do not act; investigate individual runs |
+
+Each individual run still appends its row to `docs/benchmark-run-history.md` via the core script.
 
 ---
 

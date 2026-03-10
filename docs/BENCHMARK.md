@@ -133,10 +133,32 @@ The decision agent also appends one row to [`docs/benchmark-run-history.md`](ben
 
 ---
 
+## Multi-Run Variance Analysis
+
+`scripts/run-variance.sh` wraps `run-benchmark.sh` and runs it N times, then aggregates the results into a statistical summary.
+
+```bash
+# Run 3 times and report mean/stddev (baseline mode, haiku)
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/run-variance.sh \
+  --challenger occ-skill-creator \
+  --label my-skill-baseline \
+  --creation-model haiku \
+  --runs 3
+```
+
+**When to use:** Deltas of 1–5 points from a single run may flip on re-run. Use this script when you want a statistically reliable verdict rather than a single-point estimate.
+
+**Output:** `benchmark/runs/variance__<label>__<timestamp>/variance-report.md` — verdict distribution, score summary with mean/stddev/min/max per slot, per-dimension mean/stddev table, and individual run results.
+
+All flags except `--runs` are forwarded to `run-benchmark.sh` unchanged. `--runs` defaults to 3; minimum is 2.
+
+---
+
 ## Supporting Files
 
 | File | Purpose |
 |------|---------|
+| `scripts/run-variance.sh` | Multi-run wrapper — runs N benchmarks and writes a variance-report.md |
 | `benchmark/prd.md` | Product requirements — goals, features, acceptance criteria |
 | `benchmark/ARCHITECTURE_AND_DESIGN.md` | Technical design — component diagram, data flow, design decisions |
 | `benchmark/rubric.md` | Scoring rubric used by the Phase 3 scoring agent |

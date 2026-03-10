@@ -39,3 +39,15 @@
     NOTES: Skipped 2026-03-08. Precondition not met. occ-skill-creator vs baseline (haiku,
     3 runs) produced PROMOTE on all runs with deltas of +9, +7, +11. Differentiation is
     sufficient without brief hardening.
+
+[x] Feature 12: Multi-Run Variance Analysis
+    - scripts/run-variance.sh: new wrapper script (no changes to run-benchmark.sh)
+    - Accepts all run-benchmark.sh flags plus --runs N (default: 3, minimum: 2)
+    - Creates benchmark/runs/variance__<label>__<ts>/ parent directory
+    - Calls run-benchmark.sh N times with labels <label>__var1, var2, ... varN
+    - Parses scores from each run using awk; computes mean/stddev per dimension per slot
+    - Writes variance-report.md: verdict distribution, score summary, per-dimension table, individual run results
+    - Recommendation line: unanimous / majority / split confidence level
+    - No claude -p calls in the variance script itself
+    - Validation: --runs 3 produces variance-report.md with correct structure and N=3 rows
+    NOTES: Started 2026-03-08. Completed 2026-03-08.

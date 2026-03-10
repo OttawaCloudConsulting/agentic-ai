@@ -308,11 +308,36 @@ Augment `benchmark/inputs/T1-simple.md` with explicit convention requirements a 
 
 ---
 
+### Feature 12: Multi-Run Variance Analysis
+
+Single benchmark runs have 1–2 point variance due to model non-determinism. A `--runs N` wrapper script runs the benchmark N times and produces a statistical summary — mean and stddev per dimension per skill — reducing noise to a reliable signal.
+
+Implemented as a separate wrapper script `scripts/run-variance.sh` that calls `run-benchmark.sh` N times, parses scores from each run's score files using awk, computes statistics in bash, and writes a `variance-report.md` to a parent directory. No changes to `run-benchmark.sh`.
+
+**Acceptance Criteria:**
+
+- `bash scripts/run-variance.sh --challenger <skill> --runs 3` executes 3 complete benchmark runs and writes a `variance-report.md`
+- `variance-report.md` contains: verdict distribution table, score summary with mean/stddev/min/max per slot, per-dimension mean/stddev table per slot, individual run results table with links to run directories
+- Recommendation line states confidence level: unanimous (all agree), majority (>50% agree), or split
+- Each individual run still appends its own row to `docs/benchmark-run-history.md` via the core script
+- `--runs` defaults to 3; minimum value is 2; passing 1 is an error
+- All flags accepted by `run-benchmark.sh` pass through to each run unchanged
+- No `claude -p` calls in the variance script itself — statistics computed in awk
+
+**Outputs:**
+
+| File | Location | Description |
+|------|----------|-------------|
+| `variance-report.md` | `benchmark/runs/variance__<label>__<ts>/` | Aggregated statistical summary |
+| Individual run dirs | `benchmark/runs/<label>__var<N>__<ts>/` | One per run, standard structure |
+
+---
+
 ## Future Enhancements
 
 | Enhancement | Description |
 |-------------|-------------|
-| Multi-run variance analysis | Run N times, compute mean/stddev per skill — reduces single-run noise to a reliable signal |
+| Multi-run variance analysis | ~~Run N times, compute mean/stddev per skill — reduces single-run noise to a reliable signal~~ Implemented as Feature 12 |
 | Configurable test inputs | `--inputs <dir>` flag to use a custom brief set instead of the fixed T1/T2/T3 |
 | HTML decision report | Render `decision.md` as a formatted HTML summary for sharing |
 | Score trend tracking | Parse history table to plot score delta over successive iterations of a skill |

@@ -14,3 +14,6 @@ Each row represents one `bash scripts/run-benchmark.sh` run. Scores are out of 6
 | 20260308-231015 | occ-creator-baseline-v3 | baseline (no skill) | occ-skill-creator | 46/63 | 57/63 | PROMOTE |
 | 20260308-231011 | occ-creator-baseline-v2 | baseline (no skill) | occ-skill-creator | 51/63 | 58/63 | PROMOTE |
 | 20260308-231006 | occ-creator-baseline-v1 | baseline (no skill) | occ-skill-creator | 51/63 | 60/63 | PROMOTE |
+| 20260309-143146 | occ-skill-refactor-baseline__var1 | baseline (no skill) | occ-skill-refactor | 45/63 | 55/63 | PROMOTE |
+| 20260309-145027 | occ-skill-refactor-baseline__var2 | baseline (no skill) | occ-skill-refactor | 52/63 | 57/63 | PROMOTE |
+| 20260309-150630 | occ-skill-refactor-baseline__var3 | baseline (no skill) | occ-skill-refactor | 50/63 | 52/63 | NO VALUE |
