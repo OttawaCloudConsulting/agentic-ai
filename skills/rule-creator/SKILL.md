@@ -1,6 +1,8 @@
 ---
 name: rule-creator
-description: Generate new rules — always-on behavioral guidelines for Claude Code. Use when asked to create a rule, write best practices, add a new rule file, or generate coding guidelines. Walks through an interactive interview to produce a rule file and its documentation.
+description: Generate new rules — always-on behavioral guidelines for Claude Code. Use when asked to create a rule, write best practices, add a new rule file, or generate coding guidelines. Walks through an interactive interview to produce a rule file and its documentation. Do NOT use for auditing, reviewing, or listing existing rules.
+disable-model-invocation: true
+license: MIT
 ---
 
 # Rule Creator
@@ -33,31 +35,12 @@ If the user has already provided clear answers to any of these in their initial 
 If the rule covers a technology:
 
 1. Read existing rules in `rules/` that overlap with the topic to avoid duplication
-2. If the user has a codebase with examples, use Grep to search for configuration files, naming patterns, and recurring idioms (e.g., `grep -r "pattern" src/`). Look for: repeated boilerplate, inconsistent conventions, inline TODOs about best practices, and error-handling patterns
+2. If the user has a codebase with examples, use Grep to search for configuration files, naming patterns, and recurring idioms (e.g., `grep -r "error handling" rules/`). Look for: repeated boilerplate, inconsistent conventions, inline TODOs about best practices, and error-handling patterns
 3. Identify the boundary — what does this rule cover that existing rules do not?
 
 ### Step 3 — Draft Sections
 
-Based on the rule type, plan sections. For structural patterns, read `references/rule-format.md`.
-
-**Infrastructure best practices** typically include:
-
-- Core design principles (construct/module/resource design)
-- Architecture and organization
-- Security
-- Naming conventions
-- Testing and validation
-- Deployment safety
-- Bad Practices table
-- Monitoring/observability
-- Project hygiene
-
-**Behavioral/process rules** typically include:
-
-- Core principle (one-sentence thesis)
-- Concrete protocols with structured templates
-- Boundary conditions (when to apply, when not to)
-- Failure modes and countermeasures
+Based on the rule type, plan sections using the section-type guidance in `references/rule-format.md`.
 
 Present the planned section outline to the user via AskUserQuestion: "Here's the planned structure. Add, remove, or reorder sections?"
 
@@ -65,27 +48,13 @@ Present the planned section outline to the user via AskUserQuestion: "Here's the
 
 Write the rule file to `rules/<rule-name>.md`.
 
-Follow the format patterns in `references/rule-format.md` exactly:
-
-- H1 title
-- Blockquote one-line description
-- H2 sections separated by `---`
-- Code examples where they add clarity
-- Bad Practices table for infrastructure rules
-- Terse, imperative style throughout
+Follow `references/rule-format.md` exactly.
 
 ### Step 5 — Generate Documentation
 
 Write documentation to `docs/rules/<rule-name>.md`.
 
-Follow the format patterns in `references/doc-format.md` exactly:
-
-- Metadata header (Source, Scope, Activation)
-- Core Principle
-- Overview paragraph
-- Sections (summarized, not duplicated from rule)
-- Bad Practices table (copied from rule)
-- Related Rules
+Follow `references/doc-format.md` exactly.
 
 ### Step 6 — Update Catalog
 
@@ -114,14 +83,9 @@ Report:
 
 **User says:** "Create a rule for Go best practices focused on error handling and naming."
 
-1. **Step 1** — Skip Topic (Go) and Key concerns (error handling, naming) since the user provided them. Ask Rule type and Audience only.
-2. **Step 2** — Grep `rules/` for existing Go rules. Find none. Boundary is clear.
-3. **Step 3** — Plan sections: Error Handling, Naming Conventions, Testing, Bad Practices. Present outline to user.
-4. **Step 4** — Write `rules/go-best-practices.md` following infrastructure pattern from `references/rule-format.md`.
-5. **Step 5** — Write `docs/rules/go-best-practices.md` following `references/doc-format.md`.
-6. **Step 6** — Update `docs/RULES.md` catalog.
-7. **Step 7** — Run `bash scripts/lint-markdown.sh rules/go-best-practices.md docs/rules/go-best-practices.md`. Fix issues.
-8. **Step 8** — Report: 2 files created, 4 sections, consumption command.
+- **Trigger**: "Create a rule for Go best practices focused on error handling and naming."
+- **Key decisions**: Topic and concerns already provided — skip those Step 1 questions. No existing Go rules found — boundary clear. Infrastructure-type rule selected.
+- **Output**: `rules/go-best-practices.md`, `docs/rules/go-best-practices.md`, catalog updated.
 
 ## Error Handling
 

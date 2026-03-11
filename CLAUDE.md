@@ -17,6 +17,16 @@ bash scripts/lint-markdown.sh --no-fix    # report only, no auto-fix
 
 The script runs two passes: auto-fix safe rules first, then strict enforcement. `--no-fix` skips the first pass.
 
+```bash
+# Benchmark a skill against an unguided baseline or a previous version
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
+  --challenger <skill-name> --label <label> --threshold 5   # vs baseline
+env -u CLAUDECODE BENCHMARK_SKIP_PERMISSIONS=1 bash scripts/benchmark/run-benchmark.sh \
+  --challenger <skill-name> --compare-main --label <label>  # vs main branch
+```
+
+Outputs land in `benchmark/runs/<label>__<timestamp>/decision.md`. See `scripts/benchmark/README.md` for full usage.
+
 No build step, test suite, or runtime code. Markdown linting is the only CI-equivalent check.
 
 ## Structure
@@ -40,10 +50,17 @@ agentic-ai/
 │   └── docs/                          ← Kiro reference docs (POWERS.md, STEERING.md)
 ├── agentic-engineering/               ← strategic workflow reference (diagram + docs)
 ├── mcp/                               ← MCP server project (has own README + architecture)
-├── docs/                              ← generated reference catalogs (keep in sync)
+├── cicd/                              ← CI/CD related scripts and configs
+├── benchmark/                         ← benchmark run outputs (runs/ subdirectory)
+├── docs/                              ← reference catalogs; keep in sync when adding content
 │   ├── SKILLS.md                      ← skill catalog and usage guide
 │   ├── RULES.md                       ← rules catalog and usage guide
-│   └── COMMANDS.md                    ← command catalog and usage guide
+│   ├── COMMANDS.md                    ← command catalog and usage guide
+│   ├── ARCHITECTURE_AND_DESIGN.md     ← design docs for multi-skill suites
+│   ├── skills/                        ← per-skill detail pages
+│   ├── commands/                      ← per-command detail pages
+│   ├── rules/                         ← per-rule detail pages
+│   └── issues/                        ← tracked issues and problem statements
 ├── external_sources/                  ← external reference material
 ├── temp/                              ← temporary working files
 └── .claude/                           ← local settings for this repo only

@@ -1,6 +1,7 @@
 ---
 name: terraform-testing
-description: Run Terraform validation, security scanning, planning, and deployment testing for .tf and .tfvars files. Use when the user asks to test Terraform code, validate Terraform configurations, run Terraform checks, or deploy Terraform to a dev environment. Triggers on requests like "test terraform", "validate my terraform", "run terraform checks", "deploy terraform to dev", or "/test-terraform". Do NOT use for CloudFormation, Pulumi, CDK, or non-Terraform infrastructure code.
+description: Run Terraform (and OpenTofu) validation, security scanning, planning, and deployment testing for .tf and .tfvars files. Use when the user asks to test Terraform or OpenTofu code, validate Terraform configurations, run Terraform checks, deploy Terraform to a dev environment, or test tofu configs. Triggers on requests like "test terraform", "validate my terraform", "run terraform checks", "deploy terraform to dev", "/test-terraform", "test opentofu", "validate my tofu", or "run tofu checks". Do NOT use for CloudFormation, Pulumi, CDK, or non-Terraform infrastructure code.
+compatibility: "Requires Terraform CLI or OpenTofu (tofu) CLI. AWS credentials required for --deploy and --deploy-destroy modes. macOS, Debian, and RHEL supported."
 ---
 
 # Terraform Testing
@@ -16,7 +17,9 @@ Portable Terraform validation and deployment pipeline. Runs git-secrets, fmt, in
 
 ## Prerequisites
 
-Before running, ensure Terraform code is ready for validation.
+- Terraform CLI (`terraform`) or OpenTofu CLI (`tofu`) installed and on `PATH`
+- Git installed (required for git-secrets step)
+- AWS credentials configured (required for `--deploy` and `--deploy-destroy` modes only)
 
 ## Workflow
 
@@ -27,6 +30,8 @@ Before running, ensure Terraform code is ready for validation.
 ## Running the Script
 
 The script is bundled with this skill at `.claude/skills/terraform-testing/scripts/test-terraform.sh`.
+
+If the script is not present at that path, the skill was likely installed without its `scripts/` directory. Re-install the skill bundle or verify the installation path matches your Claude Code skills directory.
 
 ### Common Invocations
 
@@ -91,6 +96,7 @@ The script auto-detects OS (macOS, Debian, RHEL) and installs missing tools auto
 ## Failure Handling
 
 - **Critical step fails:** Script exits immediately. Fix the error and re-run.
+- **`terraform init` connectivity failure:** If Step 3 fails with provider registry or download errors, the issue is network-level, not code-level. Check for corporate proxy requirements (`HTTPS_PROXY` env var), use a local provider mirror (`terraform init -plugin-dir`), or verify provider registry access. Re-run after resolving connectivity.
 - **Security scan findings:** Reported as warnings by default. Use `--soft-fail` to prevent blocking.
 - **Suppressing false positives:**
   - Checkov: `# checkov:skip=CKV_AWS_XX:Reason` inline comment
@@ -100,28 +106,14 @@ Document suppression decisions in commit messages or project documentation.
 
 ## Output Format
 
-```text
-Terraform Testing: PASS
-  - git-secrets: passed
-  - terraform fmt: passed
-  - terraform init: passed
-  - terraform validate: passed
-  - tflint: passed (or skipped)
-  - checkov: completed with warnings (or passed)
-  Plan: 3 to add, 0 to change, 0 to destroy
-  Apply: completed successfully
-```
+The script prints a per-step pass/fail summary followed by a plan summary line (`N to add, N to change, N to destroy`) and, if deployed, an apply status line.
 
 ## Example
 
 User says: "test my terraform"
 
-1. Run the script in validate+plan mode:
+```bash
+bash .claude/skills/terraform-testing/scripts/test-terraform.sh
+```
 
-   ```bash
-   bash .claude/skills/terraform-testing/scripts/test-terraform.sh
-   ```
-
-2. Script executes steps 1-7 (git-secrets through terraform plan).
-3. All steps pass. Output shows plan summary: `2 to add, 0 to change, 0 to destroy`.
-4. Report results to user.
+All steps pass. Output shows plan summary: `2 to add, 0 to change, 0 to destroy`. Report results to user.

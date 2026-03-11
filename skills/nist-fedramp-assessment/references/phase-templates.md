@@ -2,6 +2,14 @@
 
 Output templates for each phase of the NIST SP 800-53 / FedRAMP Moderate compliance assessment. All output goes to `docs/compliance/`.
 
+## Contents
+
+- [Phase 1 — Architecture Discovery](#phase-1--architecture-discovery)
+- [Phase 2 — Control Mapping](#phase-2--control-mapping)
+- [Phase 3 — Gap Analysis](#phase-3--gap-analysis)
+- [Risk Rating Criteria](#risk-rating-criteria)
+- [Executive Summary](#executive-summary)
+
 ## Phase 1 — Architecture Discovery
 
 **File:** `docs/compliance/phase1-discovery.md`
