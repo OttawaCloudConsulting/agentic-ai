@@ -1,7 +1,7 @@
 ---
 name: update-docs
 description: Refresh project documentation (README, ARCHITECTURE) to match current codebase state. Use after multiple features have been completed, before creating a PR, or when documentation feels stale.
-disable-model-invocation: true
+
 ---
 
 # /update-docs — Refresh Project Documentation
