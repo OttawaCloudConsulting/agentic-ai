@@ -29,8 +29,13 @@ Pattern names are case-insensitive.
 | **GIT** | Anthropic server-git | Local Git repository operations |
 | **GITHUB** | GitHub MCP + server-git | GitHub API + local Git operations |
 | **SERVERLESS** | AWS serverless | Lambda, API Gateway, Step Functions |
+| **NOTEBOOKLM** | notebooklm-mcp | Google NotebookLM notebook management |
 
 Patterns are composable. Overlapping servers are deduplicated automatically.
+
+> **Context-window note:** NOTEBOOKLM registers 35 tools with Claude. Disable it when not actively using NotebookLM (`bash install_mcp.sh --remove NOTEBOOKLM`) to keep the tool list lean.
+>
+> **Authentication:** The installer runs `uv tool install notebooklm-mcp-cli --upgrade` automatically, which installs the `nlm` CLI into uv's tool bin directory. If `nlm` is not on your `PATH` after installing, run `uv tool update-shell` (or manually add the directory shown by `uv tool dir --bin` to your `PATH`) and restart your shell. Once `nlm` is available, run `nlm login` to authenticate before using the server.
 
 ## Examples
 
@@ -47,6 +52,10 @@ bash install_mcp.sh --remove PRICING
 
 # See what a pattern includes
 bash install_mcp.sh list SECURITY
+
+# Install NotebookLM MCP, remove when not in use (exposes 35 tools)
+bash install_mcp.sh NOTEBOOKLM
+bash install_mcp.sh --remove NOTEBOOKLM
 ```
 
 ## Prerequisites
@@ -56,7 +65,7 @@ The script checks for required tools before installing:
 | Tool | Required By | Install |
 |------|-------------|---------|
 | `claude` | All operations | [Claude Code CLI](https://claude.ai/claude-code) |
-| `uvx` | AWS, CDK, Terraform (AWS), Documentation, Security, Pricing, Serverless | `pip install uv` |
+| `uvx` | AWS, CDK, Terraform (AWS), Documentation, Security, Pricing, Serverless, NotebookLM | `pip install uv` |
 | `npx` | Documentation (Context7), Architecture (Mermaid), Kubernetes, Git, GitHub | Included with Node.js |
 | `docker` | Terraform (HashiCorp), Crossplane | [Docker Desktop](https://www.docker.com/products/docker-desktop/) |
 | `trivy` | Security (Trivy) | [Trivy install guide](https://aquasecurity.github.io/trivy/) |

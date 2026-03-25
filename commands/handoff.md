@@ -1,7 +1,6 @@
 ---
 name: handoff
-description: Write session state to agents/memory/handoff.md before ending a work session. Only invoke when the user explicitly says to hand off, wrap up, or end the session. Never invoke proactively.
-disable-model-invocation: true
+description: Write session state to agents/memory/handoff.md before ending a work session. Use only when the user explicitly says to hand off, wrap up, or end the session.
 ---
 
 # /handoff — Write Session State

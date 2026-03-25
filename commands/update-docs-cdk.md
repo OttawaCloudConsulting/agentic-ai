@@ -1,7 +1,7 @@
 ---
 name: update-docs-cdk
 description: Refresh CDK project documentation (README, ARCHITECTURE, TESTING) to match current codebase state. Use after multiple features have been completed, before creating a PR, or when documentation feels stale.
-disable-model-invocation: true
+
 ---
 
 # /update-docs-cdk — Refresh CDK Project Documentation
