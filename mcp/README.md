@@ -35,7 +35,7 @@ Patterns are composable. Overlapping servers are deduplicated automatically.
 
 > **Context-window note:** NOTEBOOKLM registers 35 tools with Claude. Disable it when not actively using NotebookLM (`bash install_mcp.sh --remove NOTEBOOKLM`) to keep the tool list lean.
 >
-> **Authentication:** The installer runs `uv tool install notebooklm-mcp-cli --upgrade` automatically, which installs `nlm` into your PATH. After installing, run `nlm login` to authenticate before using the server.
+> **Authentication:** The installer runs `uv tool install notebooklm-mcp-cli --upgrade` automatically, which installs the `nlm` CLI into uv's tool bin directory. If `nlm` is not on your `PATH` after installing, run `uv tool update-shell` (or manually add the directory shown by `uv tool dir --bin` to your `PATH`) and restart your shell. Once `nlm` is available, run `nlm login` to authenticate before using the server.
 
 ## Examples
 

@@ -224,7 +224,7 @@ get_server_prereq() {
     trivy-mcp)
       printf '%s' "trivy" ;;
     notebooklm-mcp)
-      printf '%s' "uvx" ;;
+      printf '%s' "uv" ;;
     *)
       printf '%s' "none" ;;
   esac
@@ -486,6 +486,14 @@ check_prerequisites() {
         else
           log_error "  ✗ uvx not found (install: pip install uv)"
           missing="${missing} uvx"
+        fi
+        ;;
+      uv)
+        if command -v uv >/dev/null 2>&1; then
+          log_success "  ✓ uv found"
+        else
+          log_error "  ✗ uv not found (install: https://github.com/astral-sh/uv)"
+          missing="${missing} uv"
         fi
         ;;
       npx)
@@ -810,10 +818,12 @@ ${server}"
       printf '  [%s/%s] %s — installing dependencies ... ' \
         "${current}" "${install_count}" "${server}"
       # shellcheck disable=SC2086
-      if ${preinstall_cmd} >/dev/null 2>&1; then
+      local preinstall_output
+      if preinstall_output="$(${preinstall_cmd} 2>&1)"; then
         log_success "✓"
       else
         log_error "✗ dependency install failed"
+        printf '%s\n' "${preinstall_output}"
         failed_count=$((failed_count + 1))
         continue
       fi

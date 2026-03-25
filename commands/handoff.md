@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Write session state to agents/memory/handoff.md before ending a work session. Use when the user says to hand off, wrap up, or end the session, or when a natural stopping point is reached.
+description: Write session state to agents/memory/handoff.md before ending a work session. Use only when the user explicitly says to hand off, wrap up, or end the session.
 ---
 
 # /handoff — Write Session State
