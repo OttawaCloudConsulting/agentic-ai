@@ -104,6 +104,9 @@ install_mcp.sh
 | 9 | No dry-run mode | `list` command serves the preview purpose. Keeps the script simple. |
 | 10 | Hardcoded environment variables | Sensible defaults (FASTMCP_LOG_LEVEL=warning). No user configuration needed. If users need different values, they can modify the script. |
 | 11 | Google Shell Style Guide + ShellCheck | Ensures consistent, maintainable, and correct shell code. ShellCheck catches common pitfalls (unquoted variables, missing error handling, POSIX compatibility issues). |
+| 12 | `uvx --from notebooklm-mcp-cli@latest notebooklm-mcp` for NOTEBOOKLM | The PyPI package name (`notebooklm-mcp-cli`) differs from the executable name (`notebooklm-mcp`). The `uvx --from PACKAGE EXECUTABLE` form is required when they diverge. All other uvx-based servers use `uvx PACKAGE@latest` where package and executable match. This is the only server in the registry that needs the `--from` form. |
+| 13 | Third-party @latest for notebooklm-mcp-cli | Same `@latest` policy as Decision #5. Supply chain risk is elevated compared to AWS/HashiCorp/Anthropic-published servers — `notebooklm-mcp-cli` is a third-party package. Risk accepted: the package is actively maintained and widely used. Users requiring version pinning can fork the script. |
+| 14 | Context-window warning in README for NOTEBOOKLM | The notebooklm-mcp server exposes 35 tools, the highest of any registered server. Documented in README with a note to disable the server when not in use, consistent with the upstream package's own warning. |
 
 ## Pattern-to-Server Mapping
 
@@ -151,6 +154,7 @@ Alternative approach: use a flat lookup via `case` statements. Preferred for sim
 | mcp-server-git | npx | stdio | `claude mcp add mcp-server-git -s project -- npx -y @modelcontextprotocol/server-git@latest` |
 | github-mcp-server | npx | stdio | `claude mcp add github-mcp-server -s project -- npx -y @github/mcp-server@latest` |
 | awslabs.serverless-mcp-server | uvx | stdio | `claude mcp add awslabs.serverless-mcp-server -s project -- uvx awslabs.serverless-mcp-server@latest` |
+| notebooklm-mcp | uvx | stdio | `claude mcp add notebooklm-mcp -s project -- uvx --from notebooklm-mcp-cli@latest notebooklm-mcp` |
 
 ### Pattern → Server Mapping
 
@@ -168,6 +172,7 @@ Alternative approach: use a flat lookup via `case` statements. Preferred for sim
 | GIT | mcp-server-git |
 | GITHUB | github-mcp-server, mcp-server-git |
 | SERVERLESS | awslabs.serverless-mcp-server |
+| NOTEBOOKLM | notebooklm-mcp |
 
 ### Overlap Matrix (servers shared across patterns)
 
@@ -276,6 +281,7 @@ Available Patterns:
   GIT            (1 server)   Local Git repository operations
   GITHUB         (2 servers)  GitHub API + local Git operations
   SERVERLESS     (1 server)   Lambda, API Gateway, Step Functions
+  NOTEBOOKLM     (1 server)   Google NotebookLM notebooks, research, and studio content
 
 Usage: bash install_mcp.sh PATTERN [PATTERN...]
        bash install_mcp.sh --remove PATTERN [PATTERN...]

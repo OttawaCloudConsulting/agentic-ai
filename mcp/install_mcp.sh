@@ -24,7 +24,7 @@ readonly COLOR_BLUE=$'\033[0;34m'
 readonly COLOR_BOLD=$'\033[1m'
 readonly COLOR_RESET=$'\033[0m'
 
-readonly VALID_PATTERNS="AWS CDK TERRAFORM DOCUMENTATION ARCHITECTURE SECURITY KUBERNETES CROSSPLANE PRICING GIT GITHUB SERVERLESS"
+readonly VALID_PATTERNS="AWS CDK TERRAFORM DOCUMENTATION ARCHITECTURE SECURITY KUBERNETES CROSSPLANE PRICING GIT GITHUB SERVERLESS NOTEBOOKLM"
 
 #######################################
 # Logging
@@ -137,6 +137,9 @@ get_pattern_servers() {
     SERVERLESS)
       printf '%s\n' "awslabs-serverless-mcp-server"
       ;;
+    NOTEBOOKLM)
+      printf '%s\n' "notebooklm-mcp"
+      ;;
     *) return 1 ;;
   esac
 }
@@ -162,6 +165,7 @@ get_pattern_description() {
     GIT)           printf '%s' "Local Git repository operations" ;;
     GITHUB)        printf '%s' "GitHub API + local Git operations" ;;
     SERVERLESS)    printf '%s' "Lambda, API Gateway, Step Functions" ;;
+    NOTEBOOKLM)    printf '%s' "Google NotebookLM notebooks, research, and studio content" ;;
     *)             printf '%s' "Unknown pattern" ;;
   esac
 }
@@ -219,6 +223,8 @@ get_server_prereq() {
       printf '%s' "docker" ;;
     trivy-mcp)
       printf '%s' "trivy" ;;
+    notebooklm-mcp)
+      printf '%s' "uvx" ;;
     *)
       printf '%s' "none" ;;
   esac
@@ -292,7 +298,30 @@ get_server_install_cmd() {
     awslabs-serverless-mcp-server)
       printf '%s' "awslabs-serverless-mcp-server -s project -- uvx awslabs.serverless-mcp-server@latest"
       ;;
+    notebooklm-mcp)
+      printf '%s' "notebooklm-mcp -s project -- uvx --from notebooklm-mcp-cli@latest notebooklm-mcp"
+      ;;
     *) return 1 ;;
+  esac
+}
+
+#######################################
+# Get an optional pre-install command for a server.
+# Run this before `claude mcp add` to install any required
+# CLI tools that the server depends on at runtime.
+# Arguments:
+#   $1 - server name
+# Outputs:
+#   Command string to stdout, or empty string if none needed
+#######################################
+get_server_preinstall_cmd() {
+  case "$1" in
+    notebooklm-mcp)
+      printf '%s' "uv tool install notebooklm-mcp-cli --upgrade"
+      ;;
+    *)
+      printf ''
+      ;;
   esac
 }
 
@@ -324,6 +353,7 @@ get_server_description() {
     mcp-server-git)                               printf '%s' "Local Git repository operations" ;;
     github-mcp-server)                            printf '%s' "GitHub API access" ;;
     awslabs-serverless-mcp-server)                printf '%s' "Lambda, API Gateway, Step Functions" ;;
+    notebooklm-mcp)                               printf '%s' "Google NotebookLM via CLI and MCP (35 tools)" ;;
     *)                                            printf '%s' "Unknown server" ;;
   esac
 }
@@ -597,6 +627,7 @@ Patterns:
   GIT            Local Git repository operations
   GITHUB         GitHub API + local Git operations
   SERVERLESS     Lambda, API Gateway, Step Functions
+  NOTEBOOKLM     Google NotebookLM notebooks, research, and studio content
 
 Examples:
   bash install_mcp.sh AWS CDK              # Install AWS + CDK servers
@@ -770,6 +801,22 @@ ${server}"
       log_error "  [${current}/${install_count}] ${server} — unknown server"
       failed_count=$((failed_count + 1))
       continue
+    fi
+
+    # Run pre-install step if defined (e.g. uv tool install for nlm).
+    local preinstall_cmd
+    preinstall_cmd="$(get_server_preinstall_cmd "${server}")"
+    if [[ -n "${preinstall_cmd}" ]]; then
+      printf '  [%s/%s] %s — installing dependencies ... ' \
+        "${current}" "${install_count}" "${server}"
+      # shellcheck disable=SC2086
+      if ${preinstall_cmd} >/dev/null 2>&1; then
+        log_success "✓"
+      else
+        log_error "✗ dependency install failed"
+        failed_count=$((failed_count + 1))
+        continue
+      fi
     fi
 
     printf '  [%s/%s] %s ... ' "${current}" "${install_count}" "${server}"
