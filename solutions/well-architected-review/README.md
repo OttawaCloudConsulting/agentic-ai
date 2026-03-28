@@ -131,7 +131,7 @@ The two required servers are defined in `mcp.json` (project-scoped, no auth). Th
 
 ### Enabling aws-pricing (Optional)
 
-To enable cost pricing enrichment, edit `.claude/agents/war-pillar-reviewer.md` and uncomment the inline `awslabs-aws-pricing` MCP server definition in the frontmatter. Requires AWS credentials with `pricing:GetProducts` and `pricing:DescribeServices` permissions.
+To enable cost pricing enrichment, edit `.claude/agents/war-pillar-reviewer.md` and add the following inline MCP server definition to the `mcpServers` frontmatter list: `awslabs-aws-pricing` with `command: uvx` and `args: ["awslabs.aws-pricing-mcp-server@latest"]`. Requires AWS credentials with `pricing:GetProducts` and `pricing:DescribeServices` permissions.
 
 The solution functions fully without this server — the cost pillar review will still cover cost optimization practices, just without real-time pricing data.
 

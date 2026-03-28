@@ -85,7 +85,7 @@ External:
 2. **Orchestrator** invokes `war-governance-profiler` skill inline. The skill reads `docs/TENANT_PROFILE.md`, uses `AskUserQuestion` to resolve gaps, writes `GOVERNANCE_PROFILE.md`. Orchestrator then spawns 2 `war-cataloguer` agents in parallel with context: "catalogue documentation" / "catalogue code". Each agent reads the project, writes a catalogue file.
 3. **Orchestrator** spawns 2 `war-architecture-reviewer` agents in parallel, passing file paths to catalogues, `GOVERNANCE_PROFILE.md`, plus brief summaries. Each reviewer reads the catalogue, governance profile, and source files, writes an architecture review.
 4. **Orchestrator** invokes `war-discovery-interview` skill inline. The skill interviews the user via `AskUserQuestion`, writes `DESIGN_REQUIREMENTS.md`.
-5. **Orchestrator** spawns `war-discovery-analyst` agent, passing paths to all 6 prior deliverables (1 governance profile, 2 catalogues, 2 architecture reviews, 1 requirements doc). Analyst reads them, writes `DISCOVERY_ANALYSIS.md` with gaps and proceed/stop recommendation.
+5. **Orchestrator** spawns `war-discovery-analyst` agent, passing paths to all 5 prior deliverables (2 catalogues, 2 architecture reviews, 1 requirements doc). Analyst reads them, writes `DISCOVERY_ANALYSIS.md` with gaps and proceed/stop recommendation.
 6. **Orchestrator** reads the analyst output. If "stop": presents gaps to user, halts. If "proceed": presents summary, asks user confirmation.
 7. **Orchestrator** spawns 6 `war-pillar-reviewer` agents in parallel (one per WAF pillar), passing pillar name, file paths (including `GOVERNANCE_PROFILE.md`), and brief context. Each writes `PILLAR_<name>.md`. Pillar reviewers classify findings as "workload gap" vs "inherited from governance."
 8. **Orchestrator** updates `PROGRESS.md` after each phase. Supports resume from checkpoint.
@@ -225,7 +225,7 @@ Must be a skill (not agent) because sub-agents cannot use `AskUserQuestion` inte
 | Server | Distribution | Scope | Auth |
 |--------|-------------|-------|------|
 | `awslabs-aws-documentation-mcp-server` | `.mcp.json` (project) | Session-wide, all agents | None |
-| `awslabs-iac-mcp-server` | `.mcp.json` (project) | Session-wide, used by architecture reviewer + pillar reviewers | None |
+| `awslabs-iac-mcp-server` | `.mcp.json` (project) | Session-wide, used by pillar reviewers | None |
 | `awslabs-aws-pricing-mcp-server` | Inline in `war-pillar-reviewer.md` | Agent-scoped, cost pillar only | AWS creds + `pricing:*` |
 
 ### Per-Agent MCP Access
@@ -238,7 +238,7 @@ Must be a skill (not agent) because sub-agents cannot use `AskUserQuestion` inte
 | war-discovery-analyst | — | — | — |
 | war-pillar-reviewer (Security) | via .mcp.json | via .mcp.json | — |
 | war-pillar-reviewer (Cost) | via .mcp.json | via .mcp.json | inline (optional) |
-| war-pillar-reviewer (Others) | via .mcp.json | — | — |
+| war-pillar-reviewer (Others) | via .mcp.json | via .mcp.json | — |
 | war-governance-profiler (skill) | — | — | — |
 | war-discovery-interview (skill) | — | — | — |
 

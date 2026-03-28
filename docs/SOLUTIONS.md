@@ -8,7 +8,7 @@ Solutions differ from standalone skills and commands: they orchestrate multiple 
 
 | Solution | Invocation | Purpose | Details |
 |---|---|---|---|
-| AWS Well-Architected Review | `@war-orchestrator` | 4-phase AWS WAF review producing 14 deliverable documents from code and documentation | [View](solutions/WELL_ARCHITECTED_REVIEW.md) |
+| AWS Well-Architected Review | `@war-orchestrator` | 5-phase AWS WAF review producing 14 deliverable documents from code and documentation | [View](solutions/WELL_ARCHITECTED_REVIEW.md) |
 
 ## How Solutions Work
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-A multi-construct Claude Code solution kit that performs an AWS Well-Architected Framework (WAF) review against a project's architecture documentation and Infrastructure as Code. An orchestrator agent drives a 4-phase workflow: cataloguing, architecture review, discovery (interactive interview + gap analysis), and per-pillar WAF assessment. All phases produce markdown deliverable documents. Reviews code and documentation only — no live AWS account access.
+A multi-construct Claude Code solution kit that performs an AWS Well-Architected Framework (WAF) review against a project's architecture documentation and Infrastructure as Code. An orchestrator agent drives a 5-phase workflow: cataloguing, architecture review, discovery (interactive interview + gap analysis), per-pillar WAF assessment, and finalization (README generation + cleanup). All phases produce markdown deliverable documents. Reviews code and documentation only — no live AWS account access.
 
 Ships as a self-contained kit: 5 agent files, 2 skill bundles, and 1 MCP configuration file. Install by copying to three targets in the consumer project.
 
@@ -32,7 +32,7 @@ war-orchestrator
 
 | # | Component | Type | Purpose |
 |---|-----------|------|---------|
-| 1 | `war-orchestrator.md` | Agent | Drives 4-phase workflow, spawns sub-agents, manages gate and resume |
+| 1 | `war-orchestrator.md` | Agent | Drives 5-phase workflow, spawns sub-agents, manages gate and resume |
 | 2 | `war-cataloguer.md` | Agent | Reads project files, produces catalogue (parameterized: docs or code) |
 | 3 | `war-architecture-reviewer.md` | Agent | Produces WAF-structured review from a catalogue (parameterized: doc-driven or code-driven) |
 | 4 | `war-discovery-analyst.md` | Agent | Gap analysis across all deliverables, proceed/stop recommendation |
@@ -94,7 +94,9 @@ All output writes to `docs/well-architected-review/` in the target project.
 | `PILLAR_PERFORMANCE_EFFICIENCY.md` | 4 | Performance Efficiency pillar review |
 | `PILLAR_COST_OPTIMIZATION.md` | 4 | Cost Optimization pillar review |
 | `PILLAR_SUSTAINABILITY.md` | 4 | Sustainability pillar review |
-| `PROGRESS.md` | All | Workflow progress tracker updated per phase |
+| `README.md` | 5 | Reading guide with findings summary and relative links to all deliverables |
+
+`PROGRESS.md` is maintained during the review as a workflow checkpoint (enabling resume if interrupted) and deleted upon successful completion.
 
 ## Design Decisions
 
@@ -131,7 +133,7 @@ cp solutions/well-architected-review/mcp.json  $TARGET/.mcp.json
 @war-orchestrator
 ```
 
-The orchestrator runs all 4 phases, manages sub-agents, and produces the full deliverable set. Supports checkpoint resume if interrupted.
+The orchestrator runs all 5 phases, manages sub-agents, and produces the full deliverable set. Supports checkpoint resume if interrupted.
 
 ## Related
 

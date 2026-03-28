@@ -115,7 +115,8 @@ Use Glob to check for `.mcp.json` in the project root directory. If not found, w
 ```
 WARNING: .mcp.json not found in project root.
 MCP servers will not be available to sub-agents.
-Copy the WAR mcp.json to your project root: cp .claude/agents/../mcp.json .mcp.json
+Copy or merge the WAR mcp.json into your project root .mcp.json.
+See the solution kit README for install instructions.
 The review will proceed with degraded output quality.
 ```
 
