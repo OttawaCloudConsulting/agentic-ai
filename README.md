@@ -28,6 +28,14 @@ Covers: defensive protocol (anti-slop, epistemology, session management), CDK, T
 
 → [docs/RULES.md](docs/RULES.md)
 
+### Solutions
+
+Multi-construct kits combining agents, skills, and MCP configurations into complete workflows. Copy agents to `.claude/agents/`, skills to `.claude/skills/`, and MCP config to `.mcp.json`.
+
+Covers: AWS Well-Architected Framework review (pre-deployment design review from code and documentation).
+
+> [docs/SOLUTIONS.md](docs/SOLUTIONS.md)
+
 ### Scripts
 
 Shell script bundles copied to `scripts/` and run directly from the terminal. Not Claude Code content.

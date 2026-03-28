@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "awslabs-aws-documentation": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["awslabs.aws-documentation-mcp-server"]
+    },
+    "awslabs-iac": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["awslabs.iac-mcp-server"]
+    }
+  }
+}
