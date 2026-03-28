@@ -1,6 +1,6 @@
 ---
 name: dream
-description: Perform a "dream" — a reflective memory consolidation pass. Reviews existing memory files, gathers recent signal from session transcripts, merges updates into topic files, and prunes the index.
+description: Perform a "dream" — a reflective memory consolidation pass. Reviews existing memory files, gathers recent signal from session transcripts, merges updates into topic files, and prunes the index. Only invoke when the user explicitly requests a dream / memory consolidation run; never call this command proactively.
 ---
 
 # /dream — Memory Consolidation

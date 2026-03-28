@@ -20,10 +20,10 @@ No arguments. The command locates the memory directory from the system prompt's 
 
 | Input | Source | Required |
 |---|---|---|
-| Memory directory | `~/.claude/projects/<project-path>/memory/` | Yes |
+| Memory directory | `~/.claude/projects/<project-path-hash>/memory/` | Yes |
 | Memory index | `MEMORY.md` in memory directory | Yes |
 | Topic memory files | `*.md` files in memory directory | Yes |
-| Session transcripts | `~/.claude/projects/<project-path>/` JSONL files | No (searched narrowly if relevant) |
+| Session transcripts | `~/.claude/projects/<project-path-hash>/` JSONL files | No (searched narrowly if relevant) |
 | Git history | `git log` output | No (checked for recent context) |
 
 ## Outputs
