@@ -40,6 +40,12 @@ agentic-ai/
 │       ├── SKILL.md                   ← skill definition with frontmatter
 │       └── scripts/                   ← supporting shell scripts
 ├── rules/                             ← always-on behavioral guidelines (not commands)
+├── solutions/                         ← multi-construct solution kits (agents + skills + MCP config)
+│   └── <solution-name>/
+│       ├── README.md                  ← install guide, prerequisites, usage
+│       ├── mcp.json                   ← MCP server definitions
+│       ├── agents/                    ← agent definition files
+│       └── skills/                    ← skill bundles
 ├── scripts/                           ← repo tooling (lint-markdown.sh)
 ├── kiro/                              ← Kiro-native equivalents (powers + steering)
 │   ├── powers/                        ← keyword-activated workflow bundles
@@ -56,10 +62,12 @@ agentic-ai/
 │   ├── SKILLS.md                      ← skill catalog and usage guide
 │   ├── RULES.md                       ← rules catalog and usage guide
 │   ├── COMMANDS.md                    ← command catalog and usage guide
+│   ├── SOLUTIONS.md                   ← solution kit catalog and usage guide
 │   ├── ARCHITECTURE_AND_DESIGN.md     ← design docs for multi-skill suites
 │   ├── skills/                        ← per-skill detail pages
 │   ├── commands/                      ← per-command detail pages
 │   ├── rules/                         ← per-rule detail pages
+│   ├── solutions/                     ← per-solution detail pages
 │   └── issues/                        ← tracked issues and problem statements
 ├── external_sources/                  ← external reference material
 ├── temp/                              ← temporary working files
@@ -75,6 +83,7 @@ agentic-ai/
 | `commands/*.md` | Standalone commands (catchup, handoff, investigate, etc.) | `.claude/commands/` |
 | `skills/<name>/` | Skill bundles (SKILL.md + scripts) | `.claude/skills/<name>/` |
 | `rules/*.md` | Always-on behavioral guidelines | `.claude/rules/` |
+| `solutions/<name>/` | Multi-construct solution kits (agents + skills + MCP config) | `.claude/agents/` + `.claude/skills/` + `.mcp.json` |
 
 ### Kiro Content
 

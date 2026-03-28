@@ -1,0 +1,123 @@
+# Progress: AWS Well-Architected Review Solution Kit
+# Source: prd.md + docs/ARCHITECTURE_AND_DESIGN.md
+# Spec: docs/ARCHITECTURE_AND_DESIGN.md is the authoritative design reference
+# Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
+
+## Features
+
+[x] Feature 1: Architecture and Design
+    - prd.md complete and reviewed
+    - docs/ARCHITECTURE_AND_DESIGN.md complete and reviewed
+    - Solution kit directory structure created
+    NOTES: Started 2026-03-25, Completed 2026-03-25
+
+## Phase 0: Foundation (Build and Test Individually)
+
+[x] Feature 2.1: Document Cataloguer Agent
+    - war-cataloguer.md agent file with frontmatter (model: sonnet, maxTurns: 20)
+    - Test: produces clean DOCUMENT_CATALOGUE.md against a real repository
+    - Agent handles doc cataloguing via orchestrator parameterization
+    NOTES: Started 2026-03-25, Completed 2026-03-25. Tested against this repo — 607-line catalogue, well-structured.
+
+[x] Feature 2.2: Code Cataloguer Agent
+    - Same war-cataloguer.md file as Feature 2.1 (parameterized)
+    - Test: produces clean CODE_CATALOGUE.md against a real repository
+    - Catalogues IaC, Lambda/scripts, and miscellaneous code
+    NOTES: Started 2026-03-25, Completed 2026-03-25. Tested code mode — 60-line catalogue of shell scripts + configs. Correctly handled content-only repo with no IaC.
+
+[x] Feature 2.3: Architecture Reviewer Agent (Doc-Driven)
+    - war-architecture-reviewer.md agent file with frontmatter (model: sonnet, maxTurns: 25)
+    - Test: feed a document catalogue, verify WAF-structured review output
+    - Uses aws-documentation-mcp-server for WAF pillar guidance
+    NOTES: Started 2026-03-25, Completed 2026-03-25. Tested doc-driven mode against this repo — 119-line review, all 6 pillars + cross-cutting + 12 gaps. Correctly handled content-only repo with limited WAF applicability.
+
+[x] Feature 2.4: Architecture Reviewer Agent (Code-Driven)
+    - Same war-architecture-reviewer.md file as Feature 2.3 (parameterized)
+    - Test: feed a code catalogue, verify WAF-structured review output
+    NOTES: Started 2026-03-25, Completed 2026-03-25. Tested code-driven mode against this repo — 199-line review, all 6 pillars + cross-cutting + 12 gaps. Evidence-based with specific file/config citations throughout.
+
+[x] Feature 2.5: Discovery Interview Skill
+    - war-discovery-interview/SKILL.md with frontmatter (disable-model-invocation: true)
+    - Test: interview flow produces usable DESIGN_REQUIREMENTS.md
+    - Uses AskUserQuestion for structured interview (not open-ended)
+    NOTES: Started 2026-03-25, Completed 2026-03-25. Tested 6-round interview against this repo — 47-line DESIGN_REQUIREMENTS.md. Correctly cross-referenced prior deliverables and flagged contradictions for analyst.
+
+[x] Feature 2.6: Discovery Analyst Agent
+    - war-discovery-analyst.md agent file with frontmatter (model: sonnet, maxTurns: 15)
+    - Test: feed 5 deliverable documents, verify gap analysis and proceed/stop recommendation
+    - Structured output: gaps list, severity, recommendation
+    NOTES: Started 2026-03-25, Completed 2026-03-25. Tested against 5 deliverables — 46-line analysis, 10 gaps (5 major/5 minor), correctly recommended Stop due to structural contradiction between requirements and content-only repo. 9 tool turns, 102s.
+
+[x] Feature 2.7: Pillar Reviewer Agent
+    - war-pillar-reviewer.md agent file with frontmatter (model: sonnet, maxTurns: 25)
+    - Test: feed review context, verify one pillar output with standardized template
+    - Test repo: temp/gcco-guard-public-website-infra (Terraform IaC, public website)
+    - Standardized template: Overview, Findings (H/M/L), Evidence, Recommendations, Summary
+    - Uses aws-documentation-mcp-server + iac-mcp-server
+    NOTES: Started 2026-03-25, Completed 2026-03-25. Tested Security pillar against IaC repo — 13 findings (3H/6M/4L), 249 lines. All template sections present. Evidence cites specific files, line numbers, and config values. Strengths section documents 7 well-implemented controls. Minor bug: agent miscounted summary table (11 vs actual 13) — added count-verification rule to prompt.
+
+## Phase 1: Governance + Orchestration
+
+[x] Feature 2.8: Governance Profiler Skill
+    - war-governance-profiler/SKILL.md with frontmatter (disable-model-invocation: true)
+    - Reads docs/TENANT_PROFILE.md, produces GOVERNANCE_PROFILE.md
+    - Maps tenant controls to WAF pillars: inherited vs workload-responsible
+    - Uses AskUserQuestion for gap resolution
+    - Test repo: temp/gcco-guard-public-website-infra (needs docs/TENANT_PROFILE.md created first)
+    NOTES: Started 2026-03-26, Completed 2026-03-27. Tested against IaC repo — 116-line GOVERNANCE_PROFILE.md, 19 inherited controls, 25 workload responsibilities, 8 unresolved items. AskUserQuestion flow not interactively tested (sub-agent limitation); will get live test when orchestrator runs it inline in Phase 1.
+
+[x] Feature 3.1: Pre-Flight Check
+    - Hard gates: docs/TENANT_PROFILE.md and docs/ARCHITECTURE_AND_DESIGN.md must exist
+    - Soft checks: uvx, .mcp.json, output directory, existing deliverables
+    - Fails with guidance on expected content if pre-requisite docs missing
+    - Warns about overwrite if prior deliverables exist
+    NOTES: Started 2026-03-27, Completed 2026-03-27. Implemented as Step 1 of war-orchestrator.md. Hard gates report both failures before stopping. Soft checks: uvx, .mcp.json, output dir creation, existing deliverable overwrite confirmation via AskUserQuestion, aws-pricing info note. Pre-flight report written to PROGRESS.md.
+
+[x] Feature 3.2: Orchestrator Agent
+    - war-orchestrator.md agent file with frontmatter (model: sonnet, maxTurns: 50)
+    - Pre-flight: validate pre-requisite documents + tools
+    - Phase 1: parallel governance profiler + cataloguers (governance + doc + code)
+    - Phase 2: parallel architecture reviewers (doc + code), reference GOVERNANCE_PROFILE.md
+    - Phase 3: discovery interview skill + discovery analyst agent
+    - Decision gate: surfaces analyst recommendation to user
+    - Phase 4: parallel pillar reviewers (6x), reference GOVERNANCE_PROFILE.md
+    - Context passing: file paths + brief summaries
+    - PROGRESS.md maintained after each phase
+    - Checkpoint resume: reads PROGRESS.md, skips completed phases
+    NOTES: Started 2026-03-27, Completed 2026-03-27. Implemented Steps 0-6: checkpoint resume reads PROGRESS.md and skips completed phases with deliverable verification. Phase 1 runs governance profiler inline (AskUserQuestion) while 2 cataloguers run as background sub-agents. Phase 2 spawns 2 architecture reviewers in parallel, both reference GOVERNANCE_PROFILE.md. Phase 3 runs discovery interview inline then spawns analyst. Decision gate always surfaces recommendation via AskUserQuestion. Phase 4 spawns 6 pillar reviewers in parallel. All phases update PROGRESS.md and verify deliverables before proceeding. Rules section codifies orchestration constraints. 607 lines total.
+
+## Phase 2: MCP Integration + Distribution
+
+[x] Feature 4.1: MCP Configuration File
+    - mcp.json with aws-documentation and iac-server definitions (no auth)
+    - Inline aws-pricing definition in war-pillar-reviewer.md (optional, AWS creds)
+    - Per-agent MCP access matches architecture doc mapping
+    NOTES: Started 2026-03-27, Completed 2026-03-27. Created mcp.json with 2 servers (awslabs-aws-documentation, awslabs-iac) using uvx/stdio, no auth. Added mcpServers frontmatter to war-architecture-reviewer.md (aws-documentation) and war-pillar-reviewer.md (aws-documentation + iac). Added optional aws-pricing inline definition documented in war-pillar-reviewer.md prompt body with enablement instructions. Updated both agent prompts with MCP usage steps. Per-agent access verified against architecture doc mapping.
+
+[x] Feature 4.2: Solution Kit Distribution Package
+    - README.md: install guide, prerequisites, MCP permissions table, verification, usage, troubleshooting
+    - All agents, skills, and mcp.json packaged in solutions/well-architected-review/
+    - Install: 3 copy commands + uvx prerequisite check
+    NOTES: Started 2026-03-27, Completed 2026-03-27. README covers: prerequisites (uvx, pre-requisite docs), install (3 copy commands with TARGET variable), verification checklist, usage (orchestrator invocation + 4-phase workflow), deliverables table (14 documents), MCP servers (3 servers with per-agent access matrix), components table (8 components), and troubleshooting (7 scenarios). All kit files verified present: 5 agents, 2 skills, 1 mcp.json, 1 README.
+
+[x] Feature 4.3: Documentation Updates
+    - docs/solutions/WELL_ARCHITECTED_REVIEW.md architecture doc (public-facing)
+    - docs/SOLUTIONS.md catalog page
+    - CLAUDE.md updated with solutions/ in structure diagram and content model
+    NOTES: Started 2026-03-27, Completed 2026-03-27. Created WELL_ARCHITECTED_REVIEW.md (130 lines) covering architecture, components, MCP servers, workflow, deliverables, design decisions, and install. Created SOLUTIONS.md catalog (65 lines) following SKILLS.md pattern with quick reference table, structure diagram, and install pattern. Updated CLAUDE.md: added solutions/ to structure diagram (4 lines), SOLUTIONS.md + solutions/ to docs listing, and solutions row to content model table.
+
+## Phase 3: Finalization
+
+[x] Feature 5.1: Review README Generation
+    - Generate README.md in docs/well-architected-review/ after all pillar reviews complete
+    - Overview of WAR process, recommended reading order with rationale
+    - Relative links to all deliverable files with 1-2 sentence descriptions
+    - Serves as entry point and map, not a summary of findings
+    NOTES: Started 2026-03-27, Completed 2026-03-27. Sub-agent validated template against real test repo deliverables. Verdict: MINOR ISSUES — all fixed. Added: executive summary section (risk posture + top findings), workload metadata block, improved descriptions (governance inherited-vs-workload, structured interview). Standardized pillar summary table format (two-column, title-case, no bold labels, Total row) in war-pillar-reviewer.md for reliable extraction. Added per-pillar Total column to findings summary table.
+
+[x] Feature 5.2: Progress Tracker Cleanup
+    - Delete PROGRESS.md after all phases complete successfully
+    - Only delete if all expected deliverables exist
+    - If any deliverable missing, keep PROGRESS.md and warn user
+    - Log deletion in orchestrator's final status message
+    NOTES: Started 2026-03-28, Completed 2026-03-28. Already implemented in war-orchestrator.md Step 7 (Phase 5 — Finalization, lines 640-671) as part of Feature 3.2. Verified all 5 acceptance criteria satisfied: runs after README generation, deletes PROGRESS.md via Bash rm, gates on all 14 deliverables existing, logs deletion in final report (line 705), warns with missing file list if incomplete.
