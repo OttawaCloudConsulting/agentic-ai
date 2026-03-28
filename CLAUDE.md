@@ -149,6 +149,12 @@ Claude Code and Kiro content are parallel — same concepts, different formats. 
 - `auto` mode needs `name` and `description` fields
 - Tool-agnostic language (no Claude Code-specific references)
 
+## Tool-Specific Guidance
+
+### Mermaid Diagrams (mcp__mermaid-mcp)
+
+- Use `<br/>` for line breaks inside node labels. `\n` is rendered as literal text, not a newline.
+
 ## Workflow
 
 The user describes what they need. Claude generates the content. The user reviews.
