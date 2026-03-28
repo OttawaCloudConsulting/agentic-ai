@@ -17,6 +17,7 @@ For multi-file skill bundles (with scripts and references), see [SKILLS.md](SKIL
 | Update Docs CDK | `/update-docs-cdk` | CDK-specific documentation refresh | [View](commands/update-docs-cdk.md) |
 | Update Docs Terraform | `/update-docs-terraform` | Terraform-specific documentation refresh | [View](commands/update-docs-terraform.md) |
 | Compliance Auto-Assess | `/compliance-auto-assess` | Automated ITSG-33 compliance assessment via sub-agent | [View](commands/compliance-auto-assess.md) |
+| Dream | `/dream` | Reflective memory consolidation pass | [View](commands/dream.md) |
 
 ## How Commands Work
 
@@ -60,6 +61,7 @@ Commands follow a development lifecycle. Use them in this order for new projects
 /catchup             Start of session: read last handoff + progress.txt
   (work)
 /handoff             End of session: save state before closing
+/dream               Consolidate, merge, and prune memory files
 ```
 
 ### Debugging
@@ -83,6 +85,7 @@ cp commands/update-docs.md             <target-repo>/.claude/commands/
 cp commands/update-docs-cdk.md         <target-repo>/.claude/commands/
 cp commands/update-docs-terraform.md   <target-repo>/.claude/commands/
 cp commands/compliance-auto-assess.md  <target-repo>/.claude/commands/
+cp commands/dream.md                   <target-repo>/.claude/commands/
 ```
 
 Commands take effect immediately on the next Claude Code conversation in that repository.
@@ -91,7 +94,7 @@ Commands take effect immediately on the next Claude Code conversation in that re
 
 | Project Type | Recommended Commands |
 |---|---|
-| Any project | `create-prd`, `start-feature`, `catchup`, `handoff`, `investigate`, `update-docs` |
+| Any project | `create-prd`, `start-feature`, `catchup`, `handoff`, `investigate`, `update-docs`, `dream` |
 | Terraform projects | Above + `update-docs-terraform` |
 | CDK projects | Above + `update-docs-cdk` |
 | Compliance-sensitive projects | Above + `compliance-auto-assess` |
