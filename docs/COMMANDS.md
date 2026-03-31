@@ -10,6 +10,7 @@ For multi-file skill bundles (with scripts and references), see [SKILLS.md](SKIL
 |---|---|---|---|
 | Create PRD | `/create-prd` | Guided interview to create PRD, architecture doc, and progress file | [View](commands/create-prd.md) |
 | Start Feature | `/start-feature` | Begin the next feature from progress.txt — interactive, with human-in-the-loop review | [View](commands/start-feature.md) |
+| Start Feature (Auto) | `/start-feature-auto` | Automated feature implementation: writes plan to NOTES, implements without user checkpoint | [View](commands/start-feature-auto.md) |
 | Catchup | `/catchup` | Read project state at start of a new session | [View](commands/catchup.md) |
 | Handoff | `/handoff` | Save session state before ending | [View](commands/handoff.md) |
 | Investigate | `/investigate` | Structured debugging investigation | [View](commands/investigate.md) |
@@ -79,6 +80,7 @@ Copy command files from `commands/` into `.claude/commands/` in the target repos
 # Copy individual commands
 cp commands/create-prd.md              <target-repo>/.claude/commands/
 cp commands/start-feature.md           <target-repo>/.claude/commands/
+cp commands/start-feature-auto.md      <target-repo>/.claude/commands/
 cp commands/catchup.md                 <target-repo>/.claude/commands/
 cp commands/handoff.md                 <target-repo>/.claude/commands/
 cp commands/investigate.md             <target-repo>/.claude/commands/

@@ -1,8 +1,8 @@
 # Start Feature (Auto)
 
-**Source:** `skills/start-feature-auto/`
+**Source:** `commands/start-feature-auto.md`
 **Command:** `/start-feature-auto`
-**Activation:** Manual only (`disable-model-invocation: true`) — invoked via slash command.
+**Activation:** Manual — invoked via slash command only. Never auto-triggered.
 
 ## Description
 
@@ -11,19 +11,13 @@ Automated counterpart to `/start-feature`. Executes the same pre-work (reads `pr
 `progress.txt` NOTES rather than presenting it for human review, then implements the feature
 without a confirmation checkpoint.
 
-Before writing any code, the skill persists a structured NOTES entry covering the feature
+Before writing any code, the command persists a structured NOTES entry covering the feature
 summary, files identified, relevant design decisions, dependencies, and chosen execution model.
 This ensures the record is complete regardless of outcome.
 
-The skill dynamically selects an execution model based on feature complexity: inline for simple
+The command dynamically selects an execution model based on feature complexity: inline for simple
 changes, a single isolated sub-agent for self-contained features, or a parallel agent team for
 features with independent work streams.
-
-## Bundle Contents
-
-| File | Purpose |
-|---|---|
-| `SKILL.md` | Skill definition with 7-step workflow, complexity routing table, and NOTES format |
 
 ## Usage
 
@@ -31,17 +25,34 @@ features with independent work streams.
 /start-feature-auto
 ```
 
-Invoke when you want the next feature implemented without a review checkpoint. The skill
-identifies the next pending feature automatically — no arguments needed.
+No arguments. The command determines which feature to implement from `progress.txt` automatically.
+
+## Inputs
+
+| Input | Source | Required |
+|---|---|---|
+| Feature status | `progress.txt` | Yes |
+| Feature requirements and acceptance criteria | `prd.md` | Yes |
+| Design decisions, component inventory, file organization | `docs/ARCHITECTURE_AND_DESIGN.md` | No — proceeds with `prd.md` alone if absent |
+| Current codebase structure | Glob and Grep scan | Yes |
+
+## Outputs
+
+| Output | Location | Description |
+|---|---|---|
+| NOTES entry | `progress.txt` (in-place edit) | Structured pre-work record written before implementation |
+| Completed feature | Codebase | Files created or modified per the feature requirements |
+| Completion record | `progress.txt` (in-place edit) | CODE COMPLETE appended to NOTES; status changed to `[x]` |
+| Summary report | Console (stdout) | Execution model used, files changed, next feature pointer |
 
 ## Workflow
 
 ### Step 1 — Read progress.txt
 
-Validates `progress.txt` exists and identifies the next feature to work on:
+Validates `progress.txt` exists and identifies the target feature:
 
-- `[~]` (in progress): resumes that feature. If the NOTES entry is complete (has `FILES
-  IDENTIFIED`, `KEY DECISIONS`, `EXECUTION` fields), skips to Step 5.
+- `[~]` (in progress): resumes. If NOTES already has `FILES IDENTIFIED`, `KEY DECISIONS`, and
+  `EXECUTION` fields, skips pre-work and proceeds to Step 5.
 - `[ ]` (pending): picks the next feature in order.
 - All `[x]`: reports completion and stops.
 
@@ -49,7 +60,7 @@ Validates `progress.txt` exists and identifies the next feature to work on:
 
 Reads `prd.md` for the feature's requirements and acceptance criteria. Reads
 `docs/ARCHITECTURE_AND_DESIGN.md` for Design Decisions, Component Inventory, File Organization,
-and Deployment Workflow sections relevant to the feature.
+and Deployment Workflow relevant to the feature.
 
 ### Step 3 — Scan the codebase
 
@@ -59,8 +70,7 @@ files to be created.
 
 ### Step 4 — Write NOTES entry
 
-Marks the feature `[~]` and writes a structured NOTES block to `progress.txt` before any
-implementation begins:
+Marks the feature `[~]` and writes a structured NOTES block to `progress.txt`:
 
 ```
 NOTES: Started YYYY-MM-DD.
@@ -73,7 +83,7 @@ NOTES: Started YYYY-MM-DD.
 
 ### Step 5 — Assess complexity and route
 
-Selects an execution model based on the codebase scan and requirements:
+Selects an execution model:
 
 | Signal | Execution model |
 |---|---|
@@ -91,30 +101,23 @@ parallel, then merges results.
 
 ### Step 7 — Close the feature
 
-Appends completion record to NOTES, changes status to `[x]`, and reports to the user:
+Appends `CODE COMPLETE` and `Completed YYYY-MM-DD` to NOTES, changes status to `[x]`, and
+reports to the user with execution model, files changed, and the next feature.
 
-```
-COMPLETED: Feature X.Y — [Title]
-EXECUTION MODEL: [inline | sub-agent | team]
-FILES CHANGED: [list]
-NEXT FEATURE: Feature X.Z — [Title]
-```
+## NOTES Structure
 
-## Output
+The NOTES block has a consistent structure written in two passes:
 
-All context and outcomes are persisted to `progress.txt` under the feature's NOTES field. The
-NOTES block has a consistent structure across all features:
-
-| Field | When written |
-|---|---|
-| `Started` | Step 4 — before implementation |
-| `SUMMARY` | Step 4 — before implementation |
-| `FILES IDENTIFIED` | Step 4 — before implementation |
-| `KEY DECISIONS` | Step 4 — before implementation |
-| `DEPENDENCIES` | Step 4 — before implementation |
-| `EXECUTION` | Step 5 — before implementation |
-| `CODE COMPLETE` | Step 7 — after implementation |
-| `Completed` | Step 7 — after implementation |
+| Field | Written | Content |
+|---|---|---|
+| `Started` | Step 4 — before implementation | Start date |
+| `SUMMARY` | Step 4 — before implementation | 1–2 sentence feature description |
+| `FILES IDENTIFIED` | Step 4 — before implementation | Files from codebase scan |
+| `KEY DECISIONS` | Step 4 — before implementation | Relevant design decisions |
+| `DEPENDENCIES` | Step 4 — before implementation | Feature and external deps |
+| `EXECUTION` | Step 5 — before implementation | Chosen model and rationale |
+| `CODE COMPLETE` | Step 7 — after implementation | Files changed, test and lint status |
+| `Completed` | Step 7 — after implementation | Completion date |
 
 ## Error Handling
 
@@ -130,16 +133,18 @@ NOTES block has a consistent structure across all features:
 ## When to Use
 
 - Implementing a well-defined feature where requirements and architecture are clear
-- Batch processing multiple features without manual checkpoints between each
 - When you trust the context in `prd.md` and `docs/ARCHITECTURE_AND_DESIGN.md` and want hands-off execution
+- Batch-processing multiple features without manual checkpoints between each
 
 ## When Not to Use
 
 - When you want to review the plan before implementation begins — use `/start-feature` instead
 - When the feature has significant ambiguity in requirements or architecture
-- When the feature touches shared infrastructure or has irreversible side effects that warrant a human checkpoint
+- When the feature touches shared infrastructure or has irreversible side effects warranting a human checkpoint
 
-## Related
+## Related Commands
 
-- **`/start-feature`** — interactive version with a human-in-the-loop review checkpoint before implementation
-- **`/create-prd`** — produces the `prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`, and `progress.txt` that this skill consumes
+- `/start-feature` — interactive version: presents plan for review, waits for confirmation before implementing
+- `/create-prd` — produces the `prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`, and `progress.txt` that this command consumes
+- `/catchup` — reads project state at the start of a session; often invoked before `/start-feature-auto`
+- `/handoff` — captures in-progress state at the end of a session

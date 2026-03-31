@@ -1,7 +1,6 @@
 ---
 name: start-feature-auto
-description: Automated feature implementation. Reads project context, writes a structured plan to progress.txt NOTES, then implements the feature without waiting for user confirmation. Use when the user explicitly invokes /start-feature-auto. Do NOT use for review or planning only — use /start-feature for the interactive version with a human-in-the-loop checkpoint.
-disable-model-invocation: true
+description: Automated feature implementation. Reads project context, writes a structured plan to progress.txt NOTES, then implements the feature without waiting for user confirmation. Only invoke when the user explicitly requests autonomous feature implementation. Do NOT use for review or planning only — use /start-feature for the interactive version with a human-in-the-loop checkpoint.
 ---
 
 # /start-feature-auto — Automated Feature Implementation
@@ -61,19 +60,19 @@ based on the architecture doc's File Organization section.
 
 ## Step 4 — Write NOTES entry
 
-Update `progress.txt`. If the feature is being started fresh, first mark it `[~]` and then write
-the following NOTES block:
+Mark the feature `[~]` and write the following NOTES block to `progress.txt` before any
+implementation begins:
 
 ```
 NOTES: Started YYYY-MM-DD.
        SUMMARY: [1-2 sentence description of what this feature builds and why].
        FILES IDENTIFIED: [comma-separated list from codebase scan]
        KEY DECISIONS: [#N summary; #M summary — from docs/ARCHITECTURE_AND_DESIGN.md]
-       DEPENDENCIES: [feature deps and any external deps; "None" if absent]
+       DEPENDENCIES: [feature and external deps; "None" if absent]
        EXECUTION: [inline | sub-agent | team] — [one-line rationale]
 ```
 
-If resuming a `[~]` feature that has an incomplete NOTES block, append the missing fields.
+If resuming a `[~]` feature with an incomplete NOTES block, append only the missing fields.
 
 ## Step 5 — Assess complexity and route
 
@@ -86,8 +85,7 @@ Based on the codebase scan and requirements, determine the execution model:
 | Multiple independent components with no shared state between work streams | **Team** — one agent per work stream, results merged |
 
 Write the chosen model and a one-line rationale to the `EXECUTION:` field in NOTES before
-proceeding. If the model chosen is sub-agent or team, state which agent(s) will be launched and
-what each is responsible for.
+proceeding.
 
 ## Step 6 — Implement
 
@@ -101,14 +99,14 @@ or linters.
 implements, runs tests, and returns. Apply the result.
 
 **Team:** Launch one Agent per independent work stream in parallel, each with `isolation: "worktree"`.
-Each agent receives only its own scope. After all agents return, merge the results and resolve any
+Each agent receives only its own scope. After all agents return, merge results and resolve any
 conflicts.
 
 ## Step 7 — Close the feature
 
 After implementation is complete:
 
-1. Update `progress.txt` — append to the feature's NOTES block:
+1. Append to the feature's NOTES block in `progress.txt`:
 
 ```
        CODE COMPLETE: [N files changed; tests: pass/fail; lint: pass/fail].
