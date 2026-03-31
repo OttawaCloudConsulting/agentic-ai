@@ -45,8 +45,9 @@ Commands follow a development lifecycle. Use them in this order for new projects
 ```
 /create-prd          Create project requirements, architecture, progress file
     │
-/start-feature       Pick up the next feature — review plan, then implement on confirmation
-/start-feature-auto  Pick up the next feature — write plan to NOTES, implement automatically
+/start-feature       Pick up the next feature (interactive — review plan, confirm to implement)
+  OR
+/start-feature-auto  Pick up the next feature (autonomous — write plan to NOTES, implement)
     │
   (implement)        Write the code
     │

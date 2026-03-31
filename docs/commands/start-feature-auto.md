@@ -52,7 +52,8 @@ No arguments. The command determines which feature to implement from `progress.t
 Validates `progress.txt` exists and identifies the target feature:
 
 - `[~]` (in progress): resumes. If NOTES already has `FILES IDENTIFIED`, `KEY DECISIONS`, and
-  `EXECUTION` fields, skips pre-work and proceeds to Step 5.
+  `EXECUTION` fields, skips pre-work and proceeds directly to Step 6 (Implement) using the
+  recorded `EXECUTION` value without modifying it.
 - `[ ]` (pending): picks the next feature in order.
 - All `[x]`: reports completion and stops.
 
@@ -78,12 +79,12 @@ NOTES: Started YYYY-MM-DD.
        FILES IDENTIFIED: [list from codebase scan]
        KEY DECISIONS: [relevant decisions from ARCHITECTURE_AND_DESIGN.md]
        DEPENDENCIES: [feature and external deps]
-       EXECUTION: [inline | sub-agent | team] — [rationale]
+       EXECUTION: [TBD — filled by Step 5]
 ```
 
 ### Step 5 — Assess complexity and route
 
-Selects an execution model:
+Selects an execution model and updates the `EXECUTION:` field in NOTES:
 
 | Signal | Execution model |
 |---|---|

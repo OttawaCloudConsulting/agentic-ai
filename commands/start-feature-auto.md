@@ -30,8 +30,9 @@ Read `progress.txt` and identify:
 If all features are marked `[x]`, report that all planned features are complete and stop.
 
 **Resuming a `[~]` feature:** Read the NOTES field. If a NOTES entry already exists with
-`FILES IDENTIFIED`, `KEY DECISIONS`, and `EXECUTION` fields, the pre-work is done — skip to
-Step 5 using the recorded execution model. Otherwise proceed through all steps.
+`FILES IDENTIFIED`, `KEY DECISIONS`, and `EXECUTION` fields, the pre-work is done — skip any
+steps that re-determine the execution model and proceed directly to Step 6 (Implement), using
+the recorded `EXECUTION` value without modifying it. Otherwise proceed through all steps.
 
 ## Step 2 — Read requirements
 
@@ -69,7 +70,7 @@ NOTES: Started YYYY-MM-DD.
        FILES IDENTIFIED: [comma-separated list from codebase scan]
        KEY DECISIONS: [#N summary; #M summary — from docs/ARCHITECTURE_AND_DESIGN.md]
        DEPENDENCIES: [feature and external deps; "None" if absent]
-       EXECUTION: [inline | sub-agent | team] — [one-line rationale]
+       EXECUTION: [TBD — filled by Step 5]
 ```
 
 If resuming a `[~]` feature with an incomplete NOTES block, append only the missing fields.
@@ -84,7 +85,7 @@ Based on the codebase scan and requirements, determine the execution model:
 | 4–8 files, self-contained concern, or unfamiliar codebase area | **Sub-agent** — single isolated agent in a worktree |
 | Multiple independent components with no shared state between work streams | **Team** — one agent per work stream, results merged |
 
-Write the chosen model and a one-line rationale to the `EXECUTION:` field in NOTES before
+Update the `EXECUTION:` field in NOTES with the chosen model and a one-line rationale before
 proceeding.
 
 ## Step 6 — Implement

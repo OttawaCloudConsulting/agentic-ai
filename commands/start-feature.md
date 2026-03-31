@@ -21,8 +21,8 @@ Read `progress.txt` and identify:
 If all features are marked `[x]`, report that all planned features are complete and stop.
 
 **Resuming a `[~]` feature:** Read the NOTES field for the feature. Surface any recorded start
-date, code-complete status, or open questions from NOTES in the Step 4 report. Skip marking the
-feature `[~]` in Step 3 (it is already marked).
+date, code-complete status, or open questions from NOTES in the Step 5 report. Skip marking the
+feature `[~]` in Step 4 (it is already marked).
 
 ### Step 2 — Read requirements
 
