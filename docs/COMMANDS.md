@@ -9,7 +9,8 @@ For multi-file skill bundles (with scripts and references), see [SKILLS.md](SKIL
 | Command | Trigger | Purpose | Details |
 |---|---|---|---|
 | Create PRD | `/create-prd` | Guided interview to create PRD, architecture doc, and progress file | [View](commands/create-prd.md) |
-| Start Feature | `/start-feature` | Begin the next feature from progress.txt | [View](commands/start-feature.md) |
+| Start Feature | `/start-feature` | Begin the next feature from progress.txt — interactive, with human-in-the-loop review | [View](commands/start-feature.md) |
+| Start Feature (Auto) | `/start-feature-auto` | Automated feature implementation: writes plan to NOTES, implements without user checkpoint | [View](commands/start-feature-auto.md) |
 | Catchup | `/catchup` | Read project state at start of a new session | [View](commands/catchup.md) |
 | Handoff | `/handoff` | Save session state before ending | [View](commands/handoff.md) |
 | Investigate | `/investigate` | Structured debugging investigation | [View](commands/investigate.md) |
@@ -44,7 +45,9 @@ Commands follow a development lifecycle. Use them in this order for new projects
 ```
 /create-prd          Create project requirements, architecture, progress file
     │
-/start-feature       Pick up the next feature from progress.txt
+/start-feature       Pick up the next feature (interactive — review plan, confirm to implement)
+  OR
+/start-feature-auto  Pick up the next feature (autonomous — write plan to NOTES, implement)
     │
   (implement)        Write the code
     │
@@ -78,6 +81,7 @@ Copy command files from `commands/` into `.claude/commands/` in the target repos
 # Copy individual commands
 cp commands/create-prd.md              <target-repo>/.claude/commands/
 cp commands/start-feature.md           <target-repo>/.claude/commands/
+cp commands/start-feature-auto.md      <target-repo>/.claude/commands/
 cp commands/catchup.md                 <target-repo>/.claude/commands/
 cp commands/handoff.md                 <target-repo>/.claude/commands/
 cp commands/investigate.md             <target-repo>/.claude/commands/
@@ -94,7 +98,7 @@ Commands take effect immediately on the next Claude Code conversation in that re
 
 | Project Type | Recommended Commands |
 |---|---|
-| Any project | `create-prd`, `start-feature`, `catchup`, `handoff`, `investigate`, `update-docs`, `dream` |
+| Any project | `create-prd`, `start-feature`, `start-feature-auto`, `catchup`, `handoff`, `investigate`, `update-docs`, `dream` |
 | Terraform projects | Above + `update-docs-terraform` |
 | CDK projects | Above + `update-docs-cdk` |
 | Compliance-sensitive projects | Above + `compliance-auto-assess` |
