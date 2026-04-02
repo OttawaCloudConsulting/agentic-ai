@@ -14,9 +14,9 @@ Every phase transition requires explicit human approval, preventing AI drift fro
 
 - [x] `/project` orchestrator — reads `progress.txt` and `milestone-status.txt`, reports current state, routes user to the right next skill, bootstraps state on first run — *Validated in Phase 1: project-router*
 - [x] `/define` skill — runs Gates 0 (codebase alignment), optional WB (Working Backwards PR/FAQ), and Gate 1 (PRD creation) as a single continuous session — *Validated in Phase 2: define-gates-0-wb-1*
+- [x] `/design` skill — Gate 2: produces `docs/ARCHITECTURE_AND_DESIGN.md` from approved PRD + codebase assessment, with refresh mode for deviation consolidation — *Validated in Phase 3: design-gate-2*
 
 ### Active
-- [ ] `/design` skill — Gate 2: produces `docs/ARCHITECTURE_AND_DESIGN.md` from approved PRD + codebase assessment
 - [ ] `/milestone` skill — Gate 3: breaks approved PRD + design into milestone breakdown with feature grouping, ordering, acceptance criteria, and sizing
 - [ ] `/plan` skill — Gate 4: produces per-feature implementation plans (one invocation per feature) including sub-feature breakdown, test command, and interface contracts
 - [ ] `/build` skill — implements features sub-feature by sub-feature, tracks deviations, refreshes codebase assessment, updates `milestone-status.txt` on completion
@@ -63,7 +63,7 @@ A codebase map exists at `.planning/codebase/`. Key existing patterns: skills ar
 | Test command planned in `/plan`, executed in `/build` (DD-12) | Skill invokes command, user manages test content — decouples from any specific test framework | — Pending |
 
 ---
-*Last updated: 2026-04-02 — Phase 2 (define-gates-0-wb-1) complete*
+*Last updated: 2026-04-02 — Phase 3 (design-gate-2) complete*
 
 ## Evolution
 
