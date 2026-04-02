@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Reference specifications (progress format, routing logic, status report format)
-- [ ] 01-02-PLAN.md — SKILL.md main workflow file
+- [x] 01-02-PLAN.md — SKILL.md main workflow file
 - [ ] 01-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 2: /define (Gates 0/WB/1)

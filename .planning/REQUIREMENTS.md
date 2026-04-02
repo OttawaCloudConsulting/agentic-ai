@@ -9,8 +9,8 @@
 
 ### Router (`/project`)
 
-- [ ] **PROJ-01**: `/project` bootstraps `progress.txt` with gate entries and no milestones on first run (only state write it ever performs)
-- [ ] **PROJ-02**: `/project` reads `progress.txt` and `milestones/*/milestone-status.txt` and reports current project state — which gates are approved, which milestone is active, next recommended action
+- [x] **PROJ-01**: `/project` bootstraps `progress.txt` with gate entries and no milestones on first run (only state write it ever performs)
+- [x] **PROJ-02**: `/project` reads `progress.txt` and `milestones/*/milestone-status.txt` and reports current project state — which gates are approved, which milestone is active, next recommended action
 - [x] **PROJ-03**: `/project` routes user to the correct next skill by outputting a plain-language instruction (it does not auto-dispatch; the user starts a new conversation)
 - [x] **PROJ-04**: `/project` validates that artifact file paths listed alongside approved gates exist on disk; warns (does not block) when missing
 - [x] **PROJ-05**: `/project` validates consistency between milestone summary status in `progress.txt` and each `milestone-status.txt`; warns on divergence
@@ -18,7 +18,7 @@
 - [x] **PROJ-07**: `/project` detects Gate WB `Pending` state on invocation and re-prompts user for a decision before reporting any further status
 - [x] **PROJ-08**: `/project` routes to `/define` in revision mode when user signals project-level goals have changed
 - [x] **PROJ-09**: `/project` routes to `/milestone` in revision mode when user initiates milestone re-planning
-- [ ] **PROJ-10**: `/project` remains strictly read-only after bootstrap — never modifies state files in normal operation
+- [x] **PROJ-10**: `/project` remains strictly read-only after bootstrap — never modifies state files in normal operation
 
 ### Define (`/define`)
 
@@ -103,7 +103,7 @@
 
 - [x] **STATE-01**: `progress.txt` (project-level) uses plain-text checkbox notation; contains gate entries, milestone summary lines (one per milestone), and spikes section
 - [x] **STATE-02**: `milestone-status.txt` (per-milestone) uses plain-text checkbox notation; contains one feature entry per milestone feature with plan path, sub-feature checklist, and notes
-- [ ] **STATE-03**: All skills read state files fresh on entry — no reliance on in-session memory for state
+- [x] **STATE-03**: All skills read state files fresh on entry — no reliance on in-session memory for state
 - [x] **STATE-04**: Skills write `milestone-status.txt` before `progress.txt` when both require updates (source-of-truth-first ordering for crash safety)
 
 ### Documentation
@@ -144,8 +144,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROJ-01 | Phase 1 | Pending |
-| PROJ-02 | Phase 1 | Pending |
+| PROJ-01 | Phase 1 | Complete |
+| PROJ-02 | Phase 1 | Complete |
 | PROJ-03 | Phase 1 | Complete |
 | PROJ-04 | Phase 1 | Complete |
 | PROJ-05 | Phase 1 | Complete |
@@ -153,10 +153,10 @@
 | PROJ-07 | Phase 1 | Complete |
 | PROJ-08 | Phase 1 | Complete |
 | PROJ-09 | Phase 1 | Complete |
-| PROJ-10 | Phase 1 | Pending |
+| PROJ-10 | Phase 1 | Complete |
 | STATE-01 | Phase 1 | Complete |
 | STATE-02 | Phase 1 | Complete |
-| STATE-03 | Phase 1 | Pending |
+| STATE-03 | Phase 1 | Complete |
 | STATE-04 | Phase 1 | Complete |
 | DEF-01 | Phase 2 | Pending |
 | DEF-02 | Phase 2 | Pending |
