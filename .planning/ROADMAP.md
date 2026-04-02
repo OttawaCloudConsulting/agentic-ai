@@ -67,7 +67,12 @@ Plans:
   2. `/design` produces `docs/ARCHITECTURE_AND_DESIGN.md` with all required sections and a `docs/reviews/gate-2-review.md` checklist
   3. Gate 2 approval is recorded in `progress.txt` with date and artifact path only after the user explicitly approves; in-session revision is supported before approval
   4. Refresh mode consolidates accumulated architectural deviations from feature plans into an updated design document
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Reference files and architecture template (gate-2-design, refresh-mode, progress-format, review-checklist-template, architecture-template)
+- [ ] 03-02-PLAN.md — SKILL.md flow controller
+- [ ] 03-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 4: /milestone (Gate 3)
 **Goal**: Users can define milestones one at a time, with Gate 3 staying open until all milestones are defined, and revision mode preserving completed features
@@ -122,7 +127,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. /project Router | 0/3 | Not started | - |
 | 2. /define (Gates 0/WB/1) | 0/4 | Not started | - |
-| 3. /design (Gate 2) | 0/TBD | Not started | - |
+| 3. /design (Gate 2) | 0/3 | Not started | - |
 | 4. /milestone (Gate 3) | 0/TBD | Not started | - |
 | 5. /plan (Gate 4) | 0/TBD | Not started | - |
 | 6. /build | 0/TBD | Not started | - |
