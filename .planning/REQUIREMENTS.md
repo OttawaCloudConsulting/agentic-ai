@@ -31,13 +31,13 @@
 - [ ] **DEF-07**: `/define` records Gate 0 approval in `progress.txt`: `[x] Gate 0: Codebase Alignment  Approved: <date>  docs/codebase-assessment.md`
 - [ ] **DEF-08**: `/define` offers Gate WB after Gate 0; records `[x]` (approved), `[-] Skipped`, or `[ ] Pending — offered, awaiting decision` in `progress.txt`
 - [ ] **DEF-09**: `/define` at Gate WB produces `docs/working-backwards.md` with: Press Release (customer, problem, solution, experience, quote, CTA), External FAQ, Internal FAQ
-- [ ] **DEF-10**: `/define` conducts a PRD interview at Gate 1, using approved PR/FAQ as primary input when Gate WB was used
-- [ ] **DEF-11**: `/define` produces `prd.md` at Gate 1 with sections: Summary, Goals, Non-Goals, External Dependencies, Milestones (initially empty), Configuration, Outputs, Risk Assessment, Future Enhancements
-- [ ] **DEF-12**: `/define` supports partial Gate 1 approval — user can approve parts and request revision of others; skill revises in-session (no restart)
-- [ ] **DEF-13**: `/define` records Gate 1 approval in `progress.txt`: `[x] Gate 1: Scope Review  Approved: <date>  prd.md`
+- [x] **DEF-10**: `/define` conducts a PRD interview at Gate 1, using approved PR/FAQ as primary input when Gate WB was used
+- [x] **DEF-11**: `/define` produces `prd.md` at Gate 1 with sections: Summary, Goals, Non-Goals, External Dependencies, Milestones (initially empty), Configuration, Outputs, Risk Assessment, Future Enhancements
+- [x] **DEF-12**: `/define` supports partial Gate 1 approval — user can approve parts and request revision of others; skill revises in-session (no restart)
+- [x] **DEF-13**: `/define` records Gate 1 approval in `progress.txt`: `[x] Gate 1: Scope Review  Approved: <date>  prd.md`
 - [ ] **DEF-14**: `/define` runs Gates 0, WB, and 1 as a single continuous session — user does not leave the conversation between gates
-- [ ] **DEF-15**: `/define` in revision mode reads existing `prd.md` and runs a focused interview on what changed; does not automatically reset downstream artifacts; surfaces affected artifact list for user decision
-- [ ] **DEF-16**: `/define` re-reads `docs/codebase-assessment.md` from disk at Gate 1 rather than relying on in-session memory (context rot mitigation)
+- [x] **DEF-15**: `/define` in revision mode reads existing `prd.md` and runs a focused interview on what changed; does not automatically reset downstream artifacts; surfaces affected artifact list for user decision
+- [x] **DEF-16**: `/define` re-reads `docs/codebase-assessment.md` from disk at Gate 1 rather than relying on in-session memory (context rot mitigation)
 
 ### Design (`/design`)
 
@@ -167,13 +167,13 @@
 | DEF-07 | Phase 2 | Pending |
 | DEF-08 | Phase 2 | Pending |
 | DEF-09 | Phase 2 | Pending |
-| DEF-10 | Phase 2 | Pending |
-| DEF-11 | Phase 2 | Pending |
-| DEF-12 | Phase 2 | Pending |
-| DEF-13 | Phase 2 | Pending |
+| DEF-10 | Phase 2 | Complete |
+| DEF-11 | Phase 2 | Complete |
+| DEF-12 | Phase 2 | Complete |
+| DEF-13 | Phase 2 | Complete |
 | DEF-14 | Phase 2 | Pending |
-| DEF-15 | Phase 2 | Pending |
-| DEF-16 | Phase 2 | Pending |
+| DEF-15 | Phase 2 | Complete |
+| DEF-16 | Phase 2 | Complete |
 | DES-01 | Phase 3 | Pending |
 | DES-02 | Phase 3 | Pending |
 | DES-03 | Phase 3 | Pending |

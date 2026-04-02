@@ -53,7 +53,7 @@ Plans:
 
 Plans:
 - [ ] 02-01-PLAN.md — Gate 0 + Gate WB reference files and shared references
-- [ ] 02-02-PLAN.md — Gate 1 reference file and adapted PRD template
+- [x] 02-02-PLAN.md — Gate 1 reference file and adapted PRD template
 - [ ] 02-03-PLAN.md — SKILL.md flow controller
 - [ ] 02-04-PLAN.md — Documentation (detail doc + catalog entry)
 **UI hint**: no
