@@ -49,7 +49,13 @@ Plans:
   3. Gate WB produces `docs/working-backwards.md` when approved; records `[-] Skipped` or `[ ] Pending` in `progress.txt` otherwise
   4. Gate 1 produces `prd.md` and records approval in `progress.txt` with date and artifact path; partial approval triggers in-session revision without restarting
   5. Revision mode reads existing `prd.md`, interviews on what changed, and surfaces a list of affected downstream artifacts for user decision without auto-resetting them
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Gate 0 + Gate WB reference files and shared references
+- [ ] 02-02-PLAN.md — Gate 1 reference file and adapted PRD template
+- [ ] 02-03-PLAN.md — SKILL.md flow controller
+- [ ] 02-04-PLAN.md — Documentation (detail doc + catalog entry)
 **UI hint**: no
 
 ### Phase 3: /design (Gate 2)
@@ -115,7 +121,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. /project Router | 0/3 | Not started | - |
-| 2. /define (Gates 0/WB/1) | 0/TBD | Not started | - |
+| 2. /define (Gates 0/WB/1) | 0/4 | Not started | - |
 | 3. /design (Gate 2) | 0/TBD | Not started | - |
 | 4. /milestone (Gate 3) | 0/TBD | Not started | - |
 | 5. /plan (Gate 4) | 0/TBD | Not started | - |
