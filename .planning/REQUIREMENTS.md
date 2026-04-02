@@ -22,15 +22,15 @@
 
 ### Define (`/define`)
 
-- [ ] **DEF-01**: `/define` detects greenfield projects (empty dir or boilerplate-only) and skips Gate 0, proceeding directly to Gate WB offer or Gate 1
-- [ ] **DEF-02**: `/define` scans the codebase at Gate 0: file structure, naming patterns, dependency graph, git history, architectural conventions
-- [ ] **DEF-03**: `/define` produces `docs/codebase-assessment.md` at Gate 0 with sections: Project Overview, File Organization, Detected Patterns, Dependency Graph, Assumptions, Patterns to Deviate From, Open Questions, Recent Changes
-- [ ] **DEF-04**: `/define` produces a gate review checklist file at each gate (Gate 0: `docs/reviews/gate-0-review.md`, Gate WB: `docs/reviews/gate-wb-review.md`, Gate 1: `docs/reviews/gate-1-review.md`)
-- [ ] **DEF-05**: `/define` presents Gate 0 findings to user and supports in-session correction before approval
-- [ ] **DEF-06**: `/define` validates all review checklist items are resolved (`[x]` or `[-]` N/A with reason) before recording gate approval in `progress.txt`
-- [ ] **DEF-07**: `/define` records Gate 0 approval in `progress.txt`: `[x] Gate 0: Codebase Alignment  Approved: <date>  docs/codebase-assessment.md`
-- [ ] **DEF-08**: `/define` offers Gate WB after Gate 0; records `[x]` (approved), `[-] Skipped`, or `[ ] Pending — offered, awaiting decision` in `progress.txt`
-- [ ] **DEF-09**: `/define` at Gate WB produces `docs/working-backwards.md` with: Press Release (customer, problem, solution, experience, quote, CTA), External FAQ, Internal FAQ
+- [x] **DEF-01**: `/define` detects greenfield projects (empty dir or boilerplate-only) and skips Gate 0, proceeding directly to Gate WB offer or Gate 1
+- [x] **DEF-02**: `/define` scans the codebase at Gate 0: file structure, naming patterns, dependency graph, git history, architectural conventions
+- [x] **DEF-03**: `/define` produces `docs/codebase-assessment.md` at Gate 0 with sections: Project Overview, File Organization, Detected Patterns, Dependency Graph, Assumptions, Patterns to Deviate From, Open Questions, Recent Changes
+- [x] **DEF-04**: `/define` produces a gate review checklist file at each gate (Gate 0: `docs/reviews/gate-0-review.md`, Gate WB: `docs/reviews/gate-wb-review.md`, Gate 1: `docs/reviews/gate-1-review.md`)
+- [x] **DEF-05**: `/define` presents Gate 0 findings to user and supports in-session correction before approval
+- [x] **DEF-06**: `/define` validates all review checklist items are resolved (`[x]` or `[-]` N/A with reason) before recording gate approval in `progress.txt`
+- [x] **DEF-07**: `/define` records Gate 0 approval in `progress.txt`: `[x] Gate 0: Codebase Alignment  Approved: <date>  docs/codebase-assessment.md`
+- [x] **DEF-08**: `/define` offers Gate WB after Gate 0; records `[x]` (approved), `[-] Skipped`, or `[ ] Pending — offered, awaiting decision` in `progress.txt`
+- [x] **DEF-09**: `/define` at Gate WB produces `docs/working-backwards.md` with: Press Release (customer, problem, solution, experience, quote, CTA), External FAQ, Internal FAQ
 - [x] **DEF-10**: `/define` conducts a PRD interview at Gate 1, using approved PR/FAQ as primary input when Gate WB was used
 - [x] **DEF-11**: `/define` produces `prd.md` at Gate 1 with sections: Summary, Goals, Non-Goals, External Dependencies, Milestones (initially empty), Configuration, Outputs, Risk Assessment, Future Enhancements
 - [x] **DEF-12**: `/define` supports partial Gate 1 approval — user can approve parts and request revision of others; skill revises in-session (no restart)
@@ -158,15 +158,15 @@
 | STATE-02 | Phase 1 | Complete |
 | STATE-03 | Phase 1 | Complete |
 | STATE-04 | Phase 1 | Complete |
-| DEF-01 | Phase 2 | Pending |
-| DEF-02 | Phase 2 | Pending |
-| DEF-03 | Phase 2 | Pending |
-| DEF-04 | Phase 2 | Pending |
-| DEF-05 | Phase 2 | Pending |
-| DEF-06 | Phase 2 | Pending |
-| DEF-07 | Phase 2 | Pending |
-| DEF-08 | Phase 2 | Pending |
-| DEF-09 | Phase 2 | Pending |
+| DEF-01 | Phase 2 | Complete |
+| DEF-02 | Phase 2 | Complete |
+| DEF-03 | Phase 2 | Complete |
+| DEF-04 | Phase 2 | Complete |
+| DEF-05 | Phase 2 | Complete |
+| DEF-06 | Phase 2 | Complete |
+| DEF-07 | Phase 2 | Complete |
+| DEF-08 | Phase 2 | Complete |
+| DEF-09 | Phase 2 | Complete |
 | DEF-10 | Phase 2 | Complete |
 | DEF-11 | Phase 2 | Complete |
 | DEF-12 | Phase 2 | Complete |
