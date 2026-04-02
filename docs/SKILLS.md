@@ -15,6 +15,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | NIST CSF Assessment | `/nist-csf-assessment` | NIST CSF 2.0 outcome-based assessment across all 6 Functions with platform-agnostic evidence mapping, 800-53 informative references, and self-updating Phase 0 that always validates against the latest published CSF version | [View](skills/nist-csf-assessment.md) |
 | Create PRD | `/create-prd` | Guided interview to produce a PRD, architecture document, and progress file for a new project | [View](skills/create-prd.md) |
 | Define | `/define` | Single-session codebase assessment, optional Working Backwards, and PRD creation (Gates 0/WB/1) | [View](skills/define.md) |
+| Design | `/design` | Architecture and design specification from approved PRD, with refresh mode for deviation consolidation (Gate 2) | [View](skills/design.md) |
 | OCC Skill Creator | `/occ-skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/occ-skill-creator.md) |
 | OCC Skill Refactor | `/occ-skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/occ-skill-refactor.md) |
 | Project | `/project` | Project orchestrator -- bootstraps state, reports status, routes to next skill | [View](skills/project.md) |
