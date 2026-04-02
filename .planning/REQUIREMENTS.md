@@ -142,25 +142,92 @@
 
 ## Traceability
 
-Populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROJ-01 through PROJ-10 | Phase 1 | Pending |
-| DEF-01 through DEF-16 | Phase 2 | Pending |
-| DES-01 through DES-08 | Phase 3 | Pending |
-| MIL-01 through MIL-13 | Phase 4 | Pending |
-| PLAN-01 through PLAN-09 | Phase 5 | Pending |
-| BUILD-01 through BUILD-09 | Phase 6 | Pending |
-| SPIKE-01 through SPIKE-06 | Phase 7 | Pending |
-| STATE-01 through STATE-04 | Phase 1 | Pending |
-| DOCS-01 through DOCS-03 | Phase 7 | Pending |
+| PROJ-01 | Phase 1 | Pending |
+| PROJ-02 | Phase 1 | Pending |
+| PROJ-03 | Phase 1 | Pending |
+| PROJ-04 | Phase 1 | Pending |
+| PROJ-05 | Phase 1 | Pending |
+| PROJ-06 | Phase 1 | Pending |
+| PROJ-07 | Phase 1 | Pending |
+| PROJ-08 | Phase 1 | Pending |
+| PROJ-09 | Phase 1 | Pending |
+| PROJ-10 | Phase 1 | Pending |
+| STATE-01 | Phase 1 | Pending |
+| STATE-02 | Phase 1 | Pending |
+| STATE-03 | Phase 1 | Pending |
+| STATE-04 | Phase 1 | Pending |
+| DEF-01 | Phase 2 | Pending |
+| DEF-02 | Phase 2 | Pending |
+| DEF-03 | Phase 2 | Pending |
+| DEF-04 | Phase 2 | Pending |
+| DEF-05 | Phase 2 | Pending |
+| DEF-06 | Phase 2 | Pending |
+| DEF-07 | Phase 2 | Pending |
+| DEF-08 | Phase 2 | Pending |
+| DEF-09 | Phase 2 | Pending |
+| DEF-10 | Phase 2 | Pending |
+| DEF-11 | Phase 2 | Pending |
+| DEF-12 | Phase 2 | Pending |
+| DEF-13 | Phase 2 | Pending |
+| DEF-14 | Phase 2 | Pending |
+| DEF-15 | Phase 2 | Pending |
+| DEF-16 | Phase 2 | Pending |
+| DES-01 | Phase 3 | Pending |
+| DES-02 | Phase 3 | Pending |
+| DES-03 | Phase 3 | Pending |
+| DES-04 | Phase 3 | Pending |
+| DES-05 | Phase 3 | Pending |
+| DES-06 | Phase 3 | Pending |
+| DES-07 | Phase 3 | Pending |
+| DES-08 | Phase 3 | Pending |
+| MIL-01 | Phase 4 | Pending |
+| MIL-02 | Phase 4 | Pending |
+| MIL-03 | Phase 4 | Pending |
+| MIL-04 | Phase 4 | Pending |
+| MIL-05 | Phase 4 | Pending |
+| MIL-06 | Phase 4 | Pending |
+| MIL-07 | Phase 4 | Pending |
+| MIL-08 | Phase 4 | Pending |
+| MIL-09 | Phase 4 | Pending |
+| MIL-10 | Phase 4 | Pending |
+| MIL-11 | Phase 4 | Pending |
+| MIL-12 | Phase 4 | Pending |
+| MIL-13 | Phase 4 | Pending |
+| PLAN-01 | Phase 5 | Pending |
+| PLAN-02 | Phase 5 | Pending |
+| PLAN-03 | Phase 5 | Pending |
+| PLAN-04 | Phase 5 | Pending |
+| PLAN-05 | Phase 5 | Pending |
+| PLAN-06 | Phase 5 | Pending |
+| PLAN-07 | Phase 5 | Pending |
+| PLAN-08 | Phase 5 | Pending |
+| PLAN-09 | Phase 5 | Pending |
+| BUILD-01 | Phase 6 | Pending |
+| BUILD-02 | Phase 6 | Pending |
+| BUILD-03 | Phase 6 | Pending |
+| BUILD-04 | Phase 6 | Pending |
+| BUILD-05 | Phase 6 | Pending |
+| BUILD-06 | Phase 6 | Pending |
+| BUILD-07 | Phase 6 | Pending |
+| BUILD-08 | Phase 6 | Pending |
+| BUILD-09 | Phase 6 | Pending |
+| SPIKE-01 | Phase 7 | Pending |
+| SPIKE-02 | Phase 7 | Pending |
+| SPIKE-03 | Phase 7 | Pending |
+| SPIKE-04 | Phase 7 | Pending |
+| SPIKE-05 | Phase 7 | Pending |
+| SPIKE-06 | Phase 7 | Pending |
+| DOCS-01 | Phase 7 | Pending |
+| DOCS-02 | Phase 7 | Pending |
+| DOCS-03 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 76 total
-- Mapped to phases: 76
+- v1 requirements: 78 total
+- Mapped to phases: 78
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after initialization*
+*Last updated: 2026-04-02 after roadmap creation*
