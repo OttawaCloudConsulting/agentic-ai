@@ -35,7 +35,7 @@
 - [x] **DEF-11**: `/define` produces `prd.md` at Gate 1 with sections: Summary, Goals, Non-Goals, External Dependencies, Milestones (initially empty), Configuration, Outputs, Risk Assessment, Future Enhancements
 - [x] **DEF-12**: `/define` supports partial Gate 1 approval — user can approve parts and request revision of others; skill revises in-session (no restart)
 - [x] **DEF-13**: `/define` records Gate 1 approval in `progress.txt`: `[x] Gate 1: Scope Review  Approved: <date>  prd.md`
-- [ ] **DEF-14**: `/define` runs Gates 0, WB, and 1 as a single continuous session — user does not leave the conversation between gates
+- [x] **DEF-14**: `/define` runs Gates 0, WB, and 1 as a single continuous session — user does not leave the conversation between gates
 - [x] **DEF-15**: `/define` in revision mode reads existing `prd.md` and runs a focused interview on what changed; does not automatically reset downstream artifacts; surfaces affected artifact list for user decision
 - [x] **DEF-16**: `/define` re-reads `docs/codebase-assessment.md` from disk at Gate 1 rather than relying on in-session memory (context rot mitigation)
 
@@ -171,7 +171,7 @@
 | DEF-11 | Phase 2 | Complete |
 | DEF-12 | Phase 2 | Complete |
 | DEF-13 | Phase 2 | Complete |
-| DEF-14 | Phase 2 | Pending |
+| DEF-14 | Phase 2 | Complete |
 | DEF-15 | Phase 2 | Complete |
 | DEF-16 | Phase 2 | Complete |
 | DES-01 | Phase 3 | Pending |
