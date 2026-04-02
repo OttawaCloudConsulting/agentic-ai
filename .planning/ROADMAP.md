@@ -32,7 +32,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Running `/project` when `progress.txt` references artifact paths that do not exist on disk produces a visible warning (does not block)
   4. Running `/project` when `progress.txt` and any `milestone-status.txt` are inconsistent produces a visible divergence warning
   5. Running `/project` when Gate WB is `[ ] Pending` prompts for resolution before reporting any other status
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Reference specifications (progress format, routing logic, status report format)
+- [ ] 01-02-PLAN.md — SKILL.md main workflow file
+- [ ] 01-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 2: /define (Gates 0/WB/1)
 **Goal**: Users can run a single continuous session that produces codebase assessment, optional Working Backwards doc, and an approved PRD
@@ -109,7 +114,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. /project Router | 0/TBD | Not started | - |
+| 1. /project Router | 0/3 | Not started | - |
 | 2. /define (Gates 0/WB/1) | 0/TBD | Not started | - |
 | 3. /design (Gate 2) | 0/TBD | Not started | - |
 | 4. /milestone (Gate 3) | 0/TBD | Not started | - |
