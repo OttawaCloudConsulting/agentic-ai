@@ -70,8 +70,8 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Reference files and architecture template (gate-2-design, refresh-mode, progress-format, review-checklist-template, architecture-template)
-- [ ] 03-02-PLAN.md — SKILL.md flow controller
+- [x] 03-01-PLAN.md — Reference files and architecture template (gate-2-design, refresh-mode, progress-format, review-checklist-template, architecture-template)
+- [x] 03-02-PLAN.md — SKILL.md flow controller
 - [ ] 03-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 4: /milestone (Gate 3)

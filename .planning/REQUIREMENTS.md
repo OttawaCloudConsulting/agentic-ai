@@ -41,14 +41,14 @@
 
 ### Design (`/design`)
 
-- [ ] **DES-01**: `/design` validates Gate 1 is approved in `progress.txt` before proceeding; reports missing prerequisite and declines if not met
-- [ ] **DES-02**: `/design` reads `prd.md` and `docs/codebase-assessment.md` (if exists) as primary inputs
-- [ ] **DES-03**: `/design` produces `docs/ARCHITECTURE_AND_DESIGN.md` with sections: Design Decisions (numbered table with decision/rationale/tradeoff/alternatives), Component Inventory, Data Flow, File Organization, Deployment & Operations, Security Considerations
-- [ ] **DES-04**: `/design` produces `docs/reviews/gate-2-review.md` checklist
-- [ ] **DES-05**: `/design` presents architecture for review focused on feasibility, tech fit, and completeness; highlights key tradeoffs explicitly
-- [ ] **DES-06**: `/design` supports in-session revision before approval
-- [ ] **DES-07**: `/design` records Gate 2 approval in `progress.txt`: `[x] Gate 2: Design Review  Approved: <date>  docs/ARCHITECTURE_AND_DESIGN.md`
-- [ ] **DES-08**: `/design` in refresh mode consolidates accumulated architectural deviations from feature plans into an updated `docs/ARCHITECTURE_AND_DESIGN.md`
+- [x] **DES-01**: `/design` validates Gate 1 is approved in `progress.txt` before proceeding; reports missing prerequisite and declines if not met
+- [x] **DES-02**: `/design` reads `prd.md` and `docs/codebase-assessment.md` (if exists) as primary inputs
+- [x] **DES-03**: `/design` produces `docs/ARCHITECTURE_AND_DESIGN.md` with sections: Design Decisions (numbered table with decision/rationale/tradeoff/alternatives), Component Inventory, Data Flow, File Organization, Deployment & Operations, Security Considerations
+- [x] **DES-04**: `/design` produces `docs/reviews/gate-2-review.md` checklist
+- [x] **DES-05**: `/design` presents architecture for review focused on feasibility, tech fit, and completeness; highlights key tradeoffs explicitly
+- [x] **DES-06**: `/design` supports in-session revision before approval
+- [x] **DES-07**: `/design` records Gate 2 approval in `progress.txt`: `[x] Gate 2: Design Review  Approved: <date>  docs/ARCHITECTURE_AND_DESIGN.md`
+- [x] **DES-08**: `/design` in refresh mode consolidates accumulated architectural deviations from feature plans into an updated `docs/ARCHITECTURE_AND_DESIGN.md`
 
 ### Milestone (`/milestone`)
 
@@ -174,14 +174,14 @@
 | DEF-14 | Phase 2 | Complete |
 | DEF-15 | Phase 2 | Complete |
 | DEF-16 | Phase 2 | Complete |
-| DES-01 | Phase 3 | Pending |
-| DES-02 | Phase 3 | Pending |
-| DES-03 | Phase 3 | Pending |
-| DES-04 | Phase 3 | Pending |
-| DES-05 | Phase 3 | Pending |
-| DES-06 | Phase 3 | Pending |
-| DES-07 | Phase 3 | Pending |
-| DES-08 | Phase 3 | Pending |
+| DES-01 | Phase 3 | Complete |
+| DES-02 | Phase 3 | Complete |
+| DES-03 | Phase 3 | Complete |
+| DES-04 | Phase 3 | Complete |
+| DES-05 | Phase 3 | Complete |
+| DES-06 | Phase 3 | Complete |
+| DES-07 | Phase 3 | Complete |
+| DES-08 | Phase 3 | Complete |
 | MIL-01 | Phase 4 | Pending |
 | MIL-02 | Phase 4 | Pending |
 | MIL-03 | Phase 4 | Pending |
