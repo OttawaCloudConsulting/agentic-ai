@@ -104,7 +104,7 @@ Plans:
 Plans:
 - [x] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
 - [ ] 05-02-PLAN.md — SKILL.md flow controller
-- [ ] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
+- [x] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 6: /build
 **Goal**: Users can implement features sub-feature by sub-feature, with each sub-feature leaving the codebase committable and state files updated incrementally
@@ -118,7 +118,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
+- [x] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
 - [ ] 05-02-PLAN.md — SKILL.md flow controller
 - [ ] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
 
@@ -134,7 +134,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
+- [x] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
 - [ ] 05-02-PLAN.md — SKILL.md flow controller
 - [ ] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
 
