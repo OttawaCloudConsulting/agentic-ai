@@ -126,9 +126,9 @@ state using the routing table. Display per D-03:
 - 2-3 **Also available** alternatives listed below (per D-04: only actions valid for the
   current project state).
 
-**Gate WB offer (DD-11, D-08):** If Gate 0 is approved, no `docs/working-backwards.md`
-exists, Gate WB has not been offered yet, and the customer outcome is unclear -- offer
-Gate WB using `AskUserQuestion` with options:
+**Gate WB offer (DD-11, D-08):** If Gate 0 is approved (`[x]`) or skipped (`[-]` greenfield),
+no `docs/working-backwards.md` exists, Gate WB has not been offered yet, and the customer
+outcome is unclear -- offer Gate WB using `AskUserQuestion` with options:
 
 - **Yes** -- proceed with Working Backwards exercise (routes to `/define`)
 - **Skip** -- record Gate WB as skipped
