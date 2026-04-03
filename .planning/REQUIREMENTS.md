@@ -52,19 +52,19 @@
 
 ### Milestone (`/milestone`)
 
-- [ ] **MIL-01**: `/milestone` validates Gate 2 is approved in `progress.txt` before proceeding
-- [ ] **MIL-02**: `/milestone` reads `prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`, `progress.txt` as primary inputs; reads spike artifacts when referenced
-- [ ] **MIL-03**: `/milestone` auto-increments milestone sequence number from existing `milestones/` directories (`01`, `02`, …)
-- [ ] **MIL-04**: `/milestone` produces `milestones/<NN>-<name>/README.md` with sections: Goal, Features (numbered with acceptance criteria), Dependencies, Ordering, Sizing, Configuration, Definition of Done
-- [ ] **MIL-05**: `/milestone` produces `milestones/<NN>-<name>/milestone-status.txt` with feature entries at `[ ]` pending status
-- [ ] **MIL-06**: `/milestone` produces `milestones/<NN>-<name>/reviews/gate-3-review.md` checklist
-- [ ] **MIL-07**: `/milestone` adds milestone summary line to `progress.txt`: `[ ] Milestone <NN>: <Name>  milestones/<NN>-<name>/  0/<N> features complete`
-- [ ] **MIL-08**: `/milestone` presents milestone breakdown for review focused on feature grouping coherence, ordering, sizing realism, acceptance criteria specificity
-- [ ] **MIL-09**: `/milestone` records Gate 3 approval as `[~] In progress` in `progress.txt` — Gate 3 stays open until user signals all milestones are defined
-- [ ] **MIL-10**: `/milestone` in revision mode loads existing milestone artifacts and offers to revise rather than overwrite
-- [ ] **MIL-11**: `/milestone` in revision mode identifies affected features, presents the list for user confirmation before resetting those features to pending in `milestone-status.txt`
-- [ ] **MIL-12**: `/milestone` in revision mode preserves completed features' status — only resets features explicitly identified as affected
-- [ ] **MIL-13**: `/milestone` in revision mode updates the milestone summary line in `progress.txt` and the milestone's 1-2 sentence summary in `prd.md`
+- [x] **MIL-01**: `/milestone` validates Gate 2 is approved in `progress.txt` before proceeding
+- [x] **MIL-02**: `/milestone` reads `prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`, `progress.txt` as primary inputs; reads spike artifacts when referenced
+- [x] **MIL-03**: `/milestone` auto-increments milestone sequence number from existing `milestones/` directories (`01`, `02`, …)
+- [x] **MIL-04**: `/milestone` produces `milestones/<NN>-<name>/README.md` with sections: Goal, Features (numbered with acceptance criteria), Dependencies, Ordering, Sizing, Configuration, Definition of Done
+- [x] **MIL-05**: `/milestone` produces `milestones/<NN>-<name>/milestone-status.txt` with feature entries at `[ ]` pending status
+- [x] **MIL-06**: `/milestone` produces `milestones/<NN>-<name>/reviews/gate-3-review.md` checklist
+- [x] **MIL-07**: `/milestone` adds milestone summary line to `progress.txt`: `[ ] Milestone <NN>: <Name>  milestones/<NN>-<name>/  0/<N> features complete`
+- [x] **MIL-08**: `/milestone` presents milestone breakdown for review focused on feature grouping coherence, ordering, sizing realism, acceptance criteria specificity
+- [x] **MIL-09**: `/milestone` records Gate 3 approval as `[~] In progress` in `progress.txt` — Gate 3 stays open until user signals all milestones are defined
+- [x] **MIL-10**: `/milestone` in revision mode loads existing milestone artifacts and offers to revise rather than overwrite
+- [x] **MIL-11**: `/milestone` in revision mode identifies affected features, presents the list for user confirmation before resetting those features to pending in `milestone-status.txt`
+- [x] **MIL-12**: `/milestone` in revision mode preserves completed features' status — only resets features explicitly identified as affected
+- [x] **MIL-13**: `/milestone` in revision mode updates the milestone summary line in `progress.txt` and the milestone's 1-2 sentence summary in `prd.md`
 
 ### Plan (`/plan`)
 
@@ -182,19 +182,19 @@
 | DES-06 | Phase 3 | Complete |
 | DES-07 | Phase 3 | Complete |
 | DES-08 | Phase 3 | Complete |
-| MIL-01 | Phase 4 | Pending |
-| MIL-02 | Phase 4 | Pending |
-| MIL-03 | Phase 4 | Pending |
-| MIL-04 | Phase 4 | Pending |
-| MIL-05 | Phase 4 | Pending |
-| MIL-06 | Phase 4 | Pending |
-| MIL-07 | Phase 4 | Pending |
-| MIL-08 | Phase 4 | Pending |
-| MIL-09 | Phase 4 | Pending |
-| MIL-10 | Phase 4 | Pending |
-| MIL-11 | Phase 4 | Pending |
-| MIL-12 | Phase 4 | Pending |
-| MIL-13 | Phase 4 | Pending |
+| MIL-01 | Phase 4 | Complete |
+| MIL-02 | Phase 4 | Complete |
+| MIL-03 | Phase 4 | Complete |
+| MIL-04 | Phase 4 | Complete |
+| MIL-05 | Phase 4 | Complete |
+| MIL-06 | Phase 4 | Complete |
+| MIL-07 | Phase 4 | Complete |
+| MIL-08 | Phase 4 | Complete |
+| MIL-09 | Phase 4 | Complete |
+| MIL-10 | Phase 4 | Complete |
+| MIL-11 | Phase 4 | Complete |
+| MIL-12 | Phase 4 | Complete |
+| MIL-13 | Phase 4 | Complete |
 | PLAN-01 | Phase 5 | Pending |
 | PLAN-02 | Phase 5 | Pending |
 | PLAN-03 | Phase 5 | Pending |
