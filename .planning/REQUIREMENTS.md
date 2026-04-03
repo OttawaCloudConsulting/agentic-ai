@@ -146,14 +146,14 @@
 |-------------|-------|--------|
 | PROJ-01 | Phase 1 | Complete |
 | PROJ-02 | Phase 1 | Complete |
-| PROJ-03 | Phase 1 | Complete |
+| PROJ-03 | Phase 1, Phase 8 (gap closure) | Complete |
 | PROJ-04 | Phase 1 | Complete |
 | PROJ-05 | Phase 1 | Complete |
-| PROJ-06 | Phase 1 | Complete |
+| PROJ-06 | Phase 1, Phase 8 (gap closure) | Complete |
 | PROJ-07 | Phase 1 | Complete |
 | PROJ-08 | Phase 1 | Complete |
 | PROJ-09 | Phase 1 | Complete |
-| PROJ-10 | Phase 1 | Complete |
+| PROJ-10 | Phase 1, Phase 11 (gap closure) | Complete |
 | STATE-01 | Phase 1 | Complete |
 | STATE-02 | Phase 1 | Complete |
 | STATE-03 | Phase 1 | Complete |
@@ -190,7 +190,7 @@
 | MIL-06 | Phase 4 | Complete |
 | MIL-07 | Phase 4 | Complete |
 | MIL-08 | Phase 4 | Complete |
-| MIL-09 | Phase 4 | Complete |
+| MIL-09 | Phase 4, Phase 11 (gap closure) | Complete |
 | MIL-10 | Phase 4 | Complete |
 | MIL-11 | Phase 4 | Complete |
 | MIL-12 | Phase 4 | Complete |
@@ -227,7 +227,8 @@
 - v1 requirements: 78 total
 - Mapped to phases: 78
 - Unmapped: 0 ✓
+- Gap closure phases added: 8 (Greenfield Routing), 9 (Nyquist), 10 (Tech Debt), 11 (Gate 3 Closure) — 2026-04-03
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after roadmap creation*
+*Last updated: 2026-04-03 after gap closure phases added (v1.0 audit)*

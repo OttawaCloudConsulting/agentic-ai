@@ -12,13 +12,17 @@ Seven Claude Code skills built in gate order — `/project` first as the state c
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: /project Router** - Bootstraps state files, validates project state, routes user to correct next skill
-- [ ] **Phase 2: /define (Gates 0/WB/1)** - Single-session codebase assessment, optional Working Backwards, and PRD creation
-- [ ] **Phase 3: /design (Gate 2)** - Architecture and design document from approved PRD
-- [ ] **Phase 4: /milestone (Gate 3)** - Per-milestone feature breakdown with acceptance criteria and revision support
-- [ ] **Phase 5: /plan (Gate 4)** - Per-feature implementation plans with sub-feature sizing and interface contracts
-- [ ] **Phase 6: /build** - Sub-feature-by-sub-feature implementation with state file updates and deviation tracking
+- [x] **Phase 1: /project Router** - Bootstraps state files, validates project state, routes user to correct next skill (completed 2026-04-02)
+- [x] **Phase 2: /define (Gates 0/WB/1)** - Single-session codebase assessment, optional Working Backwards, and PRD creation (completed 2026-04-02)
+- [x] **Phase 3: /design (Gate 2)** - Architecture and design document from approved PRD (completed 2026-04-02)
+- [x] **Phase 4: /milestone (Gate 3)** - Per-milestone feature breakdown with acceptance criteria and revision support (completed 2026-04-02)
+- [x] **Phase 5: /plan (Gate 4)** - Per-feature implementation plans with sub-feature sizing and interface contracts (completed 2026-04-03)
+- [x] **Phase 6: /build** - Sub-feature-by-sub-feature implementation with state file updates and deviation tracking (completed 2026-04-03)
 - [x] **Phase 7: /spike + Docs** - Adversarial research tool with red-team validation, plus suite documentation (completed 2026-04-03)
+- [ ] **Phase 8: Fix Greenfield Routing** - Close routing ambiguity for Gate 0 `[-]` state on second `/project` invocation
+- [ ] **Phase 9: Nyquist Compliance** - Complete Wave 0 test strategy for all 7 phases
+- [ ] **Phase 10: Tech Debt Sweep** - Fix 4 low-severity documentation and attribution issues
+- [ ] **Phase 11: Gate 3 Closure Pathway** - Resolve structural contradiction between PROJ-10 read-only rule and D-05 Gate 3 closure design
 
 ## Phase Details
 
@@ -138,6 +142,50 @@ Plans:
 - [x] 07-02-PLAN.md — SKILL.md flow controller
 - [x] 07-03-PLAN.md — Documentation (detail doc + catalog entry)
 
+### Phase 8: Fix Greenfield Routing
+**Goal**: Close the greenfield routing ambiguity — second `/project` invocation on a greenfield project routes correctly and Gate WB offer fires
+**Depends on**: Phase 1 (routing-logic.md, SKILL.md)
+**Requirements**: PROJ-03, PROJ-06 (gap closure)
+**Gap Closure**: Closes `GREENFIELD-ROUTING` integration gap and `GREENFIELD-E2E` flow gap from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `routing-logic.md` has an explicit row for Gate 0 `[-]` (greenfield skip) state that routes correctly to Gate WB or Gate 1
+  2. Gate WB offer condition in SKILL.md Step 5 fires for both `Gate 0 = [x]` and `Gate 0 = [-]` (greenfield)
+  3. Second `/project` invocation on a greenfield project produces correct routing output — no ambiguous fall-through to unmatched state
+**Plans:** 0 plans
+
+### Phase 9: Nyquist Compliance
+**Goal**: Complete Wave 0 test strategy for all 7 phases — define automated test coverage and mark `nyquist_compliant: true`
+**Depends on**: All phases 1–7
+**Requirements**: (tech debt — all phases, no new requirements)
+**Gap Closure**: Closes systematic Nyquist compliance gap from v1.0 audit (0/7 phases compliant)
+**Success Criteria** (what must be TRUE):
+  1. All 7 phase VALIDATION.md files have `wave_0_complete: true` and `nyquist_compliant: true`
+  2. Each phase has a defined test strategy covering its core observable behaviors
+  3. Wave 0 tests run and pass for all 7 phases
+**Plans:** 0 plans
+
+### Phase 10: Tech Debt Sweep
+**Goal**: Fix 4 low-severity documentation and attribution issues identified in v1.0 audit
+**Depends on**: Phases 1, 4, 7
+**Requirements**: (tech debt — no requirement changes)
+**Gap Closure**: Closes SKILLS.md copy commands inconsistency, STATE-04 attribution, 04-03-SUMMARY.md missing frontmatter, ROADMAP.md stale checkboxes
+**Success Criteria** (what must be TRUE):
+  1. ROADMAP.md phase checkboxes are accurate (phases 1–7 show `[x]`, phases 8–11 show `[ ]`)
+  2. `docs/SKILLS.md` consuming instructions list `cp` commands consistently for all skills (not just milestone/plan/spike)
+  3. `/project` SKILL.md STATE-04 attribution accurately reflects which skill writes both files
+  4. `04-03-SUMMARY.md` has `requirements-completed` frontmatter matching MIL requirements covered
+**Plans:** 0 plans
+
+### Phase 11: Gate 3 Closure Pathway
+**Goal**: Resolve the structural contradiction between PROJ-10 (read-only after bootstrap) and D-05 (offer to close Gate 3) — either implement closure or explicitly document the constraint
+**Depends on**: Phase 1 (SKILL.md, PROJ-10), Phase 4 (Gate 3 behavior)
+**Requirements**: MIL-09, PROJ-10 (gap closure)
+**Gap Closure**: Closes `GATE3-CLOSURE` integration gap from v1.0 audit (Gate 3 displays `[~] In progress` permanently)
+**Success Criteria** (what must be TRUE):
+  1. Either: Gate 3 closure pathway is implemented in `/project` SKILL.md with PROJ-10 updated to allow this specific write; OR: D-05 design decision is explicitly updated to acknowledge the read-only constraint makes automated closure impractical
+  2. Gate 3 status on a fully-completed project is accurate, or the permanent `[~] In progress` display is explicitly documented as a known design limitation
+**Plans:** 0 plans
+
 ## Progress
 
 **Execution Order:**
@@ -145,10 +193,14 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. /project Router | 0/3 | Not started | - |
-| 2. /define (Gates 0/WB/1) | 0/4 | Not started | - |
-| 3. /design (Gate 2) | 0/3 | Not started | - |
-| 4. /milestone (Gate 3) | 0/3 | Not started | - |
-| 5. /plan (Gate 4) | 1/3 | In Progress|  |
-| 6. /build | 0/3 | Not started | - |
-| 7. /spike + Docs | 3/3 | Complete   | 2026-04-03 |
+| 1. /project Router | 3/3 | Complete | 2026-04-02 |
+| 2. /define (Gates 0/WB/1) | 4/4 | Complete | 2026-04-02 |
+| 3. /design (Gate 2) | 3/3 | Complete | 2026-04-02 |
+| 4. /milestone (Gate 3) | 3/3 | Complete | 2026-04-02 |
+| 5. /plan (Gate 4) | 3/3 | Complete | 2026-04-03 |
+| 6. /build | 3/3 | Complete | 2026-04-03 |
+| 7. /spike + Docs | 3/3 | Complete | 2026-04-03 |
+| 8. Fix Greenfield Routing | 0/0 | Not started | - |
+| 9. Nyquist Compliance | 0/0 | Not started | - |
+| 10. Tech Debt Sweep | 0/0 | Not started | - |
+| 11. Gate 3 Closure Pathway | 0/0 | Not started | - |
