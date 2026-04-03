@@ -17,6 +17,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | Define | `/define` | Single-session codebase assessment, optional Working Backwards, and PRD creation (Gates 0/WB/1) | [View](skills/define.md) |
 | Design | `/design` | Architecture and design specification from approved PRD, with refresh mode for deviation consolidation (Gate 2) | [View](skills/design.md) |
 | Milestone | `/milestone` | Per-milestone feature breakdown with acceptance criteria and revision support (Gate 3) | [View](skills/milestone.md) |
+| Plan | `/plan` | Per-feature implementation plan with sub-feature sizing and test commands (Gate 4) | [View](skills/plan.md) |
 | OCC Skill Creator | `/occ-skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/occ-skill-creator.md) |
 | OCC Skill Refactor | `/occ-skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/occ-skill-refactor.md) |
 | Project | `/project` | Project orchestrator -- bootstraps state, reports status, routes to next skill | [View](skills/project.md) |
@@ -70,6 +71,7 @@ cp -r skills/nist-fedramp-assessment/   <target-repo>/.claude/skills/nist-fedram
 cp -r skills/nist-csf-assessment/       <target-repo>/.claude/skills/nist-csf-assessment/
 cp -r skills/create-prd/                <target-repo>/.claude/skills/create-prd/
 cp -r skills/project/milestone/          <target-repo>/.claude/skills/project/milestone/
+cp -r skills/project/plan/                <target-repo>/.claude/skills/project/plan/
 cp -r skills/occ-skill-creator/         <target-repo>/.claude/skills/occ-skill-creator/
 cp -r skills/occ-skill-refactor/        <target-repo>/.claude/skills/occ-skill-refactor/
 cp -r skills/project/                   <target-repo>/.claude/skills/project/
