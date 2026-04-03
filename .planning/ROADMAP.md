@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: /plan (Gate 4)** - Per-feature implementation plans with sub-feature sizing and interface contracts (completed 2026-04-03)
 - [x] **Phase 6: /build** - Sub-feature-by-sub-feature implementation with state file updates and deviation tracking (completed 2026-04-03)
 - [x] **Phase 7: /spike + Docs** - Adversarial research tool with red-team validation, plus suite documentation (completed 2026-04-03)
-- [ ] **Phase 8: Fix Greenfield Routing** - Close routing ambiguity for Gate 0 `[-]` state on second `/project` invocation
+- [x] **Phase 8: Fix Greenfield Routing** - Close routing ambiguity for Gate 0 `[-]` state on second `/project` invocation (completed 2026-04-03)
 - [ ] **Phase 9: Nyquist Compliance** - Complete Wave 0 test strategy for all 7 phases
 - [ ] **Phase 10: Tech Debt Sweep** - Fix 4 low-severity documentation and attribution issues
 - [ ] **Phase 11: Gate 3 Closure Pathway** - Resolve structural contradiction between PROJ-10 read-only rule and D-05 Gate 3 closure design
@@ -151,10 +151,10 @@ Plans:
   1. `routing-logic.md` has an explicit row for Gate 0 `[-]` (greenfield skip) state that routes correctly to Gate WB or Gate 1
   2. Gate WB offer condition in SKILL.md Step 5 fires for both `Gate 0 = [x]` and `Gate 0 = [-]` (greenfield)
   3. Second `/project` invocation on a greenfield project produces correct routing output — no ambiguous fall-through to unmatched state
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 08-01-PLAN.md -- Fix routing-logic.md equivalence note and SKILL.md Gate WB condition for greenfield [-] state
+- [x] 08-01-PLAN.md -- Fix routing-logic.md equivalence note and SKILL.md Gate WB condition for greenfield [-] state
 
 ### Phase 9: Nyquist Compliance
 **Goal**: Complete Wave 0 test strategy for all 7 phases — define automated test coverage and mark `nyquist_compliant: true`
@@ -203,7 +203,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 5. /plan (Gate 4) | 3/3 | Complete | 2026-04-03 |
 | 6. /build | 3/3 | Complete | 2026-04-03 |
 | 7. /spike + Docs | 3/3 | Complete | 2026-04-03 |
-| 8. Fix Greenfield Routing | 0/0 | Not started | - |
+| 8. Fix Greenfield Routing | 1/1 | Complete   | 2026-04-03 |
 | 9. Nyquist Compliance | 0/0 | Not started | - |
 | 10. Tech Debt Sweep | 0/0 | Not started | - |
 | 11. Gate 3 Closure Pathway | 0/0 | Not started | - |
