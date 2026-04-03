@@ -68,15 +68,15 @@
 
 ### Plan (`/plan`)
 
-- [ ] **PLAN-01**: `/plan` reads milestone `README.md`, `prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`, `progress.txt`, `milestone-status.txt` as primary inputs
-- [ ] **PLAN-02**: `/plan` validates the target feature exists in the milestone README and is in pending or needs-replanning status
-- [ ] **PLAN-03**: `/plan` produces `milestones/<NN>-<name>/plans/<feature>.md` with sections: Summary, Acceptance Criteria, Approach, Sub-Features (checklist), Interface Contracts, Edge Cases, Test Command, Test Strategy, Documentation, Files to Create/Modify, Dependencies, Architectural Deviations (empty)
-- [ ] **PLAN-04**: `/plan` sizes sub-features to fit within a single `/build` session (~120k tokens on 200k-token model); flags oversized sub-features and proposes splits
-- [ ] **PLAN-05**: `/plan` produces `milestones/<NN>-<name>/reviews/gate-4-<feature>-review.md` checklist
-- [ ] **PLAN-06**: `/plan` updates `milestone-status.txt` with the plan file path on plan creation
-- [ ] **PLAN-07**: `/plan` presents plan for review focused on implementation correctness, edge case coverage, sub-feature sizing, test command appropriateness
-- [ ] **PLAN-08**: `/plan` supports in-session revision before approval
-- [ ] **PLAN-09**: `/plan` records Gate 4 approval by updating the feature entry in `milestone-status.txt` from `[ ]` to `[~] planned, awaiting build`
+- [x] **PLAN-01**: `/plan` reads milestone `README.md`, `prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`, `progress.txt`, `milestone-status.txt` as primary inputs
+- [x] **PLAN-02**: `/plan` validates the target feature exists in the milestone README and is in pending or needs-replanning status
+- [x] **PLAN-03**: `/plan` produces `milestones/<NN>-<name>/plans/<feature>.md` with sections: Summary, Acceptance Criteria, Approach, Sub-Features (checklist), Interface Contracts, Edge Cases, Test Command, Test Strategy, Documentation, Files to Create/Modify, Dependencies, Architectural Deviations (empty)
+- [x] **PLAN-04**: `/plan` sizes sub-features to fit within a single `/build` session (~120k tokens on 200k-token model); flags oversized sub-features and proposes splits
+- [x] **PLAN-05**: `/plan` produces `milestones/<NN>-<name>/reviews/gate-4-<feature>-review.md` checklist
+- [x] **PLAN-06**: `/plan` updates `milestone-status.txt` with the plan file path on plan creation
+- [x] **PLAN-07**: `/plan` presents plan for review focused on implementation correctness, edge case coverage, sub-feature sizing, test command appropriateness
+- [x] **PLAN-08**: `/plan` supports in-session revision before approval
+- [x] **PLAN-09**: `/plan` records Gate 4 approval by updating the feature entry in `milestone-status.txt` from `[ ]` to `[~] planned, awaiting build`
 
 ### Build (`/build`)
 
@@ -195,15 +195,15 @@
 | MIL-11 | Phase 4 | Complete |
 | MIL-12 | Phase 4 | Complete |
 | MIL-13 | Phase 4 | Complete |
-| PLAN-01 | Phase 5 | Pending |
-| PLAN-02 | Phase 5 | Pending |
-| PLAN-03 | Phase 5 | Pending |
-| PLAN-04 | Phase 5 | Pending |
-| PLAN-05 | Phase 5 | Pending |
-| PLAN-06 | Phase 5 | Pending |
-| PLAN-07 | Phase 5 | Pending |
-| PLAN-08 | Phase 5 | Pending |
-| PLAN-09 | Phase 5 | Pending |
+| PLAN-01 | Phase 5 | Complete |
+| PLAN-02 | Phase 5 | Complete |
+| PLAN-03 | Phase 5 | Complete |
+| PLAN-04 | Phase 5 | Complete |
+| PLAN-05 | Phase 5 | Complete |
+| PLAN-06 | Phase 5 | Complete |
+| PLAN-07 | Phase 5 | Complete |
+| PLAN-08 | Phase 5 | Complete |
+| PLAN-09 | Phase 5 | Complete |
 | BUILD-01 | Phase 6 | Pending |
 | BUILD-02 | Phase 6 | Pending |
 | BUILD-03 | Phase 6 | Pending |

@@ -99,10 +99,10 @@ Plans:
   2. `/plan` produces `milestones/<NN>-<name>/plans/<feature>.md` with all required sections including an empty Architectural Deviations section and a test command
   3. Sub-features that exceed the ~120k-token sizing guideline are flagged with a proposed split before the plan is presented for review
   4. Gate 4 approval updates the feature entry in `milestone-status.txt` from `[ ]` to `[~] planned, awaiting build`; the plan file path is also recorded
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
+- [x] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
 - [ ] 05-02-PLAN.md — SKILL.md flow controller
 - [ ] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
 
@@ -149,6 +149,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. /define (Gates 0/WB/1) | 0/4 | Not started | - |
 | 3. /design (Gate 2) | 0/3 | Not started | - |
 | 4. /milestone (Gate 3) | 0/3 | Not started | - |
-| 5. /plan (Gate 4) | 0/TBD | Not started | - |
+| 5. /plan (Gate 4) | 1/3 | In Progress|  |
 | 6. /build | 0/TBD | Not started | - |
 | 7. /spike + Docs | 0/TBD | Not started | - |
