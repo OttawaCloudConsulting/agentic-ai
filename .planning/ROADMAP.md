@@ -135,7 +135,7 @@ Plans:
 
 Plans:
 - [x] 07-01-PLAN.md — Reference files and spike template
-- [ ] 07-02-PLAN.md — SKILL.md flow controller
+- [x] 07-02-PLAN.md — SKILL.md flow controller
 - [ ] 07-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ## Progress
