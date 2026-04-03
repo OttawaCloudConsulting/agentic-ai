@@ -22,6 +22,7 @@ Every phase transition requires explicit human approval, preventing AI drift fro
 
 - [x] `/spike` skill — agent-based technical research with red-team validation, produces `docs/spikes/<topic>.md` — *Validated in Phase 7: spike-docs*
 - [x] Documentation — skill catalog entries and detail docs for all 7 skills (project, define, design, milestone, plan, build, spike) — *Validated in Phase 7: spike-docs*
+- [x] Greenfield routing fix — Gate 0 `[-]` (skipped) treated as equivalent to `[x]` (approved) for all downstream routing; `/project` Step 5 now fires Gate WB offer for greenfield projects on second invocation — *Validated in Phase 8: greenfield-routing*
 
 ### Active
 - [ ] Two-tier state files — project-level `progress.txt` (gate approvals, milestone summaries, spike entries) and milestone-level `milestone-status.txt` (feature details, sub-feature checklists)
@@ -65,7 +66,7 @@ A codebase map exists at `.planning/codebase/`. Key existing patterns: skills ar
 | Test command planned in `/plan`, executed in `/build` (DD-12) | Skill invokes command, user manages test content — decouples from any specific test framework | — Pending |
 
 ---
-*Last updated: 2026-04-03 — Phase 7 (spike-docs) complete — all 7 skills documented*
+*Last updated: 2026-04-03 — Phase 8 (greenfield-routing) complete — greenfield routing gap closed*
 
 ## Evolution
 
