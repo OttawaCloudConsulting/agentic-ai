@@ -99,7 +99,12 @@ Plans:
   2. `/plan` produces `milestones/<NN>-<name>/plans/<feature>.md` with all required sections including an empty Architectural Deviations section and a test command
   3. Sub-features that exceed the ~120k-token sizing guideline are flagged with a proposed split before the plan is presented for review
   4. Gate 4 approval updates the feature entry in `milestone-status.txt` from `[ ]` to `[~] planned, awaiting build`; the plan file path is also recorded
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
+- [ ] 05-02-PLAN.md — SKILL.md flow controller
+- [ ] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 6: /build
 **Goal**: Users can implement features sub-feature by sub-feature, with each sub-feature leaving the codebase committable and state files updated incrementally
@@ -110,7 +115,12 @@ Plans:
   2. `/build` refreshes `docs/codebase-assessment.md` at the start of each new feature before writing any code
   3. Each completed sub-feature is marked `[x]` in the feature plan and leaves the codebase in a committable state; architectural deviations are recorded in the plan when they occur
   4. Feature completion requires test command exit code 0; failure is a hard stop; `milestone-status.txt` is written before `progress.txt` rollup on completion
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
+- [ ] 05-02-PLAN.md — SKILL.md flow controller
+- [ ] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 7: /spike + Docs
 **Goal**: Users can run adversarial technical research that produces a structured spike artifact, and every skill in the suite has complete documentation
@@ -121,7 +131,12 @@ Plans:
   2. Follow-up mode appends a new log entry to an existing spike artifact without overwriting original findings; spike is marked `[x]` resolved in `progress.txt` when user signals resolution
   3. Each of the seven skills has a detail doc at `docs/skills/<name>.md` and a row in `docs/SKILLS.md`
   4. Each skill directory contains a `SKILL.md` with `disable-model-invocation: true` in its frontmatter
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
+- [ ] 05-02-PLAN.md — SKILL.md flow controller
+- [ ] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ## Progress
 
