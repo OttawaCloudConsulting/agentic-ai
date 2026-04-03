@@ -83,7 +83,12 @@ Plans:
   2. Each invocation produces `milestones/<NN>-<name>/README.md`, `milestone-status.txt`, and a gate-3 review checklist with auto-incremented sequence number
   3. Gate 3 status in `progress.txt` is `[~] In progress` after milestone creation and transitions only when the user explicitly signals milestone planning is complete
   4. Revision mode surfaces all in-progress and complete features before any reset; only resets features the user identifies as affected; preserves completed features' status
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Reference files and milestone README template (gate-3-milestone, revision-mode, progress-format, review-checklist-template, milestone-readme-template)
+- [ ] 04-02-PLAN.md — SKILL.md flow controller
+- [ ] 04-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 5: /plan (Gate 4)
 **Goal**: Users can produce per-feature implementation plans with sub-feature sizing validation, and gate approval updates milestone-status.txt
@@ -128,7 +133,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. /project Router | 0/3 | Not started | - |
 | 2. /define (Gates 0/WB/1) | 0/4 | Not started | - |
 | 3. /design (Gate 2) | 0/3 | Not started | - |
-| 4. /milestone (Gate 3) | 0/TBD | Not started | - |
+| 4. /milestone (Gate 3) | 0/3 | Not started | - |
 | 5. /plan (Gate 4) | 0/TBD | Not started | - |
 | 6. /build | 0/TBD | Not started | - |
 | 7. /spike + Docs | 0/TBD | Not started | - |
