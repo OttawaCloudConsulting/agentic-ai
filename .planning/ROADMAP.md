@@ -118,9 +118,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [x] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
-- [ ] 05-02-PLAN.md — SKILL.md flow controller
-- [ ] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
+- [ ] 06-01-PLAN.md — Reference files (build-execution, codebase-refresh, deviation-recording, progress-format)
+- [ ] 06-02-PLAN.md — SKILL.md flow controller
+- [ ] 06-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 7: /spike + Docs
 **Goal**: Users can run adversarial technical research that produces a structured spike artifact, and every skill in the suite has complete documentation
@@ -134,9 +134,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [x] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
-- [ ] 05-02-PLAN.md — SKILL.md flow controller
-- [ ] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
+- [ ] 07-01-PLAN.md — Reference files and spike template
+- [ ] 07-02-PLAN.md — SKILL.md flow controller
+- [ ] 07-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ## Progress
 
@@ -150,5 +150,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. /design (Gate 2) | 0/3 | Not started | - |
 | 4. /milestone (Gate 3) | 0/3 | Not started | - |
 | 5. /plan (Gate 4) | 1/3 | In Progress|  |
-| 6. /build | 0/TBD | Not started | - |
-| 7. /spike + Docs | 0/TBD | Not started | - |
+| 6. /build | 0/3 | Not started | - |
+| 7. /spike + Docs | 0/3 | Not started | - |
