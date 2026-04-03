@@ -80,15 +80,15 @@
 
 ### Build (`/build`)
 
-- [ ] **BUILD-01**: `/build` validates that a Gate 4-approved plan exists for the target feature before beginning implementation
-- [ ] **BUILD-02**: `/build` refreshes `docs/codebase-assessment.md` at the start of each new feature: re-reads codebase, checks git history for commits since last assessment, updates Recent Changes section
-- [ ] **BUILD-03**: `/build` implements sub-features from the feature plan checklist in order; each sub-feature leaves the codebase in a committable state
-- [ ] **BUILD-04**: `/build` marks each completed sub-feature `[x]` in the feature plan checklist
-- [ ] **BUILD-05**: `/build` runs the feature's test command on completion; only marks feature complete when test passes (exit code 0)
-- [ ] **BUILD-06**: `/build` supports test command update mid-build — user provides corrected command; skill updates the feature plan (no gate re-approval needed)
-- [ ] **BUILD-07**: `/build` records architectural deviations in the feature plan's Architectural Deviations section when approved design cannot be followed as planned
-- [ ] **BUILD-08**: `/build` updates `milestone-status.txt` on sub-feature and feature completion; marks feature `[x]` complete when all sub-features pass
-- [ ] **BUILD-09**: `/build` updates `progress.txt` milestone summary on feature completion (increment count); marks milestone `[x]` when last feature completes
+- [x] **BUILD-01**: `/build` validates that a Gate 4-approved plan exists for the target feature before beginning implementation
+- [x] **BUILD-02**: `/build` refreshes `docs/codebase-assessment.md` at the start of each new feature: re-reads codebase, checks git history for commits since last assessment, updates Recent Changes section
+- [x] **BUILD-03**: `/build` implements sub-features from the feature plan checklist in order; each sub-feature leaves the codebase in a committable state
+- [x] **BUILD-04**: `/build` marks each completed sub-feature `[x]` in the feature plan checklist
+- [x] **BUILD-05**: `/build` runs the feature's test command on completion; only marks feature complete when test passes (exit code 0)
+- [x] **BUILD-06**: `/build` supports test command update mid-build — user provides corrected command; skill updates the feature plan (no gate re-approval needed)
+- [x] **BUILD-07**: `/build` records architectural deviations in the feature plan's Architectural Deviations section when approved design cannot be followed as planned
+- [x] **BUILD-08**: `/build` updates `milestone-status.txt` on sub-feature and feature completion; marks feature `[x]` complete when all sub-features pass
+- [x] **BUILD-09**: `/build` updates `progress.txt` milestone summary on feature completion (increment count); marks milestone `[x]` when last feature completes
 
 ### Spike (`/spike`)
 
@@ -204,15 +204,15 @@
 | PLAN-07 | Phase 5 | Complete |
 | PLAN-08 | Phase 5 | Complete |
 | PLAN-09 | Phase 5 | Complete |
-| BUILD-01 | Phase 6 | Pending |
-| BUILD-02 | Phase 6 | Pending |
-| BUILD-03 | Phase 6 | Pending |
-| BUILD-04 | Phase 6 | Pending |
-| BUILD-05 | Phase 6 | Pending |
-| BUILD-06 | Phase 6 | Pending |
-| BUILD-07 | Phase 6 | Pending |
-| BUILD-08 | Phase 6 | Pending |
-| BUILD-09 | Phase 6 | Pending |
+| BUILD-01 | Phase 6 | Complete |
+| BUILD-02 | Phase 6 | Complete |
+| BUILD-03 | Phase 6 | Complete |
+| BUILD-04 | Phase 6 | Complete |
+| BUILD-05 | Phase 6 | Complete |
+| BUILD-06 | Phase 6 | Complete |
+| BUILD-07 | Phase 6 | Complete |
+| BUILD-08 | Phase 6 | Complete |
+| BUILD-09 | Phase 6 | Complete |
 | SPIKE-01 | Phase 7 | Pending |
 | SPIKE-02 | Phase 7 | Pending |
 | SPIKE-03 | Phase 7 | Pending |
