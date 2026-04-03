@@ -23,6 +23,7 @@ After loading inputs, determine which mode to enter:
 3. **Revision mode:** The target milestone directory already exists under `milestones/`. This is handled by `references/revision-mode.md`, not this file. SKILL.md routes to revision mode directly.
 
 Detection logic:
+
 - Check `prd.md` Milestones section content (is it `(to be defined)` or populated?)
 - Run `ls milestones/` to see which milestone directories exist
 - Compare the milestone plan in `prd.md` against existing directories to identify the next undefined milestone
@@ -46,6 +47,7 @@ Propose a complete milestone plan with:
 - **1-2 sentence summary** describing what the milestone delivers as customer-visible value
 
 Apply DD-1 sizing constraints:
+
 - 2-5 features per milestone
 - Each milestone represents a deployable increment of user-visible value
 - Features should be testable, reviewable units of delivery
@@ -55,6 +57,7 @@ Present the milestone plan with ordering rationale explaining why milestones are
 ### Tradeoff Callouts (D-03)
 
 Before requesting approval, present 2-3 tradeoff callouts highlighting key grouping or ordering decisions:
+
 - What was grouped together and why
 - Alternative groupings that were considered
 - Ordering choices and their tradeoffs (e.g., "putting auth before dashboard means users can't see anything until login works, but avoids building UI without real data")
@@ -62,6 +65,7 @@ Before requesting approval, present 2-3 tradeoff callouts highlighting key group
 ### Approval
 
 Use `AskUserQuestion` with options:
+
 - **Approve** -- milestone plan is accepted
 - **Revise** -- plan needs changes (ask what should change, revise, re-present)
 
@@ -78,6 +82,7 @@ On Approve: update `prd.md` Milestones section using the Edit tool. Replace `(to
 ### Post-Approval Flow
 
 After persisting the milestone plan in `prd.md`:
+
 - Default: proceed to define milestone #1 (Section 6 below)
 - If the user says "I'll define milestones later" or similar deferral, stop here. The `prd.md` is updated with the plan but no milestone directories are created yet.
 
@@ -101,6 +106,7 @@ Generate the complete set of artifacts for a single milestone.
 ### Sequence Number (MIL-03)
 
 Auto-increment the sequence number from existing `milestones/` directories:
+
 - Run `ls milestones/` to count existing milestone directories
 - Use the milestone's position in the approved plan (from `prd.md`) for the sequence number
 - Zero-pad to two digits (e.g., `01`, `02`, `03`)
@@ -151,15 +157,19 @@ Generate `milestones/<NN>-<name>/reviews/gate-3-review.md` using the format from
 After writing `milestone-status.txt`, update `progress.txt`:
 
 1. **Gate 3 line (MIL-09):** If not already in-progress, update the Gate 3 line to:
+
    ```
    [~] Gate 3: Milestone Review  In progress
    ```
+
    **Important:** `/milestone` NEVER writes `[x]` to the Gate 3 line. Only `/project` closes Gate 3 (D-05).
 
 2. **Milestone summary line (MIL-07):** Add a new line in the `## Milestones` section:
+
    ```
    [ ] Milestone NN: Name  milestones/<NN>-<name>/  0/N features complete
    ```
+
    Follow the Milestone Summary Line Format from `references/progress-format.md`.
 
 ## Review Phase (MIL-08, D-03)
@@ -178,6 +188,7 @@ Present 2-3 key grouping or ordering decisions with alternatives considered. Foc
 ### Approval Flow
 
 Use `AskUserQuestion` with options:
+
 - **Approve** -- milestone definition is accepted, proceed to Checklist Validation
 - **Revise** -- ask what needs changing, apply edits to README.md, re-present
 - **Partial** -- present a multiSelect of README sections for section-by-section approval:
