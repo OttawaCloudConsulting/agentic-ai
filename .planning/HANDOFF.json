@@ -1,28 +1,48 @@
 {
   "version": "1.0",
-  "timestamp": "2026-04-02T23:35:55.459Z",
-  "phase": "03",
-  "phase_name": "design-gate-2",
-  "phase_dir": ".planning/phases/03-design-gate-2",
-  "plan": 0,
-  "task": 0,
-  "total_tasks": 4,
+  "timestamp": "2026-04-03T00:13:38.852Z",
+  "phase": "4",
+  "phase_name": "milestone-gate-3",
+  "phase_dir": ".planning/phases/04-milestone-gate-3",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
   "status": "paused",
-  "completed_tasks": [],
+  "completed_tasks": [
+    {"id": 1, "name": "initialize", "status": "done"},
+    {"id": 2, "name": "check_existing", "status": "done"},
+    {"id": 3, "name": "load_prior_context", "status": "done"},
+    {"id": 4, "name": "cross_reference_todos", "status": "done"},
+    {"id": 5, "name": "scout_codebase", "status": "done"},
+    {"id": 6, "name": "analyze_phase", "status": "done"},
+    {"id": 7, "name": "present_gray_areas", "status": "done"},
+    {"id": 8, "name": "discuss_areas", "status": "done"}
+  ],
   "remaining_tasks": [
-    {"id": 1, "plan": "03-01", "name": "Reference files + architecture template (2 tasks)", "status": "not_started"},
-    {"id": 2, "plan": "03-02", "name": "SKILL.md flow controller (1 task)", "status": "not_started"},
-    {"id": 3, "plan": "03-03", "name": "Documentation - detail doc + catalog (1 task)", "status": "not_started"}
+    {"id": 9, "name": "write_context", "status": "not_started"},
+    {"id": 10, "name": "git_commit", "status": "not_started"},
+    {"id": 11, "name": "update_state", "status": "not_started"},
+    {"id": 12, "name": "confirm_creation", "status": "not_started"},
+    {"id": 13, "name": "auto_advance", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Reference file pattern for SKILL.md decomposition", "rationale": "Consistent with Phase 2 /define approach", "phase": "03"},
-    {"decision": "Agent-based deep codebase scan always, even greenfield", "rationale": "User wants thorough scanning regardless of project state", "phase": "03"},
-    {"decision": "Section-by-section partial approval with tradeoff callouts", "rationale": "Same pattern as Gate 1 PRD, plus 2-4 key tradeoff highlights", "phase": "03"},
-    {"decision": "Per-deviation review for refresh mode", "rationale": "Granular control over which deviations to consolidate", "phase": "03"}
+    {"decision": "Analyze and propose pattern for milestone generation", "rationale": "Consistent with produce-then-review from prior phases; inputs are focused docs", "phase": "4"},
+    {"decision": "Direct reading of PRD + architecture (no sub-agent)", "rationale": "Inputs are small focused docs, not a sprawling codebase", "phase": "4"},
+    {"decision": "Tradeoff callouts before approval checklist", "rationale": "Consistent with /design Phase 3 D-09", "phase": "4"},
+    {"decision": "Spike artifacts user-referenced only", "rationale": "Keeps context clean", "phase": "4"},
+    {"decision": "/project detects and offers Gate 3 closure with user confirmation", "rationale": "Keeps /project as routing authority, maintains HITL principle", "phase": "4"},
+    {"decision": "Gate 3 closure requires milestones + completed gate-3-review.md per milestone", "rationale": "Ensures every milestone was reviewed before gate closes", "phase": "4"},
+    {"decision": "Propose all milestones upfront, define one at a time", "rationale": "Balances planning visibility with per-milestone review quality", "phase": "4"},
+    {"decision": "Milestone plan persisted in prd.md Milestones section", "rationale": "Natural home alongside requirements", "phase": "4"},
+    {"decision": "Auto-select next undefined milestone on subsequent invocations", "rationale": "Reduces friction while allowing user override", "phase": "4"},
+    {"decision": "Auto-detect revision mode when milestone directory exists", "rationale": "No flag needed, consistent with analyze-and-propose approach", "phase": "4"},
+    {"decision": "Feature checklist with multiSelect for affected feature identification", "rationale": "User controls which features reset, completed features preserved", "phase": "4"},
+    {"decision": "Load and revise existing README (not regenerate)", "rationale": "Consistent with /define revision mode Phase 2 D-15", "phase": "4"},
+    {"decision": "Fresh gate-3-review.md after revision", "rationale": "Prior review no longer valid after milestone changes", "phase": "4"}
   ],
-  "uncommitted_files": [],
-  "next_action": "Run /gsd:execute-phase 3 to execute all 3 plans (3 waves, sequential)",
-  "context_notes": "Phase 3 discuss→plan pipeline complete. Context captured, research done, 3 plans created and verified by plan-checker (all 10 dimensions passed). Auto-advance to execute was interrupted by context budget. Execute-phase init was run but no plans were executed yet."
+  "uncommitted_files": [".claude/settings.local.json", ".planning/config.json"],
+  "next_action": "Write 04-CONTEXT.md and 04-DISCUSSION-LOG.md from captured decisions, then commit and update state",
+  "context_notes": "discuss-phase workflow completed all user interaction. Remaining steps are mechanical: write files, commit, update state. All 13 decisions captured across 4 gray areas."
 }
