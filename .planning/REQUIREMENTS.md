@@ -108,9 +108,9 @@
 
 ### Documentation
 
-- [ ] **DOCS-01**: Each skill (`/project`, `/define`, `/design`, `/milestone`, `/plan`, `/build`, `/spike`) has a detail doc at `docs/skills/<name>.md`
-- [ ] **DOCS-02**: `docs/SKILLS.md` catalog has a row for each new skill
-- [ ] **DOCS-03**: Each skill directory (`skills/project/<name>/`) contains a `SKILL.md` entry point with `disable-model-invocation: true`
+- [x] **DOCS-01**: Each skill (`/project`, `/define`, `/design`, `/milestone`, `/plan`, `/build`, `/spike`) has a detail doc at `docs/skills/<name>.md`
+- [x] **DOCS-02**: `docs/SKILLS.md` catalog has a row for each new skill
+- [x] **DOCS-03**: Each skill directory (`skills/project/<name>/`) contains a `SKILL.md` entry point with `disable-model-invocation: true`
 
 ---
 
@@ -219,9 +219,9 @@
 | SPIKE-04 | Phase 7 | Complete |
 | SPIKE-05 | Phase 7 | Complete |
 | SPIKE-06 | Phase 7 | Complete |
-| DOCS-01 | Phase 7 | Pending |
-| DOCS-02 | Phase 7 | Pending |
-| DOCS-03 | Phase 7 | Pending |
+| DOCS-01 | Phase 7 | Complete |
+| DOCS-02 | Phase 7 | Complete |
+| DOCS-03 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 78 total

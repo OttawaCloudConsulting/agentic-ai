@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: /milestone (Gate 3)** - Per-milestone feature breakdown with acceptance criteria and revision support
 - [ ] **Phase 5: /plan (Gate 4)** - Per-feature implementation plans with sub-feature sizing and interface contracts
 - [ ] **Phase 6: /build** - Sub-feature-by-sub-feature implementation with state file updates and deviation tracking
-- [ ] **Phase 7: /spike + Docs** - Adversarial research tool with red-team validation, plus suite documentation
+- [x] **Phase 7: /spike + Docs** - Adversarial research tool with red-team validation, plus suite documentation (completed 2026-04-03)
 
 ## Phase Details
 
@@ -131,12 +131,12 @@ Plans:
   2. Follow-up mode appends a new log entry to an existing spike artifact without overwriting original findings; spike is marked `[x]` resolved in `progress.txt` when user signals resolution
   3. Each of the seven skills has a detail doc at `docs/skills/<name>.md` and a row in `docs/SKILLS.md`
   4. Each skill directory contains a `SKILL.md` with `disable-model-invocation: true` in its frontmatter
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 07-01-PLAN.md — Reference files and spike template
 - [x] 07-02-PLAN.md — SKILL.md flow controller
-- [ ] 07-03-PLAN.md — Documentation (detail doc + catalog entry)
+- [x] 07-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ## Progress
 
@@ -151,4 +151,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. /milestone (Gate 3) | 0/3 | Not started | - |
 | 5. /plan (Gate 4) | 1/3 | In Progress|  |
 | 6. /build | 0/3 | Not started | - |
-| 7. /spike + Docs | 0/3 | Not started | - |
+| 7. /spike + Docs | 3/3 | Complete   | 2026-04-03 |
