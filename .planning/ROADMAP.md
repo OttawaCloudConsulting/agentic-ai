@@ -88,7 +88,7 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — Reference files and milestone README template (gate-3-milestone, revision-mode, progress-format, review-checklist-template, milestone-readme-template)
 - [x] 04-02-PLAN.md — SKILL.md flow controller
-- [ ] 04-03-PLAN.md — Documentation (detail doc + catalog entry)
+- [x] 04-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 5: /plan (Gate 4)
 **Goal**: Users can produce per-feature implementation plans with sub-feature sizing validation, and gate approval updates milestone-status.txt
