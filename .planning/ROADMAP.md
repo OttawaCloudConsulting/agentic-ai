@@ -118,9 +118,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Reference files (build-execution, codebase-refresh, deviation-recording, progress-format)
-- [ ] 06-02-PLAN.md — SKILL.md flow controller
-- [ ] 06-03-PLAN.md — Documentation (detail doc + catalog entry)
+- [x] 06-01-PLAN.md — Reference files (build-execution, codebase-refresh, deviation-recording, progress-format)
+- [x] 06-02-PLAN.md — SKILL.md flow controller
+- [x] 06-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 7: /spike + Docs
 **Goal**: Users can run adversarial technical research that produces a structured spike artifact, and every skill in the suite has complete documentation
