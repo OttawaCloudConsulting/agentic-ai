@@ -33,6 +33,7 @@ Notes:
 - "Offer Gate WB" is also handled internally by `/project` via `AskUserQuestion`.
 - When open spikes exist, `/spike` is added to the alternatives list for any state where it is contextually relevant (post-Gate 1 states).
 - The "customer outcome unclear" condition for Gate WB offer is evaluated by Claude based on available project context -- if the project's purpose and target customer are well-defined from existing artifacts, Gate WB may not be offered.
+- `[-]` (skipped) is treated as equivalent to `[x]` (approved) for all Gate 0 routing. Greenfield projects skip Gate 0 (codebase alignment is not applicable), but the skip counts as Gate 0 resolved for all downstream routing purposes.
 
 ## Re-planning Intent Detection
 
