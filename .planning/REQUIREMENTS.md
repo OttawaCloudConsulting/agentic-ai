@@ -92,12 +92,12 @@
 
 ### Spike (`/spike`)
 
-- [ ] **SPIKE-01**: `/spike` accepts a user-defined research question and list of available tooling; spawns a research sub-agent to investigate
-- [ ] **SPIKE-02**: `/spike` spawns a red-team sub-agent to validate research findings (factual errors, missing alternatives, flawed reasoning, unverified assumptions)
-- [ ] **SPIKE-03**: `/spike` produces `docs/spikes/<topic>.md` with sections: Question, Available Tooling, Methodology, Findings, Red-Team Assessment, Recommendation, Status (open/resolved), Follow-Up Log
-- [ ] **SPIKE-04**: `/spike` adds spike entry to `progress.txt` under `## Spikes` section
-- [ ] **SPIKE-05**: `/spike` in follow-up mode appends a new entry to the Follow-Up Log of the existing spike artifact rather than overwriting
-- [ ] **SPIKE-06**: `/spike` marks spike `[x]` resolved in `progress.txt` when user signals resolution
+- [x] **SPIKE-01**: `/spike` accepts a user-defined research question and list of available tooling; spawns a research sub-agent to investigate
+- [x] **SPIKE-02**: `/spike` spawns a red-team sub-agent to validate research findings (factual errors, missing alternatives, flawed reasoning, unverified assumptions)
+- [x] **SPIKE-03**: `/spike` produces `docs/spikes/<topic>.md` with sections: Question, Available Tooling, Methodology, Findings, Red-Team Assessment, Recommendation, Status (open/resolved), Follow-Up Log
+- [x] **SPIKE-04**: `/spike` adds spike entry to `progress.txt` under `## Spikes` section
+- [x] **SPIKE-05**: `/spike` in follow-up mode appends a new entry to the Follow-Up Log of the existing spike artifact rather than overwriting
+- [x] **SPIKE-06**: `/spike` marks spike `[x]` resolved in `progress.txt` when user signals resolution
 
 ### State Files
 
@@ -213,12 +213,12 @@
 | BUILD-07 | Phase 6 | Complete |
 | BUILD-08 | Phase 6 | Complete |
 | BUILD-09 | Phase 6 | Complete |
-| SPIKE-01 | Phase 7 | Pending |
-| SPIKE-02 | Phase 7 | Pending |
-| SPIKE-03 | Phase 7 | Pending |
-| SPIKE-04 | Phase 7 | Pending |
-| SPIKE-05 | Phase 7 | Pending |
-| SPIKE-06 | Phase 7 | Pending |
+| SPIKE-01 | Phase 7 | Complete |
+| SPIKE-02 | Phase 7 | Complete |
+| SPIKE-03 | Phase 7 | Complete |
+| SPIKE-04 | Phase 7 | Complete |
+| SPIKE-05 | Phase 7 | Complete |
+| SPIKE-06 | Phase 7 | Complete |
 | DOCS-01 | Phase 7 | Pending |
 | DOCS-02 | Phase 7 | Pending |
 | DOCS-03 | Phase 7 | Pending |
