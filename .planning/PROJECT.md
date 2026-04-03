@@ -20,12 +20,13 @@ Every phase transition requires explicit human approval, preventing AI drift fro
 - [x] `/plan` skill — Gate 4: produces per-feature implementation plans (one invocation per feature) including sub-feature breakdown, test command, and interface contracts — *Validated in Phase 5: plan-gate-4*
 - [x] `/build` skill — implements features sub-feature by sub-feature, tracks deviations, refreshes codebase assessment, updates `milestone-status.txt` on completion — *Validated in Phase 6: build*
 
+- [x] `/spike` skill — agent-based technical research with red-team validation, produces `docs/spikes/<topic>.md` — *Validated in Phase 7: spike-docs*
+- [x] Documentation — skill catalog entries and detail docs for all 7 skills (project, define, design, milestone, plan, build, spike) — *Validated in Phase 7: spike-docs*
+
 ### Active
-- [ ] `/spike` skill — agent-based technical research with red-team validation, produces `docs/spikes/<topic>.md`
 - [ ] Two-tier state files — project-level `progress.txt` (gate approvals, milestone summaries, spike entries) and milestone-level `milestone-status.txt` (feature details, sub-feature checklists)
 - [ ] Gate review checklists — structured review artifacts per gate for offline reviewers, completeness validated before gate approval recorded
 - [ ] Re-planning support — milestone re-planning via `/milestone` in revision mode; PRD revision via `/define` in revision mode
-- [ ] Documentation — skill catalog entries and detail docs for all 6 skills + orchestrator
 
 ### Out of Scope
 
@@ -64,7 +65,7 @@ A codebase map exists at `.planning/codebase/`. Key existing patterns: skills ar
 | Test command planned in `/plan`, executed in `/build` (DD-12) | Skill invokes command, user manages test content — decouples from any specific test framework | — Pending |
 
 ---
-*Last updated: 2026-04-03 — Phase 6 (build) complete*
+*Last updated: 2026-04-03 — Phase 7 (spike-docs) complete — all 7 skills documented*
 
 ## Evolution
 
