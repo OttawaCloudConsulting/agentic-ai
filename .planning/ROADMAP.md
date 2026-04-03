@@ -151,7 +151,10 @@ Plans:
   1. `routing-logic.md` has an explicit row for Gate 0 `[-]` (greenfield skip) state that routes correctly to Gate WB or Gate 1
   2. Gate WB offer condition in SKILL.md Step 5 fires for both `Gate 0 = [x]` and `Gate 0 = [-]` (greenfield)
   3. Second `/project` invocation on a greenfield project produces correct routing output — no ambiguous fall-through to unmatched state
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+Plans:
+- [ ] 08-01-PLAN.md -- Fix routing-logic.md equivalence note and SKILL.md Gate WB condition for greenfield [-] state
 
 ### Phase 9: Nyquist Compliance
 **Goal**: Complete Wave 0 test strategy for all 7 phases — define automated test coverage and mark `nyquist_compliant: true`
