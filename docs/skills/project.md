@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Project orchestrator that bootstraps state on first run and routes users to the correct next skill on every subsequent invocation. `/project` is the single entry point to the project skill suite. It reads `progress.txt` and all `milestone-status.txt` files, validates artifact existence and milestone consistency, displays a structured status report, and recommends what to do next. Read-only after bootstrap -- the initial creation of `progress.txt` is the only time `/project` writes to disk.
+Project orchestrator that bootstraps state on first run and routes users to the correct next skill on every subsequent invocation. `/project` is the single entry point to the project skill suite. It reads `progress.txt` and all `milestone-status.txt` files, validates artifact existence and milestone consistency, displays a structured status report, and recommends what to do next. Writes to disk only during bootstrap (creating `progress.txt`) and Gate 3 closure (marking all milestones complete in `progress.txt`).
 
 ## When to Use
 
@@ -27,7 +27,7 @@ Project orchestrator that bootstraps state on first run and routes users to the 
 
 ### 1. Bootstrap (first run)
 
-On the very first invocation, if `progress.txt` does not exist, `/project` creates it with gate entries and empty milestone/spike sections. This is the only time `/project` writes to disk.
+On the very first invocation, if `progress.txt` does not exist, `/project` creates it with gate entries and empty milestone/spike sections.
 
 - **Greenfield projects:** Gate 0 (Codebase Alignment) is recorded as `[-] Skipped (greenfield)` since there is no existing codebase to assess.
 - **Brownfield projects:** Gate 0 is recorded as `[ ]` (not started), ready for `/define` to perform codebase assessment.
@@ -76,7 +76,7 @@ When Gate WB is in Pending state on a subsequent invocation, `/project` shows a 
 
 | File | Read/Write | When |
 |------|-----------|------|
-| `progress.txt` | Write (once) | Bootstrap only |
+| `progress.txt` | Write | Bootstrap (creation) and Gate 3 closure (completion update) |
 | `progress.txt` | Read | Every invocation after bootstrap |
 | `milestones/*/milestone-status.txt` | Read | Every invocation (for consistency validation) |
 | Gate artifact files | Read (existence check) | Every invocation (for artifact validation) |

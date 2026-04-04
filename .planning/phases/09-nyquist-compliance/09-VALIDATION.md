@@ -20,7 +20,7 @@ created: 2026-04-03
 | **Framework** | bash grep (content assertions) |
 | **Config file** | none — no test framework needed |
 | **Quick run command** | `grep -rq 'nyquist_compliant: true' .planning/phases/` |
-| **Full suite command** | `bash scripts/lint-markdown.sh -r .planning/phases/` |
+| **Full suite command** | `bash cicd/lint-markdown.sh -r .planning/phases/` |
 | **Estimated runtime** | ~5 seconds |
 
 ---
