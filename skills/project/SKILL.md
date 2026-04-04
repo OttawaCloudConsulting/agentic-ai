@@ -24,8 +24,7 @@ skill on every subsequent invocation. Read-only after bootstrap.
   instruction. Never auto-invoke or auto-dispatch another skill (DD-2).
 - **Write-ordering contract for downstream skills.** When both `milestone-status.txt` and
   `progress.txt` need updates, write `milestone-status.txt` first -- source-of-truth-first
-  ordering (STATE-04). This rule applies to `/build`, `/milestone`, and `/plan`, not to
-  `/project` itself.
+  ordering (STATE-04). This rule applies to `/build` and `/milestone`, not to `/project` or `/plan`.
 - **Interactive prompts.** Use `AskUserQuestion` for all user-facing choices (2-4 options,
   max 12-character option headers).
 

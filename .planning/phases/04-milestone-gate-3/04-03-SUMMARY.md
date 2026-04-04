@@ -3,6 +3,7 @@ phase: 04-milestone-gate-3
 plan: 03
 subsystem: docs
 tags: [milestone, gate-3, documentation, catalog]
+requirements-completed: [MIL-01, MIL-02, MIL-03, MIL-04, MIL-05, MIL-06, MIL-07, MIL-08, MIL-09, MIL-10, MIL-11, MIL-12, MIL-13]
 
 # Dependency graph
 requires:
