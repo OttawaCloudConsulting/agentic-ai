@@ -66,7 +66,7 @@ A codebase map exists at `.planning/codebase/`. Key existing patterns: skills ar
 | Test command planned in `/plan`, executed in `/build` (DD-12) | Skill invokes command, user manages test content — decouples from any specific test framework | — Pending |
 
 ---
-*Last updated: 2026-04-03 — Phase 8 (greenfield-routing) complete — greenfield routing gap closed*
+*Last updated: 2026-04-03 — Phase 9 (nyquist-compliance) complete — all 7 phase VALIDATION.md files upgraded to nyquist_compliant: true with machine-verifiable automated checks*
 
 ## Evolution
 
