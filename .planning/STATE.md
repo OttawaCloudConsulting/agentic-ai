@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-04-04T01:27:00.626Z"
+status: verifying
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-04-04T01:27:30.084Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 11
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 26
-  completed_plans: 25
+  completed_plans: 26
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 Phase: 09 (nyquist-compliance) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-04
 
 Progress: [░░░░░░░░░░] 0%
@@ -74,6 +74,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 08-greenfield-routing P01 | 1min | 2 tasks | 2 files |
 | Phase 09-nyquist-compliance P02 | 1min | 2 tasks | 2 files |
 | Phase 09-nyquist-compliance P03 | 5min | 2 tasks | 2 files |
+| Phase 09-nyquist-compliance P01 | 5min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,9 @@ Recent decisions affecting current work:
 - [Phase 08-greenfield-routing]: SKILL.md Gate WB offer condition explicitly names both [x] and [-] (greenfield) as triggers
 - [Phase 09-02]: Content checks are additive — all 13 Phase 4 and 9 Phase 5 manual rows preserved unchanged
 - [Phase 09-02]: Row IDs use C-suffix pattern (04-01-C1 through C5, 05-01-C1 through C5) to distinguish content-check rows from manual rows
+- [Phase 09-01]: Content checks are strictly additive — all existing manual rows preserved unchanged across phases 1-3 VALIDATION.md files
+- [Phase 09-01]: cicd/lint-markdown.sh path retained as canonical lint path; scripts/ path does not exist on disk
+- [Phase 09-01]: All grep terms verified against live skill files (exit 0 confirmed) before writing to any VALIDATION.md
 
 ### Pending Todos
 
@@ -140,6 +144,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-04T01:27:00.623Z
-Stopped at: Completed 09-03-PLAN.md
+Last session: 2026-04-04T01:27:30.080Z
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None

@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: /build** - Sub-feature-by-sub-feature implementation with state file updates and deviation tracking (completed 2026-04-03)
 - [x] **Phase 7: /spike + Docs** - Adversarial research tool with red-team validation, plus suite documentation (completed 2026-04-03)
 - [x] **Phase 8: Fix Greenfield Routing** - Close routing ambiguity for Gate 0 `[-]` state on second `/project` invocation (completed 2026-04-03)
-- [ ] **Phase 9: Nyquist Compliance** - Complete Wave 0 test strategy for all 7 phases
+- [x] **Phase 9: Nyquist Compliance** - Complete Wave 0 test strategy for all 7 phases (completed 2026-04-04)
 - [ ] **Phase 10: Tech Debt Sweep** - Fix 4 low-severity documentation and attribution issues
 - [ ] **Phase 11: Gate 3 Closure Pathway** - Resolve structural contradiction between PROJ-10 read-only rule and D-05 Gate 3 closure design
 
@@ -165,10 +165,10 @@ Plans:
   1. All 7 phase VALIDATION.md files have `wave_0_complete: true` and `nyquist_compliant: true`
   2. Each phase has a defined test strategy covering its core observable behaviors
   3. Wave 0 tests run and pass for all 7 phases
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 09-01-PLAN.md — Upgrade phases 1–3 VALIDATION.md files (add grep content checks, update frontmatter, sign off)
+- [x] 09-01-PLAN.md — Upgrade phases 1–3 VALIDATION.md files (add grep content checks, update frontmatter, sign off)
 - [x] 09-02-PLAN.md — Upgrade phases 4–5 VALIDATION.md files (add grep content checks, update frontmatter, sign off)
 - [x] 09-03-PLAN.md — Fix phases 6–7 VALIDATION.md files (correct 2 failing checks each, update frontmatter, sign off)
 
@@ -209,6 +209,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 6. /build | 3/3 | Complete | 2026-04-03 |
 | 7. /spike + Docs | 3/3 | Complete | 2026-04-03 |
 | 8. Fix Greenfield Routing | 1/1 | Complete   | 2026-04-03 |
-| 9. Nyquist Compliance | 2/3 | In Progress|  |
+| 9. Nyquist Compliance | 3/3 | Complete   | 2026-04-04 |
 | 10. Tech Debt Sweep | 0/0 | Not started | - |
 | 11. Gate 3 Closure Pathway | 0/0 | Not started | - |
