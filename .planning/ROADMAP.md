@@ -165,12 +165,12 @@ Plans:
   1. All 7 phase VALIDATION.md files have `wave_0_complete: true` and `nyquist_compliant: true`
   2. Each phase has a defined test strategy covering its core observable behaviors
   3. Wave 0 tests run and pass for all 7 phases
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 09-01-PLAN.md — Upgrade phases 1–3 VALIDATION.md files (add grep content checks, update frontmatter, sign off)
-- [ ] 09-02-PLAN.md — Upgrade phases 4–5 VALIDATION.md files (add grep content checks, update frontmatter, sign off)
-- [ ] 09-03-PLAN.md — Fix phases 6–7 VALIDATION.md files (correct 2 failing checks each, update frontmatter, sign off)
+- [x] 09-02-PLAN.md — Upgrade phases 4–5 VALIDATION.md files (add grep content checks, update frontmatter, sign off)
+- [x] 09-03-PLAN.md — Fix phases 6–7 VALIDATION.md files (correct 2 failing checks each, update frontmatter, sign off)
 
 ### Phase 10: Tech Debt Sweep
 **Goal**: Fix 4 low-severity documentation and attribution issues identified in v1.0 audit
@@ -209,6 +209,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 6. /build | 3/3 | Complete | 2026-04-03 |
 | 7. /spike + Docs | 3/3 | Complete | 2026-04-03 |
 | 8. Fix Greenfield Routing | 1/1 | Complete   | 2026-04-03 |
-| 9. Nyquist Compliance | 0/3 | In progress | - |
+| 9. Nyquist Compliance | 2/3 | In Progress|  |
 | 10. Tech Debt Sweep | 0/0 | Not started | - |
 | 11. Gate 3 Closure Pathway | 0/0 | Not started | - |
