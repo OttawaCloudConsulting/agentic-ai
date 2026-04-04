@@ -75,6 +75,9 @@ cp -r skills/create-prd/                <target-repo>/.claude/skills/create-prd/
 cp -r skills/project/milestone/          <target-repo>/.claude/skills/project/milestone/
 cp -r skills/project/plan/                <target-repo>/.claude/skills/project/plan/
 cp -r skills/project/spike/               <target-repo>/.claude/skills/project/spike/
+cp -r skills/project/define/              <target-repo>/.claude/skills/project/define/
+cp -r skills/project/design/              <target-repo>/.claude/skills/project/design/
+cp -r skills/project/build/               <target-repo>/.claude/skills/project/build/
 cp -r skills/occ-skill-creator/         <target-repo>/.claude/skills/occ-skill-creator/
 cp -r skills/occ-skill-refactor/        <target-repo>/.claude/skills/occ-skill-refactor/
 cp -r skills/project/                   <target-repo>/.claude/skills/project/
