@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: /spike + Docs** - Adversarial research tool with red-team validation, plus suite documentation (completed 2026-04-03)
 - [x] **Phase 8: Fix Greenfield Routing** - Close routing ambiguity for Gate 0 `[-]` state on second `/project` invocation (completed 2026-04-03)
 - [x] **Phase 9: Nyquist Compliance** - Complete Wave 0 test strategy for all 7 phases (completed 2026-04-04)
-- [ ] **Phase 10: Tech Debt Sweep** - Fix 4 low-severity documentation and attribution issues
+- [x] **Phase 10: Tech Debt Sweep** - Fix 4 low-severity documentation and attribution issues (completed 2026-04-04)
 - [ ] **Phase 11: Gate 3 Closure Pathway** - Resolve structural contradiction between PROJ-10 read-only rule and D-05 Gate 3 closure design
 
 ## Phase Details
@@ -182,10 +182,10 @@ Plans:
   2. `docs/SKILLS.md` consuming instructions list `cp` commands consistently for all skills (not just milestone/plan/spike)
   3. `/project` SKILL.md STATE-04 attribution accurately reflects which skill writes both files
   4. `04-03-SUMMARY.md` has `requirements-completed` frontmatter matching MIL requirements covered
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 10-01-PLAN.md — Fix ROADMAP.md stale checkboxes, SKILLS.md cp consistency, SKILL.md STATE-04 attribution, 04-03-SUMMARY.md frontmatter
+- [x] 10-01-PLAN.md — Fix ROADMAP.md stale checkboxes, SKILLS.md cp consistency, SKILL.md STATE-04 attribution, 04-03-SUMMARY.md frontmatter
 
 ### Phase 11: Gate 3 Closure Pathway
 **Goal**: Resolve the structural contradiction between PROJ-10 (read-only after bootstrap) and D-05 (offer to close Gate 3) — either implement closure or explicitly document the constraint
@@ -213,5 +213,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 7. /spike + Docs | 3/3 | Complete | 2026-04-03 |
 | 8. Fix Greenfield Routing | 1/1 | Complete   | 2026-04-03 |
 | 9. Nyquist Compliance | 4/4 | Complete   | 2026-04-04 |
-| 10. Tech Debt Sweep | 0/0 | Not started | - |
+| 10. Tech Debt Sweep | 1/1 | Complete   | 2026-04-04 |
 | 11. Gate 3 Closure Pathway | 0/0 | Not started | - |
