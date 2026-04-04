@@ -23,6 +23,7 @@ Every phase transition requires explicit human approval, preventing AI drift fro
 - [x] `/spike` skill — agent-based technical research with red-team validation, produces `docs/spikes/<topic>.md` — *Validated in Phase 7: spike-docs*
 - [x] Documentation — skill catalog entries and detail docs for all 7 skills (project, define, design, milestone, plan, build, spike) — *Validated in Phase 7: spike-docs*
 - [x] Greenfield routing fix — Gate 0 `[-]` (skipped) treated as equivalent to `[x]` (approved) for all downstream routing; `/project` Step 5 now fires Gate WB offer for greenfield projects on second invocation — *Validated in Phase 8: greenfield-routing*
+- [x] Gate 3 closure pathway — `/project` Step 5 offers `AskUserQuestion` to close Gate 3 when all milestones are `[x]` but Gate 3 is `[~] In progress`; sentinel path guard prevents spurious PROJ-04 warnings; PROJ-10 read-only rule narrowed across all 3 locations — *Validated in Phase 11: gate3-closure*
 
 ### Active
 - [ ] Two-tier state files — project-level `progress.txt` (gate approvals, milestone summaries, spike entries) and milestone-level `milestone-status.txt` (feature details, sub-feature checklists)
@@ -66,7 +67,7 @@ A codebase map exists at `.planning/codebase/`. Key existing patterns: skills ar
 | Test command planned in `/plan`, executed in `/build` (DD-12) | Skill invokes command, user manages test content — decouples from any specific test framework | — Pending |
 
 ---
-*Last updated: 2026-04-04 — Phase 10 (tech-debt-sweep) complete — closed 4 v1.0 audit doc/attribution issues: ROADMAP.md checkboxes, SKILLS.md cp block, STATE-04 attribution, 04-03-SUMMARY.md frontmatter*
+*Last updated: 2026-04-04 — Phase 11 (gate3-closure) complete — Gate 3 closure pathway implemented; PROJ-10 read-only rule narrowed across SKILL.md, DESIGN.md DD-3, and REQUIREMENTS.md; sentinel guard added for `(closed by /project)` sentinel paths*
 
 ## Evolution
 
