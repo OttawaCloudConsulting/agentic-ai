@@ -42,7 +42,7 @@ created: 2026-04-03
 | 06-01-02 | 01 | 1 | BUILD-05 | content | `grep -q 'codebase-assessment' skills/project/build/references/*.md` | ✅ | ⬜ pending |
 | 06-01-03 | 01 | 1 | BUILD-06 | content | `grep -q 'sub-feature' skills/project/build/references/*.md` | ✅ | ⬜ pending |
 | 06-02-01 | 02 | 2 | BUILD-02 | content | `grep -q 'disable-model-invocation' skills/project/build/SKILL.md` | ✅ | ⬜ pending |
-| 06-02-02 | 02 | 2 | BUILD-03 | content | `grep -q 'gate.*4.*approved' skills/project/build/SKILL.md` | ✅ | ⬜ pending |
+| 06-02-02 | 02 | 2 | BUILD-03 | content | `grep -q 'Gate 4-approved' skills/project/build/SKILL.md` | ✅ | ⬜ pending |
 | 06-02-03 | 02 | 2 | BUILD-04 | content | `grep -q 'milestone-status' skills/project/build/SKILL.md` | ✅ | ⬜ pending |
 | 06-02-04 | 02 | 2 | BUILD-07 | content | `grep -q 'deviation' skills/project/build/SKILL.md` | ✅ | ⬜ pending |
 | 06-02-05 | 02 | 2 | BUILD-08 | content | `grep -q 'test.*exit.*0\|test.*command' skills/project/build/SKILL.md` | ✅ | ⬜ pending |
