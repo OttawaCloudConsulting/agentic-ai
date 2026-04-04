@@ -182,7 +182,10 @@ Plans:
   2. `docs/SKILLS.md` consuming instructions list `cp` commands consistently for all skills (not just milestone/plan/spike)
   3. `/project` SKILL.md STATE-04 attribution accurately reflects which skill writes both files
   4. `04-03-SUMMARY.md` has `requirements-completed` frontmatter matching MIL requirements covered
-**Plans:** 0 plans
+**Plans:** 1 plan
+
+Plans:
+- [ ] 10-01-PLAN.md — Fix ROADMAP.md stale checkboxes, SKILLS.md cp consistency, SKILL.md STATE-04 attribution, 04-03-SUMMARY.md frontmatter
 
 ### Phase 11: Gate 3 Closure Pathway
 **Goal**: Resolve the structural contradiction between PROJ-10 (read-only after bootstrap) and D-05 (offer to close Gate 3) — either implement closure or explicitly document the constraint
