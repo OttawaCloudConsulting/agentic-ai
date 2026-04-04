@@ -41,7 +41,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Reference specifications (progress format, routing logic, status report format)
 - [x] 01-02-PLAN.md — SKILL.md main workflow file
-- [ ] 01-03-PLAN.md — Documentation (detail doc + catalog entry)
+- [x] 01-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 2: /define (Gates 0/WB/1)
 **Goal**: Users can run a single continuous session that produces codebase assessment, optional Working Backwards doc, and an approved PRD
@@ -107,7 +107,7 @@ Plans:
 
 Plans:
 - [x] 05-01-PLAN.md — Reference files and feature plan template (gate-4-plan, revision-mode, review-checklist-template, progress-format, feature-plan-template)
-- [ ] 05-02-PLAN.md — SKILL.md flow controller
+- [x] 05-02-PLAN.md — SKILL.md flow controller
 - [x] 05-03-PLAN.md — Documentation (detail doc + catalog entry)
 
 ### Phase 6: /build
