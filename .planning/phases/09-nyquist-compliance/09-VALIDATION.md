@@ -1,9 +1,9 @@
 ---
 phase: 9
 slug: nyquist-compliance
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-03
 ---
 
@@ -19,8 +19,8 @@ created: 2026-04-03
 |----------|-------|
 | **Framework** | bash grep (content assertions) |
 | **Config file** | none — no test framework needed |
-| **Quick run command** | `grep -q 'nyquist_compliant: true' .planning/phases/0{N}-*/*.md` |
-| **Full suite command** | `bash cicd/lint-markdown.sh -r .planning/phases/` |
+| **Quick run command** | `grep -rq 'nyquist_compliant: true' .planning/phases/` |
+| **Full suite command** | `bash scripts/lint-markdown.sh -r .planning/phases/` |
 | **Estimated runtime** | ~5 seconds |
 
 ---
@@ -38,13 +38,13 @@ created: 2026-04-03
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 9-01-01 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/01-project-router/01-VALIDATION.md && echo PASS` | ✅ | ⬜ pending |
-| 9-01-02 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/02-define-gates-0-wb-1/02-VALIDATION.md && echo PASS` | ✅ | ⬜ pending |
-| 9-01-03 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/03-design-gate-2/03-VALIDATION.md && echo PASS` | ✅ | ⬜ pending |
-| 9-01-04 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/04-milestone-gate-3/04-VALIDATION.md && echo PASS` | ✅ | ⬜ pending |
-| 9-01-05 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/05-plan-gate-4/05-VALIDATION.md && echo PASS` | ✅ | ⬜ pending |
-| 9-01-06 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/06-build/06-VALIDATION.md && echo PASS` | ✅ | ⬜ pending |
-| 9-01-07 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/07-spike-docs/07-VALIDATION.md && echo PASS` | ✅ | ⬜ pending |
+| 9-01-01 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/01-project-router/01-VALIDATION.md && echo PASS` | ✅ | ✅ green |
+| 9-01-02 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/02-define-gates-0-wb-1/02-VALIDATION.md && echo PASS` | ✅ | ✅ green |
+| 9-01-03 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/03-design-gate-2/03-VALIDATION.md && echo PASS` | ✅ | ✅ green |
+| 9-01-04 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/04-milestone-gate-3/04-VALIDATION.md && echo PASS` | ✅ | ✅ green |
+| 9-01-05 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/05-plan-gate-4/05-VALIDATION.md && echo PASS` | ✅ | ✅ green |
+| 9-01-06 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/06-build/06-VALIDATION.md && echo PASS` | ✅ | ✅ green |
+| 9-01-07 | 01 | 1 | tech-debt | content | `grep -q 'wave_0_complete: true' .planning/phases/07-spike-docs/07-VALIDATION.md && echo PASS` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -66,11 +66,11 @@ Existing infrastructure covers all phase requirements. No test framework needed 
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-04-03
