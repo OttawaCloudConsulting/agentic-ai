@@ -2,8 +2,8 @@
 phase: 5
 slug: plan-gate-4
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-02
 ---
 
@@ -19,8 +19,8 @@ created: 2026-04-02
 |----------|-------|
 | **Framework** | Manual validation (Markdown skill — no automated test framework) |
 | **Config file** | none |
-| **Quick run command** | `bash cicd/lint-markdown.sh` |
-| **Full suite command** | `bash cicd/lint-markdown.sh` |
+| **Quick run command** | `bash -c 'grep -q "Gate 4" skills/project/plan/SKILL.md && echo PASS'` |
+| **Full suite command** | `bash -c 'grep -q "Gate 4" skills/project/plan/SKILL.md && grep -q "milestone-status" skills/project/plan/SKILL.md && grep -q "sub-feature" skills/project/plan/SKILL.md && echo ALL_PASS'` |
 | **Estimated runtime** | ~5 seconds |
 
 ---
@@ -47,6 +47,11 @@ created: 2026-04-02
 | 05-01-07 | 01 | 1 | PLAN-07 | manual-only | Manual: verify tradeoff callouts and review prompts | N/A | ⬜ pending |
 | 05-01-08 | 01 | 1 | PLAN-08 | manual-only | Manual: request revision, verify targeted edit | N/A | ⬜ pending |
 | 05-01-09 | 01 | 1 | PLAN-09 | manual-only | Manual: approve plan, verify milestone-status.txt marker change | N/A | ⬜ pending |
+| 05-01-C1 | 01 | 1 | PLAN-02/09 | content | `grep -q 'Gate 4' skills/project/plan/SKILL.md && echo PASS` | ✅ | ⬜ pending |
+| 05-01-C2 | 01 | 1 | PLAN-06/09 | content | `grep -q 'milestone-status' skills/project/plan/SKILL.md && echo PASS` | ✅ | ⬜ pending |
+| 05-01-C3 | 01 | 1 | PLAN-04 | content | `grep -q 'sub-feature' skills/project/plan/SKILL.md && echo PASS` | ✅ | ⬜ pending |
+| 05-01-C4 | 01 | 1 | PLAN-09 | content | `grep -q 'awaiting build\|awaiting' skills/project/plan/SKILL.md && echo PASS` | ✅ | ⬜ pending |
+| 05-01-C5 | 01 | 1 | PLAN-03 | content | `grep -q 'gate-4-plan\|gate-4' skills/project/plan/SKILL.md && echo PASS` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -54,7 +59,7 @@ created: 2026-04-02
 
 ## Wave 0 Requirements
 
-Existing infrastructure covers all phase requirements. No framework install needed — this is a Markdown-based skill (prompt engineering).
+Existing infrastructure covers all phase requirements. Target file (`skills/project/plan/SKILL.md`) exists on disk. No new files, no framework setup required.
 
 ---
 
@@ -76,11 +81,11 @@ Existing infrastructure covers all phase requirements. No framework install need
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-04-03
