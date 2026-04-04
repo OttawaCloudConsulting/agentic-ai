@@ -18,8 +18,8 @@ skill on every subsequent invocation. Read-only after bootstrap.
 - **Read fresh every time.** Read all state files from disk on every invocation -- never
   rely on conversation memory or cached values (STATE-03).
 - **Read-only after bootstrap.** After the initial `progress.txt` creation, `/project`
-  never modifies `progress.txt` or any other file (PROJ-10). Bootstrap (Step 2) is the
-  sole exception.
+  never modifies `progress.txt` or any other file (PROJ-10) -- two exceptions exist:
+  bootstrap (Step 2) and Gate 3 closure (Step 5, when all milestones are complete).
 - **Route, never dispatch.** Tell the user which skill to run next via plain-language
   instruction. Never auto-invoke or auto-dispatch another skill (DD-2).
 - **Write-ordering contract for downstream skills.** When both `milestone-status.txt` and
@@ -134,6 +134,27 @@ outcome is unclear -- offer Gate WB using `AskUserQuestion` with options:
 - **Defer** -- record Gate WB as Pending for later decision
 
 Include a 2-3 sentence explanation of the Working Backwards value proposition.
+
+**Gate 3 closure offer (D-01 through D-05, PROJ-10):** If all milestones in `progress.txt`
+are `[x]` complete AND Gate 3 is still `[~] In progress` -- offer Gate 3 closure using
+`AskUserQuestion` with options:
+
+- **Close Gate 3** -- write `[x] Gate 3: Milestone Review  Approved: <YYYY-MM-DD>  (closed by /project)`
+  to `progress.txt` (replacing the `[~] In progress` line), where `<YYYY-MM-DD>` is today's date.
+  Then continue to routing (the "All milestones complete" row will show "Project complete").
+- **Leave open** -- skip the write. Continue to normal routing (the "All milestones complete"
+  row will still show "Project complete").
+
+Show a 1-line explanation before the prompt: "Gate 3 tracks milestone planning. Closing it
+marks the milestone review phase officially complete."
+
+After `AskUserQuestion` resolves (regardless of which option the user chose), continue to
+normal routing table evaluation.
+
+If the user chose **Close Gate 3**: use the Write tool to update the Gate 3 line in
+`progress.txt`. Read the file first, replace `[~] Gate 3: Milestone Review             In progress`
+with `[x] Gate 3: Milestone Review  Approved: <YYYY-MM-DD>  (closed by /project)`. Read the
+file back and confirm the update was applied correctly before proceeding to routing.
 
 ## Error Handling
 
