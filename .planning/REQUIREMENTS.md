@@ -18,7 +18,7 @@
 - [x] **PROJ-07**: `/project` detects Gate WB `Pending` state on invocation and re-prompts user for a decision before reporting any further status
 - [x] **PROJ-08**: `/project` routes to `/define` in revision mode when user signals project-level goals have changed
 - [x] **PROJ-09**: `/project` routes to `/milestone` in revision mode when user initiates milestone re-planning
-- [x] **PROJ-10**: `/project` remains strictly read-only after bootstrap — never modifies state files in normal operation
+- [x] **PROJ-10**: `/project` remains strictly read-only after bootstrap — never modifies state files in normal operation (Bootstrap and Gate 3 closure are the two exceptions)
 
 ### Define (`/define`)
 

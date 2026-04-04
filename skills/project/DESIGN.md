@@ -102,6 +102,10 @@ Project state is split across two levels:
 files are created by `/milestone` when milestones are defined. This bootstrap is the only case where
 `/project` writes to disk. After bootstrap, `/project` is strictly read-only.
 
+**Gate 3 closure exception:** When all milestones are `[x]` complete and Gate 3 remains
+`[~] In progress`, `/project` offers closure via `AskUserQuestion`. This is the only
+post-bootstrap write `/project` performs.
+
 **Artifact validation:** When reading `progress.txt`, `/project` checks that artifact paths
 listed alongside approved gates exist on disk. If a gate is marked approved but its artifact
 file is missing, `/project` warns the user but does not block — the user decides whether to
