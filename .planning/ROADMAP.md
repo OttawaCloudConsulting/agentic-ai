@@ -165,7 +165,7 @@ Plans:
   1. All 7 phase VALIDATION.md files have `wave_0_complete: true` and `nyquist_compliant: true`
   2. Each phase has a defined test strategy covering its core observable behaviors
   3. Wave 0 tests run and pass for all 7 phases
-**Plans:** 3/3 plans complete
+**Plans:** 4/4 plans complete
 
 Plans:
 - [x] 09-01-PLAN.md — Upgrade phases 1–3 VALIDATION.md files (add grep content checks, update frontmatter, sign off)
@@ -209,6 +209,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 6. /build | 3/3 | Complete | 2026-04-03 |
 | 7. /spike + Docs | 3/3 | Complete | 2026-04-03 |
 | 8. Fix Greenfield Routing | 1/1 | Complete   | 2026-04-03 |
-| 9. Nyquist Compliance | 3/3 | Complete   | 2026-04-04 |
+| 9. Nyquist Compliance | 4/4 | Complete   | 2026-04-04 |
 | 10. Tech Debt Sweep | 0/0 | Not started | - |
 | 11. Gate 3 Closure Pathway | 0/0 | Not started | - |
