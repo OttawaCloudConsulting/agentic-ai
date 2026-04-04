@@ -21,6 +21,7 @@ The state-to-action table below covers every reachable project state. The skill 
 | Feature planned (`[~]` planned, awaiting build) | Run `/build` for planned feature | `/plan` (next feature), `/spike` |
 | Feature in progress (sub-features partially complete) | Run `/build` to continue feature | `/spike` |
 | All features complete in active milestone, more milestones to define | Run `/milestone` for next milestone | `/design` (refresh) |
+| All milestones `[x]` complete, Gate 3 still `[~] In progress` | Offer Gate 3 closure via `AskUserQuestion` (per D-01–D-05) | -- |
 | All milestones complete | Project complete -- celebrate | `/design` (refresh) |
 | User says "goals changed" / "revise PRD" / similar | Run `/define` in revision mode (per D-05, PROJ-08) | -- |
 | User says "re-plan" / "revise milestone" / similar | Run `/milestone` in revision mode (per D-05, PROJ-09) | -- |
@@ -97,8 +98,9 @@ Per PROJ-04 and DESIGN.md DD-3, `/project` validates that artifacts referenced b
 **Process:**
 
 1. For each gate marked `[x]` in `progress.txt`, extract the artifact path from the gate entry line (the path following the date).
-2. Check if the file exists on disk at the extracted path.
-3. If the file is missing, emit an inline warning (per D-06) directly after the gate entry in the status report:
+2. **Sentinel path check:** If the extracted path begins with `(` (e.g., `(closed by /project)`), skip the file-existence check -- this is a sentinel value indicating no physical artifact exists. No warning is emitted for sentinel paths.
+3. Check if the file exists on disk at the extracted path.
+4. If the file is missing, emit an inline warning (per D-06) directly after the gate entry in the status report:
 
 ```
 [x] Gate 1: Scope Review          Approved: 2026-03-16  prd.md
