@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: Fix Greenfield Routing** - Close routing ambiguity for Gate 0 `[-]` state on second `/project` invocation (completed 2026-04-03)
 - [x] **Phase 9: Nyquist Compliance** - Complete Wave 0 test strategy for all 7 phases (completed 2026-04-04)
 - [x] **Phase 10: Tech Debt Sweep** - Fix 4 low-severity documentation and attribution issues (completed 2026-04-04)
-- [ ] **Phase 11: Gate 3 Closure Pathway** - Resolve structural contradiction between PROJ-10 read-only rule and D-05 Gate 3 closure design
+- [x] **Phase 11: Gate 3 Closure Pathway** - Resolve structural contradiction between PROJ-10 read-only rule and D-05 Gate 3 closure design (completed 2026-04-04)
 
 ## Phase Details
 
@@ -195,10 +195,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Either: Gate 3 closure pathway is implemented in `/project` SKILL.md with PROJ-10 updated to allow this specific write; OR: D-05 design decision is explicitly updated to acknowledge the read-only constraint makes automated closure impractical
   2. Gate 3 status on a fully-completed project is accurate, or the permanent `[~] In progress` display is explicitly documented as a known design limitation
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 11-01-PLAN.md — Gate 3 closure: SKILL.md offer branch, routing row, DESIGN.md DD-3, REQUIREMENTS.md PROJ-10
+- [x] 11-01-PLAN.md — Gate 3 closure: SKILL.md offer branch, routing row, DESIGN.md DD-3, REQUIREMENTS.md PROJ-10
 
 ## Progress
 
@@ -217,4 +217,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 8. Fix Greenfield Routing | 1/1 | Complete   | 2026-04-03 |
 | 9. Nyquist Compliance | 4/4 | Complete   | 2026-04-04 |
 | 10. Tech Debt Sweep | 1/1 | Complete    | 2026-04-04 |
-| 11. Gate 3 Closure Pathway | 0/1 | In progress | - |
+| 11. Gate 3 Closure Pathway | 1/1 | Complete   | 2026-04-04 |
