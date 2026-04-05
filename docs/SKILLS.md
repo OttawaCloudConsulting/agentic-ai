@@ -14,8 +14,15 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | NIST FedRAMP Assessment | `/nist-fedramp-assessment` | NIST SP 800-53 Rev 5 / FedRAMP Moderate compliance assessment for US cloud workloads with dual inheritance model and FedRAMP ATO readiness | [View](skills/nist-fedramp-assessment.md) |
 | NIST CSF Assessment | `/nist-csf-assessment` | NIST CSF 2.0 outcome-based assessment across all 6 Functions with platform-agnostic evidence mapping, 800-53 informative references, and self-updating Phase 0 that always validates against the latest published CSF version | [View](skills/nist-csf-assessment.md) |
 | Create PRD | `/create-prd` | Guided interview to produce a PRD, architecture document, and progress file for a new project | [View](skills/create-prd.md) |
+| Define | `/define` | Single-session codebase assessment, optional Working Backwards, and PRD creation (Gates 0/WB/1) | [View](skills/define.md) |
+| Design | `/design` | Architecture and design specification from approved PRD, with refresh mode for deviation consolidation (Gate 2) | [View](skills/design.md) |
+| Milestone | `/milestone` | Per-milestone feature breakdown with acceptance criteria and revision support (Gate 3) | [View](skills/milestone.md) |
+| Plan | `/plan` | Per-feature implementation plan with sub-feature sizing and test commands (Gate 4) | [View](skills/plan.md) |
+| Build | `/build` | Sub-feature implementation from Gate 4-approved plans with test gating and deviation tracking | [View](skills/build.md) |
+| Spike | `/spike` | Adversarial technical research with red-team validation and follow-up support | [View](skills/spike.md) |
 | OCC Skill Creator | `/occ-skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/occ-skill-creator.md) |
 | OCC Skill Refactor | `/occ-skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/occ-skill-refactor.md) |
+| Project | `/project` | Project orchestrator -- bootstraps state, reports status, routes to next skill | [View](skills/project.md) |
 | Rule Creator | `/rule-creator` | Interactive rule generation with documentation and catalog updates | [View](skills/rule-creator.md) |
 
 ## How Skills Work
@@ -65,8 +72,15 @@ cp -r skills/itsg-assessment/           <target-repo>/.claude/skills/itsg-assess
 cp -r skills/nist-fedramp-assessment/   <target-repo>/.claude/skills/nist-fedramp-assessment/
 cp -r skills/nist-csf-assessment/       <target-repo>/.claude/skills/nist-csf-assessment/
 cp -r skills/create-prd/                <target-repo>/.claude/skills/create-prd/
+cp -r skills/project/milestone/          <target-repo>/.claude/skills/project/milestone/
+cp -r skills/project/plan/                <target-repo>/.claude/skills/project/plan/
+cp -r skills/project/spike/               <target-repo>/.claude/skills/project/spike/
+cp -r skills/project/define/              <target-repo>/.claude/skills/project/define/
+cp -r skills/project/design/              <target-repo>/.claude/skills/project/design/
+cp -r skills/project/build/               <target-repo>/.claude/skills/project/build/
 cp -r skills/occ-skill-creator/         <target-repo>/.claude/skills/occ-skill-creator/
 cp -r skills/occ-skill-refactor/        <target-repo>/.claude/skills/occ-skill-refactor/
+cp -r skills/project/                   <target-repo>/.claude/skills/project/
 cp -r skills/rule-creator/              <target-repo>/.claude/skills/rule-creator/
 ```
 

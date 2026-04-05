@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-03T17:20:17.056Z",
+  "phase": "07",
+  "phase_name": "spike-docs",
+  "phase_dir": ".planning/phases/07-spike-docs",
+  "plan": 2,
+  "task": 1,
+  "total_tasks": 5,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "07-01-T1", "name": "Create research-agent.md and redteam-agent.md", "status": "done", "commit": "043beb9"},
+    {"id": "07-01-T2", "name": "Create spike-format.md and progress-format.md", "status": "done", "commit": "1c14ba1"}
+  ],
+  "remaining_tasks": [
+    {"id": "07-02-T1", "name": "Create SKILL.md flow controller for /spike", "status": "not_started"},
+    {"id": "07-03-T1", "name": "Create docs/skills/spike.md detail doc and SKILLS.md row", "status": "not_started"},
+    {"id": "07-03-T2", "name": "Audit all 7 skills for DOCS-01/02/03 compliance", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Sequential research then red-team agent flow", "rationale": "Ensures red-team has full context to challenge findings", "phase": "07"},
+    {"decision": "Final artifact only — no mid-flow user checkpoints", "rationale": "Fastest flow, minimal interaction", "phase": "07"},
+    {"decision": "Red-team has full tooling (web search, docs, codebase)", "rationale": "Credible adversarial review requires independent verification", "phase": "07"},
+    {"decision": "Fixed sections per SPIKE-03 with equal peer red-team section", "rationale": "Two perspectives never merged or suppressed", "phase": "07"}
+  ],
+  "uncommitted_files": ["skills/project/spike/SKILL.md"],
+  "next_action": "Run /gsd:execute-phase 7 to continue — Wave 1 (07-01) is complete, Waves 2 and 3 (07-02, 07-03) remain. A partial SKILL.md may exist in working tree from an interrupted worktree agent — discard it and let the executor recreate it cleanly.",
+  "context_notes": "Phase 7 discuss→plan→execute pipeline was auto-advanced. Context captured (assumptions mode recommended all defaults, user confirmed). Research complete. All 3 plans created and verified (10-dimension check passed). Wave 1 executed successfully via worktree agent. Wave 2 agent was rejected by user before it could start — no work done on 07-02 yet. The untracked skills/project/spike/SKILL.md in git status may be a partial artifact from the interrupted agent spawn — should be discarded."
+}
