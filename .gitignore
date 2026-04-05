@@ -1,1 +1,6 @@
 benchmark/runs/
+temp
+.claude
+.devcontainer
+.gemini
+.planning
