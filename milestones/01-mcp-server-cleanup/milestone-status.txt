@@ -1,5 +1,5 @@
 # Milestone 01: MCP Server Cleanup
-# Status: [~] in progress  3 features, 2 complete
+# Status: [x] complete  3 features, 3 complete
 
 ## Features
 
@@ -13,6 +13,7 @@
     Sub-features: 1/1 complete
     Completed: 2026-04-06
 
-[~] Feature 01.3: mcp/docs/ARCHITECTURE_AND_DESIGN.md Update
+[x] Feature 01.3: mcp/docs/ARCHITECTURE_AND_DESIGN.md Update
     Plan: milestones/01-mcp-server-cleanup/plans/mcp-docs-architecture-and-design-md-update.md
-    Sub-features: 0/1 complete
+    Sub-features: 1/1 complete
+    Completed: 2026-04-06

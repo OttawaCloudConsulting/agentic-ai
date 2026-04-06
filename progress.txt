@@ -12,7 +12,7 @@
 
 ## Milestones
 
-[~] Milestone 01: MCP Server Cleanup  milestones/01-mcp-server-cleanup/  2/3 features complete
+[x] Milestone 01: MCP Server Cleanup  milestones/01-mcp-server-cleanup/  3/3 features complete  Completed: 2026-04-06
 
 ## Spikes
 
