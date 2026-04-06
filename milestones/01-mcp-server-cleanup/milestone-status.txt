@@ -1,0 +1,18 @@
+# Milestone 01: MCP Server Cleanup
+# Status: [~] in progress  3 features, 2 complete
+
+## Features
+
+[x] Feature 01.1: install_mcp.sh Script Updates
+    Plan: milestones/01-mcp-server-cleanup/plans/install-mcp-sh-script-updates.md
+    Sub-features: 1/1 complete
+    Completed: 2026-04-06
+
+[x] Feature 01.2: mcp/README.md Update
+    Plan: milestones/01-mcp-server-cleanup/plans/mcp-readme-md-update.md
+    Sub-features: 1/1 complete
+    Completed: 2026-04-06
+
+[~] Feature 01.3: mcp/docs/ARCHITECTURE_AND_DESIGN.md Update
+    Plan: milestones/01-mcp-server-cleanup/plans/mcp-docs-architecture-and-design-md-update.md
+    Sub-features: 0/1 complete
