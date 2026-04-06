@@ -19,8 +19,8 @@ Pattern names are case-insensitive.
 |---------|---------|----------|
 | **AWS** | core, knowledge, docs, diagrams | Base AWS development |
 | **CDK** | iac (CDK + CloudFormation) | AWS CDK projects |
-| **TERRAFORM** | HashiCorp Terraform, AWS Terraform | Terraform IaC projects |
-| **DOCUMENTATION** | AWS docs, code doc gen, Context7 | Documentation lookup and generation |
+| **TERRAFORM** | HashiCorp Terraform | Terraform IaC projects |
+| **DOCUMENTATION** | AWS docs, Context7 | Documentation lookup and generation |
 | **ARCHITECTURE** | AWS diagrams, Mermaid | Architecture and design work |
 | **SECURITY** | Trivy, AWS Well-Architected security | Security scanning and compliance |
 | **KUBERNETES** | Red Hat kubernetes-mcp-server | General Kubernetes management |
@@ -33,6 +33,8 @@ Pattern names are case-insensitive.
 
 Patterns are composable. Overlapping servers are deduplicated automatically.
 
+> **Deprecated servers:** `awslabs-code-doc-gen-mcp-server` has been removed from all patterns. `awslabs-terraform-mcp-server` has been replaced by `terraform-mcp-server` (HashiCorp official). If you previously installed either server, remove it manually: `claude mcp remove awslabs-code-doc-gen-mcp-server` and/or `claude mcp remove awslabs-terraform-mcp-server`.
+>
 > **Context-window note:** NOTEBOOKLM registers 35 tools with Claude. Disable it when not actively using NotebookLM (`bash install_mcp.sh --remove NOTEBOOKLM`) to keep the tool list lean.
 >
 > **Authentication:** The installer runs `uv tool install notebooklm-mcp-cli --upgrade` automatically, which installs the `nlm` CLI into uv's tool bin directory. If `nlm` is not on your `PATH` after installing, run `uv tool update-shell` (or manually add the directory shown by `uv tool dir --bin` to your `PATH`) and restart your shell. Once `nlm` is available, run `nlm login` to authenticate before using the server.
@@ -65,7 +67,7 @@ The script checks for required tools before installing:
 | Tool | Required By | Install |
 |------|-------------|---------|
 | `claude` | All operations | [Claude Code CLI](https://claude.ai/claude-code) |
-| `uvx` | AWS, CDK, Terraform (AWS), Documentation, Security, Pricing, Serverless, NotebookLM | `pip install uv` |
+| `uv` / `uvx` | AWS, CDK, Documentation, Security, Pricing, Serverless, NotebookLM | `pip install uv` (provides both `uv` and `uvx`) |
 | `npx` | Documentation (Context7), Architecture (Mermaid), Kubernetes, Git, GitHub | Included with Node.js |
 | `docker` | Terraform (HashiCorp), Crossplane | [Docker Desktop](https://www.docker.com/products/docker-desktop/) |
 | `trivy` | Security (Trivy) | [Trivy install guide](https://aquasecurity.github.io/trivy/) |

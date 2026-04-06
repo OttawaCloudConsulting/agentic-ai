@@ -95,14 +95,11 @@ get_pattern_servers() {
       printf '%s\n' "awslabs-iac-mcp-server"
       ;;
     TERRAFORM)
-      printf '%s\n' \
-        "terraform-mcp-server" \
-        "awslabs-terraform-mcp-server"
+      printf '%s\n' "terraform-mcp-server"
       ;;
     DOCUMENTATION)
       printf '%s\n' \
         "awslabs-aws-documentation-mcp-server" \
-        "awslabs-code-doc-gen-mcp-server" \
         "context7"
       ;;
     ARCHITECTURE)
@@ -205,8 +202,6 @@ get_server_prereq() {
     awslabs-aws-documentation-mcp-server|\
     awslabs-diagram-mcp-server|\
     awslabs-iac-mcp-server|\
-    awslabs-terraform-mcp-server|\
-    awslabs-code-doc-gen-mcp-server|\
     awslabs-well-architected-security-mcp-server|\
     awslabs-aws-pricing-mcp-server|\
     awslabs-cost-analysis-mcp-server|\
@@ -258,12 +253,6 @@ get_server_install_cmd() {
       ;;
     terraform-mcp-server)
       printf '%s' "terraform-mcp-server -s project -- docker run -i --rm hashicorp/terraform-mcp-server"
-      ;;
-    awslabs-terraform-mcp-server)
-      printf '%s' "awslabs-terraform-mcp-server -s project -- uvx awslabs.terraform-mcp-server@latest"
-      ;;
-    awslabs-code-doc-gen-mcp-server)
-      printf '%s' "awslabs-code-doc-gen-mcp-server -s project -- uvx awslabs.code-doc-gen-mcp-server@latest"
       ;;
     context7)
       printf '%s' "context7 -s project -- npx -y @upstash/context7-mcp@latest"
@@ -340,8 +329,6 @@ get_server_description() {
     awslabs-diagram-mcp-server)                   printf '%s' "Architecture diagrams" ;;
     awslabs-iac-mcp-server)                       printf '%s' "CDK and CloudFormation" ;;
     terraform-mcp-server)                         printf '%s' "HashiCorp Terraform registry" ;;
-    awslabs-terraform-mcp-server)                 printf '%s' "AWS Terraform with Checkov" ;;
-    awslabs-code-doc-gen-mcp-server)              printf '%s' "Code documentation generation" ;;
     context7)                                     printf '%s' "Version-specific library docs" ;;
     mermaid-mcp)                                  printf '%s' "Mermaid diagram generation" ;;
     trivy-mcp)                                    printf '%s' "Vulnerability and IaC scanning" ;;
@@ -625,8 +612,8 @@ Options:
 Patterns:
   AWS            Base AWS development (core, knowledge, docs, diagrams)
   CDK            AWS CDK and CloudFormation
-  TERRAFORM      HashiCorp Terraform + AWS Terraform
-  DOCUMENTATION  AWS docs, code doc gen, Context7
+  TERRAFORM      HashiCorp Terraform
+  DOCUMENTATION  AWS docs, Context7
   ARCHITECTURE   AWS diagrams, Mermaid
   SECURITY       Trivy scanning, AWS Well-Architected security
   KUBERNETES     General Kubernetes management (Red Hat)

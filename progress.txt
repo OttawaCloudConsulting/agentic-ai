@@ -1,0 +1,19 @@
+# Progress: Deprecated MCP Servers
+# Created: 2026-04-04
+# Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
+
+## Gates
+
+[x] Gate 0: Codebase Alignment  Approved: 2026-04-04  docs/codebase-assessment.md
+[-] Gate WB: Working Backwards  Skipped
+[x] Gate 1: Scope Review  Approved: 2026-04-06  prd.md
+[x] Gate 2: Design Review  Approved: 2026-04-06  docs/ARCHITECTURE_AND_DESIGN.md
+[x] Gate 3: Milestone Review  Approved: 2026-04-06  (closed by /project)
+
+## Milestones
+
+[x] Milestone 01: MCP Server Cleanup  milestones/01-mcp-server-cleanup/  3/3 features complete  Completed: 2026-04-06
+
+## Spikes
+
+(none yet)
