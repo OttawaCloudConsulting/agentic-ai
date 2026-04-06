@@ -67,7 +67,7 @@ The script checks for required tools before installing:
 | Tool | Required By | Install |
 |------|-------------|---------|
 | `claude` | All operations | [Claude Code CLI](https://claude.ai/claude-code) |
-| `uvx` | AWS, CDK, Documentation, Security, Pricing, Serverless, NotebookLM | `pip install uv` |
+| `uv` / `uvx` | AWS, CDK, Documentation, Security, Pricing, Serverless, NotebookLM | `pip install uv` (provides both `uv` and `uvx`) |
 | `npx` | Documentation (Context7), Architecture (Mermaid), Kubernetes, Git, GitHub | Included with Node.js |
 | `docker` | Terraform (HashiCorp), Crossplane | [Docker Desktop](https://www.docker.com/products/docker-desktop/) |
 | `trivy` | Security (Trivy) | [Trivy install guide](https://aquasecurity.github.io/trivy/) |

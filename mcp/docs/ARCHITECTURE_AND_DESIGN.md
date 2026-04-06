@@ -135,49 +135,49 @@ Alternative approach: use a flat lookup via `case` statements. Preferred for sim
 
 | Server Name | Prereq | Transport | Install Command |
 |-------------|--------|-----------|-----------------|
-| awslabs.core-mcp-server | uvx | stdio | `claude mcp add awslabs.core-mcp-server -s project -e FASTMCP_LOG_LEVEL=warning -- uvx awslabs.core-mcp-server@latest` |
+| awslabs-core-mcp-server | uvx | stdio | `claude mcp add awslabs-core-mcp-server -s project -e FASTMCP_LOG_LEVEL=warning -- uvx awslabs.core-mcp-server@latest` |
 | aws-knowledge-mcp | none | http | `claude mcp add aws-knowledge-mcp -s project --transport http https://knowledge-mcp.global.api.aws` |
-| awslabs.aws-documentation-mcp-server | uvx | stdio | `claude mcp add awslabs.aws-documentation-mcp-server -s project -- uvx awslabs.aws-documentation-mcp-server@latest` |
-| awslabs.diagram-mcp-server | uvx | stdio | `claude mcp add awslabs.diagram-mcp-server -s project -- uvx awslabs.diagram-mcp-server@latest` |
-| awslabs.iac-mcp-server | uvx | stdio | `claude mcp add awslabs.iac-mcp-server -s project -- uvx awslabs.iac-mcp-server@latest` |
+| awslabs-aws-documentation-mcp-server | uvx | stdio | `claude mcp add awslabs-aws-documentation-mcp-server -s project -- uvx awslabs.aws-documentation-mcp-server@latest` |
+| awslabs-diagram-mcp-server | uvx | stdio | `claude mcp add awslabs-diagram-mcp-server -s project -- uvx awslabs.aws-diagram-mcp-server@latest` |
+| awslabs-iac-mcp-server | uvx | stdio | `claude mcp add awslabs-iac-mcp-server -s project -- uvx awslabs.iac-mcp-server@latest` |
 | terraform-mcp-server | docker | stdio | `claude mcp add terraform-mcp-server -s project -- docker run -i --rm hashicorp/terraform-mcp-server` |
 | context7 | npx | stdio | `claude mcp add context7 -s project -- npx -y @upstash/context7-mcp@latest` |
 | mermaid-mcp | npx | stdio | `claude mcp add mermaid-mcp -s project -- npx -y mcp-mermaid@latest` |
 | trivy-mcp | trivy | stdio | `trivy plugin install mcp && claude mcp add trivy-mcp -s project -- trivy mcp` |
-| awslabs.well-architected-security-mcp-server | uvx | stdio | `claude mcp add awslabs.well-architected-security-mcp-server -s project -- uvx awslabs.well-architected-security-mcp-server@latest` |
+| awslabs-well-architected-security-mcp-server | uvx | stdio | `claude mcp add awslabs-well-architected-security-mcp-server -s project -- uvx awslabs.well-architected-security-mcp-server@latest` |
 | kubernetes-mcp-server | npx | stdio | `claude mcp add kubernetes-mcp-server -s project -- npx kubernetes-mcp-server@latest` |
 | controlplane-mcp-server | docker | http-stream | `claude mcp add controlplane-mcp-server -s project --transport http -- docker run -i --rm xpkg.upbound.io/upbound/controlplane-mcp-server:v0.1.0` |
-| awslabs.aws-pricing-mcp-server | uvx | stdio | `claude mcp add awslabs.aws-pricing-mcp-server -s project -- uvx awslabs.aws-pricing-mcp-server@latest` |
-| awslabs.cost-analysis-mcp-server | uvx | stdio | `claude mcp add awslabs.cost-analysis-mcp-server -s project -- uvx awslabs.cost-analysis-mcp-server@latest` |
+| awslabs-aws-pricing-mcp-server | uvx | stdio | `claude mcp add awslabs-aws-pricing-mcp-server -s project -- uvx awslabs.aws-pricing-mcp-server@latest` |
+| awslabs-cost-analysis-mcp-server | uvx | stdio | `claude mcp add awslabs-cost-analysis-mcp-server -s project -- uvx awslabs.cost-analysis-mcp-server@latest` |
 | mcp-server-git | npx | stdio | `claude mcp add mcp-server-git -s project -- npx -y @modelcontextprotocol/server-git@latest` |
 | github-mcp-server | npx | stdio | `claude mcp add github-mcp-server -s project -- npx -y @github/mcp-server@latest` |
-| awslabs.serverless-mcp-server | uvx | stdio | `claude mcp add awslabs.serverless-mcp-server -s project -- uvx awslabs.serverless-mcp-server@latest` |
-| notebooklm-mcp | uvx | stdio | `claude mcp add notebooklm-mcp -s project -- uvx --from notebooklm-mcp-cli@latest notebooklm-mcp` |
+| awslabs-serverless-mcp-server | uvx | stdio | `claude mcp add awslabs-serverless-mcp-server -s project -- uvx awslabs.serverless-mcp-server@latest` |
+| notebooklm-mcp | uv | stdio | `claude mcp add notebooklm-mcp -s project -- uvx --from notebooklm-mcp-cli@latest notebooklm-mcp` |
 
 ### Pattern → Server Mapping
 
 | Pattern | Servers (by name) |
 |---------|-------------------|
-| AWS | awslabs.core-mcp-server, aws-knowledge-mcp, awslabs.aws-documentation-mcp-server, awslabs.diagram-mcp-server |
-| CDK | awslabs.iac-mcp-server |
+| AWS | awslabs-core-mcp-server, aws-knowledge-mcp, awslabs-aws-documentation-mcp-server, awslabs-diagram-mcp-server |
+| CDK | awslabs-iac-mcp-server |
 | TERRAFORM | terraform-mcp-server |
-| DOCUMENTATION | awslabs.aws-documentation-mcp-server, context7 |
-| ARCHITECTURE | awslabs.diagram-mcp-server, mermaid-mcp |
-| SECURITY | trivy-mcp, awslabs.well-architected-security-mcp-server |
+| DOCUMENTATION | awslabs-aws-documentation-mcp-server, context7 |
+| ARCHITECTURE | awslabs-diagram-mcp-server, mermaid-mcp |
+| SECURITY | trivy-mcp, awslabs-well-architected-security-mcp-server |
 | KUBERNETES | kubernetes-mcp-server |
 | CROSSPLANE | controlplane-mcp-server |
-| PRICING | awslabs.aws-pricing-mcp-server, awslabs.cost-analysis-mcp-server |
+| PRICING | awslabs-aws-pricing-mcp-server, awslabs-cost-analysis-mcp-server |
 | GIT | mcp-server-git |
 | GITHUB | github-mcp-server, mcp-server-git |
-| SERVERLESS | awslabs.serverless-mcp-server |
+| SERVERLESS | awslabs-serverless-mcp-server |
 | NOTEBOOKLM | notebooklm-mcp |
 
 ### Overlap Matrix (servers shared across patterns)
 
 | Server | Patterns |
 |--------|----------|
-| awslabs.aws-documentation-mcp-server | AWS, DOCUMENTATION |
-| awslabs.diagram-mcp-server | AWS, ARCHITECTURE |
+| awslabs-aws-documentation-mcp-server | AWS, DOCUMENTATION |
+| awslabs-diagram-mcp-server | AWS, ARCHITECTURE |
 | mcp-server-git | GIT, GITHUB |
 
 These overlaps are handled by deduplication during resolution.
