@@ -141,8 +141,6 @@ Alternative approach: use a flat lookup via `case` statements. Preferred for sim
 | awslabs.diagram-mcp-server | uvx | stdio | `claude mcp add awslabs.diagram-mcp-server -s project -- uvx awslabs.diagram-mcp-server@latest` |
 | awslabs.iac-mcp-server | uvx | stdio | `claude mcp add awslabs.iac-mcp-server -s project -- uvx awslabs.iac-mcp-server@latest` |
 | terraform-mcp-server | docker | stdio | `claude mcp add terraform-mcp-server -s project -- docker run -i --rm hashicorp/terraform-mcp-server` |
-| awslabs.terraform-mcp-server | uvx | stdio | `claude mcp add awslabs.terraform-mcp-server -s project -- uvx awslabs.terraform-mcp-server@latest` |
-| awslabs.code-doc-gen-mcp-server | uvx | stdio | `claude mcp add awslabs.code-doc-gen-mcp-server -s project -- uvx awslabs.code-doc-gen-mcp-server@latest` |
 | context7 | npx | stdio | `claude mcp add context7 -s project -- npx -y @upstash/context7-mcp@latest` |
 | mermaid-mcp | npx | stdio | `claude mcp add mermaid-mcp -s project -- npx -y mcp-mermaid@latest` |
 | trivy-mcp | trivy | stdio | `trivy plugin install mcp && claude mcp add trivy-mcp -s project -- trivy mcp` |
@@ -162,8 +160,8 @@ Alternative approach: use a flat lookup via `case` statements. Preferred for sim
 |---------|-------------------|
 | AWS | awslabs.core-mcp-server, aws-knowledge-mcp, awslabs.aws-documentation-mcp-server, awslabs.diagram-mcp-server |
 | CDK | awslabs.iac-mcp-server |
-| TERRAFORM | terraform-mcp-server, awslabs.terraform-mcp-server |
-| DOCUMENTATION | awslabs.aws-documentation-mcp-server, awslabs.code-doc-gen-mcp-server, context7 |
+| TERRAFORM | terraform-mcp-server |
+| DOCUMENTATION | awslabs.aws-documentation-mcp-server, context7 |
 | ARCHITECTURE | awslabs.diagram-mcp-server, mermaid-mcp |
 | SECURITY | trivy-mcp, awslabs.well-architected-security-mcp-server |
 | KUBERNETES | kubernetes-mcp-server |
@@ -271,8 +269,8 @@ Summary: 2 removed
 Available Patterns:
   AWS            (4 servers)  Base AWS development
   CDK            (1 server)   AWS CDK projects
-  TERRAFORM      (2 servers)  Terraform IaC projects
-  DOCUMENTATION  (3 servers)  Documentation lookup and generation
+  TERRAFORM      (1 server)   Terraform IaC projects
+  DOCUMENTATION  (2 servers)  Documentation lookup and generation
   ARCHITECTURE   (2 servers)  Architecture and design work
   SECURITY       (2 servers)  Security scanning and compliance
   KUBERNETES     (1 server)   General Kubernetes management
