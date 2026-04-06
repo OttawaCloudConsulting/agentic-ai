@@ -31,13 +31,17 @@ Architecture and design specification skill that produces `docs/ARCHITECTURE_AND
 On invocation, `/design` reads `progress.txt` and determines entry mode:
 
 - **Gate 1 not approved:** Declines with prerequisite message (run `/define` first)
-- **Gate 2 not approved:** Normal mode -- proceeds to architecture generation
+- **Gate 2 not approved:** Normal mode -- proceeds to architecture generation (integrates into existing doc if one is found, or creates from scratch)
 - **Gate 2 approved + architecture doc exists + refresh intent:** Refresh mode
 - **Gate 2 approved + no refresh intent:** Offers Refresh or Status check
 
 ### 2. Architecture Generation (Normal Mode)
 
-Reads `prd.md` and `docs/codebase-assessment.md` (if exists). Spawns an architecture sub-agent to scan 15-30 files focusing on component boundaries, data flow patterns, interface contracts, and technology choices. Synthesizes findings into `docs/ARCHITECTURE_AND_DESIGN.md` with 6 sections: Design Decisions (numbered table), Component Inventory, Data Flow, File Organization, Deployment & Operations, Security Considerations. Always spawns the agent, even on greenfield projects.
+Reads `prd.md` and `docs/codebase-assessment.md` (if exists). Spawns an architecture sub-agent to scan 15-30 files focusing on component boundaries, data flow patterns, interface contracts, and technology choices. Always spawns the agent, even on greenfield projects.
+
+**If `docs/ARCHITECTURE_AND_DESIGN.md` does not exist:** Creates the document from scratch using the template with 6 sections: Design Decisions (numbered table), Component Inventory, Data Flow, File Organization, Deployment & Operations, Security Considerations.
+
+**If `docs/ARCHITECTURE_AND_DESIGN.md` already exists:** Treats the existing document as authoritative and integrates new content into it. Preserves all existing entries, adds new design decisions and components identified from the PRD and scan, and uses the Edit tool (not Write) to avoid overwriting prior content. Contradictions with the current PRD are surfaced as tradeoff callouts for user review.
 
 ### 3. Design Review
 
