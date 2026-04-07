@@ -71,3 +71,4 @@ The orchestrator grants this agent the following tools:
 - `Read` — read artifact and related files
 - `Glob` — find files by pattern
 - `Grep` — search file contents
+- `Write` — write findings file to output directory

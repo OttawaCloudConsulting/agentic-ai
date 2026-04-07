@@ -66,4 +66,5 @@ The orchestrator grants this agent the following tools:
 - `Read` — read artifact and related files
 - `Glob` — find files by pattern
 - `Grep` — search file contents
+- `Write` — write findings file to output directory
 - `Bash` — run commands for verification of security claims (e.g., dependency checks)

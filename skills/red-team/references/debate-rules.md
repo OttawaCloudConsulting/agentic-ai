@@ -109,7 +109,10 @@ After debate, each finding carries a Status label:
 - **Contested:** Both sides have specific, valid evidence. The red-team acknowledges
   the defense has merit but maintains the finding based on their evidence.
 
-A finding that receives no rebuttal (green-team accepted it) is marked **Sustained**.
+A finding that is explicitly accepted by the green-team (ACCEPT response with reasoning)
+is marked **Sustained** with the Defense field recording the acceptance reason. A finding
+that receives no rebuttal due to agent failure or timeout is also marked **Sustained**
+with the Defense field set to "No rebuttal received (agent failure or timeout)."
 
 ## Updated Findings Format
 

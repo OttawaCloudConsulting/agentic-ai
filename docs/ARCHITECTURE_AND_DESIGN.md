@@ -90,9 +90,9 @@ docs/red-team/{slug}-{nn}/
 No separate access control. The skill runs within the user's Claude Code session with the user's existing permissions. Sub-agents inherit the session's tool access, scoped by the orchestrator:
 
 - **Configurable per-agent tool access:** The orchestrator assigns tools based on lens type and artifact. For example:
-  - Security agent: `Read`, `Glob`, `Grep`, `Bash` (for verification of security claims)
-  - Assumptions agent: `Read`, `Glob`, `Grep` (read-only, focused on document analysis)
-  - Design agent: `Read`, `Glob`, `Grep` (read-only, focused on structural analysis)
+  - Security agent: `Read`, `Glob`, `Grep`, `Write`, `Bash` (`Write` for findings; `Bash` for security verification)
+  - Assumptions agent: `Read`, `Glob`, `Grep`, `Write` (`Write` for findings files)
+  - Design agent: `Read`, `Glob`, `Grep`, `Write` (`Write` for findings files)
 
 ### Audit and Logging
 
@@ -169,7 +169,7 @@ docs/red-team/{slug}-{nn}/
 | 8 | Active filtering in synthesis (not preserve-all) | Reduces noise. Weak findings (low evidence, speculative) downgraded or omitted with note. Keeps consolidated report actionable. |
 | 9 | Mandatory approval gate at 5+ agents | Cost-awareness checkpoint. Even with `--auto`, spawning 5+ parallel agents requires user confirmation. |
 | 10 | Configurable per-agent tool access | Orchestrator assigns tools based on lens type. Security agents may need Bash for verification; analysis-focused agents are read-only. Balances capability with least-privilege. |
-| 11 | Opus preferred for sub-agents, graceful Sonnet degradation | Adversarial review benefits from Opus depth. Skill warns if lesser model detected but proceeds. |
+| 11 | Opus preferred for sub-agents | Adversarial review benefits from Opus depth. The `model: "opus"` setting is a preference hint to Claude Code; if Opus is unavailable, the best available model is used automatically. No explicit fallback logic needed. |
 | 12 | Smart chunking for large artifacts | Orchestrator segments large files by logical boundaries (headings, functions, classes). Each agent gets relevant sections + full-artifact summary. Prevents context overflow. |
 | 13 | Markdown-only output format | Simplicity. Reports are human-readable and version-controllable. No JSON or other machine-readable formats. |
 | 14 | Confirmation bias prevention via 5 structural safeguards | Adversarial instruction, isolated contexts, structured output, quantified effort, multi-perspective lenses. These are architectural constraints, not optional guidelines. |
@@ -198,7 +198,7 @@ Phase 3 Debate Flow:
 3. Debate round(s):
    → Green-team presents rebuttals to red-team agents
    → Red-team agents evaluate rebuttals against their evidence
-   → Red-team agents update findings: mark as Sustained, Modified, or Withdrawn
+   → Red-team agents update findings: mark as Sustained, Rebutted, or Contested
    → If --rounds > 1: additional debate iterations
 
 4. Red-team agents write final updated findings files

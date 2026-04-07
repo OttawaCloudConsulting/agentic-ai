@@ -108,6 +108,7 @@ INSTRUCTIONS:
 - Read — read artifact and related files
 - Glob — find files by pattern
 - Grep — search file contents
+- Write — write findings file to output directory
 ```
 
 The `{lens}` and `{Lens}` placeholders are replaced with the lowercase and title-case

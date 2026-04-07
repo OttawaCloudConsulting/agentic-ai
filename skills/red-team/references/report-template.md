@@ -102,6 +102,15 @@ Individual agent findings are preserved alongside this report for full traceabil
 | Findings sustained | {count — debate mode only, omit otherwise} |
 | Findings rebutted | {count — debate mode only, omit otherwise} |
 | Findings contested | {count — debate mode only, omit otherwise} |
+
+### Rebutted Findings (debate mode only — omit this section when debate is not active)
+
+{Findings that were rebutted during debate. These are excluded from the main findings
+sections above but recorded here for transparency.}
+
+| # | Original Title | Severity | Lens | Rebuttal Summary |
+|---|----------------|----------|------|-----------------|
+| 1 | {title} | {level} | {lens} | {one-line summary of green-team evidence that invalidated the finding} |
 ```
 
 ---

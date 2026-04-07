@@ -69,15 +69,18 @@ Every section gets a stable identifier for traceability:
 Examples:
 - `§authenticate-user:45-120` — a function named `authenticateUser` at lines 45-120
 - `§design-decisions:88-145` — a `## Design Decisions` heading at lines 88-145
+- `§preamble:1-24` — shared preamble content in a single-file artifact
 - `§auth-api.py:UserAuth:12-95` — class `UserAuth` in `auth-api.py`
+- `§auth-api.py:preamble:1-18` — shared preamble content in `auth-api.py`
 
 ## Preamble Sections
 
 Most splitting strategies produce a "preamble" — imports, type declarations, introductory
 content, or shared configuration. The preamble is:
 
-- Included in **every** agent's assignment (not counted as a separate section).
-- Not assigned a standalone identifier — it provides context, not review scope.
+- Included in **every** agent's assignment.
+- Assigned a stable identifier: `§preamble:{start-line}-{end-line}` for single-file
+  artifacts, or `§{filename}:preamble:{start-line}-{end-line}` for multi-file artifacts.
 - Kept as compact as possible (if the preamble alone exceeds 200 lines, summarize it
   and include only the summary).
 

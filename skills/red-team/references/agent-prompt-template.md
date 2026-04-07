@@ -77,8 +77,9 @@ DEBATE MODE ACTIVE:
 After writing your initial findings, you will receive rebuttals from a green-team
 defender via Agent Teams messaging. For each rebuttal:
 1. Evaluate the evidence provided against your original evidence.
-2. Update the finding's status: Sustained (your evidence holds), Modified (partially
-   valid rebuttal), or Withdrawn (rebuttal invalidates your finding).
+2. Update the finding's status: Sustained (your evidence holds), Rebutted (the
+   defense shows the finding is not supported), or Contested (the evidence is mixed
+   or remains disputed).
 3. After all debate rounds complete, rewrite your findings file with updated statuses.
    Add a "Defense" field after "Recommendation" containing the green-team's rebuttal
    summary and a "Status" field with your verdict.

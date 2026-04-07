@@ -277,9 +277,9 @@ Also create `docs/red-team/` if it does not exist (handled by `-p`).
 For each selected lens, resolve its persona prompt using a 3-tier hierarchy:
 
 1. **Project override:** Check `.claude/red-team/{lens}-agent.md` in the project root.
-   If it exists and its `## Preamble` section declares an adversarial posture matching
-   the lens name, use it. If the file exists but the posture is mismatched (e.g., a
-   security persona file that describes a design lens), skip it and fall to tier 2.
+   If it exists and contains a `PERSONA:` line naming the selected lens, use it.
+   If the file exists but the `PERSONA:` line is missing or names a different lens
+   (e.g., a security override used for the design lens), skip it and fall to tier 2.
 2. **Bundled persona:** Read `references/{lens}-agent.md` from the skill directory.
    This is the default for all 8 lenses (Security, Assumptions, Completeness, Design,
    Feasibility, Operational, Cost, Compliance).
@@ -298,8 +298,8 @@ and note the failure in the completion summary.
 
 Each agent receives tools based on its lens type:
 
-- **Security:** `Read`, `Glob`, `Grep`, `Bash` (Bash for verifying security claims)
-- **All other lenses:** `Read`, `Glob`, `Grep` (read-only)
+- **Security:** `Read`, `Glob`, `Grep`, `Write`, `Bash` (`Write` for findings; `Bash` for security verification)
+- **All other lenses:** `Read`, `Glob`, `Grep`, `Write` (`Write` for findings files)
 
 ### 3f. Spawn agents in parallel
 
