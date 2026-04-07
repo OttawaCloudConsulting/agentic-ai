@@ -1,249 +1,282 @@
-# Architecture and Design: Compliance Assessment Skill Suite — ITSG, NIST/FedRAMP & CSF
+# Architecture and Design: Red-Team Skill
 
 ## Overview
 
-Three parallel, structurally consistent Claude Code skills for jurisdiction-specific cloud compliance assessment:
+The `/red-team` skill provides general-purpose adversarial review of any artifact in a Claude Code project. The user invokes `/red-team <target>`, and the skill orchestrates a team of parallel sub-agents -- each with a different adversarial lens -- to systematically find flaws, gaps, and risks in the target artifact. Findings are synthesized into a severity-rated consolidated report.
 
-- **itsg-assessment** — Canadian ITSG-33 / CCCS Medium Cloud Profile assessment (renamed from `compliance-assess`)
-- **nist-fedramp-assessment** — USA NIST SP 800-53 Rev 5 / FedRAMP Moderate assessment (new)
-- **nist-csf-assessment** — NIST Cybersecurity Framework 2.0 outcome-based assessment (new)
+The skill is a standalone Claude Code skill living in `skills/red-team/` as a library component. Users copy it to their own projects. It does not replace or integrate with existing red-team patterns in `/spike`, `/occ-skill-refactor`, or `/occ-skill-creator`.
 
-All three skills are drop-in prompt bundles (no runtime code). Consumers copy the skill directory into `.claude/skills/` of the target repository. All follow an identical 4-phase workflow. Each skill is self-contained with its own control reference tables, output templates, and official references.
+The architecture is phased:
+- **Phase 1 (MVP):** 4 lenses, auto-selection, parallel agents, consolidated report
+- **Phase 2:** Expanded to 8 lenses, user lens override, approval gate, per-agent findings in output
+- **Phase 3:** Dedicated synthesis agent, persona resolution hierarchy, debate mode via Agent Teams
 
 ## Component Diagram
 
 ```
-agentic-ai/skills/
-│
-├── itsg-assessment/                  ← Feature 1 (rename + rebrand)
-│   ├── SKILL.md                      ← Skill definition, workflow, rules
-│   └── references/
-│       ├── itsg33-controls.md        ← ITSG-33 / CCCS Medium control tables
-│       ├── phase-templates.md        ← Output format templates (ITSG terminology)
-│       └── official-references.md   ← Canadian GC official links
-│
-├── nist-fedramp-assessment/          ← Feature 2 (new)
-│   ├── SKILL.md                      ← Skill definition, workflow, rules
-│   └── references/
-│       ├── nist-fedramp-controls.md  ← FedRAMP Moderate control tables (12 families)
-│       ├── phase-templates.md        ← Output format templates (NIST/FedRAMP terminology)
-│       └── official-references.md   ← NIST CSRC, FedRAMP.gov, AWS FedRAMP links
-│
-└── nist-csf-assessment/              ← Feature 3 (new)
-    ├── SKILL.md                      ← Skill definition, self-updating Phase 0, CSF workflow
-    └── references/
-        ├── nist-csf-subcategories.md ← CSF 2.0 subcategories + 800-53 informative refs (self-updating)
-        ├── phase-templates.md        ← Output format templates (CSF terminology)
-        └── official-references.md   ← NIST CSRC CSF links
-
-agentic-ai/docs/
-└── SKILLS.md                         ← Updated catalog (Features 1, 2 & 3)
+/red-team <target>
+    |
+    v
+[Orchestrator (SKILL.md)]
+    |-- Step 1: Resolve target artifact (file path or conversation context)
+    |-- Step 2: Classify artifact type, select lenses
+    |-- Step 3: Determine output path (docs/red-team/{slug}-{nn}/)
+    |-- Step 4: Create output directory
+    |-- Step 5: (Phase 2+) Present approval gate
+    |
+    |-- Step 6: Resolve per-lens persona prompts (3-tier: .claude/ -> references/ -> dynamic)
+    |-- Step 7: Spawn parallel sub-agents (one per lens):
+    |     |
+    |     [Security Agent]     --> docs/red-team/{slug}-{nn}/security-findings.md
+    |     [Assumptions Agent]  --> docs/red-team/{slug}-{nn}/assumptions-findings.md
+    |     [Design Agent]       --> docs/red-team/{slug}-{nn}/design-findings.md
+    |     [Completeness Agent] --> docs/red-team/{slug}-{nn}/completeness-findings.md
+    |     ... (up to 10 agents)
+    |
+    |-- Step 8: (Phase 3 debate mode) Green-team debate via Agent Teams
+    |
+    |-- Step 9: Synthesis
+    |     Dedicated synthesis agent reads all findings, deduplicates, filters, writes report
+    |
+    v
+docs/red-team/{slug}-{nn}/
+    ├── security-findings.md
+    ├── assumptions-findings.md
+    ├── design-findings.md
+    ├── completeness-findings.md
+    └── CONSOLIDATED-REPORT.md
 ```
 
-## Workflow (All Three Skills — 4 Phases)
+## Data Flow
 
-```
-Phase 0: Framework Validation
-    ↓  Fetch official source → compare vs embedded control tables → update if needed
-Phase 1: Architecture Discovery
-    ↓  Scan tech stack + codebase → user checkpoint
-Phase 2: Control Mapping
-    ↓  Map each control: status + inheritance + evidence → user checkpoint
-Phase 3: Gap Analysis + Executive Summary
-       Risk-rate gaps → remediation guidance → executive dashboard
-```
+1. **User invocation** -- user provides target (file path or natural language reference)
+2. **Artifact resolution** -- orchestrator reads target file(s); if ambiguous, prompts user
+3. **Classification** -- orchestrator analyzes file extension, content structure, and user hint to determine artifact type
+4. **Lens selection** -- artifact type maps to 2-3 lenses via static mapping table; user override available in Phase 2+
+5. **Output path** -- orchestrator checks for existing `docs/red-team/{slug}-*` directories, increments sequence number
+6. **Agent spawning** -- orchestrator resolves per-lens persona via 3-tier hierarchy (`.claude/red-team/` override -> `references/` bundled -> dynamic generation), spawns all agents in parallel via `Agent` tool
+7. **Agent execution** -- each agent independently reviews the artifact through its adversarial lens, writes structured findings to the output directory
+8. **Debate (--debate only)** -- green-team agents spawned via Agent Teams, paired with red-team agents for evidence-based rebuttals; findings updated with Defense/Status fields (Sustained/Rebutted/Contested)
+9. **Synthesis** -- dedicated synthesis agent reads all findings files, deduplicates, actively filters weak findings, and writes `CONSOLIDATED-REPORT.md`; in debate mode, rebutted findings moved to methodology section
+10. **Completion** -- orchestrator displays summary (finding counts, risk level, report path, debate outcome counts if applicable, suggested next steps)
 
-Smart re-run gate sits before Phase 0: if previous outputs exist, offer incremental re-run vs. full re-run.
+## Component Inventory
+
+| # | Component | Type / Technology | Purpose |
+|---|-----------|-------------------|---------|
+| 1 | SKILL.md | Claude Code skill (markdown + YAML frontmatter) | Orchestrator: artifact resolution, classification, lens selection, agent spawning, synthesis agent dispatch |
+| 2 | `references/security-agent.md` | Persona prompt (markdown) | Security lens adversarial persona, focus areas, output format |
+| 3 | `references/assumptions-agent.md` | Persona prompt (markdown) | Assumptions lens adversarial persona, focus areas, output format |
+| 4 | `references/completeness-agent.md` | Persona prompt (markdown) | Completeness lens adversarial persona, focus areas, output format |
+| 5 | `references/design-agent.md` | Persona prompt (markdown) | Design lens adversarial persona, focus areas, output format |
+| 6 | `references/feasibility-agent.md` | Persona prompt (markdown) | Feasibility lens adversarial persona (Phase 2) |
+| 7 | `references/operational-agent.md` | Persona prompt (markdown) | Operational lens adversarial persona (Phase 2) |
+| 8 | `references/cost-agent.md` | Persona prompt (markdown) | Cost lens adversarial persona (Phase 2) |
+| 9 | `references/compliance-agent.md` | Persona prompt (markdown) | Compliance lens adversarial persona (Phase 2) |
+| 10 | `references/report-template.md` | Report template (markdown) | Consolidated report structure and field definitions |
+| 11 | `references/findings-format.md` | Output format spec (markdown) | Standardized per-agent findings format shared across all lens prompts |
+| 12 | `references/persona-resolution.md` | Resolution rules (markdown) | 3-tier persona lookup rules, mismatch detection, dynamic generation template |
+| 13 | `references/agent-prompt-template.md` | Prompt template (markdown) | Red-team agent prompt assembly structure with debate mode additions |
+| 14 | `references/synthesis-prompt-template.md` | Prompt template (markdown) | Synthesis agent prompt assembly structure with debate mode additions |
+| 15 | `references/debate-rules.md` | Debate protocol (markdown) | Green-team persona, debate rounds, status labels, error handling |
+| 16 | Sub-agents (runtime) | Claude Code Agent tool invocations | Parallel adversarial review agents, one per selected lens |
+| 17 | Synthesis agent (runtime) | Claude Code Agent tool invocation | Deduplication, filtering, consolidated report generation; dynamically generated by orchestrator each run |
+| 18 | Green-team agents (runtime) | Claude Code Agent Teams | Debate participants defending the artifact against red-team findings; spawned via Agent Teams in debate mode |
+
+## Security Model
+
+### Access Control
+
+No separate access control. The skill runs within the user's Claude Code session with the user's existing permissions. Sub-agents inherit the session's tool access, scoped by the orchestrator:
+
+- **Configurable per-agent tool access:** The orchestrator assigns tools based on lens type and artifact. For example:
+  - Security agent: `Read`, `Glob`, `Grep`, `Bash` (for verification of security claims)
+  - Assumptions agent: `Read`, `Glob`, `Grep` (read-only, focused on document analysis)
+  - Design agent: `Read`, `Glob`, `Grep` (read-only, focused on structural analysis)
+
+### Audit and Logging
+
+All run metadata captured in the Methodology section of `CONSOLIDATED-REPORT.md`: agents used, lenses applied, artifact path, date. No separate log files.
 
 ## File Organization
 
-### Feature 1 — itsg-assessment
+```
+skills/red-team/
+├── SKILL.md                              # Orchestrator: workflow, lens mapping, critical rules
+├── references/
+│   ├── security-agent.md                 # Security lens persona prompt
+│   ├── assumptions-agent.md              # Assumptions lens persona prompt
+│   ├── completeness-agent.md             # Completeness lens persona prompt
+│   ├── design-agent.md                   # Design lens persona prompt
+│   ├── feasibility-agent.md              # Feasibility lens persona prompt (Phase 2)
+│   ├── operational-agent.md              # Operational lens persona prompt (Phase 2)
+│   ├── cost-agent.md                     # Cost lens persona prompt (Phase 2)
+│   ├── compliance-agent.md               # Compliance lens persona prompt (Phase 2)
+│   ├── report-template.md               # Consolidated report structure
+│   ├── findings-format.md               # Per-agent findings output format spec
+│   ├── persona-resolution.md            # 3-tier persona lookup rules and dynamic template
+│   ├── agent-prompt-template.md         # Red-team agent prompt assembly template
+│   ├── synthesis-prompt-template.md     # Synthesis agent prompt assembly template
+│   └── debate-rules.md                  # Debate mode protocol, green-team persona, status labels
+```
 
-| File | Change |
-|---|---|
-| `skills/itsg-assessment/SKILL.md` | Renamed from `compliance-assess/SKILL.md`. Frontmatter `name` → `itsg-assessment`. Description updated to explicitly name ITSG-33, CCCS Medium, and Canadian jurisdiction. |
-| `skills/itsg-assessment/references/itsg33-controls.md` | Renamed file. Internal references updated. |
-| `skills/itsg-assessment/references/phase-templates.md` | Internal references updated. Canadian terminology preserved (Protected B, CCCS, GC Org-level). |
-| `skills/itsg-assessment/references/official-references.md` | Internal references updated. |
-| `docs/SKILLS.md` | Catalog entry updated: old name removed, new name + description added. |
+Output directory (created per-run):
 
-### Feature 2 — nist-fedramp-assessment
+```
+docs/red-team/{slug}-{nn}/
+├── security-findings.md                  # Security agent findings
+├── assumptions-findings.md               # Assumptions agent findings
+├── completeness-findings.md              # Completeness agent findings
+├── design-findings.md                    # Design agent findings
+└── CONSOLIDATED-REPORT.md               # Synthesized, deduplicated report
+```
 
-| File | Purpose |
-|---|---|
-| `skills/nist-fedramp-assessment/SKILL.md` | Skill definition mirroring itsg-assessment. Workflow adapted for FedRAMP Moderate. Phase 0 targets NIST CSRC + FedRAMP.gov. |
-| `skills/nist-fedramp-assessment/references/nist-fedramp-controls.md` | FedRAMP Moderate control tables for 12 core technical families. Dual inheritance model. |
-| `skills/nist-fedramp-assessment/references/phase-templates.md` | Output templates with NIST/FedRAMP terminology. `phase2-nist-mapping.md` naming. |
-| `skills/nist-fedramp-assessment/references/official-references.md` | NIST CSRC, FedRAMP.gov, AWS FedRAMP Moderate Audit Manager links. |
+## Configuration
 
-### Feature 3 — nist-csf-assessment
+### Required
 
-| File | Purpose |
-|---|---|
-| `skills/nist-csf-assessment/SKILL.md` | Skill definition. CSF 2.0 default. Self-updating Phase 0 fetches latest CSF version from NIST CSRC. Subcategory-level mapping workflow. |
-| `skills/nist-csf-assessment/references/nist-csf-subcategories.md` | CSF 2.0 subcategory tables (all 6 Functions) with 800-53 informative references. **Self-updating** — overwritten by Phase 0 if a newer CSF version is detected. |
-| `skills/nist-csf-assessment/references/phase-templates.md` | Output templates using CSF terminology (Functions/Categories/Subcategories). `phase2-csf-mapping.md` naming. Includes AWS evidence column and 800-53 reference column. |
-| `skills/nist-csf-assessment/references/official-references.md` | NIST CSRC CSF page, NIST CSF 2.0 quick-start guides. |
+| Parameter | Type | Validation | Description |
+|-----------|------|------------|-------------|
+| `<target>` | string | Must resolve to existing file(s) in repo or conversation context | Artifact to review |
 
-## Control Family Scope
+### Optional
 
-### itsg-assessment (unchanged from compliance-assess)
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--debate` | flag | off | Enable red + green team debate via Agent Teams (Phase 3) |
+| `--rounds` | integer | 1 | Number of debate rounds; requires `--debate` (Phase 3) |
+| `--auto` | flag | off | Skip approval gate; overridden when >5 agents (Phase 2) |
 
-8 families: AC, AU, CM, CP, IA, SA, SC, SI
+## Outputs
 
-### nist-csf-assessment (new)
-
-6 CSF 2.0 Functions → Categories → Subcategories (subcategory-level mapping):
-
-| Function | Code | Subcategory Count (CSF 2.0) |
-|---|---|---|
-| Govern | GV | ~6 categories |
-| Identify | ID | ~5 categories |
-| Protect | PR | ~6 categories |
-| Detect | DE | ~3 categories |
-| Respond | RS | ~5 categories |
-| Recover | RC | ~3 categories |
-
-All subcategories include NIST 800-53 Rev 5 informative references (native to CSF 2.0).
-
-> **Note:** Exact subcategory counts subject to Phase 0 self-update. The embedded reference file reflects the latest published CSF version on the date of assessment.
-
-### nist-fedramp-assessment (new)
-
-12 core technical families from FedRAMP Moderate baseline:
-
-| Family | Code | Added vs. itsg-assessment |
-|---|---|---|
-| Access Control | AC | — (core 8) |
-| Audit and Accountability | AU | — (core 8) |
-| Configuration Management | CM | — (core 8) |
-| Contingency Planning | CP | — (core 8) |
-| Identification and Authentication | IA | — (core 8) |
-| System and Services Acquisition | SA | — (core 8) |
-| System and Communications Protection | SC | — (core 8) |
-| System and Information Integrity | SI | — (core 8) |
-| Risk Assessment | RA | Added |
-| Incident Response | IR | Added |
-| Planning | PL | Added |
-| Security Assessment and Authorization | CA | Added |
-
-## Inheritance Model
-
-### itsg-assessment (unchanged)
-
-| Category | Meaning |
-|---|---|
-| AWS Inherited | Fully AWS-managed |
-| AWS Shared | AWS capability, customer must configure |
-| Customer Implemented | Entirely customer responsibility |
-| GC Org-level | Government of Canada organization-level |
-
-### nist-fedramp-assessment (new — dual model)
-
-| Category | Meaning |
-|---|---|
-| AWS FedRAMP Inherited | In AWS FedRAMP Moderate authorization package; no customer action needed |
-| AWS FedRAMP Shared | AWS provides capability in authorization; customer must configure and document |
-| Customer Implemented | Entirely customer responsibility |
-| Organization-Level | Implemented at the agency/org level, not per-system |
-
-FedRAMP note: AWS maintains a FedRAMP Moderate P-ATO. Customer Responsibility Matrix (CRM) defines which controls are inherited vs. shared. Reference the AWS Audit Manager FedRAMP Moderate framework for the current CRM.
-
-NIST 800-53 note: For non-FedRAMP deployments, the generic shared responsibility model applies: platform-provided vs. customer-configured.
-
-### nist-csf-assessment — No Inheritance Model (AWS Evidence + Shared Responsibility)
-
-CSF is not a cloud-specific framework and has no inheritance concept. Instead:
-
-**AWS Service Evidence Mapping:** At the subcategory level, identify which AWS services provide implementation evidence. Example: CloudTrail → DE.CM-3 (Monitored Computing Environment), GuardDuty → DE.AE-2 (Potentially Adverse Events Analyzed).
-
-**Function-Level Shared Responsibility Summary:** In the executive summary, surface which CSF Functions are largely covered by AWS platform capabilities vs. customer responsibility:
-
-| CSF Function | AWS Platform Contribution | Customer Responsibility |
-|---|---|---|
-| Govern (GV) | Low — governance is primarily customer | Policy, risk management, supply chain |
-| Identify (ID) | Medium — asset inventory partially via Config/SSM | Classification, risk assessment |
-| Protect (PR) | High — encryption, network, IAM via AWS services | Configuration, access management |
-| Detect (DE) | High — CloudTrail, GuardDuty, Security Hub | Alerting thresholds, SIEM integration |
-| Respond (RS) | Low — response is primarily customer | IR plan, runbooks, communication |
-| Recover (RC) | Medium — backup/restore via AWS services | RTO/RPO definition, DR testing |
-
-## Output File Naming
-
-| Phase | itsg-assessment | nist-fedramp-assessment | nist-csf-assessment |
-|---|---|---|---|
-| Discovery | `phase1-discovery.md` | `phase1-discovery.md` | `phase1-discovery.md` |
-| Control Mapping | `phase2-control-mapping.md` | `phase2-nist-mapping.md` | `phase2-csf-mapping.md` |
-| Gap Analysis | `phase3-gap-analysis.md` | `phase3-gap-analysis.md` | `phase3-gap-analysis.md` |
-| Summary | `assessment-summary.md` | `assessment-summary.md` | `assessment-summary.md` |
-
-## Terminology Mapping
-
-| Concept | itsg-assessment | nist-fedramp-assessment | nist-csf-assessment |
-|---|---|---|---|
-| Framework | ITSG-33 / CCCS Medium | NIST SP 800-53 Rev 5 / FedRAMP Moderate | NIST CSF 2.0 (self-updating) |
-| Structure | Control families → Controls | Control families → Controls | Functions → Categories → Subcategories |
-| Profile | CCCS Medium Cloud Profile | FedRAMP Moderate Baseline | All 6 CSF 2.0 Functions |
-| Official source (Phase 0) | CCCS Annex 3A + ITSP.50.103 | NIST CSRC SP 800-53 Rev 5 + FedRAMP.gov | NIST CSRC CSF (latest version) |
-| Jurisdiction flag | ca-central-1 / Canadian regions | us-east-1/us-west-2 / US regions | N/A (framework is jurisdiction-agnostic) |
-| Data classification | Protected B | CUI / Controlled Unclassified Information | N/A (CSF is classification-agnostic) |
-| Org-level category | GC Org-level | Organization-Level | N/A (no inheritance model) |
-| Control status | Implemented / Partially / Not Implemented / N/A | Same + FedRAMP ATO notes | Implemented / Partially / Not Implemented / N/A |
-| AWS handling | Inheritance model | Dual inheritance (FedRAMP CRM + 800-53) | AWS service evidence + Function-level summary |
-| Cross-reference | None | None | NIST 800-53 informative references per subcategory |
-
-## Phase 0 Validation Sources
-
-### itsg-assessment
-
-- ITSG-33 Annex 3A: `https://www.cyber.gc.ca/en/guidance/annex-3a-security-control-catalogue-itsg-33`
-- ITSP.50.103 Annex B (CCCS Medium profile): `https://www.cyber.gc.ca/en/guidance/guidance-security-categorization-cloud-based-services-itsp50103`
-
-### nist-fedramp-assessment
-
-- NIST SP 800-53 Rev 5: `https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final`
-- FedRAMP Moderate baseline: `https://www.fedramp.gov/documents-templates/`
-- AWS Audit Manager FedRAMP Moderate framework: `https://docs.aws.amazon.com/audit-manager/latest/userguide/fedramp-moderate.html`
-
-### nist-csf-assessment (self-updating — always fetch latest)
-
-- NIST CSF landing page (latest version): `https://www.nist.gov/cyberframework`
-- NIST CSRC CSF 2.0 publication: `https://csrc.nist.gov/pubs/cswp/29/final`
-- CSF 2.0 reference tool (subcategories + informative refs): `https://csrc.nist.gov/projects/cybersecurity-framework/filters`
-
-Phase 0 fetches the NIST CSF landing page, detects the current version number, and compares against the version recorded in `nist-csf-subcategories.md`. If a newer version exists, it fetches the updated subcategory list and overwrites the reference file before proceeding.
+| Output | Type | Description |
+|--------|------|-------------|
+| `CONSOLIDATED-REPORT.md` | Markdown | Synthesized report: executive summary, severity-rated findings, cross-cutting themes, strengths, methodology |
+| `{lens}-findings.md` | Markdown | Per-agent findings with persona, assessment summary, individual findings, strengths |
+| Terminal summary | Text | Finding counts by severity, overall risk level, report path, suggested next steps |
 
 ## Design Decisions
 
 | # | Decision | Rationale |
-|---|---|---|
-| 1 | Rename skill dir from `compliance-assess` to `itsg-assessment` (not keep old name) | Eliminates ambiguity. Consumers browsing skills/ directory immediately know jurisdiction. |
-| 2 | nist-fedramp-assessment mirrors itsg-assessment structure exactly | Consistent UX for teams working across jurisdictions. Lowers onboarding cost. |
-| 3 | FedRAMP Moderate (not Full 800-53) as the primary control selection | FedRAMP Moderate is the most common US gov cloud compliance target. Scoping prevents overwhelming assessments. |
-| 4 | 12 families for NIST skill (not 8, not all 17+) | Core 8 + RA/IR/PL/CA covers the technically relevant FedRAMP controls. Org-level families (PE, PS, AT, MP) are excluded as per-project assessment rarely applies. |
-| 5 | NIST 800-53 status terms + FedRAMP ATO notes (not pure FedRAMP SSP vocabulary) | NIST terms are familiar to a wider audience. FedRAMP ATO notes layer in SSP-specific context without requiring FedRAMP SSP expertise. |
-| 6 | Smart re-run identical in both skills | Consistent behavior reduces confusion. Teams running repeated assessments benefit equally. |
-| 7 | Different Phase 2 output file name (`phase2-nist-mapping.md` vs `phase2-control-mapping.md`) | If both skills run against the same repo, outputs don't collide. Makes origin of each file obvious. |
-| 8 | Dual inheritance model for NIST skill (FedRAMP CRM + generic 800-53) | Not all consumers use AWS GovCloud or have a FedRAMP ATO. Generic 800-53 model keeps the skill useful for non-FedRAMP NIST assessments. |
-| 9 | CSF skill uses self-updating Phase 0 (overwrite reference file on version change) | CSF is actively maintained; CSF 2.0 released in 2024. Hardcoding a version would silently drift. Self-update ensures assessments always reflect the current published framework. |
-| 10 | CSF skill has no inheritance model — uses AWS service evidence + Function-level summary | CSF is not a cloud-specific or control-catalogue framework. Inheritance doesn't map to its outcome-based structure. AWS evidence mapping is more aligned with CSF intent. |
-| 11 | Include 800-53 informative references in CSF Phase 2 output | CSF 2.0 natively provides these cross-references. Surfacing them lets teams use CSF output to inform 800-53 / FedRAMP assessments, increasing the skill's utility. |
-| 12 | CSF skill scoped to all 6 Functions (not a subset) | CSF is relatively concise at the Function level. All 6 Functions (including Govern, new in 2.0) are relevant to cloud workloads. No basis for excluding any. |
+|---|----------|-----------|
+| 1 | SKILL.md is the orchestrator (not a separate agent) | Keeps architecture simple; orchestration logic is sequential and doesn't benefit from agent isolation. SKILL.md reads files, makes decisions, spawns agents. |
+| 2 | Agents write directly to output directory (no temp files) | Eliminates temp file cleanup, ensures findings are always persisted, simplifies the flow. Output directory created before agent spawning. |
+| 3 | Per-lens persona prompts in separate files (`references/{lens}-agent.md`) | Progressive disclosure: orchestrator loads only the prompts needed for selected lenses. Easier to maintain and extend individual lenses. Phase 3 adds 3-tier resolution (see #18). |
+| 4 | Shared findings format spec in `references/findings-format.md` | Common output structure referenced by all persona prompts. Single source of truth for the findings file format. |
+| 5 | Report template in `references/report-template.md` | Keeps SKILL.md lean. Template loaded during synthesis step only. |
+| 6 | Static lens-to-artifact mapping table in SKILL.md | Simple, predictable, no external config. Table is small (~10 rows). User override (Phase 2) provides flexibility without changing the table. |
+| 7 | Output directory naming: `docs/red-team/{slug}-{nn}/` | Lightweight audit trail via directory naming. No formal run history database. Sequential numbering provides ordering. |
+| 8 | Active filtering in synthesis (not preserve-all) | Reduces noise. Weak findings (low evidence, speculative) downgraded or omitted with note. Keeps consolidated report actionable. |
+| 9 | Mandatory approval gate at 5+ agents | Cost-awareness checkpoint. Even with `--auto`, spawning 5+ parallel agents requires user confirmation. |
+| 10 | Configurable per-agent tool access | Orchestrator assigns tools based on lens type. Security agents may need Bash for verification; analysis-focused agents are read-only. Balances capability with least-privilege. |
+| 11 | Opus preferred for sub-agents, graceful Sonnet degradation | Adversarial review benefits from Opus depth. Skill warns if lesser model detected but proceeds. |
+| 12 | Smart chunking for large artifacts | Orchestrator segments large files by logical boundaries (headings, functions, classes). Each agent gets relevant sections + full-artifact summary. Prevents context overflow. |
+| 13 | Markdown-only output format | Simplicity. Reports are human-readable and version-controllable. No JSON or other machine-readable formats. |
+| 14 | Confirmation bias prevention via 5 structural safeguards | Adversarial instruction, isolated contexts, structured output, quantified effort, multi-perspective lenses. These are architectural constraints, not optional guidelines. |
+| 15 | Agent Teams for debate mode (Phase 3) | Green-team members debate directly with red-team agents via Agent Teams coordination, influencing findings through evidence-based rebuttal rather than producing separate reports. |
+| 16 | Debate mode findings carry status labels | Each finding marked as Sustained, Rebutted, or Contested after green-team challenge. Provides transparency on which findings survived adversarial debate. |
+| 17 | Synthesis agent dynamically generated (Phase 3) | Synthesis role is fixed and uniform across all runs. No need for persona library lookup -- orchestrator generates the synthesis agent prompt each time. |
+| 18 | 3-tier persona resolution hierarchy (Phase 3) | Project override (`.claude/red-team/`) -> bundled (`references/`) -> dynamic generation. Allows teams to customize personas without forking the skill. Mismatch detection prevents accidental cross-wiring. Resolution tier recorded in methodology for transparency. |
 
-## Deployment / Drop-in Instructions
+## Agent Teams Integration (Debate Mode — Phase 3)
 
-Both skills are consumed identically:
+### Coordination Pattern
+
+Debate mode uses Claude Code Agent Teams to coordinate structured adversarial dialogue between red-team and green-team members:
 
 ```
-# Copy skill into target repo
-cp -r skills/itsg-assessment/ /path/to/project/.claude/skills/
-cp -r skills/nist-fedramp-assessment/ /path/to/project/.claude/skills/
+Phase 3 Debate Flow:
+
+1. Red-team agents run in parallel (same as default mode)
+   → Each writes initial findings to {lens}-findings.md
+
+2. Green-team members spawned via Agent Teams
+   → Each paired with one or more red-team agents
+   → Green members read the red-team findings
+   → Green members prepare evidence-based rebuttals
+
+3. Debate round(s):
+   → Green-team presents rebuttals to red-team agents
+   → Red-team agents evaluate rebuttals against their evidence
+   → Red-team agents update findings: mark as Sustained, Modified, or Withdrawn
+   → If --rounds > 1: additional debate iterations
+
+4. Red-team agents write final updated findings files
+   → New fields: Defense (green-team rebuttal), Status (Sustained/Rebutted/Contested)
+
+5. Synthesis agent reads all final findings
+   → CONSOLIDATED-REPORT.md includes debate outcome per finding
 ```
 
-No build step, no dependencies. Skills are loaded by Claude Code via the `.claude/skills/` convention.
+### Message Flow
+
+- Red-team agents and green-team members communicate via Agent Teams messaging
+- Green-team does NOT produce separate report files -- influence is through debate only
+- Green-team rebuttals must include evidence (citations, code references, documentation links)
+- "I disagree" without evidence is not a valid rebuttal
+
+### Green-Team Persona
+
+Green-team members defend the artifact. Their posture:
+- Assume the artifact is well-designed until shown specific evidence of flaws
+- Challenge vague or speculative red-team findings
+- Provide counter-evidence from the codebase, documentation, or industry best practices
+- Acknowledge valid findings rather than reflexively defending
+
+### Activation
+
+```
+/red-team my design --debate              # 1 round of debate
+/red-team my design --debate --rounds 3   # 3 rounds
+```
+
+## Deployment Workflow
+
+### Step-by-step (for users adopting the skill)
+
+1. Copy `skills/red-team/` directory to target project's `skills/` or `.claude/skills/`
+2. Verify SKILL.md frontmatter is recognized (skill appears in `/skills` list)
+3. Test with a small artifact: `/red-team path/to/small-file.md`
+4. Verify output directory created at `docs/red-team/`
+5. Review consolidated report for correct structure and evidence-based findings
+
+### Phased Development
+
+| Phase | Features | Milestone |
+|-------|----------|-----------|
+| 1 (MVP) | F1-F7: Core skill, 4 lenses, parallel agents, orchestrator synthesis, smart chunking | End-to-end red-team of any artifact |
+| 2 | F8-F11: 8 lenses, user override, approval gate, per-agent output | Full lens coverage with user control |
+| 3 | F12-F14: Synthesis agent, persona resolution, Agent Teams debate | Advanced adversarial validation with structured debate |
+
+**Note:** F12 (Synthesis Agent), F13 (Persona Resolution), and F14 (Debate Mode) are now implemented. All Phase 3 features are complete.
+
+## Dependency Graph
+
+```
+[SKILL.md (Orchestrator)]
+    ├── resolves persona: [.claude/red-team/{lens}-agent.md] -> [references/{lens}-agent.md] -> dynamic
+    ├── reads [references/persona-resolution.md] (resolution rules and dynamic template)
+    ├── reads [references/agent-prompt-template.md] (agent prompt assembly)
+    ├── reads [references/findings-format.md] (referenced by persona prompts)
+    ├── reads [references/report-template.md] (during synthesis)
+    ├── reads [references/synthesis-prompt-template.md] (synthesis prompt assembly)
+    ├── reads [references/debate-rules.md] (debate protocol, when --debate)
+    ├── spawns [Sub-Agent per lens] (parallel, via Agent tool)
+    │       └── writes [docs/red-team/{slug}-{nn}/{lens}-findings.md]
+    ├── (--debate) coordinates [Green-Team Agents] (via Agent Teams)
+    │       └── debates with [Sub-Agent per lens], updates findings with Status
+    ├── spawns [Synthesis Agent] (via Agent tool)
+    │       ├── reads [docs/red-team/{slug}-{nn}/*-findings.md]
+    │       └── writes [docs/red-team/{slug}-{nn}/CONSOLIDATED-REPORT.md]
+```
 
 ## Out of Scope
 
-- FedRAMP High or DoD IL2/IL4 — separate baselines; add as future skills if needed
-- Changes to any other existing skills (terraform-testing, cdk-testing, skill-creator, rule-creator)
-- Automated control validation tooling — skills are prompt-driven, not code
+| Item | Rationale |
+|------|-----------|
+| Replace existing skill-specific red-team patterns | Standalone by design; `/spike`, `/occ-skill-refactor`, `/occ-skill-creator` retain their own |
+| Automated remediation of findings | Review and reporting only; remediation is a separate workflow |
+| CI/CD integration or scheduled runs | On-demand invocation; future enhancement if demand exists |
+| URL, clipboard, or piped input sources | Repo files and conversation context only |
+| Non-adversarial review modes | Different posture and output; use general code review tools instead |
+| Custom user-defined lens types | Future enhancement; current lens set covers common needs |
