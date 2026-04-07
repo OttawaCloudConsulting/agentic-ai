@@ -65,6 +65,9 @@ Inform the user Gate 2 is already approved. Use `AskUserQuestion` with options:
 
 **Normal mode:**
 If Gate 2 is not yet approved: proceed to Step 2 (Architecture Generation).
+Before generating, Step 2 checks whether `docs/ARCHITECTURE_AND_DESIGN.md`
+already exists on disk and integrates into it rather than overwriting (see
+references/gate-2-design.md for details).
 
 ## Step 2 -- Architecture Generation
 
@@ -136,6 +139,11 @@ NEXT: Run /project to see updated status.
   Refresh or Status check.
 - **Agent scan failure:** Report failure, offer manual architecture input (user
   describes system) or retry.
+- **Existing architecture doc found (Gate 2 not approved):** The document is
+  preserved and new content is integrated. If the existing document is
+  unreadable, empty, non-text/binary, or does not resemble Markdown, inform
+  the user that it cannot be used as the existing architecture document and
+  offer: **Overwrite** (start fresh) or **Abort** (user fixes manually).
 - **Missing prd.md:** This should not happen if Gate 1 is approved. Report
   inconsistency -- Gate 1 is marked approved but `prd.md` is missing. Suggest
   running `/project` to check state.

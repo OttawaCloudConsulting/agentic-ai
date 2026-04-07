@@ -64,7 +64,26 @@ Synthesize the agent's findings and the PRD into `docs/ARCHITECTURE_AND_DESIGN.m
 1. Read the agent's scratch file (`/tmp/architecture-scan-findings.md`)
 2. Read `assets/architecture-template.md` for the document structure
 3. Create the `docs/` directory if it does not exist: `mkdir -p docs`
-4. Write `docs/ARCHITECTURE_AND_DESIGN.md` using the template, populating each of the 6 required sections:
+4. **Check whether `docs/ARCHITECTURE_AND_DESIGN.md` already exists on disk.**
+
+### If the file does NOT exist (new document)
+
+Write `docs/ARCHITECTURE_AND_DESIGN.md` from scratch using the template, populating each of the 6 required sections listed below.
+
+### If the file DOES exist (integrate into existing)
+
+The existing document is authoritative. Read it in full before making any changes. Integrate new content into it rather than replacing it:
+
+- **Preserve all existing content** as the baseline. Existing design decisions, components, flows, and other entries represent prior architectural context that must not be lost.
+- **Add new entries** for anything the PRD and agent scan findings indicate that is not already captured. For example, add new rows to the Design Decisions table, new components to the Component Inventory, new flows to the Data Flow section.
+- **Do not remove or overwrite** existing entries unless they directly contradict the current PRD. If a contradiction is found, note it as a tradeoff callout for the user to resolve during review.
+- **Reorganize if needed.** If the existing document uses a different structure than the template's 6 sections, reorganize it to match the template while preserving all original content.
+- **Use the Edit tool** (not Write) for all updates so the existing file content is the base.
+- **Inform the user** after integration: "An existing architecture document was found. New content from this feature's PRD has been integrated. Please review carefully to ensure consistency between prior and new content."
+
+### Required Sections
+
+The following 6 sections must be present and populated in the final document. When integrating into an existing document, these describe what content should be PRESENT -- verify each section exists and is complete, add missing content, but do not replace existing content that is still valid.
 
    - **Design Decisions** -- numbered table with columns: #, Decision, Rationale, Tradeoff, Alternatives Considered. Capture the key technical choices: framework selection, architecture pattern, data storage, API design, deployment strategy, etc.
    - **Component Inventory** -- table with columns: Component, Responsibility, Interfaces. List every major module/service/package with its role and how it connects to other components.
