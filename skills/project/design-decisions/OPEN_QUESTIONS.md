@@ -42,7 +42,7 @@ the pipeline context (codebase assessment, Working Backwards, milestone-scoped f
   within 60% of a 200k-token model (~120k tokens). Larger models provide buffer, not a larger
   sizing target.
 
-Testing: planned during `/plan` (Gate 4), executed during `/build`. Feature plan includes a
+Testing: planned during `/plan-feature` (Gate 4), executed during `/build`. Feature plan includes a
 `Test Command:` field (single command, pass/fail). Agent generates initial tests; users are
 expected to review and adjust. No separate testing phase or skill.
 
@@ -60,7 +60,7 @@ sections.
 
 Users can skip optional stages *within* the orchestration (e.g., skip Working Backwards at
 Gate WB), but they cannot bypass the orchestrator to run `/define`, `/design`, `/milestone`,
-`/plan`, or `/build` independently. This ensures gate integrity — no phase runs without the
+`/plan-feature`, or `/build` independently. This ensures gate integrity — no phase runs without the
 orchestrator confirming preconditions are met.
 
 **Affected:** DD-3 tradeoff updated to reflect mandatory orchestrator entry.

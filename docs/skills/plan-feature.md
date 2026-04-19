@@ -1,7 +1,7 @@
-# /plan
+# /plan-feature
 
-**Source:** `skills/project/plan/`
-**Command:** `/plan`
+**Source:** `skills/project/plan-feature/`
+**Command:** `/plan-feature`
 **Activation:** Manual only (`disable-model-invocation: true`) -- invoked via slash command. Not auto-triggered by conversational phrases.
 
 ## Purpose
@@ -27,7 +27,7 @@ Per-feature implementation planning skill that produces detailed feature plans w
 
 ### 1. Mode Detection
 
-On invocation, `/plan` reads `progress.txt` and `milestone-status.txt` to determine entry mode:
+On invocation, `/plan-feature` reads `progress.txt` and `milestone-status.txt` to determine entry mode:
 
 - **No active milestone:** Declines with prerequisite message (run `/milestone` first)
 - **Auto-detect active milestone:** Finds the first milestone at `[ ]` or `[~]` status in `progress.txt`. User can override with an explicit milestone name or number.
@@ -55,14 +55,14 @@ Updates `milestone-status.txt` with the plan path and `[~] planned, awaiting bui
 
 | Artifact | Path | Created By |
 |----------|------|------------|
-| Feature plan | `milestones/<NN>-<name>/plans/<feature-slug>.md` | /plan |
-| Gate 4 review | `milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md` | /plan |
-| milestone-status.txt | `milestones/<NN>-<name>/milestone-status.txt` | /plan (updates only) |
+| Feature plan | `milestones/<NN>-<name>/plans/<feature-slug>.md` | /plan-feature |
+| Gate 4 review | `milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md` | /plan-feature |
+| milestone-status.txt | `milestones/<NN>-<name>/milestone-status.txt` | /plan-feature (updates only) |
 
 ## Skill Files
 
 ```
-skills/project/plan/
+skills/project/plan-feature/
 +-- SKILL.md                           # Flow controller (~150-180 lines)
 +-- references/
 |   +-- gate-4-plan.md                 # Complete Gate 4 normal-mode spec
@@ -77,7 +77,7 @@ skills/project/plan/
 
 | Skill | Relationship |
 |-------|-------------|
-| `/project` | Reads `progress.txt` for milestone status; routes users to `/plan` |
-| `/milestone` | Produces milestone README and `milestone-status.txt` that `/plan` reads |
-| `/design` | Produces architecture doc that `/plan` reads; sub-agent scan pattern origin |
-| `/build` | Consumes feature plans produced by `/plan`; implements sub-features |
+| `/project` | Reads `progress.txt` for milestone status; routes users to `/plan-feature` |
+| `/milestone` | Produces milestone README and `milestone-status.txt` that `/plan-feature` reads |
+| `/design` | Produces architecture doc that `/plan-feature` reads; sub-agent scan pattern origin |
+| `/build` | Consumes feature plans produced by `/plan-feature`; implements sub-features |

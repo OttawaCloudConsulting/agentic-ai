@@ -135,7 +135,7 @@ not by bypassing the orchestrator itself. This ensures gate integrity is always 
 | `/define` | 0, WB, 1 | Codebase assessment, optional Working Backwards, PRD creation | codebase, progress.txt | docs/codebase-assessment.md, docs/working-backwards.md, prd.md, docs/reviews/gate-{0,wb,1}-review.md, progress.txt |
 | `/design` | 2 | Architecture and design specification | prd.md, docs/codebase-assessment.md, progress.txt | docs/ARCHITECTURE_AND_DESIGN.md, docs/reviews/gate-2-review.md, progress.txt |
 | `/milestone` | 3 | Milestone breakdown — grouping, ordering, sizing | prd.md, docs/ARCHITECTURE_AND_DESIGN.md, progress.txt, docs/spikes/\*.md (if referenced) | milestones/\<NN\>-\<name\>/README.md, milestones/\<NN\>-\<name\>/milestone-status.txt, milestones/\<NN\>-\<name\>/reviews/gate-3-review.md, progress.txt, prd.md (milestone summary sync on re-plan) |
-| `/plan` | 4 | Per-feature implementation plan (one feature per invocation) | milestone README, prd.md, docs/ARCHITECTURE_AND_DESIGN.md, progress.txt, milestones/\<NN\>-\<name\>/milestone-status.txt, docs/spikes/\*.md (if referenced) | milestones/\<NN\>-\<name\>/plans/\<feature\>.md, milestones/\<NN\>-\<name\>/reviews/gate-4-\<feature\>-review.md, milestones/\<NN\>-\<name\>/milestone-status.txt |
+| `/plan-feature` | 4 | Per-feature implementation plan (one feature per invocation) | milestone README, prd.md, docs/ARCHITECTURE_AND_DESIGN.md, progress.txt, milestones/\<NN\>-\<name\>/milestone-status.txt, docs/spikes/\*.md (if referenced) | milestones/\<NN\>-\<name\>/plans/\<feature\>.md, milestones/\<NN\>-\<name\>/reviews/gate-4-\<feature\>-review.md, milestones/\<NN\>-\<name\>/milestone-status.txt |
 | `/spike` | — | Agent-based technical research with red-team validation | user-defined question, available tooling (MCP, crawlers, local docs, repos), progress.txt | docs/spikes/\<topic\>.md, progress.txt |
 | `/build` | — | Implementation, deviation tracking, sub-feature completion | feature plan, codebase, docs/codebase-assessment.md, progress.txt, milestones/\<NN\>-\<name\>/milestone-status.txt, docs/ARCHITECTURE_AND_DESIGN.md | docs/codebase-assessment.md (refresh), feature plan (sub-feature checklist, architectural deviations), milestones/\<NN\>-\<name\>/milestone-status.txt, progress.txt (milestone summary on completion) |
 
@@ -433,13 +433,13 @@ the decision cleanly.
 
 ---
 
-### DD-12: Feature testing — planned during `/plan`, executed during `/build`
+### DD-12: Feature testing — planned during `/plan-feature`, executed during `/build`
 
 **Decision:** Every feature requires a test command that validates it (pass/fail). The skill's
 role is strictly limited to invoking the test command and interpreting the exit code — it does
 not generate, manage, or modify test content. Tests are:
 
-1. **Defined during the `/plan` phase** — the feature plan includes a `Test Command:` field
+1. **Defined during the `/plan-feature` phase** — the feature plan includes a `Test Command:` field
    specifying the single command to run for validation (e.g., `bash tests/test-auth.sh`,
    `pytest tests/test_auth.py`, `cdk deploy && bash tests/validate.sh`)
 2. **Created and maintained by the user** — the user writes, generates, or manages test
@@ -452,7 +452,7 @@ not generate, manage, or modify test content. Tests are:
    the `Test Command:` field in the feature plan. No gate re-approval needed — the feature
    plan is already a `/build` write target
 
-**Tests are not a separate phase or skill.** Test planning is part of `/plan` (Gate 4). Test
+**Tests are not a separate phase or skill.** Test planning is part of `/plan-feature` (Gate 4). Test
 execution is part of `/build`. No discrete testing gate or skill is needed.
 
 **Rationale:** The skill is an orchestrator, not a test framework. It invokes a command and
@@ -600,7 +600,7 @@ The user decides whether a spike is needed; it is never automatic.
   is common (post-Gate 2, during milestone planning, during build). The user accepts or declines.
 - `/spike` writes spike entries to the project-level `progress.txt` under the `## Spikes`
   section (adds new entries, updates status on resolution).
-- `/milestone` and `/plan` read relevant spike artifacts as inputs when the user references them.
+- `/milestone` and `/plan-feature` read relevant spike artifacts as inputs when the user references them.
 - Spikes don't block the pipeline — the user decides when a spike is resolved and whether findings
   change the plan.
 - Follow-up research: after reviewing findings, the user can re-invoke `/spike` on the same
@@ -863,7 +863,7 @@ investigation, adversarial validation, and recommendation in a single document.
 
 **Lifecycle:** Created by `/spike` when the user initiates a research question. Updated when
 the user requests follow-up investigation on the same topic. Referenced by `/milestone` and
-`/plan` when the user indicates spike findings should inform planning. Status set to `resolved`
+`/plan-feature` when the user indicates spike findings should inform planning. Status set to `resolved`
 by the user when the question is satisfactorily answered.
 
 #### `progress.txt` — Project level (All gates)
@@ -920,7 +920,7 @@ completion. Read-only by `/project` after initial creation.
 
 Milestone-level source of truth for feature status. Contains feature entries with plan paths,
 sub-feature checklists, and notes. Only read by skills working on this specific milestone
-(`/plan`, `/build`, `/milestone` in revision mode).
+(`/plan-feature`, `/build`, `/milestone` in revision mode).
 
 **Format (indicative):**
 
@@ -948,13 +948,13 @@ sub-feature checklists, and notes. Only read by skills working on this specific 
 ```
 
 **Lifecycle:** Created by `/milestone` when the milestone is defined (feature entries with
-`[ ]` pending status). Updated by `/plan` (adds plan paths, sub-feature lists) and `/build`
+`[ ]` pending status). Updated by `/plan-feature` (adds plan paths, sub-feature lists) and `/build`
 (updates feature status, sub-feature checklists, notes as work progresses). When `/build`
 completes the last feature, it also updates the milestone summary line in the project-level
 `progress.txt`.
 
 **Recovery:** If a `milestone-status.txt` file is missing but the milestone directory and
-README exist, `/milestone` or `/plan` can recreate it from the milestone README's feature
+README exist, `/milestone` or `/plan-feature` can recreate it from the milestone README's feature
 list. Feature plans on disk provide plan paths. Git history provides completion status. As
 with project-level `progress.txt`, git recovery is the primary mechanism.
 

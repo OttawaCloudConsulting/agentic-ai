@@ -17,8 +17,8 @@ The state-to-action table below covers every reachable project state. The skill 
 | Gate 0 approved, Gate WB resolved (`[x]` or `[-]`), no Gate 1 | Run `/define` to continue PRD interview | -- |
 | Gate 1 approved, no Gate 2 | Run `/design` to create architecture | `/spike` |
 | Gate 2 approved, no milestones defined | Run `/milestone` to define first milestone | `/spike` |
-| Gate 3 `[~]` in progress, unplanned features exist | Run `/plan` for next unplanned feature | `/milestone` (define another), `/spike` |
-| Feature planned (`[~]` planned, awaiting build) | Run `/build` for planned feature | `/plan` (next feature), `/spike` |
+| Gate 3 `[~]` in progress, unplanned features exist | Run `/plan-feature` for next unplanned feature | `/milestone` (define another), `/spike` |
+| Feature planned (`[~]` planned, awaiting build) | Run `/build` for planned feature | `/plan-feature` (next feature), `/spike` |
 | Feature in progress (sub-features partially complete) | Run `/build` to continue feature | `/spike` |
 | All features complete in active milestone, more milestones to define | Run `/milestone` for next milestone | `/design` (refresh) |
 | All milestones `[x]` complete, Gate 3 still `[~] In progress` | Offer Gate 3 closure via `AskUserQuestion` (per D-01–D-05) | -- |
@@ -29,7 +29,7 @@ The state-to-action table below covers every reachable project state. The skill 
 
 Notes:
 
-- The "Alternatives" column implements D-04 -- only actions valid for the current state appear. Do not show `/plan` if no milestone exists. Do not show `/build` if no planned features exist.
+- The "Alternatives" column implements D-04 -- only actions valid for the current state appear. Do not show `/plan-feature` if no milestone exists. Do not show `/build` if no planned features exist.
 - "Bootstrap" is an internal action performed by `/project` itself -- it does not route to another skill.
 - "Offer Gate WB" is also handled internally by `/project` via `AskUserQuestion`.
 - When open spikes exist, `/spike` is added to the alternatives list for any state where it is contextually relevant (post-Gate 1 states).

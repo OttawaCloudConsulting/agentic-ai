@@ -125,7 +125,7 @@ Read `assets/milestone-readme-template.md` for the template structure. Generate 
 - **Features** -- 2-5 features per milestone (DD-1), each with specific, testable acceptance criteria
 - **Dependencies** -- other milestones, external systems, or prerequisites
 - **Ordering** -- why this milestone is sequenced at this position
-- **Sizing** -- confirm 2-5 features, note any large features that may need sub-feature splitting at `/plan` time
+- **Sizing** -- confirm 2-5 features, note any large features that may need sub-feature splitting at `/plan-feature` time
 - **Configuration** -- milestone-specific config parameters (omit if none beyond `prd.md` Configuration section)
 - **Definition of Done** -- completion checklist
 

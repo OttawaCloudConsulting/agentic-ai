@@ -21,7 +21,7 @@ Milestone planning skill that breaks an approved PRD and architecture document i
 - When you want to check project status or get routing (use `/project`)
 - When you want to define project scope or create a PRD (use `/define` -- runs Gates 0/WB/1)
 - When you want to design system architecture (use `/design` -- Gate 2)
-- When you want to plan a specific feature's implementation (use `/plan`)
+- When you want to plan a specific feature's implementation (use `/plan-feature`)
 - When you want to implement code (use `/build`)
 
 ## Behavior
@@ -87,5 +87,5 @@ skills/project/milestone/
 | `/project` | Routes users to `/milestone` when Gate 2 is approved; detects Gate 3 closure when all milestones have completed reviews |
 | `/define` | Produces `prd.md` that `/milestone` reads as primary input; `/milestone` updates prd.md Milestones section |
 | `/design` | Produces `docs/ARCHITECTURE_AND_DESIGN.md` that `/milestone` reads as secondary input |
-| `/plan` | Consumes milestone `README.md` and `milestone-status.txt` as inputs for feature planning |
-| `/build` | Consumes feature plans produced by `/plan`; updates `milestone-status.txt` on feature completion |
+| `/plan-feature` | Consumes milestone `README.md` and `milestone-status.txt` as inputs for feature planning |
+| `/build` | Consumes feature plans produced by `/plan-feature`; updates `milestone-status.txt` on feature completion |

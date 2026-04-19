@@ -1,5 +1,5 @@
 ---
-name: plan
+name: plan-feature
 description: >
   Per-feature implementation plan with sub-feature sizing, interface contracts,
   and test commands. Supports re-plan mode for scope changes.
@@ -9,7 +9,7 @@ description: >
 disable-model-invocation: true
 ---
 
-# /plan -- Feature Implementation Plan (Gate 4)
+# /plan-feature -- Feature Implementation Plan (Gate 4)
 
 Produces per-feature implementation plans from an approved milestone definition,
 PRD, and architecture document. Each invocation plans one feature. Supports
@@ -24,7 +24,7 @@ entry in `milestone-status.txt` from `[ ]` to `[~] planned, awaiting build`.
   it, offer Approve / Revise (D-12).
 - **All checklist items must be resolved.** Every review checklist item must be
   `[x]` or `[-]` (N/A with reason) before recording approval.
-- **Write-ordering contract.** /plan writes ONLY to `milestone-status.txt`. It
+- **Write-ordering contract.** /plan-feature writes ONLY to `milestone-status.txt`. It
   does NOT write to `progress.txt`. This is a critical distinction from
   `/milestone`.
 - **Interactive prompts.** Use `AskUserQuestion` for all user-facing choices
@@ -155,6 +155,6 @@ user declines or no unplanned features remain, end session.
   check state.
 - **Feature not found:** If user specifies a feature name that doesn't exist in
   milestone-status.txt, report available features and ask to select one.
-- **Interrupted session:** User can re-invoke `/plan`. Skill re-reads
+- **Interrupted session:** User can re-invoke `/plan-feature`. Skill re-reads
   `progress.txt` and `milestone-status.txt` to detect correct mode and resume
   from appropriate state.

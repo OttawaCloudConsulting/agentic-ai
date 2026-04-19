@@ -274,7 +274,7 @@ DD-3, DD-4, DD-5, document tree, artifact inventory, and artifact details all up
 
 **Type:** AMBIGUITY | **Source:** DD-4, DD-7 | **Resolution:** DD-4 and DD-7 updated
 
-`/plan` runs once per feature, not batch. `/project` routes to `/plan` for the next unplanned
+`/plan-feature` runs once per feature, not batch. `/project` routes to `/plan-feature` for the next unplanned
 feature in the current milestone. `milestone-status.txt` tracks which features have plans.
 Consistent with context isolation philosophy — each feature plan is independent and doesn't
 need other plans in context.

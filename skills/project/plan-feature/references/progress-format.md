@@ -172,7 +172,7 @@ Structure:
 
 Per STATE-04: When both `milestone-status.txt` and `progress.txt` need updates, `milestone-status.txt` MUST be written first (source-of-truth-first ordering). This ensures that if a crash occurs mid-write, the more detailed file is already updated and `/project` can detect the divergence on next read.
 
-Note: `/project` itself only writes at bootstrap (PROJ-10), so this contract applies to downstream skills (`/build`, `/milestone`, `/plan`). `/project` must document this contract so downstream skills follow it. The contract is enforced by convention -- each downstream skill's SKILL.md must reference this specification.
+Note: `/project` itself only writes at bootstrap (PROJ-10), so this contract applies to downstream skills (`/build`, `/milestone`, `/plan-feature`). `/project` must document this contract so downstream skills follow it. The contract is enforced by convention -- each downstream skill's SKILL.md must reference this specification.
 
 ## Parsing Notes
 

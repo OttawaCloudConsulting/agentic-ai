@@ -8,13 +8,13 @@ the full flow from prerequisite validation through feature completion. Reference
 ## Prerequisite Validation (BUILD-01)
 
 Read `milestone-status.txt` for the active milestone. Scan the `## Features`
-section for any feature at `[~] planned, awaiting build` status (set by `/plan`
+section for any feature at `[~] planned, awaiting build` status (set by `/plan-feature`
 at Gate 4 approval). This status indicates a Gate 4-approved plan exists and the
 feature is ready for implementation.
 
 **If no features are at `[~] planned, awaiting build` status:**
 
-> "No Gate 4-approved plans found. Run /plan to create a feature plan first."
+> "No Gate 4-approved plans found. Run /plan-feature to create a feature plan first."
 
 Stop. Do not proceed.
 

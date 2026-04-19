@@ -21,7 +21,7 @@ Architecture and design specification skill that produces `docs/ARCHITECTURE_AND
 - When you want to check project status or get routing (use `/project`)
 - When you want to define project scope or create a PRD (use `/define` -- runs Gates 0/WB/1)
 - When you want to plan milestones (use `/milestone` -- requires Gate 2 approved)
-- When you want to plan a specific feature (use `/plan`)
+- When you want to plan a specific feature (use `/plan-feature`)
 - When you want to implement code (use `/build`)
 
 ## Behavior
@@ -84,5 +84,5 @@ skills/project/design/
 | `/project` | Reads `progress.txt` to route users to `/design` when Gate 1 is approved |
 | `/define` | Produces `prd.md` and `docs/codebase-assessment.md` that `/design` reads as inputs |
 | `/milestone` | Consumes `docs/ARCHITECTURE_AND_DESIGN.md` as input for milestone planning |
-| `/plan` | Consumes `docs/ARCHITECTURE_AND_DESIGN.md` for feature implementation plans |
+| `/plan-feature` | Consumes `docs/ARCHITECTURE_AND_DESIGN.md` for feature implementation plans |
 | `/build` | Records architectural deviations that `/design` refresh mode consolidates |

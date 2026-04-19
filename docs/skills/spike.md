@@ -22,7 +22,7 @@ Adversarial technical research skill that investigates technical questions using
 - When you want to define project scope or create a PRD (use `/define`)
 - When you want to design system architecture (use `/design`)
 - When you want to define milestones and features (use `/milestone`)
-- When you want to plan a feature (use `/plan`)
+- When you want to plan a feature (use `/plan-feature`)
 - When you want to implement a feature (use `/build`)
 
 ## Behavior
@@ -77,4 +77,4 @@ skills/project/spike/
 | `/project` | Reads `progress.txt` for spike status; routes users to `/spike` |
 | `/milestone` | Reads spike artifacts when referenced in milestone planning |
 | `/design` | Spike findings may inform architecture decisions |
-| `/plan` | Spike findings may inform feature planning |
+| `/plan-feature` | Spike findings may inform feature planning |

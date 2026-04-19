@@ -96,7 +96,7 @@ Populate all 12 sections of the template using information from:
 - **Documentation:** What docs to create or update for this feature
 - **Files to Create/Modify:** Specific file paths and what changes in each, informed by sub-agent scan
 - **Dependencies:** Other features, libraries, services this feature needs
-- **Architectural Deviations:** Default to `(none)`. This section is populated by `/build` during implementation, not by `/plan`.
+- **Architectural Deviations:** Default to `(none)`. This section is populated by `/build` during implementation, not by `/plan-feature`.
 
 ## Sub-Feature Sizing Validation (PLAN-04, D-06, D-07)
 
@@ -193,9 +193,9 @@ Update the feature marker in `milestone-status.txt` from `[ ]` to `[~] planned, 
 
 Where `3` is the number of sub-features defined in the plan.
 
-**CRITICAL: /plan does NOT write to progress.txt.** Unlike `/milestone` which writes to both `milestone-status.txt` and `progress.txt`, `/plan` writes ONLY to `milestone-status.txt`. Gate 4 is a feature-level event, not a milestone-level event. The `progress.txt` milestone summary line is only updated when features are completed by `/build`.
+**CRITICAL: /plan-feature does NOT write to progress.txt.** Unlike `/milestone` which writes to both `milestone-status.txt` and `progress.txt`, `/plan-feature` writes ONLY to `milestone-status.txt`. Gate 4 is a feature-level event, not a milestone-level event. The `progress.txt` milestone summary line is only updated when features are completed by `/build`.
 
-**Write-ordering (STATE-04):** Since `/plan` writes only to `milestone-status.txt`, there is no multi-file write ordering concern. Write `milestone-status.txt` and stop.
+**Write-ordering (STATE-04):** Since `/plan-feature` writes only to `milestone-status.txt`, there is no multi-file write ordering concern. Write `milestone-status.txt` and stop.
 
 ## Next Feature Offer (D-14)
 
@@ -211,7 +211,7 @@ The user can continue (return to Milestone and Feature Detection with the next f
 
 ## Anti-Patterns
 
-- **NEVER write to progress.txt** -- /plan writes ONLY to milestone-status.txt
+- **NEVER write to progress.txt** -- /plan-feature writes ONLY to milestone-status.txt
 - **Do NOT check for `[x] Gate 3`** -- Gate 3 stays `[~] In progress`. Validate that an active milestone exists instead.
 - **Do NOT auto-scan spike artifacts** -- read ONLY when the user explicitly references them (D-11)
 - **Do NOT perform architecture-wide codebase scans** -- the sub-agent scans feature-relevant files only (5-15 files, not 15-30)

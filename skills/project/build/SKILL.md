@@ -56,7 +56,7 @@ Find the target feature:
 - **All sub-features done:** If the target feature has all sub-features
   `[x]` but is not yet marked complete, skip to Step 4 (Feature Completion).
 - **No planned features:** If no features are at `[~] planned, awaiting
-  build`, report: "No planned features ready for build. Run /plan to plan a
+  build`, report: "No planned features ready for build. Run /plan-feature to plan a
   feature first." End session.
 
 ## Step 2 -- Refresh Codebase Assessment
@@ -128,10 +128,10 @@ DEVIATIONS: N recorded. Consider running /design refresh to consolidate.
 - **No active milestone:** Do not proceed. Tell user to run `/milestone`
   first.
 - **No planned features:** Report available features and their statuses.
-  Suggest running `/plan`.
+  Suggest running `/plan-feature`.
 - **Missing feature plan file:** Report inconsistency --
   `milestone-status.txt` references a plan that doesn't exist on disk.
-  Suggest running `/plan` to re-plan the feature.
+  Suggest running `/plan-feature` to re-plan the feature.
 - **Missing codebase assessment:** Warn but continue -- `/build` can proceed
   without it (see `references/codebase-refresh.md` edge cases).
 - **Test command fails:** Follow failure handling in
