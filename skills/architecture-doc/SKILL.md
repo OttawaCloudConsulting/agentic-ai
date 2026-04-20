@@ -23,8 +23,8 @@ independent of the `/project → /define → /design` flow. Two modes:
   document conforming to the canonical template at
   `skills/project/design/assets/architecture-template.md`.
 - **Audit** -- the document already exists. The same scan runs, but the
-  synthesis sub-agent uses `Edit` (not `Write`) to extend the document in
-  place, preserving user-authored content.
+  synthesis sub-agent preserves user-authored content by returning the full
+  updated document inline for the orchestrator to write.
 
 Both modes share the scan pipeline and diverge only in the synthesis
 sub-agent. The skill opportunistically uses any MCP servers detected in the
