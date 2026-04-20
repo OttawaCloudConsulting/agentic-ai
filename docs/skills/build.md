@@ -20,13 +20,13 @@ Sub-feature-by-sub-feature implementation skill that executes Gate 4-approved fe
 - When you want to define project scope or create a PRD (use `/define`)
 - When you want to design system architecture (use `/design`)
 - When you want to define milestones and features (use `/milestone`)
-- When you want to plan a feature (use `/plan`)
+- When you want to plan a feature (use `/plan-feature`)
 
 ## Behavior
 
 ### 1. State Detection
 
-Reads `progress.txt` from the project root and finds the active milestone (first at `[ ]` or `[~]` status). Reads that milestone's `milestone-status.txt`. Auto-selects the first feature at `[~] planned, awaiting build` status. The user can override with an explicit feature name. If no features are at `[~] planned, awaiting build`, reports that no planned features are ready and suggests running `/plan`. If all sub-features are already `[x]` but the feature is not yet marked complete, skips directly to Feature Completion.
+Reads `progress.txt` from the project root and finds the active milestone (first at `[ ]` or `[~]` status). Reads that milestone's `milestone-status.txt`. Auto-selects the first feature at `[~] planned, awaiting build` status. The user can override with an explicit feature name. If no features are at `[~] planned, awaiting build`, reports that no planned features are ready and suggests running `/plan-feature`. If all sub-features are already `[x]` but the feature is not yet marked complete, skips directly to Feature Completion.
 
 ### 2. Codebase Assessment Refresh
 
@@ -82,5 +82,5 @@ skills/project/build/
 | Skill | Relationship |
 |-------|-------------|
 | `/project` | Reads `progress.txt` for milestone status; routes users to `/build` |
-| `/plan` | Produces Gate 4-approved feature plans that `/build` consumes |
+| `/plan-feature` | Produces Gate 4-approved feature plans that `/build` consumes |
 | `/design` | Refresh mode consolidates deviations recorded by `/build` |

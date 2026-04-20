@@ -112,7 +112,7 @@ SPIKES: (none yet)
 Per D-03, one bold recommended action plus alternatives. Per D-04, only show alternatives valid for the current state:
 
 ```
-RECOMMENDED: Run `/plan` to create the implementation plan for Feature 01.3: Password Reset
+RECOMMENDED: Run `/plan-feature` to create the implementation plan for Feature 01.3: Password Reset
 Also available:
   - `/spike` -- research a technical question
   - `/milestone` -- define the next milestone

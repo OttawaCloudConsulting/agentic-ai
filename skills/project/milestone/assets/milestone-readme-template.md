@@ -32,7 +32,7 @@
 
 ## Sizing
 
-[Brief sizing assessment. Confirm 2-5 features (DD-1). Note any features that may be large enough to warrant sub-feature splitting at /plan time. Reference the ~120k token per sub-feature guideline from DD-1.]
+[Brief sizing assessment. Confirm 2-5 features (DD-1). Note any features that may be large enough to warrant sub-feature splitting at /plan-feature time. Reference the ~120k token per sub-feature guideline from DD-1.]
 
 ## Configuration
 

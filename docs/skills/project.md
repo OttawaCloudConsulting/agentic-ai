@@ -56,7 +56,7 @@ Recommends the next skill to run based on current project state. Displays one pr
 - Routes to `/define` for Gates 0, WB, and 1
 - Routes to `/design` for Gate 2
 - Routes to `/milestone` for Gate 3
-- Routes to `/plan` for Gate 4
+- Routes to `/plan-feature` for Gate 4
 - Routes to `/build` for implementation
 - Routes to `/spike` when technical research is needed
 
@@ -96,6 +96,6 @@ When Gate WB is in Pending state on a subsequent invocation, `/project` shows a 
 | `/define` | Routed to for Gates 0, WB, 1 |
 | `/design` | Routed to for Gate 2 |
 | `/milestone` | Routed to for Gate 3 |
-| `/plan` | Routed to for Gate 4 |
+| `/plan-feature` | Routed to for Gate 4 |
 | `/build` | Routed to for implementation |
 | `/spike` | Routed to for technical research |
