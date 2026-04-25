@@ -1,101 +1,64 @@
-# /project
+# Project Codex Skills
 
-**Source:** `skills/project/`
-**Command:** `/project`
-**Activation:** Manual only (`disable-model-invocation: true`) -- invoked via slash command. Not auto-triggered by conversational phrases.
+**Source:** `codex-skills/project/`
+**Entry Skill:** `$project`
+**Activation:** Manual only. The project suite is used only when the user explicitly invokes a project skill.
+**Detailed Docs:** [docs/codex-skills/project.md](../codex-skills/project.md)
 
 ## Purpose
 
-Project orchestrator that bootstraps state on first run and routes users to the correct next skill on every subsequent invocation. `/project` is the single entry point to the project skill suite. It reads `progress.txt` and all `milestone-status.txt` files, validates artifact existence and milestone consistency, displays a structured status report, and recommends what to do next. Writes to disk only during bootstrap (creating `progress.txt`) and Gate 3 closure (marking all milestones complete in `progress.txt`).
+The Project Codex skills provide a gated project delivery workflow for Codex. The suite bootstraps project state, defines requirements, creates architecture, breaks work into milestones and feature plans, implements planned features, and captures technical spikes. State is tracked in plain-text project artifacts so Codex can resume work across sessions without relying on chat history.
+
+## Skill Suite
+
+| Skill | Purpose | Primary Outputs |
+|---|---|---|
+| `$project` | Bootstrap `progress.txt`, report status, validate state, and recommend the next skill | `progress.txt` on bootstrap; status report in chat |
+| `$project-define` | Run Codebase Alignment, optional Working Backwards, and Scope Review | `docs/codebase-assessment.md`, `docs/working-backwards.md`, `prd.md`, review files |
+| `$project-design` | Produce or refresh architecture and design documentation | `docs/ARCHITECTURE_AND_DESIGN.md`, Gate 2 review file |
+| `$project-milestone` | Define or revise one milestone at a time | `milestones/<NN>-<name>/README.md`, `milestone-status.txt` |
+| `$project-plan-feature` | Create or revise one feature implementation plan | `milestones/<NN>-<name>/plans/<feature>.md` |
+| `$project-build` | Implement a planned feature sub-feature by sub-feature | Code changes, commits, updated status files, deviation notes when needed |
+| `$project-spike` | Run adversarial technical research and track spike state | `docs/spikes/<topic>.md`, spike entries in `progress.txt` |
 
 ## When to Use
 
-- Starting a new project (triggers bootstrap -- creates `progress.txt` with gate entries)
-- Checking project status ("where am I?", "project status")
-- Deciding what to do next ("what's next?")
-- After completing a phase and needing routing to the next skill
-- When project goals have changed and you need re-planning routing
+- Starting a new gated project with Codex
+- Checking project status and deciding what to do next
+- Creating a PRD, architecture document, milestones, and implementation plans in a controlled sequence
+- Implementing approved feature plans while keeping progress files current
+- Researching uncertain technical questions without mixing research and red-team review contexts
 
-## When NOT to Use
+## Workflow Summary
 
-- When you want to create or revise a PRD (use `/define`)
-- When you want to implement code (use `/build`)
-- When you want to research a technical question (use `/spike`)
-- When you want to design architecture (use `/design`)
+1. Run `$project` first to create or read `progress.txt`.
+2. Run `$project-define` to complete Gates 0, WB, and 1.
+3. Run `$project-design` to complete Gate 2.
+4. Run `$project-milestone` to define one milestone for Gate 3.
+5. Run `$project-plan-feature` to approve a Gate 4 feature plan.
+6. Run `$project-build` to implement the planned feature.
+7. Use `$project-spike` whenever a technical uncertainty needs isolated research.
+8. Return to `$project` for status, validation, routing, and Gate 3 closure.
 
-## Behavior
+## State Model
 
-### 1. Bootstrap (first run)
+The suite uses `progress.txt` as the project-level state file and `milestones/*/milestone-status.txt` as per-milestone state. Both use four checkbox markers:
 
-On the very first invocation, if `progress.txt` does not exist, `/project` creates it with gate entries and empty milestone/spike sections.
+| Marker | Meaning |
+|---|---|
+| `[x]` | Complete |
+| `[~]` | In progress |
+| `[ ]` | Pending |
+| `[-]` | Skipped or not applicable |
 
-- **Greenfield projects:** Gate 0 (Codebase Alignment) is recorded as `[-] Skipped (greenfield)` since there is no existing codebase to assess.
-- **Brownfield projects:** Gate 0 is recorded as `[ ]` (not started), ready for `/define` to perform codebase assessment.
+When both `milestone-status.txt` and `progress.txt` need updates, the milestone status file is written first. `$project` treats `milestone-status.txt` as the source of truth for feature completion and blocks routing when milestone counts diverge.
 
-Gate WB (Working Backwards) is included as a gate entry in Pending or Not Started state depending on whether the customer outcome is clear.
+## Related Documentation
 
-### 2. Status Report (subsequent runs)
-
-Reads `progress.txt` and all `milestones/*/milestone-status.txt` files. Displays a structured summary:
-
-- **Gates:** Checklist with completion dates (e.g., `[x] Gate 0: Codebase Alignment -- 2026-03-15`)
-- **Active milestone:** Expanded view with per-feature status, sub-feature progress, and notes
-- **Completed milestones:** One-line summaries with completion dates
-- **Upcoming milestones:** One-line summaries showing they are not yet started
-- **Spikes:** All spikes (both open and resolved) in a dedicated section
-
-**Validation checks run on every invocation:**
-
-- **Artifact existence:** For each approved gate, checks that the expected artifact file exists on disk. Missing artifacts produce an inline warning directly after the affected gate entry. These warnings are informational only and do not block routing.
-- **Milestone consistency:** Compares `progress.txt` milestone summary lines against the corresponding `milestone-status.txt` files. Divergence (e.g., feature count mismatch, status disagreement) blocks routing until the user acknowledges the inconsistency.
-
-### 3. Routing
-
-Recommends the next skill to run based on current project state. Displays one primary recommendation (highlighted) plus 2-3 context-sensitive alternatives. Only actions valid for the current project state are shown.
-
-- Routes to `/define` for Gates 0, WB, and 1
-- Routes to `/design` for Gate 2
-- Routes to `/milestone` for Gate 3
-- Routes to `/plan-feature` for Gate 4
-- Routes to `/build` for implementation
-- Routes to `/spike` when technical research is needed
-
-**Re-planning detection:** When the user signals that goals have changed (e.g., "goals changed", "re-plan", "revise PRD"), `/project` detects the intent and routes to `/define` in revision mode. When the user signals milestone re-planning, routes to `/milestone` in revision mode.
-
-## Gate WB Handling
-
-Working Backwards is an optional gate offered when the customer outcome is unclear. When no `working-backwards.md` exists and customer outcome is unclear, `/project` offers Gate WB with a brief explanation of the Working Backwards approach (2-3 sentences) plus three options:
-
-- **Yes** -- proceed with Working Backwards via `/define`
-- **Skip** -- mark Gate WB as skipped and continue
-- **Defer** -- mark Gate WB as Pending for later decision
-
-When Gate WB is in Pending state on a subsequent invocation, `/project` shows a gentle reminder at the top of the status report but still displays the full status report. The pending decision is highlighted but does not suppress or block status output.
-
-## Artifacts
-
-| File | Read/Write | When |
-|------|-----------|------|
-| `progress.txt` | Write | Bootstrap (creation) and Gate 3 closure (completion update) |
-| `progress.txt` | Read | Every invocation after bootstrap |
-| `milestones/*/milestone-status.txt` | Read | Every invocation (for consistency validation) |
-| Gate artifact files | Read (existence check) | Every invocation (for artifact validation) |
-
-## Skill Files
-
-- `skills/project/SKILL.md` -- Main workflow (entry point)
-- `skills/project/references/progress-format.md` -- State file format specification
-- `skills/project/references/routing-logic.md` -- Routing decision tables
-- `skills/project/references/status-report-format.md` -- Output format specification
-- `skills/project/DESIGN.md` -- Design decisions (13 decisions, DD-1 through DD-14)
-
-## Related Skills
-
-| Skill | Relationship |
-|-------|-------------|
-| `/define` | Routed to for Gates 0, WB, 1 |
-| `/design` | Routed to for Gate 2 |
-| `/milestone` | Routed to for Gate 3 |
-| `/plan-feature` | Routed to for Gate 4 |
-| `/build` | Routed to for implementation |
-| `/spike` | Routed to for technical research |
+- [Project Codex Skills Detailed Guide](../codex-skills/project.md)
+- [Define Skill](define.md)
+- [Design Skill](design.md)
+- [Milestone Skill](milestone.md)
+- [Plan Feature Skill](plan-feature.md)
+- [Build Skill](build.md)
+- [Spike Skill](spike.md)
