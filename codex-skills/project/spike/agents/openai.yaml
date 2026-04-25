@@ -1,0 +1,7 @@
+interface:
+  display_name: "Project Spike"
+  short_description: "Run adversarial Project spike research"
+  default_prompt: "Use $project-spike to research a technical question and write a spike artifact."
+
+policy:
+  allow_implicit_invocation: false

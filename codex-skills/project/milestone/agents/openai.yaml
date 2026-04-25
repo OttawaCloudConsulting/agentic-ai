@@ -1,0 +1,7 @@
+interface:
+  display_name: "Project Milestone"
+  short_description: "Define or revise one Project milestone"
+  default_prompt: "Use $project-milestone to define or revise the next Project milestone."
+
+policy:
+  allow_implicit_invocation: false

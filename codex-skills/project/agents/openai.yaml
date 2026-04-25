@@ -1,0 +1,7 @@
+interface:
+  display_name: "Project"
+  short_description: "Report Project status and route next steps"
+  default_prompt: "Use $project to bootstrap or report Project status and recommend the next explicit Project skill."
+
+policy:
+  allow_implicit_invocation: false
