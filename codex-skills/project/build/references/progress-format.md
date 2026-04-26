@@ -84,7 +84,7 @@ Or with a reason:
 **Pending (deferred decision):**
 
 ```
-[ ] Gate WB: Working Backwards  Pending — offered, awaiting decision
+[ ] Gate WB: Working Backwards  Pending -- offered, awaiting decision
 ```
 
 **In progress:**

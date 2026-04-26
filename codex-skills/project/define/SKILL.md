@@ -33,8 +33,9 @@ artifact, and PRD in one continuous session.
    `docs/codebase-assessment.md`. For greenfield projects, record Gate 0 as
    skipped using the compatible notation.
 3. Read `references/gate-wb-working-backwards.md` and offer Working Backwards.
-   Gate WB can be approved, skipped, or deferred; deferred state does not block
-   Gate 1.
+   Gate WB can be approved, skipped, or deferred; a deferred state allows Gate 1
+   interview and drafting work to proceed, but Gate 1 cannot be approved or
+   completed until Gate WB is resolved as `[x]` or `[-]`.
 4. Read `references/gate-1-prd.md` and create or revise `prd.md` using
    `assets/prd-template.md`.
 5. Create/update review files under `docs/reviews/` using

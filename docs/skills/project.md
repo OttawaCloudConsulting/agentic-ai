@@ -5,6 +5,8 @@
 **Activation:** Manual only. The project suite is used only when the user explicitly invokes a project skill.
 **Detailed Docs:** [docs/codex-skills/project.md](../codex-skills/project.md)
 
+**Note:** This page is a Codex skill-suite summary, not a slash-command skill page. The commands below use `$project-*` invocation names and are documented separately from the legacy `/project` slash-command suite.
+
 ## Purpose
 
 The Project Codex skills provide a gated project delivery workflow for Codex. The suite bootstraps project state, defines requirements, creates architecture, breaks work into milestones and feature plans, implements planned features, and captures technical spikes. State is tracked in plain-text project artifacts so Codex can resume work across sessions without relying on chat history.
@@ -56,9 +58,3 @@ When both `milestone-status.txt` and `progress.txt` need updates, the milestone 
 ## Related Documentation
 
 - [Project Codex Skills Detailed Guide](../codex-skills/project.md)
-- [Define Skill](define.md)
-- [Design Skill](design.md)
-- [Milestone Skill](milestone.md)
-- [Plan Feature Skill](plan-feature.md)
-- [Build Skill](build.md)
-- [Spike Skill](spike.md)
