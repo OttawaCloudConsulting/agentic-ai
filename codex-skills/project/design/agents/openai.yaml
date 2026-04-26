@@ -1,0 +1,7 @@
+interface:
+  display_name: "Project Design"
+  short_description: "Create or refresh the architecture design"
+  default_prompt: "Use $project-design to create or refresh the Project architecture document."
+
+policy:
+  allow_implicit_invocation: false

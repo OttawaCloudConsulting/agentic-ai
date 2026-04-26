@@ -1,0 +1,7 @@
+interface:
+  display_name: "Project Build"
+  short_description: "Implement a planned Project feature"
+  default_prompt: "Use $project-build to implement the next planned Project feature."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,6 +1,6 @@
 # Skills Reference
 
-Skills are portable bundles that provide structured workflows with supporting assets (scripts, references, templates). Each skill is a directory containing a `SKILL.md` definition plus supporting files. They are invoked with `/<skill-name>` in the Claude Code CLI.
+Skills are portable bundles that provide structured workflows with supporting assets (scripts, references, templates). Each skill is a directory containing a `SKILL.md` definition plus supporting files. Most skills in this index are invoked with `/<skill-name>` in the Claude Code CLI. Codex-specific skill suites are listed separately in the same table and use their documented `$skill` explicit invocation names.
 
 For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 
@@ -22,7 +22,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | Spike | `/spike` | Adversarial technical research with red-team validation and follow-up support | [View](skills/spike.md) |
 | OCC Skill Creator | `/occ-skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/occ-skill-creator.md) |
 | OCC Skill Refactor | `/occ-skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/occ-skill-refactor.md) |
-| Project | `/project` | Project orchestrator -- bootstraps state, reports status, routes to next skill | [View](skills/project.md) |
+| Project Codex Skills | `$project` | Codex project suite -- bootstraps state, reports status, routes to the next explicit `$project-*` skill | [View](skills/project.md) |
 | Rule Creator | `/rule-creator` | Interactive rule generation with documentation and catalog updates | [View](skills/rule-creator.md) |
 
 ## How Skills Work

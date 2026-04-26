@@ -1,0 +1,7 @@
+interface:
+  display_name: "Project Define"
+  short_description: "Create assessment, WB, and PRD artifacts"
+  default_prompt: "Use $project-define to run Project definition gates and produce the PRD."
+
+policy:
+  allow_implicit_invocation: false

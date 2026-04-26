@@ -1,0 +1,7 @@
+interface:
+  display_name: "Project Plan Feature"
+  short_description: "Create a Gate 4 feature implementation plan"
+  default_prompt: "Use $project-plan-feature to plan the next Project feature for implementation."
+
+policy:
+  allow_implicit_invocation: false
