@@ -68,7 +68,7 @@ cp rules/agent-delegation.md                         <target-repo>/.claude/rules
 **Note on `agent-delegation.md`:** This rule depends on a `UserPromptSubmit` hook in `.claude/settings.json` to be reliably consulted (see § Setup / Installation in the rule file). Prefer the installer over a bare `cp`:
 
 ```bash
-bash scripts/install-agent-delegation.sh <target-repo-path>
+bash scripts/agent-delegation/install.sh <target-repo-path>
 ```
 
 The installer copies the rule and merges the hook idempotently.
@@ -79,7 +79,7 @@ Rules take effect immediately on the next Claude Code conversation in that repos
 
 | Project Type | Recommended Rules |
 |---|---|
-| Any project | Defensive v2 (all 3) + `agent-delegation.md` (install via `scripts/install-agent-delegation.sh`) |
+| Any project | Defensive v2 (all 3) + `agent-delegation.md` (install via `scripts/agent-delegation/install.sh`) |
 | AWS CDK projects | Defensive v2 (all 3) + `cdk-best-practices.md` |
 | Terraform projects | Defensive v2 (all 3) + `terraform-best-practices.md` |
 | Crossplane v1 projects | Defensive v2 (all 3) + `crossplane-v1-best-practices.md` + `kubernetes-best-practices.md` |

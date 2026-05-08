@@ -9,7 +9,7 @@ set -euo pipefail
 # before its first tool call.
 #
 # Usage:
-#   bash scripts/install-agent-delegation.sh <target-repo-path>
+#   bash scripts/agent-delegation/install.sh <target-repo-path>
 #
 # Effects on the target:
 #   - <target>/.claude/rules/agent-delegation.md      copied (added | updated | unchanged)
@@ -19,7 +19,7 @@ set -euo pipefail
 # Dependencies: jq
 
 if [[ $# -ne 1 ]]; then
-  echo "Usage: bash scripts/install-agent-delegation.sh <target-repo-path>" >&2
+  echo "Usage: bash scripts/agent-delegation/install.sh <target-repo-path>" >&2
   exit 1
 fi
 
@@ -30,7 +30,7 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TARGET_INPUT="$1"
 
 if [[ ! -d "$TARGET_INPUT" ]]; then
@@ -63,14 +63,20 @@ else
 fi
 echo "==> Rule file:   $RULE_STATE ($RULE_DST)"
 
-# 2. Ensure settings.json exists
+# 2. Ensure settings.json exists and is valid JSON before any merge attempt.
+#    Validating up front gives a clean error rather than a cryptic jq parse
+#    failure halfway through, and lets us trust the file for subsequent reads.
 if [[ ! -f "$SETTINGS" ]]; then
   echo '{}' > "$SETTINGS"
+elif ! jq empty "$SETTINGS" >/dev/null 2>&1; then
+  echo "ERROR: $SETTINGS is not valid JSON. Fix the file or remove it before re-running." >&2
+  exit 1
 fi
 
 # 3. Hook command (literal — heredoc is single-quoted, no expansion).
 #    First line must contain the marker used for idempotency. Bumping the
 #    marker (v1 → v2) re-installs even if a v1 entry already exists.
+#    To change the keyword set, edit the heredoc below and bump the marker.
 HOOK_MARKER="agent-delegation-hook v1"
 HOOK_COMMAND=$(cat <<'EOF'
 # agent-delegation-hook v1
@@ -82,13 +88,16 @@ exit 0
 EOF
 )
 
-# 4. Idempotency check: scan every .command string in the JSON for the marker
+# 4. Idempotency check: scan every .command string in the JSON for the marker.
 if jq -e --arg marker "$HOOK_MARKER" \
      '[.. | objects | .command? // empty | select(type == "string" and contains($marker))] | length > 0' \
      "$SETTINGS" >/dev/null 2>&1; then
   HOOK_STATE="already installed"
 else
-  TMP="$TARGET/.claude/settings.json.tmp"
+  # Use mktemp + trap so a partial write or jq failure never leaves a stale
+  # *.tmp behind in the consumer's .claude/ directory.
+  TMP="$(mktemp "$TARGET/.claude/settings.json.XXXXXX")"
+  trap 'rm -f "$TMP"' EXIT
   jq --arg cmd "$HOOK_COMMAND" '
     .hooks = (.hooks // {}) |
     .hooks.UserPromptSubmit = (.hooks.UserPromptSubmit // []) |
@@ -102,6 +111,7 @@ else
     }]
   ' "$SETTINGS" > "$TMP"
   mv "$TMP" "$SETTINGS"
+  trap - EXIT
   HOOK_STATE="added"
 fi
 echo "==> Hook:        $HOOK_STATE ($SETTINGS)"

@@ -20,7 +20,7 @@ Adopt this rule on any project where Claude Code is the primary development agen
 
 ### Trigger Card
 
-A six-line fast-path table at the top of the rule. Maps task shape to agent: bulk discovery → Explore, bash/logs → Haiku, repo-wide search → Gemini, architecture/blocker → Opus, terminal/scripting → Codex, default → Sonnet. Designed to drop consultation cost from "re-read the matrix" to "scan five lines."
+A six-line fast-path table at the top of the rule. Maps task shape to agent: bulk discovery → Explore, log retrieval / output parsing → Haiku, repo-wide search → Gemini, architecture/blocker → Opus, terminal/scripting → Codex, default → Sonnet. Designed to drop consultation cost from "re-read the matrix" to "scan five lines."
 
 ### Entry Condition
 
@@ -39,7 +39,7 @@ Sonnet is the default development and orchestration agent. Responsibilities: mul
 Six rows. Each lists the agent, when to delegate to it, its strengths, and its weaknesses:
 
 - **Sonnet** — default for feature development, refactoring, debugging, coordinated multi-file changes. Best balance of reasoning, context retention, architectural cohesion. Less cost-efficient for repetitive boilerplate.
-- **Haiku** — tests, documentation, schema mappings, repetitive CRUD, simple UI/CSS. Fast and cheap for localized tasks. Weak at deep architectural reasoning.
+- **Haiku** — tests, documentation, schema mappings, repetitive CRUD, simple UI/CSS, log retrieval and output parsing. Fast and cheap for localized tasks. Weak at deep architectural reasoning.
 - **Opus** — unresolved system failures, security design, difficult debugging, core architecture decisions. Maximum reasoning depth. Highest latency and cost.
 - **Codex** — terminal workflows, shell scripts, deterministic implementation, regex transformations, tooling glue. Strong execution accuracy. Smaller effective context, weaker project-wide cohesion.
 - **Gemini** — repository-wide discovery, large log analysis, legacy codebase scanning, long-document ingestion. Massive context window. Lower implementation precision; outputs require validation.
@@ -88,7 +88,7 @@ A `UserPromptSubmit` hook is the right mechanism. Hooks fire deterministically �
 ### Installer usage
 
 ```bash
-bash scripts/install-agent-delegation.sh <target-repo-path>
+bash scripts/agent-delegation/install.sh <target-repo-path>
 ```
 
 The installer:
@@ -121,7 +121,7 @@ Behaviour:
 - On match, prints the reminder line on stdout — Claude Code injects stdout as additional context before the agent processes the prompt.
 - On no match, exits silently. No injection, no overhead.
 
-The keyword set is intentionally narrow to keep false positives low. Add or remove keywords by editing the rule file's Setup section, then re-running the installer with a bumped marker (`v1` → `v2`).
+The keyword set is intentionally narrow to keep false positives low. To change keywords, edit the heredoc in `scripts/agent-delegation/install.sh`, bump the marker (`v1` → `v2`), then re-run the installer. Editing the rule file does **not** affect the installed hook — the `command` value in `.claude/settings.json` is a static string captured at install time. The bumped marker is what forces a re-install over an existing `v1` entry.
 
 ### Manual install
 
@@ -156,18 +156,23 @@ Confirm the rule and hook are wired correctly:
 # 1. Rule file landed
 test -f <target>/.claude/rules/agent-delegation.md && echo OK
 
-# 2. Hook entry present
+# 2. Hook entry present (marker-keyed — robust to other UserPromptSubmit hooks)
 jq -r '.hooks.UserPromptSubmit[].hooks[].command' <target>/.claude/settings.json \
   | grep -q 'agent-delegation-hook v1' && echo OK
 
+# Extract the agent-delegation hook by its marker, NOT by array index, in case
+# the target already had other UserPromptSubmit hooks ahead of it.
+HOOK_CMD=$(jq -r '
+  [.hooks.UserPromptSubmit[].hooks[]
+   | select(.command? | type == "string" and contains("agent-delegation-hook v1"))
+   | .command][0]' <target>/.claude/settings.json)
+
 # 3. Hook fires on a matching prompt
-printf '{"prompt":"please audit the docs directory"}' \
-  | bash -c "$(jq -r '.hooks.UserPromptSubmit[0].hooks[0].command' <target>/.claude/settings.json)"
+printf '{"prompt":"please audit the docs directory"}' | bash -c "$HOOK_CMD"
 # expect: a single line starting with "Reminder (agent-delegation rule):"
 
 # 4. Hook silent on a non-matching prompt
-printf '{"prompt":"fix the typo on line 12"}' \
-  | bash -c "$(jq -r '.hooks.UserPromptSubmit[0].hooks[0].command' <target>/.claude/settings.json)"
+printf '{"prompt":"fix the typo on line 12"}' | bash -c "$HOOK_CMD"
 # expect: no output, exit 0
 ```
 

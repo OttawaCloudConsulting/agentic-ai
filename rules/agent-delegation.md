@@ -8,7 +8,7 @@
 
 ```text
 Bulk discovery (read-only)             → Explore
-Bash scripts / logs / commands         → Haiku
+Log retrieval / output parsing         → Haiku
 Repo-wide search / dependency map      → Gemini
 Architecture / unresolved blocker      → Opus
 Terminal / scripting workflows         → Codex
@@ -68,7 +68,7 @@ Even when delegation occurs, Sonnet remains responsible for:
 | Agent       | Delegate When... | Strengths | Weaknesses |
 |-------------|------------------|-----------|------------|
 | **Sonnet**  | Default for feature development, refactoring, debugging, and coordinated multi-file changes | Best balance of reasoning, context retention, and architectural cohesion | Less cost-efficient for repetitive boilerplate |
-| **Haiku**   | Generating tests, documentation, schema mappings, repetitive CRUD, simple UI/CSS updates | Extremely fast and low-cost for localized implementation tasks | Weak at deep architectural reasoning and complex dependencies |
+| **Haiku**   | Generating tests, documentation, schema mappings, repetitive CRUD, simple UI/CSS updates, log retrieval and output parsing | Extremely fast and low-cost for localized implementation tasks | Weak at deep architectural reasoning and complex dependencies |
 | **Opus**    | Resolving unresolved system failures, security design, difficult debugging, or core architecture decisions | Maximum reasoning depth and abstract systems thinking | Highest latency and cost |
 | **Codex**   | Terminal workflows, shell scripts, deterministic implementation tasks, regex transformations, tooling glue code | Strong execution-oriented accuracy and structured implementation | Smaller effective context and weaker project-wide cohesion |
 | **Gemini**  | Repository-wide discovery, large log analysis, legacy codebase scanning, long-document ingestion | Massive context window enables large-scale analysis | Lower implementation precision; requires validation before merge |
@@ -215,7 +215,7 @@ Excessive delegation increases fragmentation and integration cost.
 **How to install.** Run the installer from this repository against the target consumer repo:
 
 ```bash
-bash scripts/install-agent-delegation.sh <target-repo-path>
+bash scripts/agent-delegation/install.sh <target-repo-path>
 ```
 
 The installer:
