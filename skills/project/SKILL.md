@@ -73,13 +73,16 @@ This is the ONLY time `/project` writes to disk.
 
 Read `progress.txt` from disk (fresh read -- STATE-03). Parse:
 
+- `# Project-ID: <slug>` header line -- derive the artifact base path: `.project/<slug>/`.
+  All artifact reads and writes use this base path for the remainder of the invocation.
 - All gate entries in the `## Gates` section (status marker, name, date, artifact path).
 - All milestone summary lines in the `## Milestones` section (status, name, path, feature
   counts).
 - All spike entries in the `## Spikes` section (status, name, path, resolution date).
 
-For each milestone found, read its `milestone-status.txt` file (path derived from the
-milestone summary line's directory path).
+For each milestone found, read its `milestone-status.txt` at
+`.project/<slug>/milestones/<NN>-<name>/milestone-status.txt` (path derived from the
+milestone summary line's directory path, resolved against the artifact base path).
 
 Read `references/routing-logic.md` for validation rules, then perform:
 
@@ -134,7 +137,8 @@ state using the routing table. Display per D-03:
   current project state).
 
 **Gate WB offer (DD-11, D-08):** If Gate 0 is approved (`[x]`) or skipped (`[-]` greenfield),
-no `docs/working-backwards.md` exists, Gate WB has not been offered yet, and the customer
+no `.project/{slug}/docs/working-backwards.md` exists (where `{slug}` is the value parsed
+from the `# Project-ID:` header), Gate WB has not been offered yet, and the customer
 outcome is unclear -- offer Gate WB using `AskUserQuestion` with options:
 
 - **Yes** -- proceed with Working Backwards exercise (routes to `/define`)

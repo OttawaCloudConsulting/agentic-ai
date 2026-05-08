@@ -13,7 +13,7 @@ The state-to-action table below covers every reachable project state. The skill 
 | No `progress.txt` | Bootstrap (internal -- do not route to another skill) | -- |
 | Gate WB is `[ ] Pending` | Resolve Gate WB: offer Yes/Skip/Defer (per D-08) | -- |
 | No gates approved (all `[ ]`) | Run `/define` to begin codebase assessment | -- |
-| Gate 0 approved, Gate WB not offered yet, no `docs/working-backwards.md`, customer outcome unclear | Offer Gate WB (per D-08, DD-11) | `/define` (continue to Gate 1) |
+| Gate 0 approved, Gate WB not offered yet, no `.project/{slug}/docs/working-backwards.md`, customer outcome unclear | Offer Gate WB (per D-08, DD-11) | `/define` (continue to Gate 1) |
 | Gate 0 approved, Gate WB resolved (`[x]` or `[-]`), no Gate 1 | Run `/define` to continue PRD interview | -- |
 | Gate 1 approved, no Gate 2 | Run `/design` to create architecture | `/spike` |
 | Gate 2 approved, no milestones defined | Run `/milestone` to define first milestone | `/spike` |
@@ -69,7 +69,7 @@ Per D-08 and DD-11, Gate WB (Working Backwards) is an optional stage that `/proj
 
 **Evaluation sequence:**
 
-1. Check if `docs/working-backwards.md` exists on disk.
+1. Check if `.project/{slug}/docs/working-backwards.md` exists on disk (path derived from the `# Project-ID: <slug>` header in `progress.txt`).
 2. Check the Gate WB line in `progress.txt`.
 3. Apply the appropriate action based on state:
 
@@ -116,12 +116,12 @@ Per PROJ-05 and D-07, `/project` validates that milestone summaries in `progress
 **Process:**
 
 1. For each milestone entry in the `## Milestones` section of `progress.txt`, extract the milestone directory path and the `N/M features complete` count.
-2. Read the corresponding `milestones/<NN>-<name>/milestone-status.txt`.
+2. Read the corresponding `milestone-status.txt` at `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` (path derived from the milestone summary line, resolved against the artifact base path).
 3. Count the `[x]` feature entries in `milestone-status.txt`. Compare to the `N` (completed) and `M` (total) values in the `progress.txt` milestone summary line.
 4. If the counts diverge, emit an inline warning after the milestone entry in the status report:
 
 ```
-[~] Milestone 01: Core Auth  milestones/01-core-auth/  2/3 features complete
+[~] Milestone 01: Core Auth  .project/my-project/milestones/01-core-auth/  2/3 features complete
      Warning: Milestone status divergence detected -- progress.txt says 2/3, milestone-status.txt shows 1/3. Please acknowledge to continue routing.
 ```
 

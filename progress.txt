@@ -11,12 +11,12 @@
     - /project bootstrap proposes slug via AskUserQuestion before writing
     NOTES: Started 2026-05-08  Completed 2026-05-08
 
-[ ] Feature 2: Path Routing Infrastructure
+[x] Feature 2: Path Routing Infrastructure
     - /project reads Project-ID and constructs .project/{slug}/ base path
     - Status report displays .project/{slug}/docs/... and .project/{slug}/milestones/... paths
     - Artifact validation (PROJ-04) resolves paths using computed base
     - routing-logic.md and status-report-format.md updated
-    NOTES:
+    NOTES: Started 2026-05-08  Completed 2026-05-08
 
 [ ] Feature 3: /define Skill Path Updates
     - All docs/ outputs → .project/{slug}/docs/ (codebase-assessment, working-backwards, reviews/)
