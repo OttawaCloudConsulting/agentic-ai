@@ -1,0 +1,52 @@
+# Progress: Project Skill Path Refactor
+# Source: prd.md + docs/project-skill-refactor/ARCHITECTURE_AND_DESIGN.md
+# Spec: docs/project-skill-refactor/ARCHITECTURE_AND_DESIGN.md is the authoritative design reference
+# Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
+
+## Features
+
+[x] Feature 1: Bootstrap — Add Project-ID to progress.txt
+    - progress.txt bootstrap template gains # Project-ID: <slug> header line
+    - Slug derivation rules specified in references/progress-format.md
+    - /project bootstrap proposes slug via AskUserQuestion before writing
+    NOTES: Started 2026-05-08  Completed 2026-05-08
+
+[ ] Feature 2: Path Routing Infrastructure
+    - /project reads Project-ID and constructs .project/{slug}/ base path
+    - Status report displays .project/{slug}/docs/... and .project/{slug}/milestones/... paths
+    - Artifact validation (PROJ-04) resolves paths using computed base
+    - routing-logic.md and status-report-format.md updated
+    NOTES:
+
+[ ] Feature 3: /define Skill Path Updates
+    - All docs/ outputs → .project/{slug}/docs/ (codebase-assessment, working-backwards, reviews/)
+    - define/SKILL.md and define/references/progress-format.md updated
+    NOTES:
+
+[ ] Feature 4: /design Skill Path Updates
+    - docs/ARCHITECTURE_AND_DESIGN.md → .project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md
+    - Refresh mode scans .project/{slug}/milestones/*/plans/
+    - design/SKILL.md and design/references/progress-format.md updated
+    NOTES:
+
+[ ] Feature 5: /milestone and /plan-feature Skill Path Updates
+    - milestones/<NN>-<name>/ → .project/{slug}/milestones/<NN>-<name>/
+    - milestone-status.txt, plans/, reviews/ all under new base
+    - milestone/SKILL.md, plan-feature/SKILL.md and both progress-format.md refs updated
+    NOTES:
+
+[ ] Feature 6: /build Skill Path Updates
+    - Codebase refresh writes to .project/{slug}/docs/codebase-assessment.md
+    - Feature plans read from .project/{slug}/milestones/.../plans/
+    - build/SKILL.md and build/references/progress-format.md updated
+    NOTES:
+
+[ ] Feature 7: /spike Skill Path Updates
+    - docs/spikes/{slug}.md → .project/{project-slug}/docs/spikes/{slug}.md
+    - spike/SKILL.md and spike/references/progress-format.md updated
+    NOTES:
+
+[ ] Feature 8: Documentation Update
+    - docs/skills/project.md output paths updated to .project/{name}/ structure
+    - File tree in documentation reflects new layout
+    NOTES:

@@ -22,6 +22,7 @@ The exact `progress.txt` content created by `/project` on first run (the only ti
 ```
 # Progress: <Project Name>
 # Created: <ISO date>
+# Project-ID: <slug>
 # Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
 
 ## Gates
@@ -44,14 +45,48 @@ The exact `progress.txt` content created by `/project` on first run (the only ti
 Notes:
 
 - `<Project Name>` is derived from the project directory name or user input at bootstrap time.
+- `<slug>` is the slugified form of the project name — see Slug Derivation Rules below.
 - `<ISO date>` is the current date in YYYY-MM-DD format.
 - The `# Status:` header line serves as an inline legend for anyone reading the file.
+
+## Slug Derivation Rules
+
+The `# Project-ID:` value is a URL-safe slug derived from the project name. All skills read this value to compute the artifact base path (`.project/<slug>/`).
+
+Derivation steps (apply in order):
+
+1. Lowercase the entire string.
+2. Replace any character that is not a letter, digit, or space with a space.
+3. Collapse consecutive spaces into a single space and trim leading/trailing spaces.
+4. Replace spaces with hyphens.
+5. If the result is empty (e.g., the name was entirely punctuation), use `untitled-project` as the fallback slug.
+
+The final slug must match `^[a-z0-9]+(-[a-z0-9]+)*$`. Note: hyphens are separators produced by the derivation process, not characters preserved from the original name directly (though a hyphen in the original becomes a space in step 2 and a hyphen again in step 4).
+
+Examples:
+
+| Project Name | Slug |
+|---|---|
+| My Web App | `my-web-app` |
+| OCC Agentic AI | `occ-agentic-ai` |
+| E-Commerce Platform! | `e-commerce-platform` |
+| `api_v2 (internal)` | `api-v2-internal` |
+| `!!!` | `untitled-project` |
+
+Parsing instruction for skills: find the line starting with `# Project-ID:`, split on `: `, and use the second part as the slug. Construct the artifact base path as `.project/<slug>/`.
 
 ## Greenfield Bootstrap Variant
 
 When the project is greenfield (empty directory or boilerplate-only, per DD-10), Gate 0 is recorded as skipped in the bootstrap template instead of pending:
 
 ```
+# Progress: <Project Name>
+# Created: <ISO date>
+# Project-ID: <slug>
+# Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
+
+## Gates
+
 [-] Gate 0: Codebase Alignment  Skipped (greenfield)
 ```
 
@@ -179,6 +214,7 @@ Note: `/project` itself only writes at bootstrap (PROJ-10), so this contract app
 Instructions for the LLM reading these files:
 
 - Lines starting with `#` are headers or comments (the `# Status:` line is a legend, not data)
+- `# Project-ID:` is the third header line (after `# Progress:` and `# Created:`); its value is the slug used to construct `.project/<slug>/`
 - Status is determined by the bracket marker at the start of each entry line (`[x]`, `[~]`, `[ ]`, `[-]`)
 - Artifact paths follow the date on approved gate entries
 - Feature counts in milestone summaries are `N/M` format where N=complete, M=total

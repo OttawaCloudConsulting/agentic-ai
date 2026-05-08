@@ -46,17 +46,25 @@ Read `progress.txt` from the project root.
 
 This is the ONLY time `/project` writes to disk.
 
-1. Read `references/progress-format.md` for the exact bootstrap template and format rules.
+1. Read `references/progress-format.md` for the exact bootstrap template, slug derivation
+   rules, and format rules.
 2. Detect greenfield vs brownfield:
    - **Greenfield:** project directory is empty or contains only boilerplate files (README,
      `.gitignore`, `package.json` with no `src/` directory). Use the greenfield variant --
      Gate 0 recorded as `[-] Gate 0: Codebase Alignment  Skipped (greenfield)` (per DD-10).
    - **Brownfield:** existing source code is present. Use the standard template -- Gate 0
      recorded as `[ ] Gate 0: Codebase Alignment`.
-3. Determine the project name: use `AskUserQuestion` to ask the user, or derive from the
-   directory name if the user prefers.
+3. Determine the project name and slug:
+   - Derive a candidate name from the working directory name.
+   - Derive a candidate slug from that name using the slug derivation rules in
+     `references/progress-format.md` (lowercase, hyphens, alphanumeric only).
+   - Use `AskUserQuestion` to confirm or override the name before writing:
+     - Present the derived name and slug as the default option.
+     - Offer the user a chance to provide a custom name; the slug is always re-derived
+       from the name — it is not set independently.
 4. Use the Write tool to create `progress.txt` with the bootstrap template, replacing
-   `<Project Name>` with the project name and `<ISO date>` with today's date (YYYY-MM-DD).
+   `<Project Name>` with the confirmed project name, `<slug>` with the confirmed slug,
+   and `<ISO date>` with today's date (YYYY-MM-DD).
 5. Read the file back and confirm it was created correctly.
 6. Show the user the created file content.
 7. Proceed to Step 3 (Read State) to display the initial status report.
