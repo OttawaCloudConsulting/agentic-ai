@@ -10,6 +10,7 @@ For Claude Code skills (SKILL.md bundles), see [SKILLS.md](SKILLS.md).
 | Script Bundle | Purpose | Details |
 |---|---|---|
 | Benchmark | Measure whether a skill produces better output than a baseline or previous version; issue a scored promotion verdict | [View](scripts/benchmark/README.md) |
+| Agent Delegation | Install the `agent-delegation` rule and its `UserPromptSubmit` hook into a target Claude Code project | [View](scripts/agent-delegation/README.md) |
 
 ## How Scripts Work
 
@@ -64,3 +65,20 @@ Validates and compares Claude Code skills using a scored rubric. Runs a skill de
 | `CHAMPION CONFIRMED` | Current version outperforms the challenger |
 
 For full documentation — setup, lifecycle, flags, scoring, and rubric customisation — see [docs/scripts/benchmark/](scripts/benchmark/).
+
+## Agent Delegation
+
+Installs the companion `agent-delegation` rule (`rules/agent-delegation.md`) into a target Claude Code project, along with the `UserPromptSubmit` hook that makes the delegation matrix consulted reliably. Without the hook, the rule is passive context — the hook fires deterministically when the user's prompt matches bulk-work keywords and injects a one-line reminder before the agent picks its first tool.
+
+**Scripts:** `install.sh`
+**Documentation:** [scripts/agent-delegation/README.md](scripts/agent-delegation/README.md)
+**Companion rule:** [docs/rules/agent-delegation.md](rules/agent-delegation.md)
+
+### Effects on the Target
+
+| Path | Result |
+|------|--------|
+| `<target>/.claude/rules/agent-delegation.md` | Copied (added \| updated \| unchanged) |
+| `<target>/.claude/settings.json` | Hook merged (added \| already installed); existing keys preserved; created with `{}` if missing |
+
+The installer is idempotent — re-running does not duplicate the hook. Idempotency is keyed off the marker `# agent-delegation-hook v1` on the first line of the hook command. Bump the marker (`v1` → `v2`) in `install.sh` to force a re-install when changing keywords or reminder text.

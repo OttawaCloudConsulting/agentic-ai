@@ -15,6 +15,7 @@ Rules are always-on behavioral guidelines loaded automatically via `.claude/rule
 | Crossplane v1 Best Practices | `rules/crossplane-v1-best-practices.md` | Crossplane/Upbound guidelines: XR design, compositions, managed resources | [View](rules/crossplane-v1-best-practices.md) |
 | Crossplane v2 Best Practices | `rules/crossplane-v2-best-practices.md` | Crossplane v2 specifics: namespaced XRs, spec.crossplane, Configuration packages | [View](rules/crossplane-v2-best-practices.md) |
 | Kubernetes Best Practices | `rules/kubernetes-best-practices.md` | Kubernetes guidelines: resource management, security, RBAC, networking | [View](rules/kubernetes-best-practices.md) |
+| Agent Delegation | `rules/agent-delegation.md` | Multi-agent delegation matrix with `UserPromptSubmit` hook to force consultation before bulk tasks | [View](rules/agent-delegation.md) |
 
 ## How Rules Work
 
@@ -23,6 +24,7 @@ Rules are always-on behavioral guidelines loaded automatically via `.claude/rule
 - Claude Code loads all `.md` files in `.claude/rules/` automatically on every conversation
 - Rules have no YAML frontmatter — they are pure content
 - One concern per file
+- Some rules ship with companion hooks/scripts; install via the installer in `scripts/` rather than a bare `cp`
 
 ### Rules vs Skills vs Commands
 
@@ -60,7 +62,16 @@ cp rules/terraform-best-practices.md                 <target-repo>/.claude/rules
 cp rules/crossplane-v1-best-practices.md             <target-repo>/.claude/rules/
 cp rules/crossplane-v2-best-practices.md             <target-repo>/.claude/rules/
 cp rules/kubernetes-best-practices.md                <target-repo>/.claude/rules/
+cp rules/agent-delegation.md                         <target-repo>/.claude/rules/   # or use installer (below)
 ```
+
+**Note on `agent-delegation.md`:** This rule depends on a `UserPromptSubmit` hook in `.claude/settings.json` to be reliably consulted (see § Setup / Installation in the rule file). Prefer the installer over a bare `cp`:
+
+```bash
+bash scripts/agent-delegation/install.sh <target-repo-path>
+```
+
+The installer copies the rule and merges the hook idempotently.
 
 Rules take effect immediately on the next Claude Code conversation in that repository.
 
@@ -68,7 +79,7 @@ Rules take effect immediately on the next Claude Code conversation in that repos
 
 | Project Type | Recommended Rules |
 |---|---|
-| Any project | `defensive-protocol-v2-anti-slop.md` + `defensive-protocol-v2-epistemology.md` + `defensive-protocol-v2-session-management.md` |
+| Any project | Defensive v2 (all 3) + `agent-delegation.md` (install via `scripts/agent-delegation/install.sh`) |
 | AWS CDK projects | Defensive v2 (all 3) + `cdk-best-practices.md` |
 | Terraform projects | Defensive v2 (all 3) + `terraform-best-practices.md` |
 | Crossplane v1 projects | Defensive v2 (all 3) + `crossplane-v1-best-practices.md` + `kubernetes-best-practices.md` |
