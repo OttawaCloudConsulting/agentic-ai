@@ -30,7 +30,7 @@ Reads `progress.txt` from the project root and finds the active milestone (first
 
 ### 2. Codebase Assessment Refresh
 
-Before reading the feature plan, performs an incremental refresh of `docs/codebase-assessment.md`. Uses `git log` to find the last assessment update date, then identifies all files changed since then. If no files have changed, skips the refresh. Otherwise, spawns a sub-agent to read only the changed files and update the relevant assessment sections (Recent Changes, File Organization, Detected Patterns, Dependency Graph, Assumptions, Patterns to Deviate From). The refresh produces a standalone commit before any implementation begins.
+Before reading the feature plan, performs an incremental refresh of `.project/{slug}/docs/codebase-assessment.md`. Uses `git log` to find the last assessment update date, then identifies all files changed since then. If no files have changed, skips the refresh. Otherwise, spawns a sub-agent to read only the changed files and update the relevant assessment sections (Recent Changes, File Organization, Detected Patterns, Dependency Graph, Assumptions, Patterns to Deviate From). The refresh produces a standalone commit before any implementation begins.
 
 ### 3. Sub-Feature Execution
 
@@ -45,7 +45,7 @@ Loads the feature plan from the path recorded in `milestone-status.txt`. Parses 
 
 ### 4. Deviation Recording
 
-During implementation, watches for contradictions between the code being written and what the feature plan or `docs/ARCHITECTURE_AND_DESIGN.md` specifies. When a deviation is detected, pauses implementation and presents the deviation to the user with context on what was planned vs. what changed. The user confirms (Record) or dismisses the deviation. Confirmed deviations are written immediately to the feature plan's `## Architectural Deviations` section as a structured 4-field entry: What changed, Originally planned, Why necessary, Impact. After 3+ deviations, suggests running `/design` in refresh mode.
+During implementation, watches for contradictions between the code being written and what the feature plan or `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` specifies. When a deviation is detected, pauses implementation and presents the deviation to the user with context on what was planned vs. what changed. The user confirms (Record) or dismisses the deviation. Confirmed deviations are written immediately to the feature plan's `## Architectural Deviations` section as a structured 4-field entry: What changed, Originally planned, Why necessary, Impact. After 3+ deviations, suggests running `/design` in refresh mode.
 
 ### 5. Feature Completion
 
@@ -59,10 +59,10 @@ The feature plan checklist is the continuity mechanism. Each completed sub-featu
 
 | Artifact | Path | Created By |
 |----------|------|------------|
-| Updated feature plan | `milestones/<NN>-<name>/plans/<feature-slug>.md` | /build (marks sub-features, records deviations) |
-| milestone-status.txt | `milestones/<NN>-<name>/milestone-status.txt` | /build (updates sub-feature counts, marks completion) |
+| Updated feature plan | `.project/{slug}/milestones/<NN>-<name>/plans/<feature-slug>.md` | /build (marks sub-features, records deviations) |
+| milestone-status.txt | `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` | /build (updates sub-feature counts, marks completion) |
 | progress.txt | `progress.txt` | /build (increments feature counts, marks milestone completion) |
-| Codebase assessment | `docs/codebase-assessment.md` | /build (incremental refresh via sub-agent) |
+| Codebase assessment | `.project/{slug}/docs/codebase-assessment.md` | /build (incremental refresh via sub-agent) |
 | Sub-feature commits | Git history | /build (one commit per sub-feature) |
 
 ## Skill Files

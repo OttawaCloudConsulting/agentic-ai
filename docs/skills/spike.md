@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Adversarial technical research skill that investigates technical questions using sequential research and red-team agents. Accepts a research question and list of available tooling, produces a structured spike artifact at `docs/spikes/<topic>.md` with both research findings and independent red-team validation. The two perspectives are presented as equal peer sections -- never merged or suppressed. Supports follow-up research on existing spikes with dated append entries. Tracks spike lifecycle in `progress.txt` (open/resolved).
+Adversarial technical research skill that investigates technical questions using sequential research and red-team agents. Accepts a research question and list of available tooling, produces a structured spike artifact at `.project/{slug}/docs/spikes/<topic>.md` with both research findings and independent red-team validation. The two perspectives are presented as equal peer sections -- never merged or suppressed. Supports follow-up research on existing spikes with dated append entries. Tracks spike lifecycle in `progress.txt` (open/resolved).
 
 ## When to Use
 
@@ -29,7 +29,7 @@ Adversarial technical research skill that investigates technical questions using
 
 ### 1. Input Gathering and Mode Detection
 
-Reads `progress.txt` from the project root. Gathers the user's research question and available tooling list per SPIKE-01. If provided in the invocation message, uses them directly; otherwise prompts with `AskUserQuestion`. Generates a topic slug (kebab-case) and checks if `docs/spikes/<slug>.md` exists. If it exists, enters follow-up mode. If not, enters new spike mode. Slug collisions prompt the user to choose follow-up or new spike with a different name.
+Reads `progress.txt` from the project root. Gathers the user's research question and available tooling list per SPIKE-01. If provided in the invocation message, uses them directly; otherwise prompts with `AskUserQuestion`. Generates a topic slug (kebab-case) and checks if `.project/{project-slug}/docs/spikes/<topic>.md` exists. If it exists, enters follow-up mode. If not, enters new spike mode. Slug collisions prompt the user to choose follow-up or new spike with a different name.
 
 ### 2. Research Agent
 
@@ -55,7 +55,7 @@ When the user signals resolution, updates the spike artifact status from `open` 
 
 | Artifact | Path | Created By |
 |----------|------|------------|
-| Spike artifact | `docs/spikes/<topic>.md` | /spike (new spike or follow-up append) |
+| Spike artifact | `.project/{slug}/docs/spikes/<topic>.md` | /spike (new spike or follow-up append) |
 | progress.txt | `progress.txt` | /spike (adds spike entry, marks resolved) |
 
 ## Skill Files

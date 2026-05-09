@@ -47,7 +47,7 @@
     - spike/SKILL.md and spike/references/progress-format.md updated
     NOTES: Started 2026-05-08  Completed 2026-05-08
 
-[ ] Feature 8: Documentation Update
+[x] Feature 8: Documentation Update
     - docs/skills/project.md output paths updated to .project/{name}/ structure
     - File tree in documentation reflects new layout
-    NOTES:
+    NOTES: Started 2026-05-08  Completed 2026-05-08
