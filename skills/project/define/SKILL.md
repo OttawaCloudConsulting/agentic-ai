@@ -42,7 +42,11 @@ one continuous conversation -- the user does not leave between gates.
 
 ## Step 1 -- Detect Mode and State
 
-Read `progress.txt` from the project root.
+Read `progress.txt` from the project root. Find the line starting with
+`# Project-ID:`, take the value after `:`, trim whitespace, and use it as `<slug>`.
+Construct the artifact base path: `.project/<slug>/`. All artifact reads and writes
+in this skill use this base path. If the header is missing, report the error and tell
+the user to run `/project` to re-bootstrap.
 
 **Revision mode detection (DEF-15):**
 Check ALL of the following:
@@ -83,9 +87,9 @@ Read `references/gate-0-codebase.md` for the complete Gate 0 specification.
 
 Follow the gate-0-codebase specification to:
 1. Spawn a sub-agent to scan the codebase (20-40 files).
-2. Synthesize findings into `docs/codebase-assessment.md`.
+2. Synthesize findings into `.project/<slug>/docs/codebase-assessment.md`.
 3. Present findings and enter produce-then-review cycle.
-4. Generate review checklist (`docs/reviews/gate-0-review.md`) using
+4. Generate review checklist (`.project/<slug>/docs/reviews/gate-0-review.md`) using
    `references/review-checklist-template.md`.
 5. Validate checklist completeness before recording approval.
 6. Record Gate 0 approval in `progress.txt` per `references/progress-format.md`.
@@ -106,8 +110,9 @@ Check current Gate WB state in `progress.txt`:
 - If `[ ]` (not yet offered): offer Gate WB per the specification.
 
 Follow the gate-wb specification to handle the 3-outcome offer:
-- **Yes**: run WB interview, produce `docs/working-backwards.md`, review cycle,
-  record approval.
+- **Yes**: run WB interview, produce `.project/<slug>/docs/working-backwards.md`,
+  generate review checklist (`.project/<slug>/docs/reviews/gate-wb-review.md`),
+  review cycle, record approval.
 - **Skip**: record `[-] Gate WB: Working Backwards  Skipped` in `progress.txt`.
   Proceed to Step 5.
 - **Defer**: record `[ ] Gate WB: Working Backwards  Pending -- offered, awaiting
@@ -123,10 +128,10 @@ Proceed to Step 5.
 Read `references/gate-1-prd.md` for the complete Gate 1 specification.
 
 Follow the gate-1 specification to:
-1. Silently re-read `docs/codebase-assessment.md` from disk for context (DEF-16).
-   Do NOT recap or summarize it to the user -- use internally only.
-2. Read `docs/working-backwards.md` if it exists (D-14 -- context only, does not
-   auto-populate PRD sections).
+1. Silently re-read `.project/<slug>/docs/codebase-assessment.md` from disk for
+   context (DEF-16). Do NOT recap or summarize it to the user -- use internally only.
+2. Read `.project/<slug>/docs/working-backwards.md` if it exists (D-14 -- context
+   only, does not auto-populate PRD sections).
 3. Gather the initial project concept (seed the PRD).
 4. Conduct the 5-round interview (Scope, Inputs/Outputs, Security, Operational,
    Milestone Scoping). One round at a time via `AskUserQuestion`.
@@ -135,7 +140,7 @@ Follow the gate-1 specification to:
    Partial Approve).
 7. Handle partial approval if needed (DEF-12 -- section checklist for focused
    revision of unchecked sections).
-8. Generate review checklist (`docs/reviews/gate-1-review.md`) using
+8. Generate review checklist (`.project/<slug>/docs/reviews/gate-1-review.md`) using
    `references/review-checklist-template.md`.
 9. Validate checklist completeness.
 10. Record Gate 1 approval in `progress.txt`.
@@ -146,14 +151,14 @@ Proceed to Step 7 (Completion Report).
 
 Read `references/gate-1-prd.md` for the revision mode specification.
 Read existing `prd.md` from disk.
-Re-read `docs/codebase-assessment.md` from disk if it exists (DEF-16 silent
-re-read -- no recap to user).
+Re-read `.project/<slug>/docs/codebase-assessment.md` from disk if it exists (DEF-16
+silent re-read -- no recap to user).
 
 Follow the revision mode specification to:
 1. Ask "What changed?" -- focused interview on affected sections only.
 2. Revise `prd.md` with edits. Show each change before and after.
 3. Present for review (produce-then-review cycle).
-4. Generate or update review checklist (`docs/reviews/gate-1-review.md`).
+4. Generate or update review checklist (`.project/<slug>/docs/reviews/gate-1-review.md`).
 5. Surface downstream artifact impacts without auto-resetting (DD-6). List
    affected artifacts and ask the user which need re-review.
 6. Record Gate 1 re-approval with updated date in `progress.txt`.
@@ -168,14 +173,14 @@ Display a summary of what was produced:
 DEFINITION COMPLETE: [Project Title]
 
 ARTIFACTS CREATED:
-- docs/codebase-assessment.md (Gate 0) [or "Skipped (greenfield)"]
-- docs/working-backwards.md (Gate WB) [or "Skipped" / "Pending"]
+- .project/<slug>/docs/codebase-assessment.md (Gate 0) [or "Skipped (greenfield)"]
+- .project/<slug>/docs/working-backwards.md (Gate WB) [or "Skipped" / "Pending"]
 - prd.md (Gate 1)
 
 REVIEW CHECKLISTS:
-- docs/reviews/gate-0-review.md [if applicable]
-- docs/reviews/gate-wb-review.md [if applicable]
-- docs/reviews/gate-1-review.md
+- .project/<slug>/docs/reviews/gate-0-review.md [if applicable]
+- .project/<slug>/docs/reviews/gate-wb-review.md [if applicable]
+- .project/<slug>/docs/reviews/gate-1-review.md
 
 NEXT: Run /project to see updated status, then /design for Gate 2.
 ```
@@ -189,6 +194,9 @@ NEXT: Run /project to see updated status, then /design for Gate 2.
 - **Gate 1 already approved without revision intent:** Inform the user that Gate 1
   is already complete. Use `AskUserQuestion` with options: **Revise** (enters
   revision mode) or **Status** (suggests running `/project`).
+- **Missing Project-ID header:** If `progress.txt` exists but has no `# Project-ID:`
+  line, do not proceed. Tell the user to run `/project` to re-bootstrap and add the
+  Project-ID header.
 - **Interrupted session:** If the conversation is interrupted mid-gate, the user
   can re-invoke `/define`. The skill re-reads `progress.txt` and resumes from the
   appropriate gate based on which gates are already approved.

@@ -22,6 +22,7 @@ The exact `progress.txt` content created by `/project` on first run (the only ti
 ```
 # Progress: <Project Name>
 # Created: <ISO date>
+# Project-ID: <slug>
 # Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
 
 ## Gates
@@ -44,8 +45,13 @@ The exact `progress.txt` content created by `/project` on first run (the only ti
 Notes:
 
 - `<Project Name>` is derived from the project directory name or user input at bootstrap time.
+- `<slug>` is the slugified form of the project name (lowercase, hyphens, alphanumeric only).
 - `<ISO date>` is the current date in YYYY-MM-DD format.
 - The `# Status:` header line serves as an inline legend for anyone reading the file.
+
+Parsing instruction for skills: find the line starting with `# Project-ID:`, take the
+value after `:`, trim whitespace, and use it as `<slug>`. Construct the artifact base
+path as `.project/<slug>/`.
 
 ## Greenfield Bootstrap Variant
 
@@ -64,10 +70,13 @@ Gate entries appear in the `## Gates` section, one per line. The format varies b
 **Approved:**
 
 ```
-[x] Gate 0: Codebase Alignment  Approved: 2026-03-15  docs/codebase-assessment.md
+[x] Gate 0: Codebase Alignment  Approved: 2026-03-15  .project/<slug>/docs/codebase-assessment.md
 ```
 
 Format: `[x] Gate N: Name  Approved: <YYYY-MM-DD>  <artifact-path>`
+
+The artifact path is relative to the project root and uses the `.project/<slug>/` base
+path derived from the `# Project-ID: <slug>` header in `progress.txt`.
 
 **Skipped:**
 

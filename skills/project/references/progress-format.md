@@ -99,7 +99,7 @@ Gate entries appear in the `## Gates` section, one per line. The format varies b
 **Approved:**
 
 ```
-[x] Gate 0: Codebase Alignment  Approved: 2026-03-15  docs/codebase-assessment.md
+[x] Gate 0: Codebase Alignment  Approved: 2026-03-15  .project/<slug>/docs/codebase-assessment.md
 ```
 
 Format: `[x] Gate N: Name  Approved: <YYYY-MM-DD>  <artifact-path>`

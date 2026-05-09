@@ -18,10 +18,10 @@
     - routing-logic.md and status-report-format.md updated
     NOTES: Started 2026-05-08  Completed 2026-05-08
 
-[ ] Feature 3: /define Skill Path Updates
+[x] Feature 3: /define Skill Path Updates
     - All docs/ outputs → .project/{slug}/docs/ (codebase-assessment, working-backwards, reviews/)
     - define/SKILL.md and define/references/progress-format.md updated
-    NOTES:
+    NOTES: Started 2026-05-08  Completed 2026-05-08
 
 [ ] Feature 4: /design Skill Path Updates
     - docs/ARCHITECTURE_AND_DESIGN.md → .project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md
