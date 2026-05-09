@@ -7,7 +7,8 @@ deviation flow -- from detection through confirmation to structured recording.
 ## What Constitutes a Deviation (D-11)
 
 A deviation occurs when the implementation **contradicts** what the feature plan
-or `docs/ARCHITECTURE_AND_DESIGN.md` specifies.
+or `.project/<slug>/docs/ARCHITECTURE_AND_DESIGN.md` specifies. `<slug>` is the
+value derived from the `# Project-ID:` header in `progress.txt`.
 
 ### A deviation IS:
 

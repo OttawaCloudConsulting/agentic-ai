@@ -1,8 +1,9 @@
 # Codebase Assessment Refresh Specification
 
-Incremental refresh of `docs/codebase-assessment.md` before feature
+Incremental refresh of `.project/<slug>/docs/codebase-assessment.md` before feature
 implementation begins. An executor reading only this file can run the complete
-refresh flow.
+refresh flow. `<slug>` is the value derived from the `# Project-ID:` header in
+`progress.txt` (established in Step 1 of `SKILL.md`).
 
 ## Timing (D-06, D-07)
 
@@ -22,7 +23,7 @@ codebase state rather than a stale assessment.
 Find when the assessment was last updated:
 
 ```bash
-git log -1 --format="%ai" -- docs/codebase-assessment.md
+git log -1 --format="%ai" -- .project/<slug>/docs/codebase-assessment.md
 ```
 
 This returns the date of the most recent commit that modified the assessment
@@ -68,10 +69,11 @@ Provide the sub-agent with:
 
 1. The list of changed files (from the git log output above)
 2. The feature name being built (for context)
+3. The value of `<slug>` (the Project-ID from `progress.txt`)
 
 Instruct the sub-agent to:
 
-1. **Read `docs/codebase-assessment.md`** -- the current assessment content.
+1. **Read `.project/<slug>/docs/codebase-assessment.md`** -- the current assessment content.
 
 2. **Read only the changed/new files** identified above. Do NOT perform a full
    codebase re-scan. The goal is incremental update, not re-assessment.
@@ -92,8 +94,8 @@ Instruct the sub-agent to:
    sub-agent updates sections, not rewrites the file. Sections unaffected by
    the changes should be left untouched.
 
-5. **Write the updated assessment** back to `docs/codebase-assessment.md` using
-   the Write tool.
+5. **Write the updated assessment** back to `.project/<slug>/docs/codebase-assessment.md`
+   using the Write tool.
 
 ### Sub-Agent Tool Access
 
@@ -109,6 +111,8 @@ any implementation commits:
 docs(assessment): refresh codebase assessment for <feature-name>
 ```
 
+The commit covers `.project/<slug>/docs/codebase-assessment.md`.
+
 This commit is made before loading the feature plan or writing any
 implementation code. It provides a clean separation between "understood the
 codebase" and "started building."
@@ -117,9 +121,9 @@ codebase" and "started building."
 
 ### Assessment File Does Not Exist
 
-If `docs/codebase-assessment.md` does not exist on disk:
+If `.project/<slug>/docs/codebase-assessment.md` does not exist on disk:
 
-> "No codebase assessment found. Run /define to create one."
+> "No codebase assessment found at `.project/<slug>/docs/codebase-assessment.md`. Run /define to create one."
 
 This is a **warning, not a blocker**. `/build` can proceed without an
 assessment, but the user should know their codebase assessment is missing. Skip
