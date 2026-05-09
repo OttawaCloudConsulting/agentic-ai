@@ -4,12 +4,14 @@ Conducts a structured interview and produces a Product Requirements Document (`p
 
 Gate 1 is the most complex gate in the `/define` skill. It covers the full PRD lifecycle: context loading, multi-round interview, document production, partial approval, checklist validation, gate approval recording, and revision mode for existing PRDs.
 
+`{slug}` is read from the `# Project-ID: <slug>` header in `progress.txt` at session start. All artifact paths in this document use `.project/{slug}/` as the base path.
+
 ## Context Refresh (DEF-16)
 
 At the start of Gate 1, silently re-read context files from disk to mitigate context rot (by this point, Gate 0 and Gate WB conversations may have scrolled out of the context window).
 
-1. **Read `docs/codebase-assessment.md`** from disk (if it exists). Do NOT recap or summarize the assessment to the user -- use it internally as context for the interview.
-2. **Read `docs/working-backwards.md`** from disk (if it exists and Gate WB was approved). Use as context for the interview -- the WB narrative informs better questions and answers, but does NOT auto-populate PRD sections (D-14). The full interview still runs.
+1. **Read `.project/{slug}/docs/codebase-assessment.md`** from disk (if it exists). Do NOT recap or summarize the assessment to the user -- use it internally as context for the interview.
+2. **Read `.project/{slug}/docs/working-backwards.md`** from disk (if it exists and Gate WB was approved). Use as context for the interview -- the WB narrative informs better questions and answers, but does NOT auto-populate PRD sections (D-14). The full interview still runs.
 
 This silent re-read is critical: without it, the PRD interview proceeds without codebase awareness, producing a document that ignores existing patterns and constraints.
 
@@ -133,7 +135,8 @@ When all sections are checked (approved) or the user does a full Approve, procee
 ## Checklist Validation (DEF-04, DEF-06)
 
 1. Read `references/review-checklist-template.md` for the Gate 1 checklist structure
-2. Generate `docs/reviews/gate-1-review.md` using the Gate 1 section from the template
+2. Create `.project/{slug}/docs/reviews/` directory if needed: `mkdir -p .project/{slug}/docs/reviews`
+3. Generate `.project/{slug}/docs/reviews/gate-1-review.md` using the Gate 1 section from the template
 3. Add content-specific `[Auto]` items based on actual PRD content (e.g., verify specific assumptions, confirm specific non-goals are intentional, validate specific risks have mitigations)
 4. Claude pre-checks `[x]` items that can be verified from the PRD content
 5. Present remaining unchecked items to the user for resolution
@@ -159,7 +162,7 @@ Revision mode is triggered when `/define` detects an existing `prd.md` AND the u
 ### Revision Flow
 
 1. **Read existing `prd.md`** from disk
-2. **Context refresh**: Read `docs/codebase-assessment.md` from disk if it exists (same DEF-16 silent re-read -- no recap to user)
+2. **Context refresh**: Read `.project/{slug}/docs/codebase-assessment.md` from disk if it exists (same DEF-16 silent re-read -- no recap to user)
 3. **Ask the user**: "What changed?" -- open-ended question about what prompted the revision. Let the user describe the changes in their own words.
 4. **Focused interview**: Conduct a targeted interview on ONLY the affected sections. Do not re-run the full 5-round interview. Ask clarifying questions specific to the changed areas.
 5. **Update `prd.md`**: Apply revisions using the Edit tool. Show the user each change before and after.
@@ -170,9 +173,9 @@ Revision mode is triggered when `/define` detects an existing `prd.md` AND the u
 After PRD revision is approved, surface downstream impacts. Do NOT automatically reset any downstream artifacts -- the user decides what needs re-review.
 
 7. **List affected downstream artifacts** that MAY need re-review:
-   - `docs/ARCHITECTURE_AND_DESIGN.md` (if exists) -- design may be invalidated by scope changes
-   - `milestones/*/README.md` (if any exist) -- milestone breakdown may need updating
-   - `milestones/*/plans/*.md` (if any exist) -- implementation plans may be affected
+   - `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` (if exists) -- design may be invalidated by scope changes
+   - `.project/{slug}/milestones/*/README.md` (if any exist) -- milestone breakdown may need updating
+   - `.project/{slug}/milestones/*/plans/*.md` (if any exist) -- implementation plans may be affected
 8. **Present this list to the user** and ask which (if any) need re-review
 9. **Do NOT automatically reset** any downstream artifact status -- no automatic cascade (DD-6)
 10. **Record Gate 1 re-approval** in `progress.txt` with updated date: `[x] Gate 1: Scope Review  Approved: <YYYY-MM-DD>  prd.md`

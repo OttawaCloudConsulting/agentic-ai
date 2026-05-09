@@ -2,6 +2,8 @@
 
 An optional gate that produces a customer-outcome narrative before PRD creation. Working Backwards starts with the customer experience and works backward to the technical solution. This reference contains the complete Gate WB specification -- an executor reading only this file can run the full Gate WB flow.
 
+`{slug}` is read from the `# Project-ID: <slug>` header in `progress.txt` at session start. All artifact paths in this document use `.project/{slug}/` as the base path.
+
 ## Gate WB Offer (DEF-08)
 
 After Gate 0 is complete (or skipped for greenfield), offer Gate WB to the user.
@@ -67,10 +69,10 @@ Ask the user:
 
 ## Document Production (DEF-09)
 
-Produce `docs/working-backwards.md` from the interview answers:
+Produce `.project/{slug}/docs/working-backwards.md` from the interview answers:
 
-1. Create `docs/` directory if it does not exist: `mkdir -p docs`
-2. Write `docs/working-backwards.md` with these required sections:
+1. Create `.project/{slug}/docs/` directory if it does not exist: `mkdir -p .project/{slug}/docs`
+2. Write `.project/{slug}/docs/working-backwards.md` with these required sections:
 
 ### Press Release
 
@@ -119,7 +121,7 @@ Present the Working Backwards document to the user using the produce-then-review
    - **Approve** -- document captures the right customer outcome, proceed to checklist validation
    - **Revise** -- document needs corrections
 
-3. **If Revise:** Ask the user what needs changing. Apply edits to `docs/working-backwards.md`. Re-present the updated document. Repeat until the user selects Approve.
+3. **If Revise:** Ask the user what needs changing. Apply edits to `.project/{slug}/docs/working-backwards.md`. Re-present the updated document. Repeat until the user selects Approve.
 
 4. **If Approve:** Proceed to Checklist Validation.
 
@@ -127,14 +129,14 @@ Present the Working Backwards document to the user using the produce-then-review
 
 Generate and validate the review checklist:
 
-1. Create `docs/reviews/` directory if needed: `mkdir -p docs/reviews`
+1. Create `.project/{slug}/docs/reviews/` directory if needed: `mkdir -p .project/{slug}/docs/reviews`
 
-2. Generate `docs/reviews/gate-wb-review.md` using the Gate WB section from `references/review-checklist-template.md`. Start with the file header:
+2. Generate `.project/{slug}/docs/reviews/gate-wb-review.md` using the Gate WB section from `references/review-checklist-template.md`. Start with the file header:
 
    ```
    # Gate WB Review -- Working Backwards
 
-   **Artifact:** docs/working-backwards.md
+   **Artifact:** .project/{slug}/docs/working-backwards.md
    **Status:** [ ] Pending
    **Reviewer(s):**
    **Date:**
@@ -153,7 +155,7 @@ Generate and validate the review checklist:
    - `[ ] [Auto] Confirm scope alignment: "{specific feature mentioned}"`
 
 5. **Claude pre-checks** items it can verify programmatically:
-   - File `docs/working-backwards.md` exists
+   - File `.project/{slug}/docs/working-backwards.md` exists
    - All required sections are present (Press Release, External FAQ, Internal FAQ)
    - Press release contains all required elements (headline, subheading, etc.)
 
@@ -175,7 +177,7 @@ Record the gate approval in progress.txt:
    ```
    to:
    ```
-   [x] Gate WB: Working Backwards  Approved: <YYYY-MM-DD>  docs/working-backwards.md
+   [x] Gate WB: Working Backwards  Approved: <YYYY-MM-DD>  .project/{slug}/docs/working-backwards.md
    ```
    where `<YYYY-MM-DD>` is the current date.
 

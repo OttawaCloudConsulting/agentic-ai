@@ -2,6 +2,8 @@
 
 Scans the existing codebase and produces a structured assessment for use in subsequent gates. This reference contains the complete Gate 0 specification -- an executor reading only this file can run the full Gate 0 flow.
 
+`{slug}` is read from the `# Project-ID: <slug>` header in `progress.txt` at session start. All artifact paths in this document use `.project/{slug}/` as the base path.
+
 ## Greenfield Detection (DEF-01)
 
 Before running the codebase scan, check whether the project is greenfield. ALL of the following conditions must be true to classify as greenfield and skip Gate 0:
@@ -63,8 +65,8 @@ The agent uses only: `Read`, `Bash` (for `ls`, `git log`), and `Glob` tools.
 After the agent completes, synthesize its findings into the final assessment:
 
 1. Read the agent's scratch file (e.g., `/tmp/codebase-scan-findings.md`)
-2. Create `docs/` directory if it does not exist: `mkdir -p docs`
-3. Write `docs/codebase-assessment.md` with these required sections:
+2. Create `.project/{slug}/docs/` directory if it does not exist: `mkdir -p .project/{slug}/docs`
+3. Write `.project/{slug}/docs/codebase-assessment.md` with these required sections:
 
 ### Required Assessment Sections
 
@@ -96,7 +98,7 @@ Present the assessment to the user using the produce-then-review cycle:
    - **Approve** -- assessment is accurate, proceed to checklist validation
    - **Revise** -- assessment needs corrections
 
-3. **If Revise:** Ask the user what needs changing. Apply edits to `docs/codebase-assessment.md`. Re-present the updated summary. Repeat until the user selects Approve.
+3. **If Revise:** Ask the user what needs changing. Apply edits to `.project/{slug}/docs/codebase-assessment.md`. Re-present the updated summary. Repeat until the user selects Approve.
 
 4. **If Approve:** Proceed to Checklist Validation.
 
@@ -104,14 +106,14 @@ Present the assessment to the user using the produce-then-review cycle:
 
 Generate and validate the review checklist:
 
-1. Create `docs/reviews/` directory if needed: `mkdir -p docs/reviews`
+1. Create `.project/{slug}/docs/reviews/` directory if needed: `mkdir -p .project/{slug}/docs/reviews`
 
-2. Generate `docs/reviews/gate-0-review.md` using the Gate 0 section from `references/review-checklist-template.md`. Start with the file header:
+2. Generate `.project/{slug}/docs/reviews/gate-0-review.md` using the Gate 0 section from `references/review-checklist-template.md`. Start with the file header:
 
    ```
    # Gate 0 Review -- Codebase Alignment
 
-   **Artifact:** docs/codebase-assessment.md
+   **Artifact:** .project/{slug}/docs/codebase-assessment.md
    **Status:** [ ] Pending
    **Reviewer(s):**
    **Date:**
@@ -130,7 +132,7 @@ Generate and validate the review checklist:
    - `[ ] [Auto] Review deviation: "{specific anti-pattern flagged}"`
 
 5. **Claude pre-checks** items it can verify programmatically:
-   - File `docs/codebase-assessment.md` exists
+   - File `.project/{slug}/docs/codebase-assessment.md` exists
    - All required sections are present
    - File paths cited in the assessment exist on disk
 
@@ -152,7 +154,7 @@ Record the gate approval in progress.txt:
    ```
    to:
    ```
-   [x] Gate 0: Codebase Alignment  Approved: <YYYY-MM-DD>  docs/codebase-assessment.md
+   [x] Gate 0: Codebase Alignment  Approved: <YYYY-MM-DD>  .project/{slug}/docs/codebase-assessment.md
    ```
    where `<YYYY-MM-DD>` is the current date.
 

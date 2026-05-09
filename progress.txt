@@ -1,4 +1,5 @@
 # Progress: Project Skill Path Refactor
+# Project-ID: project-skill-path-refactor
 # Source: prd.md + docs/project-skill-refactor/ARCHITECTURE_AND_DESIGN.md
 # Spec: docs/project-skill-refactor/ARCHITECTURE_AND_DESIGN.md is the authoritative design reference
 # Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
