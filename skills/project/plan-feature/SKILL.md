@@ -40,16 +40,18 @@ entry in `milestone-status.txt` from `[ ]` to `[~] planned, awaiting build`.
 - Working directory is the project root (where `progress.txt` lives).
 - `progress.txt` must exist. If not, instruct user to run `/project` first.
 - An active milestone must exist. Validate: at least one milestone directory
-  exists under `milestones/` with a `milestone-status.txt` file. Do NOT check
+  exists under `.project/<slug>/milestones/` with a `milestone-status.txt` file. Do NOT check
   for `[x] Gate 3` -- Gate 3 stays `[~] In progress` and is never marked `[x]`
   until `/project` closes it.
 
 ## Step 1 -- Detect Mode and State
 
-Read `progress.txt` from the project root.
+Read `progress.txt` from the project root. Parse `# Project-ID: <slug>` from the
+header and construct the artifact base path: `.project/<slug>/`. If the header is
+missing, report the error and tell the user to run `/project` first.
 
 Prerequisite check: Verify an active milestone exists. If no milestone
-directories exist under `milestones/`, inform user: "No milestones have been
+directories exist under `.project/<slug>/milestones/`, inform user: "No milestones have been
 defined. Run /milestone to create a milestone first." Do not proceed.
 
 Auto-detect active milestone (D-02): Read `progress.txt`, find first milestone
@@ -62,7 +64,7 @@ Mode detection -- 3 branches:
 1. **Normal mode:** Target feature is at `[ ]` pending and has no plan file, OR
    user explicitly targets a pending feature --> proceed to Step 2.
 2. **Re-plan mode (D-04):** Target feature already has a plan file on disk
-   (auto-detected by checking `milestones/<NN>-<name>/plans/<feature-slug>.md`
+   (auto-detected by checking `.project/<slug>/milestones/<NN>-<name>/plans/<feature-slug>.md`
    existence) --> proceed to Step 4.
 3. **All features planned (D-03):** All features in the active milestone are at
    `[~]` planned or `[x]` complete. Report: "All features in milestone {NN}:
@@ -79,7 +81,7 @@ Follow the Input Loading and Codebase Scan Sub-Agent sections of the
 gate-4-plan specification to:
 
 1. Read all primary inputs (PLAN-01): milestone README, prd.md,
-   ARCHITECTURE_AND_DESIGN.md, progress.txt, milestone-status.txt.
+   `.project/<slug>/docs/ARCHITECTURE_AND_DESIGN.md`, progress.txt, milestone-status.txt.
 2. Spawn sub-agent for targeted codebase scan (D-10): scan files relevant to
    the target feature (5-15 files, not architecture-wide).
 3. If user referenced spike artifacts: read those specific files (D-11).
@@ -124,8 +126,8 @@ Display summary:
 FEATURE PLANNED: [Feature NN.N: Name]  (or FEATURE RE-PLANNED)
 
 ARTIFACTS CREATED:  (or ARTIFACTS UPDATED)
-- milestones/<NN>-<name>/plans/<feature-slug>.md
-- milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md
+- .project/<slug>/milestones/<NN>-<name>/plans/<feature-slug>.md
+- .project/<slug>/milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md
 
 STATE UPDATED:
 - milestone-status.txt (feature: [~] planned, awaiting build)

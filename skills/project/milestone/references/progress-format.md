@@ -2,7 +2,7 @@
 
 ## Overview
 
-The project pipeline uses plain-text checkbox notation across two tiers of state files: a project-level `progress.txt` at the project root (tracking gate approvals, milestone summaries, and spike entries) and milestone-level `milestone-status.txt` files at `milestones/<NN>-<name>/milestone-status.txt` (tracking per-feature details, sub-feature checklists, and notes). Both files use the same four-marker status notation defined below. This format was chosen over YAML for superior write-safety, token efficiency (~53% fewer tokens), and human editability (see DESIGN.md DD-3, progress-file/TEXT_vs_YAML_REPORT.md).
+The project pipeline uses plain-text checkbox notation across two tiers of state files: a project-level `progress.txt` at the project root (tracking gate approvals, milestone summaries, and spike entries) and milestone-level `milestone-status.txt` files at `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` (tracking per-feature details, sub-feature checklists, and notes). Both files use the same four-marker status notation defined below. This format was chosen over YAML for superior write-safety, token efficiency (~53% fewer tokens), and human editability (see DESIGN.md DD-3, progress-file/TEXT_vs_YAML_REPORT.md).
 
 ## Status Notation
 
@@ -106,10 +106,10 @@ The artifact path on approved entries is the primary deliverable of that gate. `
 One line per milestone in the `## Milestones` section:
 
 ```
-[ ] Milestone 01: Core Auth  milestones/01-core-auth/  0/3 features complete
+[ ] Milestone 01: Core Auth  .project/{slug}/milestones/01-core-auth/  0/3 features complete
 ```
 
-Format: `[status] Milestone NN: Name  milestones/<NN>-<name>/  N/M features complete`
+Format: `[status] Milestone NN: Name  .project/{slug}/milestones/<NN>-<name>/  N/M features complete`
 
 Where:
 
@@ -138,7 +138,7 @@ Format: `[status] Spike Name  <artifact-path>` with an optional `Resolved: <date
 
 ## milestone-status.txt Format
 
-Per-milestone file located at `milestones/<NN>-<name>/milestone-status.txt`. Uses the same checkbox notation as `progress.txt` (per STATE-02). Contains detailed feature tracking for a single milestone.
+Per-milestone file located at `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt`. Uses the same checkbox notation as `progress.txt` (per STATE-02). Contains detailed feature tracking for a single milestone.
 
 ```
 # Milestone 01: Core Auth
@@ -147,11 +147,11 @@ Per-milestone file located at `milestones/<NN>-<name>/milestone-status.txt`. Use
 ## Features
 
 [x] Feature 01.1: User Registration
-    Plan: milestones/01-core-auth/plans/user-registration.md
+    Plan: .project/{slug}/milestones/01-core-auth/plans/user-registration.md
     Sub-features: 3/3 complete
 
 [~] Feature 01.2: Session Management
-    Plan: milestones/01-core-auth/plans/session-management.md
+    Plan: .project/{slug}/milestones/01-core-auth/plans/session-management.md
     Sub-features: 1/4 complete
     Notes: Switched from JWT to session cookies (see architectural deviation)
 

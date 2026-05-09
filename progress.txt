@@ -30,11 +30,11 @@
     - design/SKILL.md and design/references/progress-format.md updated
     NOTES: Started 2026-05-08  Completed 2026-05-08
 
-[ ] Feature 5: /milestone and /plan-feature Skill Path Updates
+[x] Feature 5: /milestone and /plan-feature Skill Path Updates
     - milestones/<NN>-<name>/ → .project/{slug}/milestones/<NN>-<name>/
     - milestone-status.txt, plans/, reviews/ all under new base
     - milestone/SKILL.md, plan-feature/SKILL.md and both progress-format.md refs updated
-    NOTES:
+    NOTES: Started 2026-05-08  Completed 2026-05-08
 
 [ ] Feature 6: /build Skill Path Updates
     - Codebase refresh writes to .project/{slug}/docs/codebase-assessment.md

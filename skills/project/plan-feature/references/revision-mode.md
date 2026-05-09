@@ -4,7 +4,7 @@ Handles changes to an existing feature plan by selectively revising affected sec
 
 ## Entry Condition (D-04)
 
-Revision mode is entered when the target feature already has a plan file on disk. SKILL.md auto-detects this by checking whether `milestones/<NN>-<name>/plans/<feature-slug>.md` exists.
+Revision mode is entered when the target feature already has a plan file on disk. SKILL.md auto-detects this by checking whether `.project/{slug}/milestones/<NN>-<name>/plans/<feature-slug>.md` exists.
 
 If the plan file does not exist, this is not re-plan mode -- use `references/gate-4-plan.md` for normal mode.
 
@@ -12,9 +12,9 @@ If the plan file does not exist, this is not re-plan mode -- use `references/gat
 
 Read the existing feature plan and related artifacts from disk:
 
-1. **Read `milestones/<NN>-<name>/plans/<feature-slug>.md`** -- the existing feature plan with all 12 sections.
-2. **Read `milestones/<NN>-<name>/README.md`** -- the current milestone definition with acceptance criteria.
-3. **Read `milestones/<NN>-<name>/milestone-status.txt`** -- the current feature status (pending, planned, in progress, complete).
+1. **Read `.project/{slug}/milestones/<NN>-<name>/plans/<feature-slug>.md`** -- the existing feature plan with all 12 sections.
+2. **Read `.project/{slug}/milestones/<NN>-<name>/README.md`** -- the current milestone definition with acceptance criteria.
+3. **Read `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt`** -- the current feature status (pending, planned, in progress, complete).
 
 All three files are required. If any is missing, report the error and stop.
 
@@ -71,14 +71,14 @@ Update `milestone-status.txt` based on the feature's current status:
 
    ```
    [ ] Feature 01.1: User Registration
-       Plan: milestones/01-core-auth/plans/user-registration.md
+       Plan: .project/{slug}/milestones/01-core-auth/plans/user-registration.md
    ```
 
 2. **After re-approval:** Update back to `[~] planned, awaiting build`:
 
    ```
    [~] Feature 01.1: User Registration
-       Plan: milestones/01-core-auth/plans/user-registration.md
+       Plan: .project/{slug}/milestones/01-core-auth/plans/user-registration.md
        Sub-features: 0/3 complete
    ```
 

@@ -44,7 +44,10 @@ handled by `/project`.
 
 ## Step 1 -- Detect Mode and State
 
-Read `progress.txt` from the project root.
+Read `progress.txt` from the project root. Parse `# Project-ID: <slug>` from the
+header and construct the artifact base path: `.project/<slug>/`. If the header is
+missing, report the error and tell the user to run `/project` first to bootstrap
+a Project-ID.
 
 **Prerequisite check (MIL-01):**
 If Gate 2 is not `[x]` approved in `progress.txt`, inform the user:
@@ -57,16 +60,17 @@ Read the `prd.md` Milestones section.
 **Mode detection -- 4 branches:**
 
 1. **First invocation:** `prd.md` Milestones section is `(to be defined)` AND no
-   `milestones/` directories exist --> proceed to Step 2.
+   `.project/<slug>/milestones/` directories exist --> proceed to Step 2.
 2. **Subsequent invocation:** `prd.md` Milestones section is populated AND some
-   milestones lack directories --> proceed to Step 3.
-3. **Revision mode:** Target milestone directory already exists (D-10) -->
-   proceed to Step 5. If the user specified a milestone number or name, use that.
-   Otherwise use `AskUserQuestion` to ask which milestone to revise.
+   milestones lack directories under `.project/<slug>/milestones/` --> proceed to Step 3.
+3. **Revision mode:** Target milestone directory already exists under
+   `.project/<slug>/milestones/` (D-10) --> proceed to Step 5. If the user specified
+   a milestone number or name, use that. Otherwise use `AskUserQuestion` to ask
+   which milestone to revise.
 4. **All milestones defined:** `prd.md` Milestones section is populated AND all
-   milestones have directories --> inform the user all milestones are defined.
-   Suggest running `/project` to check gate status or specify a milestone number
-   for revision.
+   milestones have directories under `.project/<slug>/milestones/` --> inform the
+   user all milestones are defined. Suggest running `/project` to check gate status
+   or specify a milestone number for revision.
 
 ## Step 2 -- First Invocation: Propose Milestone Plan
 
@@ -74,7 +78,7 @@ Read `references/gate-3-milestone.md` for the complete Gate 3 specification.
 
 Follow the "First Invocation" section of the gate-3-milestone specification to:
 
-1. Read `prd.md` and `docs/ARCHITECTURE_AND_DESIGN.md` (MIL-02).
+1. Read `prd.md` and `.project/<slug>/docs/ARCHITECTURE_AND_DESIGN.md` (MIL-02).
 2. Propose full milestone plan with summaries and ordering (D-07, D-01).
 3. Present tradeoff callouts (D-03).
 4. Approve/Revise cycle.
@@ -129,9 +133,9 @@ Display summary:
 MILESTONE DEFINED: [Milestone NN: Name]  (or MILESTONE REVISED)
 
 ARTIFACTS CREATED:  (or ARTIFACTS UPDATED)
-- milestones/<NN>-<name>/README.md
-- milestones/<NN>-<name>/milestone-status.txt
-- milestones/<NN>-<name>/reviews/gate-3-review.md
+- .project/<slug>/milestones/<NN>-<name>/README.md
+- .project/<slug>/milestones/<NN>-<name>/milestone-status.txt
+- .project/<slug>/milestones/<NN>-<name>/reviews/gate-3-review.md
 
 STATE UPDATED:
 - progress.txt (Gate 3: [~] In progress, milestone summary line)

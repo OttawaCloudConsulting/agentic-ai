@@ -2,19 +2,21 @@
 
 Produces per-feature implementation plans from an approved milestone definition and architecture document. This reference contains the complete Gate 4 specification for normal mode -- an executor reading only this file can run the full Gate 4 flow.
 
+`{slug}` is read from the `# Project-ID: <slug>` header in `progress.txt` at session start. All artifact paths in this document use `.project/{slug}/` as the base path.
+
 ## Input Loading (PLAN-01)
 
 Read the primary inputs from disk:
 
 1. **Read `progress.txt`** from the project root. This is required -- if it does not exist, report the error and stop. Used to validate that an active milestone exists.
-2. **Read milestone `README.md`** at `milestones/<NN>-<name>/README.md`. This is required -- primary source of feature details, acceptance criteria, and milestone context.
-3. **Read `milestones/<NN>-<name>/milestone-status.txt`**. This is required -- provides current feature statuses (pending, planned, in progress, complete).
+2. **Read milestone `README.md`** at `.project/{slug}/milestones/<NN>-<name>/README.md`. This is required -- primary source of feature details, acceptance criteria, and milestone context.
+3. **Read `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt`**. This is required -- provides current feature statuses (pending, planned, in progress, complete).
 4. **Read `prd.md`** from the project root. This is required -- provides project context, goals, non-goals, and scope.
-5. **Read `docs/ARCHITECTURE_AND_DESIGN.md`** from the project root. This is required -- provides architecture constraints, component inventory, data flow, and design decisions.
+5. **Read `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`** from the project root. This is required -- provides architecture constraints, component inventory, data flow, and design decisions.
 
 All five files are primary inputs. The milestone README provides feature descriptions and acceptance criteria. The PRD provides project-level context. The architecture document provides technical constraints and patterns. The progress and milestone-status files provide current state.
 
-**Spike artifacts (D-11):** Do not auto-detect or auto-scan `docs/spikes/`. Read spike docs ONLY when the user explicitly references them (e.g., "see the websocket auth spike"). Spike artifacts are user-referenced only.
+**Spike artifacts (D-11):** Do not auto-detect or auto-scan `.project/{slug}/docs/spikes/`. Read spike docs ONLY when the user explicitly references them (e.g., "see the websocket auth spike"). Spike artifacts are user-referenced only.
 
 ## Milestone and Feature Detection (PLAN-02, D-01, D-02, D-03)
 
@@ -26,7 +28,7 @@ Read `progress.txt` and find the first milestone at `[ ]` (pending) or `[~]` (in
 
 **User override:** The user can target a specific milestone by saying "plan a feature in milestone 3" or similar. Honor the override if the target milestone directory exists on disk with a `milestone-status.txt`.
 
-**Important:** Do NOT check for `[x] Gate 3` in progress.txt. Gate 3 stays `[~] In progress` -- it is never `[x]` until `/project` closes it. Validate that an active milestone exists (milestone directory exists with `milestone-status.txt`), not that Gate 3 is approved.
+**Important:** Do NOT check for `[x] Gate 3` in progress.txt. Gate 3 stays `[~] In progress` -- it is never `[x]` until `/project` closes it. Validate that an active milestone exists (`.project/{slug}/milestones/<NN>-<name>/` directory exists with `milestone-status.txt`), not that Gate 3 is approved.
 
 ### Auto-Select Next Unplanned Feature (D-01)
 
@@ -63,7 +65,7 @@ The sub-agent results inform the Approach, Files to Create/Modify, Interface Con
 
 ## Plan Generation (PLAN-03)
 
-Generate the feature plan file at `milestones/<NN>-<name>/plans/<feature-slug>.md` using `assets/feature-plan-template.md`.
+Generate the feature plan file at `.project/{slug}/milestones/<NN>-<name>/plans/<feature-slug>.md` using `assets/feature-plan-template.md`.
 
 **Feature slug:** Kebab-case derived from the feature name. Examples:
 - "User Registration" -> `user-registration.md`
@@ -73,7 +75,7 @@ Generate the feature plan file at `milestones/<NN>-<name>/plans/<feature-slug>.m
 **Create the plans directory if it does not exist:**
 
 ```bash
-mkdir -p milestones/<NN>-<name>/plans/
+mkdir -p .project/{slug}/milestones/<NN>-<name>/plans/
 ```
 
 Populate all 12 sections of the template using information from:
@@ -146,7 +148,7 @@ This is simpler than the section-by-section approval used in `/design` and `/mil
 
 ## Review Checklist Generation (PLAN-05)
 
-Generate the review checklist at `milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md` using `references/review-checklist-template.md`.
+Generate the review checklist at `.project/{slug}/milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md` using `references/review-checklist-template.md`.
 
 The feature slug in the filename matches the plan file slug (e.g., if the plan is `user-registration.md`, the review is `gate-4-user-registration-review.md`).
 
@@ -154,7 +156,7 @@ The feature slug in the filename matches the plan file slug (e.g., if the plan i
 
 Claude pre-checks items it can verify programmatically:
 
-- Plan file exists at expected path (`milestones/<NN>-<name>/plans/<feature-slug>.md`)
+- Plan file exists at expected path (`.project/{slug}/milestones/<NN>-<name>/plans/<feature-slug>.md`)
 - All 12 required sections present in the plan (Summary, Acceptance Criteria, Approach, Sub-Features, Interface Contracts, Edge Cases, Test Command, Test Strategy, Documentation, Files to Create/Modify, Dependencies, Architectural Deviations)
 - `milestone-status.txt` exists for the target milestone
 - Feature exists in `milestone-status.txt`
@@ -178,7 +180,7 @@ Before:
 After:
 ```
 [ ] Feature 01.1: User Registration
-    Plan: milestones/01-core-auth/plans/user-registration.md
+    Plan: .project/{slug}/milestones/01-core-auth/plans/user-registration.md
 ```
 
 ### On Gate 4 Approval (PLAN-09)
@@ -187,7 +189,7 @@ Update the feature marker in `milestone-status.txt` from `[ ]` to `[~] planned, 
 
 ```
 [~] Feature 01.1: User Registration
-    Plan: milestones/01-core-auth/plans/user-registration.md
+    Plan: .project/{slug}/milestones/01-core-auth/plans/user-registration.md
     Sub-features: 0/3 complete
 ```
 
