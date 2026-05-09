@@ -23,11 +23,11 @@
     - define/SKILL.md and define/references/progress-format.md updated
     NOTES: Started 2026-05-08  Completed 2026-05-08
 
-[ ] Feature 4: /design Skill Path Updates
+[x] Feature 4: /design Skill Path Updates
     - docs/ARCHITECTURE_AND_DESIGN.md → .project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md
     - Refresh mode scans .project/{slug}/milestones/*/plans/
     - design/SKILL.md and design/references/progress-format.md updated
-    NOTES:
+    NOTES: Started 2026-05-08  Completed 2026-05-08
 
 [ ] Feature 5: /milestone and /plan-feature Skill Path Updates
     - milestones/<NN>-<name>/ → .project/{slug}/milestones/<NN>-<name>/

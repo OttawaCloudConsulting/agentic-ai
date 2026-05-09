@@ -1,13 +1,15 @@
 # Gate 2: Design Review
 
-Produces `docs/ARCHITECTURE_AND_DESIGN.md` from an approved PRD and optional codebase assessment. This reference contains the complete Gate 2 specification -- an executor reading only this file can run the full Gate 2 normal-mode flow.
+Produces `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` from an approved PRD and optional codebase assessment. This reference contains the complete Gate 2 specification -- an executor reading only this file can run the full Gate 2 normal-mode flow.
+
+`{slug}` is read from the `# Project-ID: <slug>` header in `progress.txt` at session start. All artifact paths in this document use `.project/{slug}/` as the base path.
 
 ## Input Loading (DES-02, D-07)
 
 Read the primary inputs from disk:
 
 1. **Read `prd.md`** from the project root. This is required -- if it does not exist, report the error and stop.
-2. **Read `docs/codebase-assessment.md`** if it exists. This is optional -- it may not exist for greenfield projects. If missing, proceed without it.
+2. **Read `.project/{slug}/docs/codebase-assessment.md`** if it exists. This is optional -- it may not exist for greenfield projects. If missing, proceed without it.
 
 Both files are primary inputs per D-07. The PRD provides goals, non-goals, scope, risks, and milestone intent. The codebase assessment (when present) provides existing patterns, architecture, and constraints.
 
@@ -59,16 +61,16 @@ The synthesis step compensates by drawing architecture decisions primarily from 
 
 ## Architecture Document Production (DES-03, D-04)
 
-Synthesize the agent's findings and the PRD into `docs/ARCHITECTURE_AND_DESIGN.md`:
+Synthesize the agent's findings and the PRD into `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`:
 
 1. Read the agent's scratch file (`/tmp/architecture-scan-findings.md`)
 2. Read `assets/architecture-template.md` for the document structure
-3. Create the `docs/` directory if it does not exist: `mkdir -p docs`
-4. **Check whether `docs/ARCHITECTURE_AND_DESIGN.md` already exists on disk.**
+3. Create the `.project/{slug}/docs/` directory if it does not exist: `mkdir -p .project/{slug}/docs`
+4. **Check whether `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` already exists on disk.**
 
 ### If the file does NOT exist (new document)
 
-Write `docs/ARCHITECTURE_AND_DESIGN.md` from scratch using the template, populating each of the 6 required sections listed below.
+Write `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` from scratch using the template, populating each of the 6 required sections listed below.
 
 ### If the file DOES exist (integrate into existing)
 
@@ -140,7 +142,7 @@ Present the architecture document for user review using the produce-then-review 
 
    The user checks the sections they approve. For each unchecked section, ask: "What should change in [Section Name]?" Apply the requested changes using the Edit tool. Re-present the updated sections for confirmation. Repeat until all sections are approved or the user does a full Approve.
 
-6. **If Revise:** Ask what needs changing. Apply edits to `docs/ARCHITECTURE_AND_DESIGN.md`. Re-present the updated summary. Repeat until the user selects Approve.
+6. **If Revise:** Ask what needs changing. Apply edits to `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`. Re-present the updated summary. Repeat until the user selects Approve.
 
 7. **If Approve:** Proceed to Checklist Validation.
 
@@ -148,14 +150,14 @@ Present the architecture document for user review using the produce-then-review 
 
 Generate and validate the review checklist:
 
-1. Create `docs/reviews/` directory if needed: `mkdir -p docs/reviews`
+1. Create `.project/{slug}/docs/reviews/` directory if needed: `mkdir -p .project/{slug}/docs/reviews`
 
-2. Generate `docs/reviews/gate-2-review.md` using `references/review-checklist-template.md`. Start with the file header:
+2. Generate `.project/{slug}/docs/reviews/gate-2-review.md` using `references/review-checklist-template.md`. Start with the file header:
 
    ```
    # Gate 2 Review -- Design Review
 
-   **Artifact:** docs/ARCHITECTURE_AND_DESIGN.md
+   **Artifact:** .project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md
    **Status:** [ ] Pending
    **Reviewer(s):**
    **Date:**
@@ -174,7 +176,7 @@ Generate and validate the review checklist:
    - `[ ] [Auto] Validate security: "{specific security measure}" is sufficient`
 
 5. **Claude pre-checks** items it can verify programmatically:
-   - File `docs/ARCHITECTURE_AND_DESIGN.md` exists
+   - File `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` exists
    - All 6 required sections are present
    - Design Decisions table has at least one entry
    - Component Inventory table has at least one entry
@@ -197,7 +199,7 @@ Record the gate approval in progress.txt:
    ```
    to:
    ```
-   [x] Gate 2: Design Review  Approved: <YYYY-MM-DD>  docs/ARCHITECTURE_AND_DESIGN.md
+   [x] Gate 2: Design Review  Approved: <YYYY-MM-DD>  .project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md
    ```
    where `<YYYY-MM-DD>` is the current date.
 
