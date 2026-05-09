@@ -42,10 +42,10 @@
     - build/SKILL.md and build/references/progress-format.md updated
     NOTES: Started 2026-05-08  Completed 2026-05-08
 
-[ ] Feature 7: /spike Skill Path Updates
+[x] Feature 7: /spike Skill Path Updates
     - docs/spikes/{slug}.md → .project/{project-slug}/docs/spikes/{slug}.md
     - spike/SKILL.md and spike/references/progress-format.md updated
-    NOTES:
+    NOTES: Started 2026-05-08  Completed 2026-05-08
 
 [ ] Feature 8: Documentation Update
     - docs/skills/project.md output paths updated to .project/{name}/ structure

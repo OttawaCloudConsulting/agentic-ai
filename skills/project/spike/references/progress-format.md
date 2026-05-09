@@ -22,6 +22,7 @@ The exact `progress.txt` content created by `/project` on first run (the only ti
 ```
 # Progress: <Project Name>
 # Created: <ISO date>
+# Project-ID: <slug>
 # Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
 
 ## Gates
@@ -44,8 +45,13 @@ The exact `progress.txt` content created by `/project` on first run (the only ti
 Notes:
 
 - `<Project Name>` is derived from the project directory name or user input at bootstrap time.
+- `<slug>` is the slugified form of the project name (lowercase, hyphens, alphanumeric only).
 - `<ISO date>` is the current date in YYYY-MM-DD format.
 - The `# Status:` header line serves as an inline legend for anyone reading the file.
+
+Parsing instruction for skills: find the line starting with `# Project-ID:`, take the
+value after `:`, trim whitespace, and use it as `<slug>`. Construct the artifact base
+path as `.project/<slug>/`.
 
 ## Greenfield Bootstrap Variant
 
@@ -125,16 +131,18 @@ All spikes (open and resolved) appear in the `## Spikes` section, per decision D
 **Open spike:**
 
 ```
-[ ] WebSocket Auth Compatibility  docs/spikes/websocket-auth.md
+[ ] WebSocket Auth Compatibility  .project/{project-slug}/docs/spikes/websocket-auth.md
 ```
 
 **Resolved spike:**
 
 ```
-[x] SQLite to Postgres Migration  docs/spikes/sqlite-postgres.md  Resolved: 2026-03-17
+[x] SQLite to Postgres Migration  .project/{project-slug}/docs/spikes/sqlite-postgres.md  Resolved: 2026-03-17
 ```
 
 Format: `[status] Spike Name  <artifact-path>` with an optional `Resolved: <date>` suffix for completed spikes.
+
+The `{project-slug}` is read from the `# Project-ID:` header in `progress.txt` at the time the spike entry is written.
 
 ## milestone-status.txt Format
 
