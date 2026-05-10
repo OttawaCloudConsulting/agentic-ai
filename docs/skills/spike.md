@@ -29,7 +29,7 @@ Adversarial technical research skill that investigates technical questions using
 
 ### 1. Input Gathering and Mode Detection
 
-Reads `progress.txt` from the project root. Gathers the user's research question and available tooling list per SPIKE-01. If provided in the invocation message, uses them directly; otherwise prompts with `AskUserQuestion`. Generates a topic slug (kebab-case) and checks if `.project/{project-slug}/docs/spikes/<topic>.md` exists. If it exists, enters follow-up mode. If not, enters new spike mode. Slug collisions prompt the user to choose follow-up or new spike with a different name.
+Reads `progress.txt` from the project root. Gathers the user's research question and available tooling list per SPIKE-01. If provided in the invocation message, uses them directly; otherwise prompts with `AskUserQuestion`. Generates a topic slug (kebab-case) and checks if `.project/{slug}/docs/spikes/<topic>.md` exists. If it exists, enters follow-up mode. If not, enters new spike mode. Slug collisions prompt the user to choose follow-up or new spike with a different name.
 
 ### 2. Research Agent
 

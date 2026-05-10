@@ -6,7 +6,7 @@ Refactor the `skills/project/` skill suite to group all generated documentation 
 
 ## Goals
 
-- Move all generated docs and milestone artifacts under `.project/{project-name}/` to keep the project root clean.
+- Move all generated docs and milestone artifacts under `.project/{slug}/` to keep the project root clean.
 - Store a machine-readable `Project-ID` slug in `progress.txt` so every skill can derive the base path at runtime without hardcoding it.
 - Propose a name to the user at bootstrap and allow override via `AskUserQuestion`.
 - Commit `.project/` to version control alongside the code.
@@ -28,13 +28,13 @@ All skills read `Project-ID` from the `progress.txt` header at invocation time a
 progress.txt (project root)
 prd.md       (project root)
 
-.project/{project-id}/
+.project/{slug}/
   docs/
     codebase-assessment.md      (/define, Gate 0)
     working-backwards.md        (/define, Gate WB)
     ARCHITECTURE_AND_DESIGN.md  (/design, Gate 2)
     spikes/
-      {slug}.md                 (/spike)
+      <topic>.md                (/spike)
     reviews/
       gate-0-review.md
       gate-wb-review.md
@@ -137,7 +137,7 @@ Update `spike/SKILL.md` and `spike/references/progress-format.md` so spike artif
 
 **Acceptance Criteria:**
 
-- `docs/spikes/{slug}.md` → `.project/{project-slug}/docs/spikes/{slug}.md`.
+- `docs/spikes/<topic>.md` → `.project/{slug}/docs/spikes/<topic>.md`.
 - Spike entry in `progress.txt` records the new path.
 - `spike/references/progress-format.md` updated.
 - Completion report shows new path.

@@ -57,8 +57,8 @@ The bootstrap shape is:
 
 ```text
 # Progress: <Project Name>
-# Project-ID: <slug>
 # Created: <ISO date>
+# Project-ID: <slug>
 # Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
 
 ## Gates

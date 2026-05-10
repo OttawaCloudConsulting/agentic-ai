@@ -73,7 +73,7 @@ Examples:
 | `api_v2 (internal)` | `api-v2-internal` |
 | `!!!` | `untitled-project` |
 
-Parsing instruction for skills: find the line starting with `# Project-ID:`, split on `: `, and use the second part as the slug. Construct the artifact base path as `.project/<slug>/`.
+Parsing instruction for skills: find the line starting with `# Project-ID:`, split on the first `:`, take everything after it, and trim whitespace to get the slug. Construct the artifact base path as `.project/<slug>/`.
 
 ## Greenfield Bootstrap Variant
 
