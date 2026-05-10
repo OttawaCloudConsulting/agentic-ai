@@ -1,6 +1,6 @@
 # Spike Artifact Format
 
-Defines the structure of spike artifacts produced at `docs/spikes/<topic>.md`. All spike artifacts use the same fixed section structure (D-09). The Red-Team Assessment is an EQUAL PEER section at the same level as Findings -- the two perspectives are never merged or suppressed (D-10). This ensures users see both the research and its independent critique as first-class information.
+Defines the structure of spike artifacts produced at `.project/{project-slug}/docs/spikes/<topic>.md`. All spike artifacts use the same fixed section structure (D-09). The Red-Team Assessment is an EQUAL PEER section at the same level as Findings -- the two perspectives are never merged or suppressed (D-10). This ensures users see both the research and its independent critique as first-class information.
 
 ## Topic Slug Generation
 
@@ -16,9 +16,9 @@ Convert the spike topic to a filename-safe slug:
 
 | Topic | Slug | File Path |
 |-------|------|-----------|
-| WebSocket Auth Compatibility | websocket-auth-compatibility | docs/spikes/websocket-auth-compatibility.md |
-| SQLite to Postgres Migration | sqlite-to-postgres-migration | docs/spikes/sqlite-to-postgres-migration.md |
-| React 19 vs Svelte 5 | react-19-vs-svelte-5 | docs/spikes/react-19-vs-svelte-5.md |
+| WebSocket Auth Compatibility | websocket-auth-compatibility | .project/{project-slug}/docs/spikes/websocket-auth-compatibility.md |
+| SQLite to Postgres Migration | sqlite-to-postgres-migration | .project/{project-slug}/docs/spikes/sqlite-to-postgres-migration.md |
+| React 19 vs Svelte 5 | react-19-vs-svelte-5 | .project/{project-slug}/docs/spikes/react-19-vs-svelte-5.md |
 
 This is consistent with milestone and feature slug patterns used elsewhere in the project.
 
@@ -95,7 +95,7 @@ The follow-up's research and red-team agents run the same full flow as the initi
 
 How the parent SKILL.md assembles the final spike artifact from agent outputs:
 
-1. **Create `docs/spikes/` directory** if it does not exist: `mkdir -p docs/spikes`
+1. **Create `.project/{project-slug}/docs/spikes/` directory** if it does not exist: `mkdir -p .project/{project-slug}/docs/spikes`
 
 2. **Read `/tmp/spike-research-findings.md`** for:
    - Methodology section content (from the research agent's Methodology section)
@@ -114,7 +114,7 @@ How the parent SKILL.md assembles the final spike artifact from agent outputs:
 
 6. **Set Follow-Up Log** to `(no follow-ups yet)`
 
-7. **Write the complete artifact** to `docs/spikes/<topic-slug>.md` using the New Spike Template
+7. **Write the complete artifact** to `.project/{project-slug}/docs/spikes/<topic-slug>.md` using the New Spike Template
 
 8. **Clean up temp files:** Remove `/tmp/spike-research-findings.md` and `/tmp/spike-redteam-findings.md`
 
@@ -126,11 +126,11 @@ Per D-07 and SPIKE-06, when the user signals that a spike is resolved:
 
 2. **Update progress.txt:** Change the spike entry from:
    ```
-   [ ] Spike Name  docs/spikes/<topic>.md
+   [ ] Spike Name  .project/{project-slug}/docs/spikes/<topic>.md
    ```
    to:
    ```
-   [x] Spike Name  docs/spikes/<topic>.md  Resolved: YYYY-MM-DD
+   [x] Spike Name  .project/{project-slug}/docs/spikes/<topic>.md  Resolved: YYYY-MM-DD
    ```
    where `YYYY-MM-DD` is the current date.
 

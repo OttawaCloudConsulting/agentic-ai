@@ -16,12 +16,12 @@ The Project Codex skills provide a gated project delivery workflow for Codex. Th
 | Skill | Purpose | Primary Outputs |
 |---|---|---|
 | `$project` | Bootstrap `progress.txt`, report status, validate state, and recommend the next skill | `progress.txt` on bootstrap; status report in chat |
-| `$project-define` | Run Codebase Alignment, optional Working Backwards, and Scope Review | `docs/codebase-assessment.md`, `docs/working-backwards.md`, `prd.md`, review files |
-| `$project-design` | Produce or refresh architecture and design documentation | `docs/ARCHITECTURE_AND_DESIGN.md`, Gate 2 review file |
-| `$project-milestone` | Define or revise one milestone at a time | `milestones/<NN>-<name>/README.md`, `milestone-status.txt` |
-| `$project-plan-feature` | Create or revise one feature implementation plan | `milestones/<NN>-<name>/plans/<feature>.md` |
+| `$project-define` | Run Codebase Alignment, optional Working Backwards, and Scope Review | `.project/{slug}/docs/codebase-assessment.md`, `.project/{slug}/docs/working-backwards.md`, `prd.md`, review files |
+| `$project-design` | Produce or refresh architecture and design documentation | `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`, Gate 2 review file |
+| `$project-milestone` | Define or revise one milestone at a time | `.project/{slug}/milestones/<NN>-<name>/README.md`, `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` |
+| `$project-plan-feature` | Create or revise one feature implementation plan | `.project/{slug}/milestones/<NN>-<name>/plans/<feature>.md` |
 | `$project-build` | Implement a planned feature sub-feature by sub-feature | Code changes, commits, updated status files, deviation notes when needed |
-| `$project-spike` | Run adversarial technical research and track spike state | `docs/spikes/<topic>.md`, spike entries in `progress.txt` |
+| `$project-spike` | Run adversarial technical research and track spike state | `.project/{slug}/docs/spikes/<topic>.md`, spike entries in `progress.txt` |
 
 ## When to Use
 
@@ -44,7 +44,7 @@ The Project Codex skills provide a gated project delivery workflow for Codex. Th
 
 ## State Model
 
-The suite uses `progress.txt` as the project-level state file and `milestones/*/milestone-status.txt` as per-milestone state. Both use four checkbox markers:
+The suite uses `progress.txt` as the project-level state file and `.project/{slug}/milestones/*/milestone-status.txt` as per-milestone state. Both use four checkbox markers:
 
 | Marker | Meaning |
 |---|---|

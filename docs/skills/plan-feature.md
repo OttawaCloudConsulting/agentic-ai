@@ -37,7 +37,7 @@ On invocation, `/plan-feature` reads `progress.txt` and `milestone-status.txt` t
 
 ### 2. Input Loading and Codebase Scan
 
-Reads milestone README, `prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`, `progress.txt`, and `milestone-status.txt` as primary inputs. Spawns a sub-agent for a feature-targeted codebase scan (5-15 files relevant to the feature being planned, not architecture-wide). Reads spike artifacts only when the user explicitly references them -- no auto-detection of `docs/spikes/`.
+Reads milestone README, `prd.md`, `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`, `progress.txt`, and `milestone-status.txt` as primary inputs. Spawns a sub-agent for a feature-targeted codebase scan (5-15 files relevant to the feature being planned, not architecture-wide). Reads spike artifacts only when the user explicitly references them -- no auto-detection of `.project/{slug}/docs/spikes/`.
 
 ### 3. Plan Generation and Review
 
@@ -55,9 +55,9 @@ Updates `milestone-status.txt` with the plan path and `[~] planned, awaiting bui
 
 | Artifact | Path | Created By |
 |----------|------|------------|
-| Feature plan | `milestones/<NN>-<name>/plans/<feature-slug>.md` | /plan-feature |
-| Gate 4 review | `milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md` | /plan-feature |
-| milestone-status.txt | `milestones/<NN>-<name>/milestone-status.txt` | /plan-feature (updates only) |
+| Feature plan | `.project/{slug}/milestones/<NN>-<name>/plans/<feature-slug>.md` | /plan-feature |
+| Gate 4 review | `.project/{slug}/milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md` | /plan-feature |
+| milestone-status.txt | `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` | /plan-feature (updates only) |
 
 ## Skill Files
 

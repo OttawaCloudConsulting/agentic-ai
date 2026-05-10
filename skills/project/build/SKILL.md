@@ -46,8 +46,14 @@ from the plan. Updates both `milestone-status.txt` and `progress.txt`.
 
 ## Step 1 -- Detect State and Target Feature
 
-Read `progress.txt` from the project root. Find the active milestone (first
-at `[ ]` or `[~]` status). Read that milestone's `milestone-status.txt`.
+Read `progress.txt` from the project root. Find the line starting with
+`# Project-ID:`, take the value after `:`, trim whitespace, and use it as `<slug>`.
+Construct the artifact base path: `.project/<slug>/`. All artifact reads and writes
+in this skill use this base path. If the header is missing, report the error and tell
+the user to run `/project` to re-bootstrap.
+
+Find the active milestone (first at `[ ]` or `[~]` status). Read that milestone's
+`milestone-status.txt` at `.project/<slug>/milestones/<NN>-<name>/milestone-status.txt`.
 Find the target feature:
 
 - **Auto-detect:** First feature at `[~] planned, awaiting build` status

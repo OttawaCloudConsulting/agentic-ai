@@ -12,8 +12,8 @@ disable-model-invocation: true
 
 # /design -- Architecture and Design (Gate 2)
 
-Produces `docs/ARCHITECTURE_AND_DESIGN.md` from an approved PRD and optional
-codebase assessment, with in-session revision before gate approval. Supports
+Produces `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` from an approved PRD and
+optional codebase assessment, with in-session revision before gate approval. Supports
 refresh mode to consolidate accumulated architectural deviations from feature
 plans.
 
@@ -41,7 +41,9 @@ plans.
 
 ## Step 1 -- Detect Mode and State
 
-Read `progress.txt` from the project root.
+Read `progress.txt` from the project root. Parse `# Project-ID: <slug>` from the
+header and construct the artifact base path: `.project/<slug>/`. Use this base path
+for all artifact reads and writes throughout this session.
 
 **Prerequisite check (DES-01):**
 If Gate 1 is not `[x]` approved in `progress.txt`, inform the user:
@@ -52,12 +54,12 @@ Do not proceed. End the session.
 **Refresh mode detection (DES-08):**
 Check ALL of the following:
 - Gate 2 is `[x]` approved in `progress.txt`
-- `docs/ARCHITECTURE_AND_DESIGN.md` exists on disk
+- `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` exists on disk
 
 If ALL true: jump to Step 4 (Refresh Mode).
 
 **Already-approved detection (no refresh intent):**
-If Gate 2 is `[x]` approved AND `docs/ARCHITECTURE_AND_DESIGN.md` exists AND
+If Gate 2 is `[x]` approved AND `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` exists AND
 the user's message does NOT signal refresh intent (keywords: "refresh", "update
 architecture", "consolidate deviations", "sync deviations"):
 Inform the user Gate 2 is already approved. Use `AskUserQuestion` with options:
@@ -65,7 +67,7 @@ Inform the user Gate 2 is already approved. Use `AskUserQuestion` with options:
 
 **Normal mode:**
 If Gate 2 is not yet approved: proceed to Step 2 (Architecture Generation).
-Before generating, Step 2 checks whether `docs/ARCHITECTURE_AND_DESIGN.md`
+Before generating, Step 2 checks whether `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`
 already exists on disk and integrates into it rather than overwriting (see
 references/gate-2-design.md for details).
 
@@ -74,14 +76,14 @@ references/gate-2-design.md for details).
 Read `references/gate-2-design.md` for the complete Gate 2 specification.
 
 Follow the gate-2-design specification to:
-1. Read `prd.md` and `docs/codebase-assessment.md` (if exists) (DES-02).
+1. Read `prd.md` and `.project/{slug}/docs/codebase-assessment.md` (if exists) (DES-02).
 2. Spawn architecture sub-agent to scan 15-30 files (D-05, D-06).
-3. Synthesize findings + PRD into `docs/ARCHITECTURE_AND_DESIGN.md` using
+3. Synthesize findings + PRD into `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` using
    `assets/architecture-template.md` (DES-03).
 4. Present tradeoff callouts for 2-4 key decisions (D-09).
 5. Enter produce-then-review cycle with section-by-section partial approval
    (DES-05, DES-06, D-08).
-6. Generate and validate review checklist `docs/reviews/gate-2-review.md`
+6. Generate and validate review checklist `.project/{slug}/docs/reviews/gate-2-review.md`
    (DES-04, D-11).
 7. Record Gate 2 approval in `progress.txt` (DES-07).
 
@@ -95,10 +97,10 @@ Display summary of what was produced:
 DESIGN COMPLETE: [Project Title]
 
 ARTIFACTS CREATED:
-- docs/ARCHITECTURE_AND_DESIGN.md (Gate 2)
+- .project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md (Gate 2)
 
 REVIEW CHECKLISTS:
-- docs/reviews/gate-2-review.md
+- .project/{slug}/docs/reviews/gate-2-review.md
 
 NEXT: Run /project to see updated status, then /milestone for Gate 3.
 ```
@@ -108,12 +110,12 @@ NEXT: Run /project to see updated status, then /milestone for Gate 3.
 Read `references/refresh-mode.md` for the complete refresh mode specification.
 
 Follow the refresh-mode specification to:
-1. Scan `milestones/*/plans/*.md` for Architectural Deviations sections.
+1. Scan `.project/{slug}/milestones/*/plans/*.md` for Architectural Deviations sections.
 2. If zero deviations found: report "No architectural deviations found.
    Architecture doc is current." and exit (D-14).
 3. Present each deviation with original design decision context (D-12).
 4. User selects which deviations to consolidate via multiSelect.
-5. Apply selected deviations to `docs/ARCHITECTURE_AND_DESIGN.md` (D-13).
+5. Apply selected deviations to `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` (D-13).
 6. Present updated doc for section-by-section review.
 7. Update Gate 2 date in `progress.txt`.
 
@@ -124,7 +126,7 @@ DESIGN REFRESHED: [Project Title]
 
 DEVIATIONS CONSOLIDATED: N of M
 ARTIFACTS UPDATED:
-- docs/ARCHITECTURE_AND_DESIGN.md (refreshed)
+- .project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md (refreshed)
 
 NEXT: Run /project to see updated status.
 ```

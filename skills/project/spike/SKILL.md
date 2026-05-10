@@ -13,8 +13,8 @@ disable-model-invocation: true
 
 Accepts a research question and available tooling list, spawns sequential
 research and red-team agents, and produces a structured spike artifact at
-`docs/spikes/<topic>.md`. Supports follow-up research on existing spikes
-and lifecycle tracking in `progress.txt`.
+`.project/{slug}/docs/spikes/<topic>.md`. Supports follow-up
+research on existing spikes and lifecycle tracking in `progress.txt`.
 
 ## Rules
 
@@ -39,7 +39,12 @@ and lifecycle tracking in `progress.txt`.
 
 ## Step 1 -- Gather Input and Detect Mode
 
-Read `progress.txt` from the project root.
+Read `progress.txt` from the project root. Find the line starting with
+`# Project-ID:`, take the value after `:`, trim whitespace, and use it as
+`{slug}`. Construct the artifact base path:
+`.project/{slug}/`. All artifact reads and writes in this skill use
+this base path. If the header is missing, report the error and tell the
+user to run `/project` to re-bootstrap.
 
 Gather the user's research question and available tooling list per
 D-05/SPIKE-01. If the user provided these in their invocation message, use
@@ -49,8 +54,8 @@ them directly. If not provided, use `AskUserQuestion` to ask for:
 
 **Follow-up mode detection (SPIKE-05):**
 Read `references/spike-format.md` for the Topic Slug Generation rules.
-Generate the slug from the topic. Check if `docs/spikes/{slug}.md` exists
-on disk.
+Generate the slug from the topic. Check if
+`.project/{slug}/docs/spikes/{topic-slug}.md` exists on disk.
 - If file exists: enter follow-up mode (Step 5).
 - If file does not exist: enter new spike mode (Step 2).
 - If slug collision (file exists but different question): use
@@ -87,7 +92,8 @@ Read `references/spike-format.md` for the artifact template and assembly
 instructions.
 
 Follow the assembly instructions to:
-1. Create `docs/spikes/` directory if it does not exist.
+1. Create `.project/{slug}/docs/spikes/` directory if it does not
+   exist.
 2. Build the spike artifact using the New Spike Template.
 3. Populate sections from agent outputs: Methodology and Findings from
    research findings, Red-Team Assessment from red-team findings (per D-10:
@@ -96,13 +102,13 @@ Follow the assembly instructions to:
    remaining risks after red-team review (per D-11).
 5. Set Status to `open`.
 6. Set Follow-Up Log to `(no follow-ups yet)`.
-7. Write the artifact to `docs/spikes/{slug}.md`.
+7. Write the artifact to `.project/{slug}/docs/spikes/{topic-slug}.md`.
 
 **Update progress.txt (SPIKE-04, D-07):**
 Read `references/progress-format.md` for spike entry format. Add a `[ ]`
 entry under `## Spikes` in `progress.txt`. If `(none yet)` placeholder
 exists, replace it with the entry.
-Format: `[ ] {Spike Name}  docs/spikes/{slug}.md`
+Format: `[ ] {Spike Name}  .project/{slug}/docs/spikes/{topic-slug}.md`
 
 Proceed to Step 6 (Completion Report).
 
@@ -115,13 +121,15 @@ agents (Steps 2-3) with the follow-up question as the research question
 and the same available tooling from the original spike.
 
 After both agents complete:
-1. Read the existing spike artifact from `docs/spikes/{slug}.md`.
+1. Read the existing spike artifact from
+   `.project/{slug}/docs/spikes/{topic-slug}.md`.
 2. Append a new Follow-Up Log entry per the dated entry format (per D-08,
    D-12).
 3. If `(no follow-ups yet)` placeholder exists, replace it with the entry.
 4. Preserve all original content -- never overwrite findings, red-team
    assessment, or prior follow-ups.
-5. Write the updated artifact back to `docs/spikes/{slug}.md`.
+5. Write the updated artifact back to
+   `.project/{slug}/docs/spikes/{topic-slug}.md`.
 
 **Offer resolution (SPIKE-06, D-07, D-08):**
 Use `AskUserQuestion` with options: **Resolved** (mark spike resolved) /
@@ -137,9 +145,9 @@ If "Done": Leave spike open, proceed to completion report.
 ## Step 6 -- Completion Report
 
 Display summary showing: spike name, artifact path
-(`docs/spikes/{slug}.md`), state update (`progress.txt` entry
-added/updated), and next action suggestion (review artifact or run
-`/project` for status).
+(`.project/{slug}/docs/spikes/{topic-slug}.md`), state update
+(`progress.txt` entry added/updated), and next action suggestion (review
+artifact or run `/project` for status).
 
 If follow-ups were recorded, show count. If resolved, show resolution date.
 
@@ -151,7 +159,7 @@ If follow-ups were recorded, show count. If resolved, show resolution date.
   input (user provides findings directly).
 - **Red-team agent failure:** Report failure. Offer retry or skip red-team
   (note in artifact that red-team was not performed).
-- **Missing docs/spikes/ directory:** Create it automatically.
+- **Missing `.project/{slug}/docs/spikes/` directory:** Create it automatically.
 - **Spike artifact write failure:** Report error, display artifact content
   so user can save manually.
 - **Interrupted session:** User can re-invoke `/spike`. For new spikes, if

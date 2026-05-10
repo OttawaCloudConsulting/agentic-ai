@@ -2,30 +2,32 @@
 
 Produces milestone-scoped feature breakdowns from an approved PRD and architecture document. This reference contains the complete Gate 3 specification for normal mode (first invocation and subsequent invocations) -- an executor reading only this file can run the full Gate 3 flow.
 
+`{slug}` is read from the `# Project-ID: <slug>` header in `progress.txt` at session start. All artifact paths in this document use `.project/{slug}/` as the base path.
+
 ## Input Loading (MIL-02, D-02, D-04)
 
 Read the primary inputs from disk:
 
 1. **Read `prd.md`** from the project root. This is required -- if it does not exist, report the error and stop.
-2. **Read `docs/ARCHITECTURE_AND_DESIGN.md`** from the project root. This is required -- if it does not exist, report the error and stop.
+2. **Read `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`** from the project root. This is required -- if it does not exist, report the error and stop.
 3. **Read `progress.txt`** from the project root. This is required -- if it does not exist, report the error and stop.
 
 All three files are primary inputs per D-02. The PRD provides goals, non-goals, scope, risk assessment, and milestone intent. The architecture document provides component inventory, data flow, design decisions, and technical constraints. The progress file provides current gate status.
 
-**Spike artifacts (D-04):** Do not auto-detect or auto-scan `docs/spikes/`. If the user explicitly references a spike during the session (e.g., "see the websocket auth spike"), read `docs/spikes/<topic>.md` on request. Spike artifacts are user-referenced only.
+**Spike artifacts (D-04):** Do not auto-detect or auto-scan `.project/{slug}/docs/spikes/`. If the user explicitly references a spike during the session (e.g., "see the websocket auth spike"), read `.project/{slug}/docs/spikes/<topic>.md` on request. Spike artifacts are user-referenced only.
 
 ## Mode Detection
 
 After loading inputs, determine which mode to enter:
 
-1. **First invocation:** `prd.md` Milestones section contains `(to be defined)` AND no `milestones/` directories exist on disk. Proceed to Section 4 (Propose Milestone Plan).
-2. **Subsequent invocation:** `prd.md` Milestones section is populated with an approved milestone plan AND at least one milestone still lacks a directory under `milestones/`. Proceed to Section 5 (Auto-Select Next Milestone).
-3. **Revision mode:** The target milestone directory already exists under `milestones/`. This is handled by `references/revision-mode.md`, not this file. SKILL.md routes to revision mode directly.
+1. **First invocation:** `prd.md` Milestones section contains `(to be defined)` AND no `.project/{slug}/milestones/` directories exist on disk. Proceed to Section 4 (Propose Milestone Plan).
+2. **Subsequent invocation:** `prd.md` Milestones section is populated with an approved milestone plan AND at least one milestone still lacks a directory under `.project/{slug}/milestones/`. Proceed to Section 5 (Auto-Select Next Milestone).
+3. **Revision mode:** The target milestone directory already exists under `.project/{slug}/milestones/`. This is handled by `references/revision-mode.md`, not this file. SKILL.md routes to revision mode directly.
 
 Detection logic:
 
 - Check `prd.md` Milestones section content (is it `(to be defined)` or populated?)
-- Run `ls milestones/` to see which milestone directories exist
+- Run `ls .project/{slug}/milestones/` to see which milestone directories exist
 - Compare the milestone plan in `prd.md` against existing directories to identify the next undefined milestone
 
 ## First Invocation: Propose Milestone Plan (D-07, D-01)
@@ -91,7 +93,7 @@ After persisting the milestone plan in `prd.md`:
 On subsequent invocations (milestone plan exists in `prd.md` but not all milestones have directories):
 
 1. Read `prd.md` Milestones section for the approved milestone plan
-2. Run `ls milestones/` to identify which milestones already have directories
+2. Run `ls .project/{slug}/milestones/` to identify which milestones already have directories
 3. Auto-select the next milestone in sequence that lacks a directory
 4. Report the selection: "Next undefined milestone: Milestone NN: Name"
 
@@ -105,21 +107,21 @@ Generate the complete set of artifacts for a single milestone.
 
 ### Sequence Number (MIL-03)
 
-Auto-increment the sequence number from existing `milestones/` directories:
+Auto-increment the sequence number from existing `.project/{slug}/milestones/` directories:
 
-- Run `ls milestones/` to count existing milestone directories
+- Run `ls .project/{slug}/milestones/` to count existing milestone directories
 - Use the milestone's position in the approved plan (from `prd.md`) for the sequence number
 - Zero-pad to two digits (e.g., `01`, `02`, `03`)
 
 ### Directory Creation
 
 ```bash
-mkdir -p milestones/<NN>-<kebab-name>/reviews/
+mkdir -p .project/{slug}/milestones/<NN>-<kebab-name>/reviews/
 ```
 
 ### README.md Generation (MIL-04)
 
-Read `assets/milestone-readme-template.md` for the template structure. Generate `milestones/<NN>-<name>/README.md` with all required sections populated:
+Read `assets/milestone-readme-template.md` for the template structure. Generate `.project/{slug}/milestones/<NN>-<name>/README.md` with all required sections populated:
 
 - **Goal** -- 1-3 sentences describing customer-visible outcome (not internal refactoring)
 - **Features** -- 2-5 features per milestone (DD-1), each with specific, testable acceptance criteria
@@ -131,7 +133,7 @@ Read `assets/milestone-readme-template.md` for the template structure. Generate 
 
 ### milestone-status.txt Generation (MIL-05)
 
-Generate `milestones/<NN>-<name>/milestone-status.txt` with all features at `[ ]` pending status. Follow the format from `references/progress-format.md`:
+Generate `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` with all features at `[ ]` pending status. Follow the format from `references/progress-format.md`:
 
 ```
 # Milestone NN: Name
@@ -148,7 +150,7 @@ Generate `milestones/<NN>-<name>/milestone-status.txt` with all features at `[ ]
 
 ### gate-3-review.md Generation (MIL-06)
 
-Generate `milestones/<NN>-<name>/reviews/gate-3-review.md` using the format from `references/review-checklist-template.md`. This checklist is per-milestone (not at `docs/reviews/` like Gates 0-2).
+Generate `.project/{slug}/milestones/<NN>-<name>/reviews/gate-3-review.md` using the format from `references/review-checklist-template.md`. This checklist is per-milestone (not at `.project/{slug}/docs/reviews/` like Gates 0-2).
 
 ### progress.txt Updates (MIL-07, MIL-09)
 
@@ -167,7 +169,7 @@ After writing `milestone-status.txt`, update `progress.txt`:
 2. **Milestone summary line (MIL-07):** Add a new line in the `## Milestones` section:
 
    ```
-   [ ] Milestone NN: Name  milestones/<NN>-<name>/  0/N features complete
+   [ ] Milestone NN: Name  .project/{slug}/milestones/<NN>-<name>/  0/N features complete
    ```
 
    Follow the Milestone Summary Line Format from `references/progress-format.md`.
@@ -207,12 +209,12 @@ Generate and validate the review checklist for this milestone.
 
 1. Read `references/review-checklist-template.md` for the Gate 3 template structure.
 
-2. The checklist was generated during Section 6 at `milestones/<NN>-<name>/reviews/gate-3-review.md`. Read it now.
+2. The checklist was generated during Section 6 at `.project/{slug}/milestones/<NN>-<name>/reviews/gate-3-review.md`. Read it now.
 
 3. **Claude pre-checks** items that can be verified programmatically:
-   - `milestones/<NN>-<name>/README.md` exists
+   - `.project/{slug}/milestones/<NN>-<name>/README.md` exists
    - All required sections present in README.md (Goal, Features, Dependencies, Ordering, Sizing, Definition of Done)
-   - `milestones/<NN>-<name>/milestone-status.txt` exists
+   - `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` exists
    - Feature count in `milestone-status.txt` matches feature count in README.md
    - Each feature has at least one acceptance criterion
 

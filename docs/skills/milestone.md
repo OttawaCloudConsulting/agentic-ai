@@ -38,7 +38,7 @@ On invocation, `/milestone` reads `progress.txt` and `prd.md` to determine entry
 
 ### 2. First Invocation: Milestone Plan
 
-Reads `prd.md` and `docs/ARCHITECTURE_AND_DESIGN.md`. Proposes full milestone breakdown with sequence numbers, names, summaries, and ordering rationale. Calls out 2-3 key tradeoffs in grouping/ordering decisions. After approval, persists the plan in `prd.md` Milestones section and defines milestone #1.
+Reads `prd.md` and `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`. Proposes full milestone breakdown with sequence numbers, names, summaries, and ordering rationale. Calls out 2-3 key tradeoffs in grouping/ordering decisions. After approval, persists the plan in `prd.md` Milestones section and defines milestone #1.
 
 ### 3. Subsequent Invocation
 
@@ -46,7 +46,7 @@ Reads the approved milestone plan from `prd.md`. Auto-selects the next milestone
 
 ### 4. Milestone Definition
 
-For each milestone: generates `README.md` (goal, features with acceptance criteria, dependencies, ordering, sizing, definition of done), `milestone-status.txt` (features at pending status), and `reviews/gate-3-review.md` (checklist with DD-13 static items plus auto-generated content items). Updates `progress.txt` with milestone summary line and Gate 3 as in-progress. Presents for review with Approve/Revise/Partial options.
+For each milestone: generates `.project/{slug}/milestones/<NN>-<name>/README.md` (goal, features with acceptance criteria, dependencies, ordering, sizing, definition of done), `milestone-status.txt` (features at pending status), and `reviews/gate-3-review.md` (checklist with DD-13 static items plus auto-generated content items). Updates `progress.txt` with milestone summary line and Gate 3 as in-progress. Presents for review with Approve/Revise/Partial options.
 
 ### 5. Revision Mode
 
@@ -60,9 +60,9 @@ Displays summary of artifacts created/updated, state file changes, and suggests 
 
 | File | Purpose | Gate |
 |------|---------|------|
-| `milestones/<NN>-<name>/README.md` | Milestone feature breakdown with acceptance criteria | Gate 3 |
-| `milestones/<NN>-<name>/milestone-status.txt` | Per-feature status tracking | Gate 3 |
-| `milestones/<NN>-<name>/reviews/gate-3-review.md` | Milestone review checklist for offline reviewers | Gate 3 |
+| `.project/{slug}/milestones/<NN>-<name>/README.md` | Milestone feature breakdown with acceptance criteria | Gate 3 |
+| `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` | Per-feature status tracking | Gate 3 |
+| `.project/{slug}/milestones/<NN>-<name>/reviews/gate-3-review.md` | Milestone review checklist for offline reviewers | Gate 3 |
 | `prd.md` (updated) | Milestones section populated with plan | Gate 3 |
 | `progress.txt` (updated) | Gate 3 in-progress, milestone summary lines | Gate 3 |
 
@@ -86,6 +86,6 @@ skills/project/milestone/
 |-------|-------------|
 | `/project` | Routes users to `/milestone` when Gate 2 is approved; detects Gate 3 closure when all milestones have completed reviews |
 | `/define` | Produces `prd.md` that `/milestone` reads as primary input; `/milestone` updates prd.md Milestones section |
-| `/design` | Produces `docs/ARCHITECTURE_AND_DESIGN.md` that `/milestone` reads as secondary input |
+| `/design` | Produces `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` that `/milestone` reads as secondary input |
 | `/plan-feature` | Consumes milestone `README.md` and `milestone-status.txt` as inputs for feature planning |
 | `/build` | Consumes feature plans produced by `/plan-feature`; updates `milestone-status.txt` on feature completion |

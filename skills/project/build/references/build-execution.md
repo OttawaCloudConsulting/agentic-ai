@@ -23,8 +23,8 @@ Stop. Do not proceed.
 override by specifying a feature name.
 
 Extract the `Plan:` path from the selected feature entry (e.g.,
-`milestones/01-core-auth/plans/session-management.md`). This path is required --
-if the plan file does not exist on disk, report the error and stop.
+`.project/{slug}/milestones/01-core-auth/plans/session-management.md`). This path is
+required -- if the plan file does not exist on disk, report the error and stop.
 
 ## Codebase Assessment Refresh (BUILD-02, D-05, D-06, D-07)
 
@@ -68,7 +68,7 @@ Read the sub-feature's description from the plan. Also read:
 - The feature's **Approach** section for implementation strategy
 - The feature's **Interface Contracts** section for signatures and data shapes
 - The feature's **Files to Create/Modify** section for target file paths
-- `docs/ARCHITECTURE_AND_DESIGN.md` for architectural constraints
+- `.project/<slug>/docs/ARCHITECTURE_AND_DESIGN.md` for architectural constraints
 
 ### 2. Implement the Sub-Feature
 
@@ -159,7 +159,7 @@ complete`. Add `Completed: <ISO date>` to the Notes line.
 Before:
 ```
 [~] Feature 01.2: Session Management
-    Plan: milestones/01-core-auth/plans/session-management.md
+    Plan: .project/{slug}/milestones/01-core-auth/plans/session-management.md
     Sub-features: 3/4 complete
     Notes: Started 2026-04-03.
 ```
@@ -167,7 +167,7 @@ Before:
 After:
 ```
 [x] Feature 01.2: Session Management
-    Plan: milestones/01-core-auth/plans/session-management.md
+    Plan: .project/{slug}/milestones/01-core-auth/plans/session-management.md
     Sub-features: 4/4 complete
     Notes: Started 2026-04-03. Completed 2026-04-04.
 ```
@@ -176,14 +176,14 @@ After:
 
 Increment the feature count in the milestone summary line:
 
-Before: `[~] Milestone 01: Core Auth  milestones/01-core-auth/  2/3 features complete`
-After:  `[~] Milestone 01: Core Auth  milestones/01-core-auth/  3/3 features complete`
+Before: `[~] Milestone 01: Core Auth  .project/{slug}/milestones/01-core-auth/  2/3 features complete`
+After:  `[~] Milestone 01: Core Auth  .project/{slug}/milestones/01-core-auth/  3/3 features complete`
 
 **If this was the last feature** (completed count equals total count): also
 change the milestone marker from `[~]` to `[x]` in `progress.txt`:
 
 ```
-[x] Milestone 01: Core Auth  milestones/01-core-auth/  3/3 features complete
+[x] Milestone 01: Core Auth  .project/{slug}/milestones/01-core-auth/  3/3 features complete
 ```
 
 ### Test Fails (non-zero exit code, D-09)

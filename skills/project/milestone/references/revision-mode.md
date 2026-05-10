@@ -4,7 +4,7 @@ Handles scope changes to an existing milestone by selectively resetting affected
 
 ## Entry Condition (D-10)
 
-Revision mode is entered when the target milestone directory already exists on disk. SKILL.md auto-detects this in Step 1 by checking whether `milestones/<NN>-<name>/` is present.
+Revision mode is entered when the target milestone directory already exists on disk. SKILL.md auto-detects this in Step 1 by checking whether `.project/{slug}/milestones/<NN>-<name>/` is present.
 
 If the target milestone directory does not exist, this is not revision mode -- use `references/gate-3-milestone.md` for normal mode (first invocation or subsequent invocation).
 
@@ -12,8 +12,8 @@ If the target milestone directory does not exist, this is not revision mode -- u
 
 Read the existing milestone artifacts from disk:
 
-1. **Read `milestones/<NN>-<name>/README.md`** -- the existing milestone definition with goal, features, dependencies, ordering, sizing, and definition of done.
-2. **Read `milestones/<NN>-<name>/milestone-status.txt`** -- the current feature statuses showing which features are complete, in progress, or pending.
+1. **Read `.project/{slug}/milestones/<NN>-<name>/README.md`** -- the existing milestone definition with goal, features, dependencies, ordering, sizing, and definition of done.
+2. **Read `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt`** -- the current feature statuses showing which features are complete, in progress, or pending.
 
 Both files are required. If either is missing, report the error and stop.
 
@@ -44,7 +44,7 @@ After identifying affected features, perform a focused revision of the milestone
 
 1. **Ask "What changed?"** -- understand the nature of the scope change (new requirements, removed features, modified acceptance criteria, dependency changes, etc.)
 
-2. **Load existing `milestones/<NN>-<name>/README.md`** content (already read in the Load step above).
+2. **Load existing `.project/{slug}/milestones/<NN>-<name>/README.md`** content (already read in the Load step above).
 
 3. **Revise only affected sections** -- do NOT discard and regenerate the entire README. Use the Edit tool to apply targeted changes:
    - If features were added: add new feature subsections with acceptance criteria
@@ -63,11 +63,11 @@ After revising the README, update all related artifacts. Follow write-ordering (
 
 ### 1. Generate Fresh gate-3-review.md (D-13)
 
-Generate a fresh `milestones/<NN>-<name>/reviews/gate-3-review.md` checklist using `references/review-checklist-template.md`. The prior review is no longer valid after a scope change -- a new review must be conducted against the revised milestone definition.
+Generate a fresh `.project/{slug}/milestones/<NN>-<name>/reviews/gate-3-review.md` checklist using `references/review-checklist-template.md`. The prior review is no longer valid after a scope change -- a new review must be conducted against the revised milestone definition.
 
 ### 2. Update milestone-status.txt (Write First -- STATE-04)
 
-Update `milestones/<NN>-<name>/milestone-status.txt`:
+Update `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt`:
 
 - **Reset selected features** to `[ ]` pending with `Plan: (not yet planned)` -- their previous plans are invalidated by the scope change
 - **Preserve unselected features'** status and plan paths -- completed features keep `[x]`, in-progress features keep `[~]`, pending features keep `[ ]`
@@ -81,7 +81,7 @@ Update `milestones/<NN>-<name>/milestone-status.txt`:
 Update the milestone summary line in the `## Milestones` section of `progress.txt`:
 
 ```
-[ ] Milestone NN: Name  milestones/<NN>-<name>/  N/M features complete
+[ ] Milestone NN: Name  .project/{slug}/milestones/<NN>-<name>/  N/M features complete
 ```
 
 Recalculate N (completed features) and M (total features) based on the updated `milestone-status.txt`.

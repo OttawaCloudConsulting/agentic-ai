@@ -26,7 +26,7 @@ The normal flow is:
 
 1. `$project` bootstraps `progress.txt` or reports current project status.
 2. `$project-define` performs Codebase Alignment, optional Working Backwards, and Scope Review.
-3. `$project-design` creates or refreshes `docs/ARCHITECTURE_AND_DESIGN.md`.
+3. `$project-design` creates or refreshes `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`.
 4. `$project-milestone` defines the next milestone and milestone status file.
 5. `$project-plan-feature` creates an implementation plan for one feature.
 6. `$project-build` implements the approved plan sub-feature by sub-feature.
@@ -38,12 +38,12 @@ The normal flow is:
 
 | Gate | Owned By | Meaning | Typical Artifact |
 |---|---|---|---|
-| Gate 0: Codebase Alignment | `$project-define` | Brownfield codebase assessment, or skipped for greenfield projects | `docs/codebase-assessment.md` |
-| Gate WB: Working Backwards | `$project-define` and `$project` state decisions | Optional customer-outcome exercise | `docs/working-backwards.md` |
+| Gate 0: Codebase Alignment | `$project-define` | Brownfield codebase assessment, or skipped for greenfield projects | `.project/{slug}/docs/codebase-assessment.md` |
+| Gate WB: Working Backwards | `$project-define` and `$project` state decisions | Optional customer-outcome exercise | `.project/{slug}/docs/working-backwards.md` |
 | Gate 1: Scope Review | `$project-define` | Approved PRD | `prd.md` |
-| Gate 2: Design Review | `$project-design` | Approved architecture and design | `docs/ARCHITECTURE_AND_DESIGN.md` |
-| Gate 3: Milestone Review | `$project-milestone`, closed by `$project` | Milestone sequence and one or more approved milestones | `milestones/<NN>-<name>/README.md` |
-| Gate 4: Feature Planning | `$project-plan-feature` | One approved implementation plan | `milestones/<NN>-<name>/plans/<feature>.md` |
+| Gate 2: Design Review | `$project-design` | Approved architecture and design | `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` |
+| Gate 3: Milestone Review | `$project-milestone`, closed by `$project` | Milestone sequence and one or more approved milestones | `.project/{slug}/milestones/<NN>-<name>/README.md` |
+| Gate 4: Feature Planning | `$project-plan-feature` | One approved implementation plan | `.project/{slug}/milestones/<NN>-<name>/plans/<feature>.md` |
 
 Gate 4 is represented in milestone status rather than the top-level `progress.txt` gate list. A feature marked `[~] planned, awaiting build` is ready for `$project-build`.
 
@@ -58,6 +58,7 @@ The bootstrap shape is:
 ```text
 # Progress: <Project Name>
 # Created: <ISO date>
+# Project-ID: <slug>
 # Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
 
 ## Gates
@@ -85,7 +86,7 @@ For greenfield projects, Gate 0 is recorded as:
 
 ### `milestone-status.txt`
 
-Each milestone has a detailed status file at `milestones/<NN>-<name>/milestone-status.txt`. It tracks feature status, plan paths, sub-feature counts, and notes:
+Each milestone has a detailed status file at `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt`. It tracks feature status, plan paths, sub-feature counts, and notes:
 
 ```text
 # Milestone 01: Core Auth
@@ -94,13 +95,46 @@ Each milestone has a detailed status file at `milestones/<NN>-<name>/milestone-s
 ## Features
 
 [x] Feature 01.1: User Registration
-    Plan: milestones/01-core-auth/plans/user-registration.md
+    Plan: .project/{slug}/milestones/01-core-auth/plans/user-registration.md
     Sub-features: 3/3 complete
 
 [~] Feature 01.2: Session Management
-    Plan: milestones/01-core-auth/plans/session-management.md
+    Plan: .project/{slug}/milestones/01-core-auth/plans/session-management.md
     Sub-features: 1/4 complete
 ```
+
+### Output Artifact Layout
+
+All generated documentation and milestone artifacts are grouped under `.project/{slug}/`. `progress.txt` and `prd.md` remain at the project root.
+
+```
+progress.txt                            (project root)
+prd.md                                  (project root)
+
+.project/{slug}/
+  docs/
+    codebase-assessment.md             ($project-define, Gate 0)
+    working-backwards.md               ($project-define, Gate WB)
+    ARCHITECTURE_AND_DESIGN.md         ($project-design, Gate 2)
+    spikes/
+      {topic}.md                       ($project-spike)
+    reviews/
+      gate-0-review.md
+      gate-wb-review.md
+      gate-1-review.md
+      gate-2-review.md
+  milestones/
+    {NN}-{name}/
+      README.md                        ($project-milestone)
+      milestone-status.txt             ($project-milestone, $project-build)
+      plans/
+        {feature}.md                   ($project-plan-feature, $project-build)
+      reviews/
+        gate-3-review.md
+        gate-4-{feature}-review.md
+```
+
+The `Project-ID` slug is set during bootstrap and stored in `progress.txt` as `# Project-ID: <slug>`. Every skill reads this header to derive the base path at runtime — no path is hardcoded in any skill.
 
 ### Status Markers
 
@@ -125,7 +159,7 @@ The suite is designed around conservative state writes:
 - `$project-milestone` writes milestone artifacts and updates `progress.txt`.
 - `$project-plan-feature` writes only the active `milestone-status.txt`.
 - `$project-build` updates `milestone-status.txt` first, then `progress.txt`.
-- `$project-spike` writes or updates `docs/spikes/<topic>.md` and spike entries in `progress.txt`.
+- `$project-spike` writes or updates `.project/{slug}/docs/spikes/<topic>.md` and spike entries in `progress.txt`.
 
 When both milestone-level and project-level state change, `milestone-status.txt` is written first. This preserves the detailed source of truth and lets `$project` detect any divergence during the next status read.
 
@@ -176,19 +210,19 @@ Routing is first-match based on `references/routing-logic.md`. Key decisions inc
 
 Modes:
 
-- Brownfield: creates `docs/codebase-assessment.md` for Gate 0.
+- Brownfield: creates `.project/{slug}/docs/codebase-assessment.md` for Gate 0.
 - Greenfield: records Gate 0 as skipped.
 - Gate WB resume: resolves a previously deferred Working Backwards decision.
 - PRD revision: revises an approved `prd.md` when project goals change.
 
 Outputs:
 
-- `docs/codebase-assessment.md`
-- `docs/working-backwards.md` when Gate WB is accepted
+- `.project/{slug}/docs/codebase-assessment.md`
+- `.project/{slug}/docs/working-backwards.md` when Gate WB is accepted
 - `prd.md`
-- `docs/reviews/gate-0-review.md`
-- `docs/reviews/gate-wb-review.md`
-- `docs/reviews/gate-1-review.md`
+- `.project/{slug}/docs/reviews/gate-0-review.md`
+- `.project/{slug}/docs/reviews/gate-wb-review.md`
+- `.project/{slug}/docs/reviews/gate-1-review.md`
 
 Each gate uses a produce-then-review pattern. Approval is recorded only after checklist items are marked `[x]` or `[-]` with a reason.
 
@@ -196,14 +230,14 @@ Each gate uses a produce-then-review pattern. Approval is recorded only after ch
 
 `$project-design` owns Gate 2. It requires Gate 1 approval.
 
-Normal mode creates `docs/ARCHITECTURE_AND_DESIGN.md` from the PRD and available context using `assets/architecture-template.md`.
+Normal mode creates `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md` from the PRD and available context using `assets/architecture-template.md`.
 
 Refresh mode applies when Gate 2 is already approved or the user asks to refresh architecture. The skill scans feature plans for recorded architectural deviations, asks which deviations to consolidate, and updates the architecture document without overwriting existing content unless approved.
 
 Outputs:
 
-- `docs/ARCHITECTURE_AND_DESIGN.md`
-- `docs/reviews/gate-2-review.md`
+- `.project/{slug}/docs/ARCHITECTURE_AND_DESIGN.md`
+- `.project/{slug}/docs/reviews/gate-2-review.md`
 - Updated Gate 2 entry in `progress.txt`
 
 ## `$project-milestone`
@@ -214,8 +248,8 @@ On first invocation, it proposes the full milestone sequence and writes the appr
 
 Outputs:
 
-- `milestones/<NN>-<name>/README.md`
-- `milestones/<NN>-<name>/milestone-status.txt`
+- `.project/{slug}/milestones/<NN>-<name>/README.md`
+- `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt`
 - Gate 3 review file
 - Updated Gate 3 and milestone summary entries in `progress.txt`
 
@@ -229,7 +263,7 @@ The skill chooses the first pending feature in the active milestone unless the u
 
 Outputs:
 
-- `milestones/<NN>-<name>/plans/<feature>.md`
+- `.project/{slug}/milestones/<NN>-<name>/plans/<feature>.md`
 - Gate 4 review file
 - Updated feature entry marked `[~] planned, awaiting build`
 
@@ -252,13 +286,13 @@ Outputs include code changes, commits, status updates, test results, and any rec
 
 ## `$project-spike`
 
-`$project-spike` handles technical research. It requires a bootstrapped project and writes spike artifacts under `docs/spikes/`.
+`$project-spike` handles technical research. It requires a bootstrapped project and writes spike artifacts under `.project/{slug}/docs/spikes/`.
 
 The skill intentionally separates research and red-team review into different Codex sub-agent contexts. If isolated sub-agent delegation is unavailable, the skill stops rather than collapsing the two passes into one local context.
 
 Outputs:
 
-- `docs/spikes/<topic>.md`
+- `.project/{slug}/docs/spikes/<topic>.md`
 - New or updated spike entries in `progress.txt`
 - Dated follow-up entries when revisiting an existing spike
 
@@ -266,7 +300,7 @@ Resolved spikes remain in `progress.txt` for auditability.
 
 ## Review Checklists
 
-Definition, design, milestone, and feature planning gates use review checklist files under `docs/reviews/`. Checklists combine static gate requirements with content-specific review items.
+Definition, design, milestone, and feature planning gates use review checklist files under `.project/{slug}/docs/reviews/`. Checklists combine static gate requirements with content-specific review items.
 
 Approval requires every checklist item to be:
 

@@ -33,11 +33,11 @@ Checklist of all gates with their current status, approval dates, and artifact p
 
 ```
 GATES:
-  [x] Gate 0: Codebase Alignment    Approved: 2026-03-15  docs/codebase-assessment.md
+  [x] Gate 0: Codebase Alignment    Approved: 2026-03-15  .project/my-project/docs/codebase-assessment.md
   [-] Gate WB: Working Backwards    Skipped
   [x] Gate 1: Scope Review          Approved: 2026-03-16  prd.md
        Warning: Artifact not found: prd.md
-  [x] Gate 2: Design Review         Approved: 2026-03-17  docs/ARCHITECTURE_AND_DESIGN.md
+  [x] Gate 2: Design Review         Approved: 2026-03-17  .project/my-project/docs/ARCHITECTURE_AND_DESIGN.md
   [~] Gate 3: Milestone Review      In progress
 ```
 

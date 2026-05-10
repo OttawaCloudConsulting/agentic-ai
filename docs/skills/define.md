@@ -36,15 +36,15 @@ On invocation, `/define` reads `progress.txt` and determines the entry mode:
 
 ### 2. Gate 0: Codebase Assessment (brownfield only)
 
-Spawns a sub-agent to scan 20-40 codebase files, synthesizes findings into `docs/codebase-assessment.md` with sections covering project overview, file organization, detected patterns, dependency graph, assumptions, patterns to deviate from, open questions, and recent changes. User reviews and can revise before approval.
+Spawns a sub-agent to scan 20-40 codebase files, synthesizes findings into `.project/{slug}/docs/codebase-assessment.md` with sections covering project overview, file organization, detected patterns, dependency graph, assumptions, patterns to deviate from, open questions, and recent changes. User reviews and can revise before approval.
 
 ### 3. Gate WB: Working Backwards (optional)
 
-Offers the user a Working Backwards exercise with three options: proceed, skip, or defer. When accepted, conducts a 3-round interview (customer/problem, solution/experience, internal feasibility) and produces `docs/working-backwards.md` with Press Release, External FAQ, and Internal FAQ sections.
+Offers the user a Working Backwards exercise with three options: proceed, skip, or defer. When accepted, conducts a 3-round interview (customer/problem, solution/experience, internal feasibility) and produces `.project/{slug}/docs/working-backwards.md` with Press Release, External FAQ, and Internal FAQ sections.
 
 ### 4. Gate 1: Scope Review (PRD)
 
-Silently re-reads `docs/codebase-assessment.md` from disk to mitigate context rot. If Working Backwards was completed, reads that document as context (does not auto-populate PRD sections). Conducts a 5-round interview covering Scope, Inputs/Outputs, Security, Operational concerns, and Milestone Scoping. Produces `prd.md` using an adapted template (no Architecture or Features sections -- those are handled by /design and /milestone respectively).
+Silently re-reads `.project/{slug}/docs/codebase-assessment.md` from disk to mitigate context rot. If Working Backwards was completed, reads that document as context (does not auto-populate PRD sections). Conducts a 5-round interview covering Scope, Inputs/Outputs, Security, Operational concerns, and Milestone Scoping. Produces `prd.md` using an adapted template (no Architecture or Features sections -- those are handled by /design and /milestone respectively).
 
 Supports partial approval: user can approve individual PRD sections while requesting revision on others. Sections are independently approvalable via a checklist.
 
@@ -54,7 +54,7 @@ When invoked on a project with an existing approved PRD, reads the current `prd.
 
 ### Review Checklists
 
-Each gate produces a review checklist file at `docs/reviews/gate-{0,wb,1}-review.md`. Checklists combine gate-specific static items with auto-generated content-specific items. All items must be resolved (`[x]` verified or `[-]` N/A with reason) before gate approval is recorded.
+Each gate produces a review checklist file at `.project/{slug}/docs/reviews/gate-{0,wb,1}-review.md`. Checklists combine gate-specific static items with auto-generated content-specific items. All items must be resolved (`[x]` verified or `[-]` N/A with reason) before gate approval is recorded.
 
 ## Artifacts
 
@@ -62,15 +62,15 @@ Each gate produces a review checklist file at `docs/reviews/gate-{0,wb,1}-review
 |------|-----------|------|
 | `progress.txt` | Read | Every invocation (mode detection) |
 | `progress.txt` | Write | Gate 0, WB, and 1 approval recording |
-| `docs/codebase-assessment.md` | Write | Gate 0 (brownfield) |
-| `docs/codebase-assessment.md` | Read | Gate 1 start (context refresh, DEF-16) |
-| `docs/working-backwards.md` | Write | Gate WB (when approved) |
-| `docs/working-backwards.md` | Read | Gate 1 start (context, when exists) |
+| `.project/{slug}/docs/codebase-assessment.md` | Write | Gate 0 (brownfield) |
+| `.project/{slug}/docs/codebase-assessment.md` | Read | Gate 1 start (context refresh, DEF-16) |
+| `.project/{slug}/docs/working-backwards.md` | Write | Gate WB (when approved) |
+| `.project/{slug}/docs/working-backwards.md` | Read | Gate 1 start (context, when exists) |
 | `prd.md` | Write | Gate 1 |
 | `prd.md` | Read | Revision mode |
-| `docs/reviews/gate-0-review.md` | Write | Gate 0 checklist |
-| `docs/reviews/gate-wb-review.md` | Write | Gate WB checklist |
-| `docs/reviews/gate-1-review.md` | Write | Gate 1 checklist |
+| `.project/{slug}/docs/reviews/gate-0-review.md` | Write | Gate 0 checklist |
+| `.project/{slug}/docs/reviews/gate-wb-review.md` | Write | Gate WB checklist |
+| `.project/{slug}/docs/reviews/gate-1-review.md` | Write | Gate 1 checklist |
 
 ## Skill Files
 
