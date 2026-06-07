@@ -1,6 +1,6 @@
-# Feature Request: Gemini-Delegated Codebase Assessment
+# Gemini-Delegated Codebase Assessment
 
-> **Status:** Proposed (feature request — not yet implemented)
+> **Status:** Implemented — `define/references/gate-0-codebase.md` (DEF-02) and `build/references/codebase-refresh.md` (BUILD-02)
 > **Affects:** `define/references/gate-0-codebase.md` (DEF-02), `build/references/codebase-refresh.md` (BUILD-02)
 > **Type:** Optional capability with automatic detection and graceful fallback
 
@@ -87,12 +87,13 @@ command -v gemini >/dev/null 2>&1
 The verified, canonical invocation:
 
 ```bash
-gemini -p "<scan-prompt>" \
+GEMINI_RAW=$(gemini -p "<scan-prompt>" \
   --approval-mode plan \
   --skip-trust \
   -o json \
-  2>/dev/null \
-  | jq -r '.response'
+  2>/dev/null)
+GEMINI_EXIT=$?
+FINDINGS=$(printf '%s' "$GEMINI_RAW" | jq -er '.response // empty' 2>/dev/null)
 ```
 
 Flag rationale:
@@ -101,8 +102,8 @@ Flag rationale:
 - `--approval-mode plan` — read-only. Gemini cannot modify the working tree.
 - `--skip-trust` — bypass the headless trust gate for the project root. **Mandatory** — without it, headless runs in an untrusted dir abort. Equivalent: export `GEMINI_CLI_TRUST_WORKSPACE=true`.
 - `-o json` — machine-parseable; `.response` field holds the model text.
-- `2>/dev/null` — discard stderr noise; JSON is on stdout.
-- `jq -r '.response'` — extract the findings text.
+- `2>/dev/null` — discard stderr noise; JSON is on stdout. Capture raw output and exit code separately (`GEMINI_EXIT=$?`) — never pipe `gemini` directly into `jq`, which masks the `gemini` exit code and conflates a Gemini failure with a jq failure.
+- `jq -er '.response // empty'` — extract findings text; `-e` plus `// empty` makes a null/missing `.response` collapse to an empty string so the failure reliably triggers fallback (GEM-06).
 
 **Model selection — accept the CLI default; do NOT pin `-m`.** Omitting `-m` inherits whatever
 model the installed CLI ships as default (currently `gemini-3.1-flash-lite`), which floats forward

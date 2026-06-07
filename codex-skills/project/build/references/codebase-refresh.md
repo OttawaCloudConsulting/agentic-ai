@@ -155,7 +155,7 @@ prevent pipeline exit-code masking:
 ```bash
 GEMINI_RAW=$(gemini -p "<delta-prompt>" --approval-mode plan --skip-trust -o json 2>/dev/null)
 GEMINI_EXIT=$?
-DELTA_FINDINGS=$(printf '%s' "$GEMINI_RAW" | jq -r '.response' 2>/dev/null)
+DELTA_FINDINGS=$(printf '%s' "$GEMINI_RAW" | jq -er '.response // empty' 2>/dev/null)
 ```
 
 When `-m <model-id>` is pinned, add it immediately after `gemini`:
