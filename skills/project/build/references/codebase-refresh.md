@@ -57,11 +57,162 @@ If no files have changed since the last assessment:
 Skip the refresh entirely. Do not spawn a sub-agent. Do not create a commit.
 Proceed directly to loading the feature plan.
 
-## Sub-Agent Refresh (BUILD-02)
+## Engine Marker Lookup (GEM-08)
 
-When files have changed, spawn a sub-agent using the `Agent` tool to perform the
-incremental update. The sub-agent runs in its own context, keeping the parent
-skill's context window clean for the build loop.
+When files have changed, read the engine marker from the assessment front matter
+before spawning any sub-agent. Read the file fresh from disk each refresh (STATE-03):
+
+```bash
+grep -m1 '<!-- scan-engine:' .project/<slug>/docs/codebase-assessment.md
+```
+
+Extract the value: `gemini` or `claude`. If the marker is absent or unreadable,
+default to `claude`.
+
+If the user explicitly requests a different engine, update the marker on the first
+line of `.project/<slug>/docs/codebase-assessment.md` and use the new value.
+
+**`claude` (or marker absent):** Proceed to [Claude Sub-Agent Refresh](#claude-sub-agent-refresh) below.
+
+**`gemini`:** Proceed to [Gemini Delta Scan](#gemini-delta-scan-gem-04) below.
+On any failure, fall back silently to the Claude sub-agent. Never re-prompt —
+the persisted marker is the engine choice.
+
+## Gemini Delta Scan (GEM-04)
+
+When the engine marker is `gemini` and files have changed, run an incremental
+delta scan via Gemini. On any failure, fall back silently to
+[Claude Sub-Agent Refresh](#claude-sub-agent-refresh). Never re-prompt — the
+persisted marker is the engine choice.
+
+### Optional Liveness Probe (GEM-05)
+
+> **Disabled by default.** Failure is detected from the real delta scan call.
+> Enable only when `-m <model-id>` is pinned.
+
+When a model is pinned, the probe can optionally run before the delta scan:
+
+```bash
+gemini -m <model-id> -p "ok" --approval-mode plan --skip-trust -o json 2>/dev/null \
+  | jq -e '.response' >/dev/null
+```
+
+**Probe failure:** Fall back silently to
+[Claude Sub-Agent Refresh](#claude-sub-agent-refresh).
+
+### Prepare the Delta Prompt
+
+Collect two inputs:
+
+1. **Changed files list** — the deduplicated paths from the git log above (one
+   path per line).
+2. **Current assessment content** — the full text of
+   `.project/<slug>/docs/codebase-assessment.md`.
+
+Construct the prompt by substituting both inputs into the template below:
+
+```
+You are performing an incremental update to a codebase assessment.
+
+CHANGED FILES (since last assessment):
+<changed-files-list — one path per line>
+
+CURRENT ASSESSMENT:
+<full text of codebase-assessment.md>
+
+Instructions:
+- Read ONLY the files listed in CHANGED FILES above. Do NOT perform a full
+  codebase re-scan.
+- Emit ONLY the delta: for each assessment section that the changed files
+  affect, output the complete updated section content under its exact heading.
+- Do NOT output sections that require no changes.
+- Use ONLY the following exact section headings (byte-for-byte, including case):
+    ## Project Overview
+    ## File Organization
+    ## Detected Patterns
+    ## Dependency Graph
+    ## Assumptions
+    ## Patterns That May Need Change
+    ## Open Questions
+    ## Recent Changes
+- `## Recent Changes` MUST appear in your output — changed files always affect
+  this section. If you cannot produce it, output nothing at all.
+- For `## Recent Changes`: add entries for the changed files, preserving prior
+  entries that remain relevant.
+- Cite file paths, line counts, and dependency versions. No vague statements.
+- Return raw markdown only. Start with a valid `## ` heading from the list
+  above. Do not wrap in code fences. Do not include preamble, explanation,
+  summary, or postamble. Every top-level `## ` heading must be one of the
+  headings listed above and nothing else.
+- Output findings only — do not write files. You are read-only.
+```
+
+### Invocation
+
+Run from the project root. Capture raw output and the exit code in separate steps to
+prevent pipeline exit-code masking:
+
+```bash
+GEMINI_RAW=$(gemini -p "<delta-prompt>" --approval-mode plan --skip-trust -o json 2>/dev/null)
+GEMINI_EXIT=$?
+DELTA_FINDINGS=$(printf '%s' "$GEMINI_RAW" | jq -r '.response' 2>/dev/null)
+```
+
+When `-m <model-id>` is pinned, add it immediately after `gemini`:
+
+```bash
+GEMINI_RAW=$(gemini -m <model-id> -p "<delta-prompt>" --approval-mode plan --skip-trust -o json 2>/dev/null)
+```
+
+Capture `$DELTA_FINDINGS` as `<delta-findings>`. Check `$GEMINI_EXIT` and `$DELTA_FINDINGS` before proceeding (see Failure Conditions below).
+
+### Failure Conditions → Fallback
+
+Fall back silently to [Claude Sub-Agent Refresh](#claude-sub-agent-refresh) if
+any of:
+
+- `$GEMINI_EXIT` is non-zero (check before parsing — do not rely on the pipeline's `$?`).
+- Gemini command times out or is interrupted.
+- `$GEMINI_RAW` is empty.
+- `jq` fails to parse `.response` from stdout (`$DELTA_FINDINGS` is empty or null).
+- `$DELTA_FINDINGS` is empty or whitespace-only.
+- `$DELTA_FINDINGS` contains none of the expected section headings.
+- `## Recent Changes` is absent from the delta.
+- Any top-level `## ` heading in the delta is not one of the expected headings
+  (unrecognized or wrong case).
+
+### Apply Delta
+
+When `<delta-findings>` is valid, Claude (the parent skill, not a sub-agent)
+applies the delta directly:
+
+1. Read `.project/<slug>/docs/codebase-assessment.md` (current content).
+2. For each top-level `## ` heading in `<delta-findings>` (matched
+   byte-for-byte, including case and the `## ` prefix):
+   - Locate the matching heading in the current assessment.
+   - If the heading is not found in the current assessment, fall back silently
+     to [Claude Sub-Agent Refresh](#claude-sub-agent-refresh) and abort the
+     delta apply entirely.
+   - A section spans from its `## ` heading up to (but not including) the next
+     top-level `## ` heading or EOF. Nested `### ` and deeper headings are
+     part of that section.
+   - Replace the entire section (heading + content) with the corresponding
+     section from `<delta-findings>`.
+3. Sections absent from `<delta-findings>` are left untouched.
+4. Write the updated assessment back to
+   `.project/<slug>/docs/codebase-assessment.md`.
+
+The engine marker in the front matter is preserved unchanged.
+
+Proceed to [Standalone Commit](#standalone-commit-d-07) after the delta is
+applied.
+
+## Claude Sub-Agent Refresh (BUILD-02)
+
+When files have changed and the engine is `claude` (or Gemini is absent or
+failed), spawn a sub-agent using the `Agent` tool to perform the incremental
+update. The sub-agent runs in its own context, keeping the parent skill's
+context window clean for the build loop.
 
 ### Sub-Agent Instructions
 
@@ -87,8 +238,8 @@ Instruct the sub-agent to:
    - **Dependency Graph** -- update if dependencies were added, removed, or
      changed.
    - **Assumptions** -- remove any assumptions invalidated by the changes.
-   - **Patterns to Deviate From** -- update if new anti-patterns were introduced
-     or existing ones resolved.
+   - **Patterns That May Need Change** -- update if new anti-patterns were
+     introduced or existing ones resolved.
 
 4. **Preserve all existing assessment content** that remains accurate. The
    sub-agent updates sections, not rewrites the file. Sections unaffected by
@@ -102,9 +253,22 @@ Instruct the sub-agent to:
 The sub-agent uses: `Read`, `Write`, `Bash` (for `ls`, `git` commands), and
 `Glob` tools.
 
+## Engine Report
+
+After the refresh completes (either engine), output one line. Do not prompt:
+
+- Gemini delta applied (no fallback): `Scan via Gemini CLI`
+- Claude sub-agent ran (or Gemini fell back): `Scan via Claude sub-agent`
+
+**Marker semantics on fallback:** The engine marker in the assessment front matter is
+**not updated** when Gemini falls back to Claude during a refresh. The marker persists
+the user's engine preference from Gate 0 so the next `/build` retries Gemini. The
+engine report line always reflects the actual engine used for the current refresh,
+regardless of the marker value.
+
 ## Standalone Commit (D-07)
 
-After the sub-agent completes, commit the updated assessment separately from
+After the Gemini delta is applied or the Claude sub-agent completes, commit the updated assessment separately from
 any implementation commits:
 
 ```
