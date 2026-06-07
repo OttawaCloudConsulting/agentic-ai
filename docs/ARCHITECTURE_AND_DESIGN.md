@@ -1,143 +1,251 @@
-# Architecture and Design: architecture-doc
+# Architecture and Design: Gemini-Delegated Codebase Assessment
 
-<!-- Source PRD: ../prd.md -->
-<!-- Target skill location: skills/architecture-doc/ -->
+> Authoritative design reference for the optional Gemini-delegated codebase-assessment scan.
+> Source spec: `skills/project/references/gemini-detection.md`.
 
-## Design Decisions
+## Overview
 
-| # | Decision | Rationale | Tradeoff | Alternatives Considered |
-|---|----------|-----------|----------|-------------------------|
-| 1 | Implement as a SKILL.md orchestrator under `skills/architecture-doc/`, following the `skills/project/design/` file layout (SKILL.md + references/ + optional assets/). | Aligns with the house pattern for non-trivial skills in this repo; enables the review loop, sub-agent spawning, and partial-approval flow to reuse existing conventions reviewers are already familiar with. | Couples the skill to the conventions of `skills/project/design/`. If that pattern changes, this skill will need to follow. | (a) Single-file command under `.claude/commands/` — rejected because multi-sub-agent orchestration and partial-approval loops do not fit the single-file command model (feedback memory: single-file workflows go in commands/, not skills/). (b) Standalone CLI — rejected as overscope for a Claude Code workflow. |
-| 2 | Two sub-agents: one scan sub-agent and one synthesis sub-agent, spawned sequentially via the Agent tool. | Context isolation for both the expensive codebase scan and the synthesis pass. Keeps the main orchestrator context small so the review loop can run cleanly afterwards. Matches the sub-agent spawning pattern the user chose in PRD Round 2. | Two sub-agent spawns add latency and make the hand-off contract (findings file schema) a load-bearing interface. | (a) Single scan sub-agent with synthesis inline in the orchestrator — rejected because synthesis consumes the full findings file and the template, which bloats the main context and poisons the review loop. (b) No sub-agents — rejected for context bloat on even medium-sized repos. |
-| 3 | Create mode and Audit mode share the scan sub-agent and its findings schema; only the synthesis sub-agent diverges. | Maximum reuse of the most expensive step. Both modes need the same factual picture of the code; the difference is purely in how that picture is projected onto the target document. | Audit mode cannot use a narrower, diff-focused scan to save time; it pays full-scan cost even when the existing doc is mostly accurate. | (a) Separate scan heuristics per mode — rejected because Audit mode still needs to see the full architecture to spot contradictions. (b) Audit as post-processor over Create — rejected because it would silently produce a whole new doc and then diff, which is wasteful and confusing. |
-| 4 | Scan heuristics are **read from** `skills/project/design/references/gate-2-design.md` at runtime — not copied, not inlined, not extracted to a shared location. | Single source of truth. Any improvement to the `/design` scan heuristics automatically benefits `/architecture-doc`. No drift, no duplication. | Couples `/architecture-doc` to the internal structure of `skills/project/design/references/gate-2-design.md`. If that file is renamed or restructured, this skill breaks. | (a) Copy into own `references/` — rejected for drift risk. (b) Extract to a new shared location — rejected because it requires modifying `/design`, a stable and approved skill, for the benefit of a new skill. Revisit if a third consumer appears. (c) Inline in SKILL.md — rejected for bloat. |
-| 5 | Architecture template is **read from** `skills/project/design/assets/architecture-template.md` at runtime. Not vendored into `skills/architecture-doc/assets/`. | Same rationale as Decision #4: single source of truth, no drift. The canonical template is already the authoritative shape for every architecture doc in the repo. | Same coupling risk as #4. | (a) Vendor a copy — rejected for drift. (b) Template override via CLI arg — dropped during Round 3; not worth the surface area. |
-| 6 | Runtime scratch files (scan findings, run log) live under `<target_path>/docs/.architecture-doc/` — inside the target repo, in a hidden subdirectory of `docs/`. | User-selected during Round 3. Keeps scratch co-located with the output doc for easy inspection if a run goes wrong. Hidden directory signals "not for commit". Removed at end of run so it does not persist. | Risk of accidental commit if the user forgets to add `docs/.architecture-doc/` to `.gitignore`. Risk of colliding with a user-authored `docs/.architecture-doc/` (extremely unlikely). | (a) `/tmp/architecture-doc-scan-findings.md` — rejected because it makes post-mortem debugging harder (separate location). (b) `.claude/scratch/` — rejected because it puts runtime state inside the skill-config tree. (c) `skills/architecture-doc/.state/` — rejected because it couples runtime state to the skill's source directory. |
-| 7 | Preflight validation (empty directory, binary-only directory, monorepo) runs in the scan sub-agent's orientation pass, **before** the main file selection. | Keeps the orchestrator thin. The scan agent already runs `ls -R` for orientation; adding three cheap checks to that pass is nearly free. Early termination prevents wasted synthesis work on un-scannable targets. | The scan agent has to know how to gracefully abort and surface the right error message to the orchestrator. This becomes part of the findings-file contract. | (a) Orchestrator-side preflight using Bash — rejected because it duplicates the `ls -R` pass. (b) No preflight, let synthesis handle empty findings — rejected because it produces low-quality output instead of aborting cleanly. |
-| 8 | Secret handling is **read-but-redact**: scan sub-agent may open files matching known secret patterns, but every write (findings file, run log, output doc) passes through a secrets regex pass that strips common token / key patterns. | Needed so the synthesis can still document "the app consumes `DATABASE_URL` and `JWT_SECRET` env vars" without writing the actual values. Strict skip-only policy would lose useful architectural context. | Regex-based redaction is not airtight. A non-standard secret format could slip through. | (a) Skip secret-bearing files entirely — rejected because it loses architectural context about what env vars the app consumes. (b) Redact without reading — contradictory. (c) Skip AND redact — not needed; redacting on write is sufficient for this risk profile. |
-| 9 | Path boundary enforcement: the orchestrator resolves `target_path` to an absolute path and validates every path passed to the scan sub-agent against that prefix. Symlinks are never followed. | Contains the scan to the directory the user asked about. Prevents a surprising scan of unrelated files via a symlink into a sibling project or a user's home directory. | Forces the orchestrator to resolve and validate each path before Agent spawning, which is extra defensive code. Legitimate symlinks (e.g. monorepo workspace links) are invisible to the scan. | (a) Trust the sub-agent to stay in scope — rejected because sub-agents do not enforce path boundaries. (b) Allow symlink following — rejected for unexpected scope explosion risk. |
-| 10 | The skill enables natural-language invocation (`disable-model-invocation: false`) in the SKILL.md frontmatter. | Matches the PRD goal of responding to phrases like "document this architecture" and "there's no design doc, create one". The target user is Claude operating over a fresh repo and deciding whether to run it proactively. | Departs from the `/design` precedent, which sets `disable-model-invocation: true`. Risk of surprise invocations if the SKILL.md description is too broad. | (a) Slash-only (matches `/design`) — rejected because it defeats the purpose of a skill that wants to fire automatically when Claude notices missing architecture docs. |
-| 11 | Audit-mode contradictions surface as a **top-of-doc "Audit Findings" block** prepended to `docs/ARCHITECTURE_AND_DESIGN.md`. Users delete the block when resolved. | Single artifact. Reviewers see audit findings inline with the content they pertain to. No sibling file to keep in sync. The block is visually distinct and obviously ephemeral. | Modifies the authoritative document even though the findings may not represent accepted changes yet. Risk of the block being committed and confusing future readers. | (a) Separate `docs/ARCHITECTURE_AUDIT_FINDINGS.md` — rejected because it creates a sibling file the user must track and clean up. (b) Inline Markdown comments — rejected because they are invisible in rendered output. |
-| 12 | MCP capability probe is performed in the orchestrator by introspecting the list of tools whose names carry the `mcp__` prefix in the current session. No probe sub-agent. | This is how MCP tools actually surface to Claude Code — as names in the tool list. No extra sub-agent spawn needed. Cheapest possible probe. | Couples the skill to the current naming convention (`mcp__<server>__<tool>`). If that convention changes, the probe breaks. | (a) Probe sub-agent — rejected for unnecessary spawn cost. (b) Known-name list with trial calls — rejected for fragility. (c) Defer to implementation time — rejected because it leaves a gap in the design that reviewers will immediately ask about. |
-| 13 | The produce-then-review loop (Approve / Revise / Partial with six-section multiSelect) runs in the **orchestrator context**, not in the synthesis sub-agent. | Matches the `/design` pattern exactly. Sub-agent produces the artifact; the orchestrator — which has the AskUserQuestion tool and the full conversation surface — handles the interactive review. | The orchestrator has to re-read the produced doc into its context to perform the review, which costs tokens. Acceptable. | (a) Review loop inside synthesis sub-agent — rejected because sub-agents have limited interactive surface and nested AskUserQuestion is awkward. |
-| 14 | The scan sub-agent receives a tool allowlist: `Read`, `Glob`, `Grep`, `Bash` (for `ls -R` and `git log` only), plus any MCP tools discovered by the probe. No `Write`, `Edit`, `Agent`, or network tools. | Constrains the scan to read-only operations against the target tree. Prevents the scan agent from accidentally modifying code or spawning its own sub-agents. | The scan agent cannot write its findings file using its own tool — it must return structured text that the orchestrator writes. Alternative: allow a single narrow `Write` on the scratch path. | (a) Allow `Write` on the scratch path only — accepted as a sub-decision of this one; the orchestrator's spawn prompt restricts Write to the scratch path. (b) Allow full tool access — rejected for attack surface. |
-| 15 | Synthesis sub-agent receives `Read`, `Write` (for Create mode only), `Edit` (for Audit mode only), `Glob`, `Grep`. No Bash, no Agent, no network. | Minimum required for each mode. Create mode writes a new file once; Audit mode only edits the existing file. | Two slightly different sub-agent tool allowlists for the two modes. Trivial. | (a) Same allowlist for both modes — simpler but weakens the Audit-mode guarantee that existing content cannot be replaced wholesale. |
-| 16 | The orchestrator caps the scan at 30 files by default, with no user override. | PRD Round 3 rejected a max-files config option. 30 matches the `/design` skill's scan ceiling. | A user with a very small repo (e.g. 5 files) still pays scan agent spawn cost; a user with a very large repo cannot opt in to a deeper scan. Acceptable given the PRD's minimalism bias. | (a) Expose `--max-files` flag — rejected in PRD Round 3. (b) Lower ceiling (e.g. 15) — rejected because architecture synthesis needs breadth. |
-| 17 | MCP-enriched features (Mermaid diagram embedding, language-server-assisted file selection) are **opt-in per run**: when the relevant MCP is detected, the orchestrator asks the user via `AskUserQuestion` whether to enable the enrichment. Mermaid node labels MUST use `<br/>` for line breaks (per `CLAUDE.md`); literal `\n` renders as text and corrupts diagrams. | Keeps enrichments from silently changing the output shape between runs. User sees the choice each time. Avoids the "skill behaves differently in different sessions" trap. | Adds one AskUserQuestion prompt per enrichment per run. Mild friction. | (a) Auto-enable any detected MCP — rejected because Mermaid diagrams are a material change to the output shape and should be user-consented. (b) Never auto-use MCPs — rejected because it makes the Feature 2/Feature 8 design pointless. |
-| 18 | Run log (`docs/.architecture-doc/run.log`) is **structured-text, append-only**, with one event per line in the form `<ISO8601> <level> <phase> <message>`. Phases are `preflight`, `probe`, `scan`, `synthesis`, `review`, `cleanup`. | Easy to tail during a long run. Easy to grep post-run. Matches how typical CLI tools log. No YAML / JSON overhead. | Not machine-parseable beyond grep. If we later want structured event analysis we would need to re-parse. Acceptable for an ephemeral ops log. | (a) YAML events — rejected as overkill. (b) Free-form Markdown — rejected as hard to grep. (c) No run log — rejected because debugging a failed run requires execution history. |
-| 19 | Natural-language trigger surface is controlled by the SKILL.md `description` field. The description mentions "architecture document", "design doc", "reverse engineer architecture", "audit architecture doc", and similar phrases so that Claude routes matching requests to this skill. | Gives the model a deliberate trigger surface. Under-specifying would cause missed invocations; over-specifying would cause false positives. | Authoring this description well is non-trivial. Needs review during implementation against the `/design` skill's description to minimise routing ambiguity. | (a) Minimal description — rejected because model invocation routing would miss obvious cases. (b) Broad description — rejected because it would overlap with `/design` refresh mode. |
-| 20 | The skill does **not** detect or defer when a `/project` flow is active (`progress.txt` present, Gate 2 approved). It always runs as asked. | PRD Round 1 explicitly chose this. The user is trusted to pick the right tool; `/design` refresh mode remains available for in-flow cases. | If a user accidentally runs `/architecture-doc` inside a project that already has an approved Gate 2, they might overwrite or duplicate work. Mitigated by Feature 1's existing-document detection prompt. | (a) Warn and suggest `/design` refresh — rejected in Round 1. (b) Hard block — rejected in Round 1. |
+The `skills/project/` suite runs a codebase-assessment scan at two points: the Gate 0 initial scan in `/define` (DEF-02) and the incremental refresh in `/build` (BUILD-02). Gate 0 reads 20–40 representative files; the `/build` incremental refresh reads only changed files. Both synthesise structured findings — a read-heavy, context-heavy phase.
 
-## Component Inventory
+This design adds an **optional, read-only** alternative: delegate the scan to the Gemini CLI. Gemini surveys the tree and emits structured findings to stdout; Claude reads stdout, synthesises (DEF-03 unchanged), and writes the assessment artifact. Claude retains ownership of the artifact and the produce-then-review gate. The capability activates only when the `gemini` binary is present **and** the user consents to second-vendor data egress, and degrades silently to the existing Claude `Agent` sub-agent on any absence, decline, or runtime failure.
 
-| Component | Responsibility | Interfaces |
-|-----------|---------------|------------|
-| `skills/architecture-doc/SKILL.md` | Orchestrator. Owns mode detection, MCP probe, path validation, sub-agent spawning, review loop, session summary, and scratch cleanup. | Reads: canonical template, canonical `gate-2-design.md`, existing `docs/ARCHITECTURE_AND_DESIGN.md` (if any). Writes: output doc (Create mode path via Write), scratch dir creation, scratch cleanup. Spawns: scan sub-agent, synthesis sub-agent. Calls: `AskUserQuestion`. |
-| `skills/architecture-doc/references/scan-agent-prompt.md` | Scan sub-agent prompt template. Encodes tool allowlist, preflight checks, file-selection heuristics (pulled from canonical `gate-2-design.md`), findings-file schema, redaction rules, and path-boundary instructions. | Read by orchestrator when constructing the Agent spawn. Not executed directly. |
-| `skills/architecture-doc/references/synthesis-agent-prompt.md` | Synthesis sub-agent prompt template. Contains two variants (Create and Audit) selected by the orchestrator based on Feature 1's mode decision. | Read by orchestrator when constructing the Agent spawn. Not executed directly. |
-| `skills/architecture-doc/references/audit-mode.md` | Detailed Audit-mode rules: Edit-only discipline, append-only Design Decisions, top-of-doc "Audit Findings" block format, contradiction-handling policy. | Referenced by `synthesis-agent-prompt.md`. Read by orchestrator for review-loop messaging. |
-| `skills/architecture-doc/references/mcp-probe.md` | MCP probe specification: how to enumerate `mcp__`-prefixed tools, categorisation rules (diagram / code-search / language-server / other), and opt-in prompt text for each category. | Read by orchestrator during the probe step. |
-| Scan sub-agent (runtime) | Ephemeral sub-agent spawned via the Agent tool. Runs preflight, selects 15–30 files using the heuristics, writes findings. | Input: spawn prompt from the orchestrator, including `target_path` and detected MCP tool list. Output: `docs/.architecture-doc/findings.md`. |
-| Synthesis sub-agent (runtime) | Ephemeral sub-agent spawned via the Agent tool. Reads findings, reads canonical template, writes (Create) or edits (Audit) the output doc. | Input: spawn prompt plus `findings.md`, canonical template path, and mode. Output: `docs/ARCHITECTURE_AND_DESIGN.md`. |
-| `docs/.architecture-doc/findings.md` (runtime) | Scan sub-agent's structured findings file. Consumed by synthesis, cleaned up at end of run. | Produced by scan sub-agent. Consumed by synthesis sub-agent. |
-| `docs/.architecture-doc/run.log` (runtime) | Append-only execution log with `<ISO8601> <level> <phase> <message>` entries. Cleaned up at end of run. | Written by orchestrator (phases: `preflight`, `probe`, `review`, `cleanup`) and by sub-agents via their prompt instructions. |
+Core principle: **Gemini scans, Claude writes.** No write/exec permissions are granted to Gemini in any path. The integration swap point is deliberately narrow — replace the `Agent` tool call with a Bash `gemini` call; everything downstream (synthesis, review, checklist, approval, commit) is unchanged.
+
+## Verified Environment Facts
+
+Confirmed empirically against the installed CLI (`gemini 0.45.2`). Re-verify if the CLI version changes.
+
+| Fact | Value | Source |
+|---|---|---|
+| Binary | `gemini` on `PATH` | `command -v gemini` |
+| Version tested | `0.45.2` | `gemini --version` |
+| Headless flag | `-p` / `--prompt` | `gemini --help` |
+| Read-only mode | `--approval-mode plan` | `gemini --help` |
+| Structured output | `-o json` → stdout; `.response` = text, `.stats.tools` = tool audit | live run |
+| Autonomous tool use | headless Gemini calls `list_directory`, `glob`, `read` unprompted; auto-accepts read-only tools in plan mode | live run (3 tool calls, accurate result) |
+| Trust gate | headless **blocks** in untrusted dirs unless overridden with `--skip-trust` or `GEMINI_CLI_TRUST_WORKSPACE=true` | live run |
+| Default model | `gemini-3.1-flash-lite` when `-m` omitted; floats forward with CLI updates | live run |
+| Model aliases | none — `-m` is a literal server-validated ID; `*-pro`, `-latest`, `gemini-pro` all hard-fail | live run |
+| stderr noise | extension-load errors and skill-conflict warnings from local config; stdout JSON is clean | live run |
+
+> **Noise handling:** JSON output on stdout is always clean. Discard stderr unconditionally (`2>/dev/null`) — it carries only non-fatal extension-load and skill-conflict warnings from local config artifacts.
+
+## Component Diagram
+
+```
+                         ┌──────────────────────────────────────────────┐
+                         │  /define Gate 0 (DEF-02)  │  /build (BUILD-02) │
+                         └───────────────┬───────────┴─────────┬─────────┘
+                                         │                      │
+                              GEM-01 detect gemini      read engine marker
+                              command -v gemini          from assessment
+                                         │                front matter
+                          ┌──────absent──┘                      │
+                          ▼                          claude ────┤──── gemini
+              ┌───────────────────────┐                  │             │
+              │ Claude Agent sub-agent│◄─────────────────┘             │
+              │ (fallback / default)  │◄───── any failure / decline ───┤
+              └───────────┬───────────┘                                │
+                          │                          present:          │
+                          │                  GEM-08 consent prompt     │
+                          │                  (AskUserQuestion)         │
+                          │                          │                 │
+                          │                   claude─┤─gemini          │
+                          │                          ▼                 ▼
+                          │              GEM-02 invocation     GEM-04 delta scan
+                          │              gemini -p … plan      (changed files +
+                          │              --skip-trust -o json   current assessment)
+                          │              2>/dev/null|jq .response       │
+                          │                          │                 │
+                          │                          ▼                 ▼
+                          │              findings to stdout    delta to stdout
+                          │              (read-only)           (read-only)
+                          └──────────────┬───────────┴─────────────────┘
+                                         ▼
+                          Claude synthesis (DEF-03) / apply delta
+                                         ▼
+                          Claude writes codebase-assessment.md
+                          + engine marker  (Gemini never writes)
+                                         ▼
+                          DEF-05 review · DEF-04 checklist · DEF-07
+                          approval · commit   (Claude + user, unchanged)
+```
 
 ## Data Flow
 
-1. **Invocation.** User types `/architecture-doc [target_path]` OR Claude routes a natural-language request to the skill via the SKILL.md description. `target_path` defaults to the current working directory.
+**Gate 0 initial scan (`/define`, DEF-02):**
 
-2. **Path validation.** Orchestrator resolves `target_path` to an absolute canonical path (resolving any symlink in the path itself). If the path does not exist or is not a directory, abort with an error. The no-symlink-following rule (Decision #9) applies to scan-time enumeration, not to `target_path` resolution — a user invoking the skill from a symlinked project root is supported.
+1. Detect Gemini: `command -v gemini >/dev/null 2>&1`.
+2. Absent → spawn Claude `Agent` sub-agent (current behaviour); skip to step 7. No prompt.
+3. Present → `AskUserQuestion` consent prompt (before any files sent). `Claude` → Agent path (step 7). `Gemini` → continue.
+4. Run `gemini -p "<Gate-0 scan prompt>" --approval-mode plan --skip-trust -o json 2>/dev/null | jq -r '.response'` from the project root. The prompt instructs Gemini to: (a) survey structure — list top-level dirs 2 levels deep and inspect recent git history; (b) select and read 20–40 files by DEF-02 heuristics (entry points, configs, test samples, largest/most-imported modules, CI/Docker); (c) emit findings as plain markdown under the eight required headings: `## Project Overview`, `## File Organization`, `## Detected Patterns`, `## Dependency Graph`, `## Assumptions`, `## Patterns That May Need Change`, `## Open Questions`, `## Recent Changes`; (d) cite file paths, line counts, and dependency versions — no vague statements; (e) output findings only — do not write files. Gemini autonomously calls `list_directory`/`glob`/`read` (auto-accepted in plan mode).
+5. On non-zero exit / empty / unparseable / missing-sections → silent fallback to Claude `Agent` (step 7).
+6. Claude reads findings from stdout (substitute for `/tmp/codebase-scan-findings.md`).
+7. Claude synthesises (DEF-03) and writes `codebase-assessment.md`, stamping the engine marker in front matter. The marker records the **actual engine used**: if the Gemini path fell back at runtime (GEM-06), the marker is stamped `claude` regardless of the consented choice.
+8. DEF-05 review / DEF-04 checklist / DEF-07 approval / standalone commit — unchanged.
 
-3. **MCP capability probe.** Orchestrator enumerates tools with `mcp__` prefix in its current session. Reads `references/mcp-probe.md` to categorise each tool. Records categories in an in-context variable used later for enrichment prompts. Writes one probe entry per detected category to `run.log`.
+**Incremental refresh (`/build`, BUILD-02):**
 
-4. **Existing-document detection (Feature 1).** Orchestrator tests for `<target_path>/docs/ARCHITECTURE_AND_DESIGN.md`. If absent → enter **Create mode**. If present and plausibly Markdown → ask user (`AskUserQuestion`) to choose Create (Overwrite), Audit, or Abort. If present but unreadable or non-Markdown → offer only Overwrite or Abort.
+1. Read the engine marker from the assessment front matter (fresh from disk, STATE-03).
+2. `claude` → current sub-agent delta path.
+3. `gemini` → run delta scan: Gemini receives the changed-files list (derived from the git diff in BUILD-02) plus the current assessment content, and emits only the per-section delta to stdout. Read only the changed files, not a full re-scan.
+4. Any failure → silent fallback to Claude sub-agent.
+5. Claude reads current assessment, applies delta, writes file, commits (unchanged).
 
-5. **Scratch setup.** Orchestrator creates `<target_path>/docs/.architecture-doc/` and initialises `run.log` with a session-start entry.
+## Integration Points
 
-6. **Scan sub-agent spawn (Feature 3).** Orchestrator reads the canonical `gate-2-design.md` scan-heuristic sections and embeds them in the scan sub-agent prompt constructed from `references/scan-agent-prompt.md`. Agent is spawned with the restricted tool allowlist plus discovered MCP tools. Agent runs:
-   - Orientation pass: `ls -R` (first 2 levels), `git log --oneline -20`.
-   - Preflight checks (Decision #7): empty directory → abort; binary-only → abort; monorepo → warn-and-suggest (continue only if orchestrator confirms with user).
-   - File selection (15–30 files via heuristics).
-   - Read each file, summarise to findings.
-   - Existing-documentation harvest (Feature 4) — also runs in this phase.
-   - Write `findings.md` with five heuristic sections plus **Existing Documentation**, all passed through the redaction regex pass.
+| Spec | Section | GEM Requirements | Change |
+|---|---|---|---|
+| `define/references/gate-0-codebase.md` | DEF-02 (Codebase Scan) | GEM-01, GEM-02, GEM-03, GEM-06, GEM-07, GEM-08 | Detect Gemini (GEM-01); if present, prompt for consent (GEM-08). On `Gemini`: run scan via GEM-02/GEM-03, capture stdout findings, write engine marker. On `Claude` or absent: spawn `Agent` as today (GEM-06). Package remains functional with Gemini absent (GEM-07). DEF-03 synthesis consumes findings from either source unchanged. |
+| `build/references/codebase-refresh.md` | BUILD-02 (Sub-Agent Refresh) | GEM-02, GEM-04, GEM-06, GEM-07, GEM-08 | Read engine marker from assessment file (GEM-08); reuse without re-prompting. If `gemini`: run delta scan via GEM-02/GEM-04; Claude applies delta and writes file (GEM-06 fallback on any failure). Package remains functional with Gemini absent (GEM-07). Else: current sub-agent path. |
 
-7. **Synthesis sub-agent spawn (Feature 5 or 6).** Orchestrator reads the canonical architecture template and constructs the synthesis prompt from `references/synthesis-agent-prompt.md`, selecting the Create or Audit variant.
-   - **Create mode:** agent writes `docs/ARCHITECTURE_AND_DESIGN.md` from scratch, populating all six required sections. Every Design Decision row cites ≥1 source file or existing doc; uncertain rows are marked `(inferred)`.
-   - **Audit mode:** agent reads the existing doc in full, uses `Edit` to append new Design Decisions, prepends the "Audit Findings" block at the top with any contradictions found, and never removes entries that are not directly contradicted. Follows `references/audit-mode.md`.
+DEF-03 (synthesis), DEF-05 (review), DEF-04/06 (checklist), DEF-07 (approval), and the standalone-commit step are all **unchanged** — they operate on findings regardless of which engine produced them.
 
-8. **MCP enrichment (Feature 8, conditional).** If probe detected Mermaid-rendering MCP, orchestrator asks the user whether to embed generated diagrams; if yes, orchestrator calls the MCP tool and edits the output doc to include them. If a language-server MCP was detected, its usage happened already in step 6 (scan phase), not here.
+## Component Inventory
 
-9. **Produce-then-review loop (Feature 7).** Orchestrator reads the output doc, presents a summary and 2–4 tradeoff callouts. Calls `AskUserQuestion` with Approve / Revise / Partial.
-   - **Revise:** ask what should change, apply edits in orchestrator context with `Edit`, loop back to summary.
-   - **Partial:** multiSelect over the six canonical sections; for each unchecked section ask what should change and apply edits; loop back to summary.
-   - **Approve:** exit loop.
+| # | Component | Type / Technology | Purpose |
+|---|-----------|-------------------|---------|
+| 1 | Detection check | Bash `command -v gemini` | Gate the whole path on binary presence (GEM-01). |
+| 2 | Consent prompt | `AskUserQuestion` | Obtain informed consent for second-vendor egress before any files sent (GEM-08). Prompt text: "Gemini CLI detected. Use it for the codebase scan? It sends the scanned files to Google's API (larger context, lower cost). The Claude scan keeps the files within Anthropic." Options (headers ≤12 chars): `Gemini` (delegate) and `Claude` (in-session sub-agent). |
+| 3 | Engine marker | Front-matter HTML comment in `codebase-assessment.md` | Persist engine choice; read by `/build` to avoid re-prompting (GEM-08). |
+| 4 | Gemini invocation | Bash `gemini` CLI (`-p … --approval-mode plan --skip-trust -o json`) + `jq` | Read-only scan emitting findings to stdout (GEM-02). |
+| 5 | Gate 0 scan prompt | Prompt template | Drive DEF-02 survey, output the eight DEF-03 sections (GEM-03). |
+| 6 | Delta scan prompt | Prompt template | Drive incremental per-section delta for `/build` (GEM-04). |
+| 7 | Liveness probe (optional) | Bash `gemini -p "ok" … \| jq -e` | Optional pre-scan validation; disabled by default (GEM-05). |
+| 8 | Claude `Agent` sub-agent | In-session sub-agent | Default + fallback scanner; owns synthesis in all paths (GEM-06). |
+| 9 | Synthesis (DEF-03) | Claude (parent skill) | Convert findings → `codebase-assessment.md`; engine-agnostic. |
 
-10. **Cleanup.** Orchestrator writes a final `run.log` entry, then removes `<target_path>/docs/.architecture-doc/` entirely.
+## Security Model
 
-11. **Session summary.** Orchestrator prints a terminal summary: mode used, files scanned, decisions captured, components inventoried, MCP enrichments applied (if any), review iterations performed.
+### Encryption
+
+In transit: both engines use HTTPS to their respective vendor APIs (Anthropic for Claude, Google for Gemini). No at-rest storage introduced beyond the existing assessment artifact on the local working tree.
+
+### Access Control
+
+Gemini runs strictly **read-only** via `--approval-mode plan`: in plan mode the CLI restricts Gemini's available tool set to read-only file-system operations (`list_directory`, `glob`, `read`) — no exec or write tools are offered. The working tree cannot be modified. No `--yolo`, no `--approval-mode auto_edit`, no write-trust granted. The headless trust gate is bypassed with `--skip-trust` (or `GEMINI_CLI_TRUST_WORKSPACE=true`) — required for headless runs in untrusted dirs, and safe because the plan-mode tool restriction eliminates the write/exec surface entirely.
+
+### Data Egress (primary security concern)
+
+On the Gemini path, scanned file contents reach Google's API in addition to Anthropic's. Managed by four controls:
+
+1. **Read-only** — no write/exec, no injection action surface.
+2. **Detection-gating** — the path activates only when the CLI is present.
+3. **Explicit consent** — `AskUserQuestion` (GEM-08) before any files are sent; the second-vendor egress is an informed choice. Never prompts when Gemini is absent (no unanswerable questions).
+4. **Portable fallback** — declining or unavailability costs nothing (GEM-06/07).
+
+Decision: acceptable for this scope, gated on user consent.
+
+### Audit and Logging
+
+`-o json` returns `.stats.tools` — an audit of the tools Gemini invoked during the scan (verified: headless Gemini reports its `list_directory`/`glob`/`read` calls). stderr carries extension-load and skill-conflict noise from local config artifacts; always discard with `2>/dev/null` and parse stdout only. The skill reports the engine used in one line for transparency.
 
 ## File Organization
 
-```text
-skills/architecture-doc/
-├── SKILL.md                              # Orchestrator — frontmatter + steps
-└── references/
-    ├── scan-agent-prompt.md              # Scan sub-agent prompt template
-    ├── synthesis-agent-prompt.md         # Synthesis sub-agent prompt (Create + Audit variants)
-    ├── audit-mode.md                     # Audit-mode discipline: Edit-only, append-only, Audit Findings block format
-    └── mcp-probe.md                      # MCP probe specification and categorisation rules
-
-# Runtime artifacts (created and removed per-invocation, not committed):
-<target_path>/
-├── docs/
-│   ├── ARCHITECTURE_AND_DESIGN.md        # Output — the produced or updated doc
-│   └── .architecture-doc/                # Scratch dir (cleaned up at end of run)
-│       ├── findings.md                   # Scan sub-agent structured findings
-│       └── run.log                       # Append-only execution log
+```
+skills/project/
+├── references/
+│   └── gemini-detection.md          # Canonical runtime contract (source spec)
+├── define/
+│   └── references/
+│       └── gate-0-codebase.md        # DEF-02 — integrate detection/consent/invocation
+└── build/
+    └── references/
+        └── codebase-refresh.md       # BUILD-02 — read marker, route delta scan
 ```
 
-No `assets/` directory is needed — the skill reads the canonical template from `skills/project/design/assets/architecture-template.md` at runtime (Decision #5).
+Distribution note: package convention duplicates shared references into each skill's `references/`. Either copy `gemini-detection.md` into `define/references/` and `build/references/`, or have DEF-02 / BUILD-02 link to the canonical copy under `references/`. Keep copies in sync if duplicated.
 
-## Deployment & Operations
+## Configuration
 
-**Distribution.** The skill ships as part of this repo under `skills/architecture-doc/`. Users acquire it by pulling the repo, matching the pattern of every other skill in the catalog (`nist-fedramp-assessment`, `red-team`, `create-prd`, etc.). No packaging step.
+### Required
 
-**Installation.** None beyond a repo pull. The skill is discovered by Claude Code automatically via the `skills/` directory convention.
+| Parameter | Type | Validation | Description |
+|-----------|------|------------|-------------|
+| _(none)_ | — | — | Auto-detected and consent-gated; no required configuration. |
 
-**CI/CD.** The skill has no CI of its own. Existing repo-level checks (if any) apply to the files in `skills/architecture-doc/`.
+### Optional — Engine selection
 
-**Invocation.** Two entry points:
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| Scan engine | `AskUserQuestion` choice (option headers ≤12 chars) | prompt on detection | `Gemini` or `Claude`; persisted in assessment front matter; reused by `/build`. |
 
-1. Slash command: `/architecture-doc [target_path]`
-2. Natural language: Claude routes matching requests to the skill via the SKILL.md `description` field (`disable-model-invocation: false`). Example phrases: "there is no architecture doc for this code, create one", "audit the architecture doc against the current code", "document the architecture of this directory".
+### Optional — Gemini invocation
 
-**Observability.** Two surfaces:
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `-m <model-id>` | CLI flag (opt-in) | unset → CLI default model | Pin a model. Documented opt-in only; pair with the GEM-05 probe at detection time. |
+| `--include-directories <dirs>` | CLI flag | unset | Add dirs outside cwd to the scan workspace. |
+| `--skip-trust` / `GEMINI_CLI_TRUST_WORKSPACE=true` | flag / env var | flag set in invocation | Bypass the headless trust gate (mandatory for headless untrusted-dir runs). |
+| Liveness probe | toggle | disabled | Pre-scan validation; one extra Gemini call per Gate 0 / refresh. |
 
-1. **Terminal session summary** at end of run — mode, counts, enrichments, iterations. This is the primary user-facing observability.
-2. **`docs/.architecture-doc/run.log`** — append-only per-run execution log in `<ISO8601> <level> <phase> <message>` format. Ephemeral — removed with the rest of `docs/.architecture-doc/` during cleanup. Available for inspection while a run is in progress (tail) or during post-mortem if the run is aborted before cleanup.
+## Outputs
 
-**No persistent telemetry, no metrics, no remote reporting.** The skill leaves no trace between runs beyond the produced `docs/ARCHITECTURE_AND_DESIGN.md`.
+| Output | Type | Description |
+|--------|------|-------------|
+| `codebase-assessment.md` | markdown artifact | Written by Claude from findings (either engine); identical structure regardless of source. |
+| `<!-- scan-engine: gemini\|claude -->` | front-matter marker | Persisted engine choice; read by `/build`. |
+| Engine report line | stdout | One line stating which engine ran. |
 
-**Runtime dependencies.** The skill depends on two files that must exist at runtime in the same repo:
+## Design Decisions
 
-- `skills/project/design/assets/architecture-template.md` (canonical template — Decision #5)
-- `skills/project/design/references/gate-2-design.md` (scan heuristics — Decision #4)
+| # | Decision | Rationale |
+|---|----------|-----------|
+| 1 | Gemini scans, Claude writes — Gemini emits findings to stdout, never writes files | Keeps Claude's artifact ownership and the produce-then-review gate; mirrors the existing sub-agent-writes-scratch → parent-synthesises architecture; minimises blast radius (no write-trust needed). |
+| 2 | Read-only via `--approval-mode plan`; no `--yolo` / `auto_edit` / write-trust | The scan is descriptive; granting write access adds risk with no benefit. Eliminates the injection action surface. |
+| 3 | Detection-gate on `command -v gemini` | The path is an optional accelerator; absent binary must degrade to the supported default with no warning. |
+| 4 | Explicit user consent before any files sent (GEM-08) | Second-vendor (Google) data egress is a material, informed choice; consent is the egress control point. |
+| 5 | Prompt ONLY when Gemini is detected | Never ask a question whose answer cannot be honored — if Gemini is absent, fall back silently. |
+| 6 | Persist engine choice as a front-matter marker in the assessment file | `/build` reuses the choice without re-prompting on every feature; keeps `progress.txt` format unchanged. |
+| 7 | Marker read fresh from disk per refresh (STATE-03), overridable by explicit request | Honors single-source-of-truth state reads; lets the user switch engines deliberately. |
+| 8 | Accept the CLI default model — do NOT pin `-m` by default | `-m` takes a server-validated literal ID with no wildcard / `-latest` / `*-pro` alias (verified — aliases hard-fail). A pinned model silently hard-fails on retirement and degrades to Claude until a human edits the string. Unpinned floats forward with the CLI: zero maintenance, no deprecation timebomb. |
+| 9 | `-m` available only as a documented opt-in override, paired with a detection-time probe | Operators wanting a quality tier can pin one, but a dead pin is then caught up front (GEM-05) and falls back cleanly instead of per-scan. |
+| 10 | Liveness probe disabled by default | The probe costs one Gemini call per Gate 0 / refresh; runtime-failure fallback (GEM-06) covers the same cases without the extra call. Enable only with a pinned `-m`. |
+| 11 | Silent, automatic fallback on any failure (absent / probe fail / non-zero / empty / unparseable / missing sections) | The assessment must always be produced; a `Gemini` consent choice is a preference, not a hard commit. |
+| 12 | `2>/dev/null`; parse stdout `.response` only | stderr carries non-fatal extension/skill-conflict noise; stdout JSON is clean. |
+| 13 | `--skip-trust` mandatory in the invocation | Headless runs in untrusted dirs abort without it; equivalent env var `GEMINI_CLI_TRUST_WORKSPACE=true`. |
+| 14 | Scan prompt enforces the eight DEF-03 section headings + cited paths/line-counts/versions | Lets Claude synthesise without reformatting; minimises out-of-template prose; bans vague statements. |
+| 15 | `/build` delta scan reads only changed files, not a full re-scan | Preserves the existing incremental-refresh rule; bounds cost. |
+| 16 | No new hard dependency (GEM-07) | Package must stay fully functional with Gemini uninstalled; portability across environments. |
+| 17 | Scope limited to the codebase-assessment scan | `/design`, `/milestone`, `/plan-feature` are out of scope; bounds the change to one well-understood read-only workload. |
+| 18 | Report the engine used in one line; do not prompt for it | Transparency without friction; the choice was already made at consent or via the marker. |
 
-If either file is missing, the skill aborts with a specific error naming the missing file. No vendored fallback.
+## Deployment Workflow
 
-## Security Considerations
+This is a skill-package change, not a deployed service. Rollout is documentation/contract edits validated by the produce-then-review gate:
 
-**Path boundary enforcement (Decision #9).** The orchestrator resolves `target_path` to an absolute canonical path at the start of the run. Every path subsequently passed to either sub-agent is validated against that prefix. Paths that resolve outside the tree — via `..`, symlinks, or absolute paths in agent prompts — are rejected at the orchestrator layer before the sub-agent sees them.
+1. Land the canonical runtime contract under `skills/project/references/gemini-detection.md` (source spec — present).
+2. Integrate DEF-02 (`define/references/gate-0-codebase.md`): detection → consent → invocation → marker; synthesis unchanged.
+3. Integrate BUILD-02 (`build/references/codebase-refresh.md`): read marker → route delta scan → apply/commit.
+4. Sync duplicated reference copies if the distribution uses per-skill `references/` duplication.
+5. Validate against the acceptance criteria: Gemini-present-consented, Gemini-absent, `/build` reuse, forced-failure fallback, read-only verification, uninstalled-package functionality.
 
-**No symlink following.** Neither sub-agent follows symlinks during enumeration. The scan agent's Glob and Read calls are constrained by the prompt to reject symlinked entries. This eliminates a class of path-traversal and secret-leak scenarios where a symlink points from inside the target tree to something outside it.
+## Dependency Graph
 
-**Secret handling (Decision #8, read-but-redact).** The scan sub-agent may open files matching known secret patterns (`.env*`, `*.pem`, `*.key`, `credentials*`, `.aws/credentials`) to learn about the architectural role of those files — e.g. "the app consumes `DATABASE_URL` and `JWT_SECRET` env vars". But every write from the sub-agent (findings file, run log, output doc) is passed through a secrets regex pass that strips common token and key patterns before the write commits. Concretely: the orchestrator runs the regex pass on `findings.md` after the scan sub-agent returns, and on `ARCHITECTURE_AND_DESIGN.md` after the synthesis sub-agent returns, before the review loop begins.
+```
+Feature 1: Architecture & Design doc
+    └── Feature 2: Detection + Consent (GEM-01, GEM-08)
+            ├── Feature 3: Gate 0 invocation + scan prompt (GEM-02, GEM-03)  [DEF-02]
+            │       └── Feature 5: Fallback + portability + reporting (GEM-05/06/07)
+            └── Feature 4: /build delta refresh (GEM-04)                      [BUILD-02]
+                    └── Feature 5: Fallback + portability + reporting
 
-**Tool allowlists.** Both sub-agents receive a minimum-viable tool allowlist (Decisions #14 and #15). Neither has network tools, Agent (no nested spawning), or write access to paths outside the scratch dir or the output doc.
+Runtime call chain (per scan):
+  detection (command -v gemini)
+      └── consent / marker read
+              └── gemini invocation  ──fail──► Claude Agent sub-agent (fallback)
+                      └── stdout findings
+                              └── Claude synthesis (DEF-03)
+                                      └── Claude writes assessment + marker
+```
 
-**Output section discipline (Round 4 decision).** The Security Considerations section of the produced doc is populated **only** from evidence the scan observed — auth middleware, encryption libraries, cert handling, secrets management. No generic best-practices boilerplate. If nothing relevant was observed, the section is a single sentence stating so. This prevents the skill from producing a security section that looks authoritative but is actually generic hand-waving.
+## Out of Scope
 
-**No network egress.** The skill makes no network calls except via explicitly-opted-in MCP tools discovered during the probe phase. No silent telemetry, no remote template fetches, no version checks.
-
-**Scratch cleanup.** The `docs/.architecture-doc/` directory is removed at the end of every run, whether the run succeeded, aborted, or was interrupted. Cleanup is the last orchestrator step and must run even if the review loop exits via an error. Users should add `docs/.architecture-doc/` to `.gitignore` to catch the case where cleanup is preempted (e.g. session killed mid-run).
+| Item | Rationale |
+|------|-----------|
+| Gemini writing the assessment file directly | Requires `--yolo`/write-trust; larger blast radius; removes Claude artifact ownership. Read-only-emit only. |
+| Gemini performing DEF-05 review or DEF-04 checklist | Review and checklist stay with Claude and the user. |
+| Replacing the Claude `Agent` path | It remains the fallback and the default when Gemini is absent. |
+| Hardcoding a Gemini model | Deprecation timebomb (see Decision #8); unpinned default only, `-m` opt-in. |
+| Delegation for `/design`, `/milestone`, `/plan-feature` | Scoped to the codebase-assessment scan only. |
+| Changing `progress.txt` format | Engine marker lives in the assessment front matter. |
