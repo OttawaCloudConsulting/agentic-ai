@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add an optional capability to the `skills/project/` suite that delegates the codebase-assessment scan (Gate 0 initial scan in `/define`; incremental refresh in `/build`) to the Gemini CLI as an alternative to the in-session Claude `Agent` sub-agent. Gemini runs **read-only** and emits structured findings to stdout; Claude synthesises and writes the artifact. The path activates only when the `gemini` binary is present and the user consents, and falls back silently to the existing Claude sub-agent in every failure or absence case. Source spec: `skills/project/references/gemini-detection.md`.
+Add an optional capability to the `skills/project/` suite that delegates the codebase-assessment scan (Gate 0 initial scan in `/define`; incremental refresh in `/build`) to the Gemini CLI as an alternative to the in-session Claude `Agent` sub-agent. Gemini runs **read-only** and emits structured findings to stdout; Claude synthesises and writes the artifact. The path activates only when the `gemini` binary is present and the user consents, and falls back silently to the existing Claude sub-agent in every failure or absence case.
 
 ## Goals
 

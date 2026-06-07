@@ -1,7 +1,6 @@
 # Architecture and Design: Gemini-Delegated Codebase Assessment
 
 > Authoritative design reference for the optional Gemini-delegated codebase-assessment scan.
-> Source spec: `skills/project/references/gemini-detection.md`.
 
 ## Overview
 
@@ -144,17 +143,15 @@ Decision: acceptable for this scope, gated on user consent.
 
 ```
 skills/project/
-├── references/
-│   └── gemini-detection.md          # Canonical runtime contract (source spec)
 ├── define/
 │   └── references/
-│       └── gate-0-codebase.md        # DEF-02 — integrate detection/consent/invocation
+│       └── gate-0-codebase.md        # DEF-02 — detection/consent/invocation (GEM-01..08 inlined)
 └── build/
     └── references/
         └── codebase-refresh.md       # BUILD-02 — read marker, route delta scan
 ```
 
-Distribution note: package convention duplicates shared references into each skill's `references/`. Either copy `gemini-detection.md` into `define/references/` and `build/references/`, or have DEF-02 / BUILD-02 link to the canonical copy under `references/`. Keep copies in sync if duplicated.
+The full GEM-01…08 runtime contract is inlined directly into `gate-0-codebase.md` (DEF-02) and `codebase-refresh.md` (BUILD-02); each spec is self-contained for its executor. Keep the codex-skills mirrors of both files in sync with their `skills/` counterparts.
 
 ## Configuration
 
@@ -214,11 +211,10 @@ Distribution note: package convention duplicates shared references into each ski
 
 This is a skill-package change, not a deployed service. Rollout is documentation/contract edits validated by the produce-then-review gate:
 
-1. Land the canonical runtime contract under `skills/project/references/gemini-detection.md` (source spec — present).
-2. Integrate DEF-02 (`define/references/gate-0-codebase.md`): detection → consent → invocation → marker; synthesis unchanged.
-3. Integrate BUILD-02 (`build/references/codebase-refresh.md`): read marker → route delta scan → apply/commit.
-4. Sync duplicated reference copies if the distribution uses per-skill `references/` duplication.
-5. Validate against the acceptance criteria: Gemini-present-consented, Gemini-absent, `/build` reuse, forced-failure fallback, read-only verification, uninstalled-package functionality.
+1. Integrate DEF-02 (`define/references/gate-0-codebase.md`): detection → consent → invocation → marker; synthesis unchanged.
+2. Integrate BUILD-02 (`build/references/codebase-refresh.md`): read marker → route delta scan → apply/commit.
+3. Sync the codex-skills mirrors of both specs with their `skills/` counterparts.
+4. Validate against the acceptance criteria: Gemini-present-consented, Gemini-absent, `/build` reuse, forced-failure fallback, read-only verification, uninstalled-package functionality.
 
 ## Dependency Graph
 
