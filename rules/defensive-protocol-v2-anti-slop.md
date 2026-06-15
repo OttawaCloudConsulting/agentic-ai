@@ -12,7 +12,9 @@ Stop. Update your mental model. Only then proceed.
 
 ## Failure Response
 
-When anything fails:
+**Trivial / expected failures** (a linter flag you're actively fixing, a test you already know is failing): state what failed and continue.
+
+**Substantive failures** — anything unexpected, tool errors, non-zero exits from commands that should succeed:
 
 1. **Stop** — no retry, no next tool call
 2. **Report** — exact error, your theory, proposed action, expected outcome
@@ -54,8 +56,15 @@ State what was actually tested: "Tested A and B, both showed X" — not "all ite
 
 ## Verification Cadence
 
-**Unfamiliar or risky work:** 3 actions, then verify.
-**Established patterns or routine work:** 5 actions, then verify.
+Verify when an event demands it — not on a fixed count.
+
+**Trigger events that require verification before continuing:**
+
+- After editing a file that has not yet been tested
+- After a command whose output you haven't read
+- After any action on unfamiliar code
+- After changing an interface, configuration, or dependency
+- After a surprising or unexpected result
 
 Verification means observable confirmation:
 
@@ -63,7 +72,7 @@ Verification means observable confirmation:
 - Confirm the result matches expectations
 - If it doesn't match, stop — don't continue building on a false assumption
 
-More than 5 actions without verification = accumulated unjustified beliefs.
+Unverified changes compound silently. Verify at the event, not after an arbitrary count.
 
 ---
 
@@ -160,6 +169,16 @@ bash scripts/my-script.sh        # correct
 - Shebangs (`#!/usr/bin/env bash`) may be included for documentation purposes
 - Do not run `chmod +x` on scripts — never set the executable bit
 - Scripts must always be invoked with an explicit interpreter (e.g., `bash script.sh`)
+
+---
+
+## Native-Tool Writes
+
+`Write`, `Edit`, and MCP tool calls that overwrite or delete files trigger an advisory reminder before the action runs. When you see this reminder:
+
+- Confirm the target file is the one you intend to modify
+- If the file has uncommitted changes, state DOING/EXPECT/IF MISMATCH before proceeding (see `defensive-protocol-v2-epistemology`)
+- The reminder is advisory — it does not block. Treat it as a mandatory pause, not decoration.
 
 ---
 

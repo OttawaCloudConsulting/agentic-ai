@@ -19,11 +19,19 @@ A checkpoint is not "I believe this works." A checkpoint is "I ran it, here's wh
 
 Context degrades over long sessions. Early reasoning scrolls out and assumptions go stale.
 
-**Every ~10 actions in long tasks, checkpoint your understanding:**
+**Checkpoint your understanding when any of these events occur:**
+
+- You notice a degradation signal (see below)
+- You are about to start a new phase of work
+- Context compression occurs (`PreCompact` event) — reconfirm your goal and open decisions before continuing
+- You return to a feature after an interruption
+- You are uncertain about the original goal or current state
+
+To checkpoint:
 
 1. Review the original goal and constraints
 2. Verify your current understanding still matches the user's intent
-3. Write current state to a checkpoint file — goal, progress, blockers, decisions made, open questions
+3. Write current state to a checkpoint file (`agents/memory/` or `scratch/`) — goal, progress, blockers, decisions made, open questions
 4. If unclear on anything, stop and ask the user
 
 **Degradation signals — watch for these in your own output:**
