@@ -1,0 +1,3887 @@
+{
+  "/Users/christian/git-repos/OCC-github/agentic-ai/mcp/install_mcp.sh": {
+    "mtime": 1775517576.2904456,
+    "ast_hash": "69d29f8be8b26249533cc359c936d9af",
+    "semantic_hash": "69d29f8be8b26249533cc359c936d9af"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/benchmark/run-variance.sh": {
+    "mtime": 1773254138.5002139,
+    "ast_hash": "f0d045761b2937345b5d9671f273a228",
+    "semantic_hash": "f0d045761b2937345b5d9671f273a228"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/benchmark/run-benchmark.sh": {
+    "mtime": 1773254138.500056,
+    "ast_hash": "611e9ae1a6917ea8db296f51809c53ac",
+    "semantic_hash": "611e9ae1a6917ea8db296f51809c53ac"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/agent-delegation/install.sh": {
+    "mtime": 1778268032.3525395,
+    "ast_hash": "0cab61e8ac9fa71a4996d0b5cc280b5f",
+    "semantic_hash": "0cab61e8ac9fa71a4996d0b5cc280b5f"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/cdk-testing/scripts/cdk-validation.sh": {
+    "mtime": 1771609515.2787414,
+    "ast_hash": "6e13ec49ac7505260c5d47c66d991605",
+    "semantic_hash": "6e13ec49ac7505260c5d47c66d991605"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/terraform-testing/scripts/test-terraform.sh": {
+    "mtime": 1771100633.3508267,
+    "ast_hash": "4b5298b1c0f07cc178bdccbe11dd2ff5",
+    "semantic_hash": "4b5298b1c0f07cc178bdccbe11dd2ff5"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/mcp.json": {
+    "mtime": 1774724507.1513016,
+    "ast_hash": "73214b47bf1d6f6d278c29bb71c2d06b",
+    "semantic_hash": "73214b47bf1d6f6d278c29bb71c2d06b"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/SKILL.md": {
+    "mtime": 1777246881.7540102,
+    "ast_hash": "ef28158cb8fc2e43b12200e7da782463",
+    "semantic_hash": "ef28158cb8fc2e43b12200e7da782463"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/design/SKILL.md": {
+    "mtime": 1777246881.7585561,
+    "ast_hash": "fb8b1fcc6db1dab402a23bad91da6afa",
+    "semantic_hash": "fb8b1fcc6db1dab402a23bad91da6afa"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/design/references/review-checklist-template.md": {
+    "mtime": 1777246881.7601528,
+    "ast_hash": "56a4cb63bc9d9a0d3540b945e391e409",
+    "semantic_hash": "56a4cb63bc9d9a0d3540b945e391e409"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/design/references/progress-format.md": {
+    "mtime": 1777246881.759775,
+    "ast_hash": "1fef0d5a2c37659ac78f489d73f21833",
+    "semantic_hash": "1fef0d5a2c37659ac78f489d73f21833"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/design/references/refresh-mode.md": {
+    "mtime": 1777246881.7599702,
+    "ast_hash": "9cb41bd1f455570bf91280c755203f92",
+    "semantic_hash": "9cb41bd1f455570bf91280c755203f92"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/design/references/gate-2-design.md": {
+    "mtime": 1777246881.7595952,
+    "ast_hash": "c6e02fcd3f8009bd9589be4e20c2d0d5",
+    "semantic_hash": "c6e02fcd3f8009bd9589be4e20c2d0d5"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/design/agents/openai.yaml": {
+    "mtime": 1777246881.7587683,
+    "ast_hash": "770bcf3cef1388bd909645ea02af13bc",
+    "semantic_hash": "770bcf3cef1388bd909645ea02af13bc"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/design/assets/architecture-template.md": {
+    "mtime": 1777246881.759108,
+    "ast_hash": "f772269fbf1a59dc6ea73dfff31cfca7",
+    "semantic_hash": "f772269fbf1a59dc6ea73dfff31cfca7"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/define/SKILL.md": {
+    "mtime": 1777246881.756662,
+    "ast_hash": "6fe574272fda86487db655d540dd6ad8",
+    "semantic_hash": "6fe574272fda86487db655d540dd6ad8"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/define/references/gate-wb-working-backwards.md": {
+    "mtime": 1777246881.7578993,
+    "ast_hash": "3762efdc18c03894acd8384c2c49f4eb",
+    "semantic_hash": "3762efdc18c03894acd8384c2c49f4eb"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/define/references/review-checklist-template.md": {
+    "mtime": 1777246881.7582943,
+    "ast_hash": "49eb65e03c31aaf8983db5030bbc9f0d",
+    "semantic_hash": "49eb65e03c31aaf8983db5030bbc9f0d"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/define/references/progress-format.md": {
+    "mtime": 1777246881.7581077,
+    "ast_hash": "1fef0d5a2c37659ac78f489d73f21833",
+    "semantic_hash": "1fef0d5a2c37659ac78f489d73f21833"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/define/references/gate-1-prd.md": {
+    "mtime": 1777246881.7576637,
+    "ast_hash": "de5fa612fd7f0ce7f5521cab1d0b1159",
+    "semantic_hash": "de5fa612fd7f0ce7f5521cab1d0b1159"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/define/references/gate-0-codebase.md": {
+    "mtime": 1780876669.28526,
+    "ast_hash": "53536c88f4e6441475f8f6ace2faa50c",
+    "semantic_hash": "53536c88f4e6441475f8f6ace2faa50c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/define/agents/openai.yaml": {
+    "mtime": 1777246881.7569218,
+    "ast_hash": "22f396be96c7178f788df2e8c931e168",
+    "semantic_hash": "22f396be96c7178f788df2e8c931e168"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/define/assets/prd-template.md": {
+    "mtime": 1777246881.7571335,
+    "ast_hash": "fb42cc2ac67b925b51bb15d4dcd9949d",
+    "semantic_hash": "fb42cc2ac67b925b51bb15d4dcd9949d"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/references/status-report-format.md": {
+    "mtime": 1777246881.764578,
+    "ast_hash": "b9dd9f5f9caeb0df06861308d79ff885",
+    "semantic_hash": "b9dd9f5f9caeb0df06861308d79ff885"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/references/progress-format.md": {
+    "mtime": 1777246881.7640798,
+    "ast_hash": "1fef0d5a2c37659ac78f489d73f21833",
+    "semantic_hash": "1fef0d5a2c37659ac78f489d73f21833"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/references/routing-logic.md": {
+    "mtime": 1777246881.7643504,
+    "ast_hash": "fc5a70d0089c84f89bc814c2bb1e729c",
+    "semantic_hash": "fc5a70d0089c84f89bc814c2bb1e729c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/plan-feature/SKILL.md": {
+    "mtime": 1777246881.7621214,
+    "ast_hash": "b0195d188a2f132ae23b9079bd80eadb",
+    "semantic_hash": "b0195d188a2f132ae23b9079bd80eadb"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/plan-feature/references/revision-mode.md": {
+    "mtime": 1777246881.7637095,
+    "ast_hash": "b7f614aa4dba804594a08086a93c67e6",
+    "semantic_hash": "b7f614aa4dba804594a08086a93c67e6"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/plan-feature/references/review-checklist-template.md": {
+    "mtime": 1777246881.7634976,
+    "ast_hash": "c55ea862d3c6313928b505c81b57f62d",
+    "semantic_hash": "c55ea862d3c6313928b505c81b57f62d"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/plan-feature/references/progress-format.md": {
+    "mtime": 1777246881.7633462,
+    "ast_hash": "1fef0d5a2c37659ac78f489d73f21833",
+    "semantic_hash": "1fef0d5a2c37659ac78f489d73f21833"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/plan-feature/references/gate-4-plan.md": {
+    "mtime": 1777246881.7631383,
+    "ast_hash": "1e041b6b2c1caa86cc3f6a0f0b90b48e",
+    "semantic_hash": "1e041b6b2c1caa86cc3f6a0f0b90b48e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/plan-feature/agents/openai.yaml": {
+    "mtime": 1777246881.76237,
+    "ast_hash": "c8eeda445ab3c92fc44dd91b8d0e9b6d",
+    "semantic_hash": "c8eeda445ab3c92fc44dd91b8d0e9b6d"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/plan-feature/assets/feature-plan-template.md": {
+    "mtime": 1777246881.762749,
+    "ast_hash": "328709fc89f5cdec9e5f6029794f58f3",
+    "semantic_hash": "328709fc89f5cdec9e5f6029794f58f3"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/milestone/SKILL.md": {
+    "mtime": 1777246881.7603717,
+    "ast_hash": "6e6e976f7b0ab1f06f8e36b6e956a3c2",
+    "semantic_hash": "6e6e976f7b0ab1f06f8e36b6e956a3c2"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/milestone/references/gate-3-milestone.md": {
+    "mtime": 1777246881.7612739,
+    "ast_hash": "5137edfea9fa0988ee24a3141934b7e9",
+    "semantic_hash": "5137edfea9fa0988ee24a3141934b7e9"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/milestone/references/revision-mode.md": {
+    "mtime": 1777246881.7618818,
+    "ast_hash": "cb4fa8d1b3a8bb4e09357ce7c6907806",
+    "semantic_hash": "cb4fa8d1b3a8bb4e09357ce7c6907806"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/milestone/references/review-checklist-template.md": {
+    "mtime": 1777246881.7616615,
+    "ast_hash": "c57446ec49c23d52198aa3f43579eb8e",
+    "semantic_hash": "c57446ec49c23d52198aa3f43579eb8e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/milestone/references/progress-format.md": {
+    "mtime": 1777246881.7614894,
+    "ast_hash": "1fef0d5a2c37659ac78f489d73f21833",
+    "semantic_hash": "1fef0d5a2c37659ac78f489d73f21833"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/milestone/agents/openai.yaml": {
+    "mtime": 1777246881.7606072,
+    "ast_hash": "3001da9e8f9ba64deec88930848e767c",
+    "semantic_hash": "3001da9e8f9ba64deec88930848e767c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/milestone/assets/milestone-readme-template.md": {
+    "mtime": 1777246881.760836,
+    "ast_hash": "43b98acfccb967cc7535251653bcf3a4",
+    "semantic_hash": "43b98acfccb967cc7535251653bcf3a4"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/agents/openai.yaml": {
+    "mtime": 1777246881.7544422,
+    "ast_hash": "0cd6c7f8da6499497f961a079dcc57ad",
+    "semantic_hash": "0cd6c7f8da6499497f961a079dcc57ad"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/spike/SKILL.md": {
+    "mtime": 1777246881.7648892,
+    "ast_hash": "188c8ca62b3156a4d98ed9752e29c6b8",
+    "semantic_hash": "188c8ca62b3156a4d98ed9752e29c6b8"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/spike/references/progress-format.md": {
+    "mtime": 1777246881.7654417,
+    "ast_hash": "1fef0d5a2c37659ac78f489d73f21833",
+    "semantic_hash": "1fef0d5a2c37659ac78f489d73f21833"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/spike/references/research-agent.md": {
+    "mtime": 1777246881.7658737,
+    "ast_hash": "5439ea0f7149dcaf33757dd6ed225344",
+    "semantic_hash": "5439ea0f7149dcaf33757dd6ed225344"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/spike/references/spike-format.md": {
+    "mtime": 1777246881.7661786,
+    "ast_hash": "94453c105ab23f090b4bb1d774e49188",
+    "semantic_hash": "94453c105ab23f090b4bb1d774e49188"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/spike/references/redteam-agent.md": {
+    "mtime": 1777246881.76568,
+    "ast_hash": "9df236374d34b4ba10ec2bfed780a749",
+    "semantic_hash": "9df236374d34b4ba10ec2bfed780a749"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/codex-skills/project/spike/agents/openai.yaml": {
+    "mtime": 1777246881.765204,
+    "ast_hash": "f7dec37d1d9200ef377beb2f65f8cb5b",
+    "semantic_hash": "f7dec37d1d9200ef377beb2f65f8cb5b"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/start-feature.md": {
+    "mtime": 1774919485.5477428,
+    "ast_hash": "c04039284469d4f0ba2bfc1b2f77344b",
+    "semantic_hash": "c04039284469d4f0ba2bfc1b2f77344b"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/investigate.md": {
+    "mtime": 1771618597.5414653,
+    "ast_hash": "8fef360ef53365dac60bf0f880855e54",
+    "semantic_hash": "8fef360ef53365dac60bf0f880855e54"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/compliance-auto-assess.md": {
+    "mtime": 1771618597.5410886,
+    "ast_hash": "75a912174a42fe7174ae9e5e7150074b",
+    "semantic_hash": "75a912174a42fe7174ae9e5e7150074b"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/update-docs.md": {
+    "mtime": 1774399879.4679942,
+    "ast_hash": "c6ec2498c8f77d5707a0ec8264a6e247",
+    "semantic_hash": "c6ec2498c8f77d5707a0ec8264a6e247"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/update-docs-terraform.md": {
+    "mtime": 1774399879.4675422,
+    "ast_hash": "9bbcc0e658a0c72b3342aeb07b94962e",
+    "semantic_hash": "9bbcc0e658a0c72b3342aeb07b94962e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/catchup.md": {
+    "mtime": 1770062626.471207,
+    "ast_hash": "80b0ace5be8513dbf05e243c85a20f00",
+    "semantic_hash": "80b0ace5be8513dbf05e243c85a20f00"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/start-feature-auto.md": {
+    "mtime": 1774919485.547323,
+    "ast_hash": "00dc09644bdf46f1d8fb1f3c318af295",
+    "semantic_hash": "00dc09644bdf46f1d8fb1f3c318af295"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/dream.md": {
+    "mtime": 1774733307.9497929,
+    "ast_hash": "e1efbe9b928cb70e0566d45955788c01",
+    "semantic_hash": "e1efbe9b928cb70e0566d45955788c01"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/update-docs-cdk.md": {
+    "mtime": 1774399879.4671793,
+    "ast_hash": "1bb828824cc1cc404479d405030856f2",
+    "semantic_hash": "1bb828824cc1cc404479d405030856f2"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/commands/handoff.md": {
+    "mtime": 1774399879.466654,
+    "ast_hash": "eac1dc35bb90ab1eab39774698f12aad",
+    "semantic_hash": "eac1dc35bb90ab1eab39774698f12aad"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/SOLUTIONS.md": {
+    "mtime": 1774724507.1424828,
+    "ast_hash": "53b560b480f4b3368319e38d06549c62",
+    "semantic_hash": "53b560b480f4b3368319e38d06549c62"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/COMMANDS.md": {
+    "mtime": 1774919485.5482702,
+    "ast_hash": "51535254692cc48da9e6653c0488f355",
+    "semantic_hash": "51535254692cc48da9e6653c0488f355"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/SCRIPTS.md": {
+    "mtime": 1781551223.5248222,
+    "ast_hash": "9a45568942b90ad3b19b5c7eef2720b2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/benchmark-run-history.md": {
+    "mtime": 1773254138.4972723,
+    "ast_hash": "761b5ce51154de657d8fe525e9682679",
+    "semantic_hash": "761b5ce51154de657d8fe525e9682679"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/SKILLS.md": {
+    "mtime": 1777246881.7665496,
+    "ast_hash": "918539515eeb73b1d038b5f5d1c1f86e",
+    "semantic_hash": "918539515eeb73b1d038b5f5d1c1f86e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/RULES.md": {
+    "mtime": 1781551251.1852496,
+    "ast_hash": "200d70a9c16ed182b646449cd5a574e2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/solutions/WELL_ARCHITECTED_REVIEW.md": {
+    "mtime": 1774724507.1429567,
+    "ast_hash": "f25aa4ba05161553dbcac6bcf7840dbd",
+    "semantic_hash": "f25aa4ba05161553dbcac6bcf7840dbd"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/project-skill-refactor/ARCHITECTURE_AND_DESIGN.md": {
+    "mtime": 1778270063.7525034,
+    "ast_hash": "bbc75f94bb2a376faf85cb4fc6c0d90a",
+    "semantic_hash": "bbc75f94bb2a376faf85cb4fc6c0d90a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/codex-skills/project.md": {
+    "mtime": 1778426439.8394814,
+    "ast_hash": "c6385e93cadb5ece2f5f99a5094a68d2",
+    "semantic_hash": "c6385e93cadb5ece2f5f99a5094a68d2"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/scripts/benchmark/REFERENCE.md": {
+    "mtime": 1773254138.498585,
+    "ast_hash": "353f4f7f11a85fc30205fc68f8d9ec4e",
+    "semantic_hash": "353f4f7f11a85fc30205fc68f8d9ec4e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/scripts/benchmark/RUBRIC-GUIDE.md": {
+    "mtime": 1773254138.4987862,
+    "ast_hash": "c1d36e0ee1a457f2bf595060679948fb",
+    "semantic_hash": "c1d36e0ee1a457f2bf595060679948fb"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/scripts/benchmark/SETUP.md": {
+    "mtime": 1773254138.4989388,
+    "ast_hash": "ab758031fbe664d5798eb2a29f820d02",
+    "semantic_hash": "ab758031fbe664d5798eb2a29f820d02"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/scripts/benchmark/LIFECYCLE-GUIDE.md": {
+    "mtime": 1773254138.4982333,
+    "ast_hash": "a0ee01b0ae677cfb60e000e82ee28bcb",
+    "semantic_hash": "a0ee01b0ae677cfb60e000e82ee28bcb"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/scripts/benchmark/README.md": {
+    "mtime": 1773254138.4984334,
+    "ast_hash": "faa3ee034857d115d5ef38f91d5ea6a9",
+    "semantic_hash": "faa3ee034857d115d5ef38f91d5ea6a9"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/scripts/benchmark/USER-GUIDE.md": {
+    "mtime": 1773254138.4990718,
+    "ast_hash": "fc96c69b1dfcca9ef3be8ccabb706b1c",
+    "semantic_hash": "fc96c69b1dfcca9ef3be8ccabb706b1c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/crossplane-v2-best-practices.md": {
+    "mtime": 1771618597.5434535,
+    "ast_hash": "cded667ce7359c9a04991700033c9528",
+    "semantic_hash": "cded667ce7359c9a04991700033c9528"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/defensive-protocol-v2-anti-slop.md": {
+    "mtime": 1781549328.9507105,
+    "ast_hash": "d1c049b9483e355840871641fd0307d2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/kubernetes-best-practices.md": {
+    "mtime": 1771618597.5439563,
+    "ast_hash": "0dad3b42d6c4c14512de2c1458c66800",
+    "semantic_hash": "0dad3b42d6c4c14512de2c1458c66800"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/cdk-best-practices.md": {
+    "mtime": 1771618597.5432076,
+    "ast_hash": "a980300f61fb96bfd715a9fd2d279d46",
+    "semantic_hash": "a980300f61fb96bfd715a9fd2d279d46"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/agent-delegation.md": {
+    "mtime": 1778268032.3519452,
+    "ast_hash": "edb98df33a1739be2aeb8459915c045a",
+    "semantic_hash": "edb98df33a1739be2aeb8459915c045a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/defensive-protocol-v2-session-management.md": {
+    "mtime": 1781549341.0386307,
+    "ast_hash": "b721344a876580e6b0977233411564e1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/crossplane-v1-best-practices.md": {
+    "mtime": 1771618597.543322,
+    "ast_hash": "7f0f4cbf8eb01963e4fd7509ba4bc726",
+    "semantic_hash": "7f0f4cbf8eb01963e4fd7509ba4bc726"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/defensive-protocol-v2-epistemology.md": {
+    "mtime": 1781549330.5544198,
+    "ast_hash": "a574fa6b2d8e33ecfe73291e671b06ac",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/terraform-best-practices.md": {
+    "mtime": 1771618597.5440867,
+    "ast_hash": "177f41d12153ced4f22f268d93245dc3",
+    "semantic_hash": "177f41d12153ced4f22f268d93245dc3"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/rules/defensive-protocol.md": {
+    "mtime": 1781549242.2619617,
+    "ast_hash": "1d7460a7c6e77f3e408e7a4e6a23030a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/create-prd.md": {
+    "mtime": 1771618597.5423963,
+    "ast_hash": "85c8353edb2cd002600c0684821a1e3e",
+    "semantic_hash": "85c8353edb2cd002600c0684821a1e3e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/start-feature.md": {
+    "mtime": 1771618597.5427332,
+    "ast_hash": "b92e95069b6335ffe1d76521ae4ae89d",
+    "semantic_hash": "b92e95069b6335ffe1d76521ae4ae89d"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/investigate.md": {
+    "mtime": 1771618597.542645,
+    "ast_hash": "6d826ace219cfe0085ebc215867b6b7e",
+    "semantic_hash": "6d826ace219cfe0085ebc215867b6b7e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/compliance-auto-assess.md": {
+    "mtime": 1771618597.542294,
+    "ast_hash": "a32c820a7e713cf0a8cf6411139e3f39",
+    "semantic_hash": "a32c820a7e713cf0a8cf6411139e3f39"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/update-docs.md": {
+    "mtime": 1771618597.5430396,
+    "ast_hash": "11c9ef3ceaf523d1e3cfd101ae7683ee",
+    "semantic_hash": "11c9ef3ceaf523d1e3cfd101ae7683ee"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/update-docs-terraform.md": {
+    "mtime": 1771618597.5429552,
+    "ast_hash": "b686373ffa65b9b785f9c92826eea14c",
+    "semantic_hash": "b686373ffa65b9b785f9c92826eea14c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/catchup.md": {
+    "mtime": 1771618597.542209,
+    "ast_hash": "cfe6b1b160a4f4be58e3f69f221c2919",
+    "semantic_hash": "cfe6b1b160a4f4be58e3f69f221c2919"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/start-feature-auto.md": {
+    "mtime": 1774919485.548723,
+    "ast_hash": "0322624783d09d01e021193563fb347b",
+    "semantic_hash": "0322624783d09d01e021193563fb347b"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/dream.md": {
+    "mtime": 1774733307.950607,
+    "ast_hash": "1818edbf7050beb321ca139f745c2610",
+    "semantic_hash": "1818edbf7050beb321ca139f745c2610"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/update-docs-cdk.md": {
+    "mtime": 1771618597.542835,
+    "ast_hash": "6c9e6c3c5e166dab7df84b7b08012d6c",
+    "semantic_hash": "6c9e6c3c5e166dab7df84b7b08012d6c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/commands/handoff.md": {
+    "mtime": 1771618597.5425358,
+    "ast_hash": "d1cc055bc34b36af41b6a8186e1602f9",
+    "semantic_hash": "d1cc055bc34b36af41b6a8186e1602f9"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/create-prd.md": {
+    "mtime": 1772401315.8641024,
+    "ast_hash": "23f26de2cdd91d489385ce5ed8b8e80e",
+    "semantic_hash": "23f26de2cdd91d489385ce5ed8b8e80e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/cdk-testing.md": {
+    "mtime": 1772401315.863239,
+    "ast_hash": "28955858102c9f7a8f2649bf5a85f5ef",
+    "semantic_hash": "28955858102c9f7a8f2649bf5a85f5ef"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/spike.md": {
+    "mtime": 1778426440.817226,
+    "ast_hash": "639878415b8f479a5a7d57629301db3f",
+    "semantic_hash": "639878415b8f479a5a7d57629301db3f"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/plan-feature.md": {
+    "mtime": 1778294901.4063458,
+    "ast_hash": "9df4214e1c209bc4a06bc6f3f24e82f1",
+    "semantic_hash": "9df4214e1c209bc4a06bc6f3f24e82f1"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/rule-creator.md": {
+    "mtime": 1773254138.4996717,
+    "ast_hash": "fcd214a4b8351201ff95c1f19b133232",
+    "semantic_hash": "fcd214a4b8351201ff95c1f19b133232"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/architecture-doc.md": {
+    "mtime": 1776643410.034436,
+    "ast_hash": "0e77fc17289edc0e5948ec96dee9c2ef",
+    "semantic_hash": "0e77fc17289edc0e5948ec96dee9c2ef"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/occ-skill-creator.md": {
+    "mtime": 1773254138.4992714,
+    "ast_hash": "325c8bdf3670fc69c66b5d106caaec32",
+    "semantic_hash": "325c8bdf3670fc69c66b5d106caaec32"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/project.md": {
+    "mtime": 1778426438.3401983,
+    "ast_hash": "75f70d64e248ca306d34c9558fd51217",
+    "semantic_hash": "75f70d64e248ca306d34c9558fd51217"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/milestone.md": {
+    "mtime": 1778294889.6626809,
+    "ast_hash": "72aeb20bb872ceb0e93d3a1ecd68dc2a",
+    "semantic_hash": "72aeb20bb872ceb0e93d3a1ecd68dc2a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/compliance-assess.md": {
+    "mtime": 1772401315.8636773,
+    "ast_hash": "a3519495d7ad002468a27aada121e365",
+    "semantic_hash": "a3519495d7ad002468a27aada121e365"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/define.md": {
+    "mtime": 1778294825.5877879,
+    "ast_hash": "f036bde1d0d40fe777f8e6f62ee2de98",
+    "semantic_hash": "f036bde1d0d40fe777f8e6f62ee2de98"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/build.md": {
+    "mtime": 1778294919.0768723,
+    "ast_hash": "f49161600f2255574d1abbe2564cab58",
+    "semantic_hash": "f49161600f2255574d1abbe2564cab58"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/occ-skill-refactor.md": {
+    "mtime": 1773254138.4994087,
+    "ast_hash": "96c92a1067e66b54b39139ffbeecbf54",
+    "semantic_hash": "96c92a1067e66b54b39139ffbeecbf54"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/design.md": {
+    "mtime": 1778294865.9339437,
+    "ast_hash": "544d06c3d6f1dbd364b460217b524c6a",
+    "semantic_hash": "544d06c3d6f1dbd364b460217b524c6a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/skills/terraform-testing.md": {
+    "mtime": 1772401315.8660038,
+    "ast_hash": "2961fb3287f4681052343f433db5e1a7",
+    "semantic_hash": "2961fb3287f4681052343f433db5e1a7"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/issues/9/benchmark-occ-skill-creator.md": {
+    "mtime": 1773254138.4977968,
+    "ast_hash": "ab9d0956781191aed8bfde8f3a2429d0",
+    "semantic_hash": "ab9d0956781191aed8bfde8f3a2429d0"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/issues/9/BENCHMARK-RESULTS.md": {
+    "mtime": 1773254138.4975617,
+    "ast_hash": "e7d728b0ed968efbc66b6fe8be633ddf",
+    "semantic_hash": "e7d728b0ed968efbc66b6fe8be633ddf"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/issues/9/benchmark-occ-skill-refactor.md": {
+    "mtime": 1773254138.4979494,
+    "ast_hash": "2057d1889a1ad490af434b5ceb3517b0",
+    "semantic_hash": "2057d1889a1ad490af434b5ceb3517b0"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/issues/9/PROBLEM-STATEMENT.md": {
+    "mtime": 1773254138.49766,
+    "ast_hash": "0e24534b1909e41637c428884fe65c38",
+    "semantic_hash": "0e24534b1909e41637c428884fe65c38"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/mcp/README.md": {
+    "mtime": 1775517576.2896826,
+    "ast_hash": "435056c9b8df0f1e72db01a1038f090a",
+    "semantic_hash": "435056c9b8df0f1e72db01a1038f090a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/mcp/docs/ARCHITECTURE_AND_DESIGN.md": {
+    "mtime": 1775517576.2900636,
+    "ast_hash": "9d4df093d861d6f0c0cf61d8344d8e86",
+    "semantic_hash": "9d4df093d861d6f0c0cf61d8344d8e86"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/rules/crossplane-v2-best-practices.md": {
+    "mtime": 1771618597.5479279,
+    "ast_hash": "03444ebda9f65d336c75d1e43b323330",
+    "semantic_hash": "03444ebda9f65d336c75d1e43b323330"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/rules/defensive-protocol-v2-anti-slop.md": {
+    "mtime": 1781541951.0754988,
+    "ast_hash": "c62f73aa1d7b1722e7b58b0ec9f8cfc8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/rules/kubernetes-best-practices.md": {
+    "mtime": 1770323796.8589103,
+    "ast_hash": "5160999dda354466ca6fa569ee23200c",
+    "semantic_hash": "5160999dda354466ca6fa569ee23200c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/rules/cdk-best-practices.md": {
+    "mtime": 1770322527.797739,
+    "ast_hash": "6070b3845d8020a37e4f67b65d775322",
+    "semantic_hash": "6070b3845d8020a37e4f67b65d775322"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/rules/agent-delegation.md": {
+    "mtime": 1778268032.3521264,
+    "ast_hash": "12e9bc006be8eb17f0290e5f0fba3125",
+    "semantic_hash": "12e9bc006be8eb17f0290e5f0fba3125"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/rules/defensive-protocol-v2-session-management.md": {
+    "mtime": 1781541963.5284474,
+    "ast_hash": "adde9c50e654962fa2bf4ae71dce2031",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/rules/crossplane-v1-best-practices.md": {
+    "mtime": 1771612318.9184644,
+    "ast_hash": "37afc5a763c6bf32d0e4d9bc8d8b3ad8",
+    "semantic_hash": "37afc5a763c6bf32d0e4d9bc8d8b3ad8"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/rules/defensive-protocol-v2-epistemology.md": {
+    "mtime": 1771618597.5482712,
+    "ast_hash": "db2d75b043edfe23dc24c6b85e2c01b0",
+    "semantic_hash": "db2d75b043edfe23dc24c6b85e2c01b0"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/rules/terraform-best-practices.md": {
+    "mtime": 1770259148.7970638,
+    "ast_hash": "0256fb922ceb8cd152ac50ec5a358d0c",
+    "semantic_hash": "0256fb922ceb8cd152ac50ec5a358d0c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/benchmark/README.md": {
+    "mtime": 1773254138.4999168,
+    "ast_hash": "c964fb4312d7668b065126600e72651a",
+    "semantic_hash": "c964fb4312d7668b065126600e72651a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/agent-delegation/README.md": {
+    "mtime": 1778268032.3523414,
+    "ast_hash": "4bfb2cafb898248621fb57d785d95f6f",
+    "semantic_hash": "4bfb2cafb898248621fb57d785d95f6f"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-creator/SKILL.md": {
+    "mtime": 1773254138.5047882,
+    "ast_hash": "be4ba5863cf4cf1435967391ff39e6d5",
+    "semantic_hash": "be4ba5863cf4cf1435967391ff39e6d5"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-creator/references/refactor-protocol.md": {
+    "mtime": 1773254138.5052888,
+    "ast_hash": "9c9b44f82310c007780c13e981fde7bc",
+    "semantic_hash": "9c9b44f82310c007780c13e981fde7bc"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-creator/references/anthropic-best-practices.md": {
+    "mtime": 1773254138.5049872,
+    "ast_hash": "1e68b55baf30f7b0a1fe81005a465eee",
+    "semantic_hash": "1e68b55baf30f7b0a1fe81005a465eee"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-creator/references/output-patterns.md": {
+    "mtime": 1773254138.505104,
+    "ast_hash": "9536f04973c9772ccb2f02faa3d1a0e1",
+    "semantic_hash": "9536f04973c9772ccb2f02faa3d1a0e1"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-creator/review/PLAN.md": {
+    "mtime": 1773254138.5056155,
+    "ast_hash": "a227e3d077cc7d7e22b1efcae648021d",
+    "semantic_hash": "a227e3d077cc7d7e22b1efcae648021d"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-creator/review/FEEDBACK.md": {
+    "mtime": 1773254138.505496,
+    "ast_hash": "5aecaab756b38402a0183b0aaec26634",
+    "semantic_hash": "5aecaab756b38402a0183b0aaec26634"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-fedramp-assessment/SKILL.md": {
+    "mtime": 1773254138.5036266,
+    "ast_hash": "516053df9aba8b7e5b9d0741c0503f43",
+    "semantic_hash": "516053df9aba8b7e5b9d0741c0503f43"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-fedramp-assessment/references/phase-templates.md": {
+    "mtime": 1773254138.5041003,
+    "ast_hash": "da86bbb9de72fa2e9f822355474593ec",
+    "semantic_hash": "da86bbb9de72fa2e9f822355474593ec"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-fedramp-assessment/references/nist-fedramp-controls.md": {
+    "mtime": 1773254138.5038795,
+    "ast_hash": "f8d1c923547e93fc8eba60d840a03407",
+    "semantic_hash": "f8d1c923547e93fc8eba60d840a03407"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-fedramp-assessment/references/official-references.md": {
+    "mtime": 1771778110.2868686,
+    "ast_hash": "589c201692a54fcdf511be35c5ebbaf5",
+    "semantic_hash": "589c201692a54fcdf511be35c5ebbaf5"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-fedramp-assessment/review/BENCHMARK.md": {
+    "mtime": 1773254138.5043242,
+    "ast_hash": "61f73a06f49f00cee1d65e7e2135e06d",
+    "semantic_hash": "61f73a06f49f00cee1d65e7e2135e06d"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-fedramp-assessment/review/PLAN.md": {
+    "mtime": 1773254138.5045774,
+    "ast_hash": "49eaa0b809df39439d15c805ff037100",
+    "semantic_hash": "49eaa0b809df39439d15c805ff037100"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-fedramp-assessment/review/FEEDBACK.md": {
+    "mtime": 1773254138.5044417,
+    "ast_hash": "fba3ca6ff36e341baf4b6d04b781633b",
+    "semantic_hash": "fba3ca6ff36e341baf4b6d04b781633b"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/CONCEPT.md": {
+    "mtime": 1775609832.5290117,
+    "ast_hash": "93e7207a56716ff9c708d306ef0bbfd8",
+    "semantic_hash": "93e7207a56716ff9c708d306ef0bbfd8"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/MVP.md": {
+    "mtime": 1775609832.5291996,
+    "ast_hash": "4b84cf563304767af8aac4d39068a3f4",
+    "semantic_hash": "4b84cf563304767af8aac4d39068a3f4"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/SKILL.md": {
+    "mtime": 1775609832.5294154,
+    "ast_hash": "6bfd95a41d22bdeacd8c7a821d312f56",
+    "semantic_hash": "6bfd95a41d22bdeacd8c7a821d312f56"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/design-agent.md": {
+    "mtime": 1775609832.5310326,
+    "ast_hash": "12309bac4f71fb45e18fa3f3cdcfd651",
+    "semantic_hash": "12309bac4f71fb45e18fa3f3cdcfd651"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/persona-resolution.md": {
+    "mtime": 1775609832.5318184,
+    "ast_hash": "8c135071ae03b2787ac8214ae9226d62",
+    "semantic_hash": "8c135071ae03b2787ac8214ae9226d62"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/report-template.md": {
+    "mtime": 1775609832.5320356,
+    "ast_hash": "a6ac485233252a9ec62b97a4788cc17e",
+    "semantic_hash": "a6ac485233252a9ec62b97a4788cc17e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/synthesis-prompt-template.md": {
+    "mtime": 1775609832.5324247,
+    "ast_hash": "47569a19a384ada6c76df49967cc7241",
+    "semantic_hash": "47569a19a384ada6c76df49967cc7241"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/debate-rules.md": {
+    "mtime": 1775609832.5308745,
+    "ast_hash": "4a063a72c506b8d5e719b9988329f341",
+    "semantic_hash": "4a063a72c506b8d5e719b9988329f341"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/completeness-agent.md": {
+    "mtime": 1775609832.5303254,
+    "ast_hash": "b6044ef76eeb75659bd60989701b34e7",
+    "semantic_hash": "b6044ef76eeb75659bd60989701b34e7"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/feasibility-agent.md": {
+    "mtime": 1775609832.5312057,
+    "ast_hash": "abecdbbf5069de1f217ff0456b898be9",
+    "semantic_hash": "abecdbbf5069de1f217ff0456b898be9"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/chunking-rules.md": {
+    "mtime": 1775609832.530129,
+    "ast_hash": "915fe15b8cb1ae5e5a44402f935e16dc",
+    "semantic_hash": "915fe15b8cb1ae5e5a44402f935e16dc"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/compliance-agent.md": {
+    "mtime": 1775609832.5305007,
+    "ast_hash": "fad4e44c4804a95ef10aabf06763522f",
+    "semantic_hash": "fad4e44c4804a95ef10aabf06763522f"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/cost-agent.md": {
+    "mtime": 1775609832.5306718,
+    "ast_hash": "638c67c3cc4f0616afb44210fa67fc23",
+    "semantic_hash": "638c67c3cc4f0616afb44210fa67fc23"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/agent-prompt-template.md": {
+    "mtime": 1775609832.529712,
+    "ast_hash": "12dd3121f637c3d0e496c78b1d05b614",
+    "semantic_hash": "12dd3121f637c3d0e496c78b1d05b614"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/findings-format.md": {
+    "mtime": 1775609832.5313833,
+    "ast_hash": "764e8cae7d84b7da6d8632c49cb90495",
+    "semantic_hash": "764e8cae7d84b7da6d8632c49cb90495"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/operational-agent.md": {
+    "mtime": 1775609832.5315893,
+    "ast_hash": "a030fa3c7d84b81def38e29bc91281fc",
+    "semantic_hash": "a030fa3c7d84b81def38e29bc91281fc"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/security-agent.md": {
+    "mtime": 1775609832.5322351,
+    "ast_hash": "94eee17f852ec1cea3c34f959d2d1122",
+    "semantic_hash": "94eee17f852ec1cea3c34f959d2d1122"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/red-team/references/assumptions-agent.md": {
+    "mtime": 1775609832.529917,
+    "ast_hash": "b3c1cb1b90f6e85d121fb31427686e70",
+    "semantic_hash": "b3c1cb1b90f6e85d121fb31427686e70"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/itsg-assessment/SKILL.md": {
+    "mtime": 1773254138.50208,
+    "ast_hash": "2f903cf23897c7623e75b288086feea6",
+    "semantic_hash": "2f903cf23897c7623e75b288086feea6"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/itsg-assessment/references/phase-templates.md": {
+    "mtime": 1771778110.2850847,
+    "ast_hash": "4390990aae6fe71bc5863441a78e97a8",
+    "semantic_hash": "4390990aae6fe71bc5863441a78e97a8"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/itsg-assessment/references/itsg33-controls.md": {
+    "mtime": 1771778110.2846503,
+    "ast_hash": "48a137bce5d82afee2b340d3f0bb3f5e",
+    "semantic_hash": "48a137bce5d82afee2b340d3f0bb3f5e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/itsg-assessment/references/official-references.md": {
+    "mtime": 1771778110.2848535,
+    "ast_hash": "1b27f89ebb5a91465814a85cbf3af636",
+    "semantic_hash": "1b27f89ebb5a91465814a85cbf3af636"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/itsg-assessment/review/BENCHMARK.md": {
+    "mtime": 1773254138.5023122,
+    "ast_hash": "40ef8fb0002abac221d9267ea48c8c8a",
+    "semantic_hash": "40ef8fb0002abac221d9267ea48c8c8a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/itsg-assessment/review/PLAN.md": {
+    "mtime": 1773254138.502601,
+    "ast_hash": "703741774d657752aab00b5590dcd601",
+    "semantic_hash": "703741774d657752aab00b5590dcd601"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/itsg-assessment/review/FEEDBACK.md": {
+    "mtime": 1773254138.5024319,
+    "ast_hash": "f653db9abcfe415ddb5ee68636cf5f07",
+    "semantic_hash": "f653db9abcfe415ddb5ee68636cf5f07"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/create-prd/SKILL.md": {
+    "mtime": 1773254138.501243,
+    "ast_hash": "8470bcc048880e0d8754eb6ffca31263",
+    "semantic_hash": "8470bcc048880e0d8754eb6ffca31263"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/create-prd/references/interview-guide.md": {
+    "mtime": 1772157936.127975,
+    "ast_hash": "32fd8d388ca90ad1defe1cd8f0739da9",
+    "semantic_hash": "32fd8d388ca90ad1defe1cd8f0739da9"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/create-prd/review/BENCHMARK.md": {
+    "mtime": 1773254138.5014799,
+    "ast_hash": "cf1c128ebbbbd3305a60c9bf5f2b0de9",
+    "semantic_hash": "cf1c128ebbbbd3305a60c9bf5f2b0de9"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/create-prd/review/PLAN.md": {
+    "mtime": 1773254138.5018106,
+    "ast_hash": "154e61452e816c585ac3111878b3a944",
+    "semantic_hash": "154e61452e816c585ac3111878b3a944"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/create-prd/review/FEEDBACK.md": {
+    "mtime": 1773254138.501667,
+    "ast_hash": "87e603e368085cd8c37c0dfcffcdff52",
+    "semantic_hash": "87e603e368085cd8c37c0dfcffcdff52"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/create-prd/assets/prd-template.md": {
+    "mtime": 1772158762.4801152,
+    "ast_hash": "72d73e9120ea2b794a5af13c13390885",
+    "semantic_hash": "72d73e9120ea2b794a5af13c13390885"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/create-prd/assets/architecture-template.md": {
+    "mtime": 1772401315.8676193,
+    "ast_hash": "443ccd52f963b5523d33b7e0eaf091a5",
+    "semantic_hash": "443ccd52f963b5523d33b7e0eaf091a5"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/create-prd/assets/progress-template.txt": {
+    "mtime": 1772158785.675017,
+    "ast_hash": "b174fa115e27573bd8313e2cd526c9ad",
+    "semantic_hash": "b174fa115e27573bd8313e2cd526c9ad"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-refactor/SKILL.md": {
+    "mtime": 1773254138.5058067,
+    "ast_hash": "64df8ef0d47e7e316edd7358fafbe7bd",
+    "semantic_hash": "64df8ef0d47e7e316edd7358fafbe7bd"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-refactor/references/refactor-protocol.md": {
+    "mtime": 1773254138.5061476,
+    "ast_hash": "3d39841ab6e2db7e97919f78845bc099",
+    "semantic_hash": "3d39841ab6e2db7e97919f78845bc099"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-refactor/references/anthropic-best-practices.md": {
+    "mtime": 1773254138.5059962,
+    "ast_hash": "8d470d6b3a17c09445c96b37d8de8097",
+    "semantic_hash": "8d470d6b3a17c09445c96b37d8de8097"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-refactor/review/PLAN.md": {
+    "mtime": 1773254138.506584,
+    "ast_hash": "4416e4bf505016641b8ba4b5da6aaa0a",
+    "semantic_hash": "4416e4bf505016641b8ba4b5da6aaa0a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/occ-skill-refactor/review/FEEDBACK.md": {
+    "mtime": 1773254138.5063686,
+    "ast_hash": "6058f98223860632b0332caff21ec078",
+    "semantic_hash": "6058f98223860632b0332caff21ec078"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/cdk-testing/SKILL.md": {
+    "mtime": 1773254138.5004737,
+    "ast_hash": "df793d6b18d1e04ae52c0bd9856fd78e",
+    "semantic_hash": "df793d6b18d1e04ae52c0bd9856fd78e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/cdk-testing/references/commit-workflow.md": {
+    "mtime": 1772401315.8667457,
+    "ast_hash": "446c6630e988987e83ff8780a505baa4",
+    "semantic_hash": "446c6630e988987e83ff8780a505baa4"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/cdk-testing/review/BENCHMARK.md": {
+    "mtime": 1773254138.5007155,
+    "ast_hash": "725faa8094ad0a422774b04899355353",
+    "semantic_hash": "725faa8094ad0a422774b04899355353"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/cdk-testing/review/PLAN.md": {
+    "mtime": 1773254138.5010107,
+    "ast_hash": "c847649630060ef5d7a5bae570941750",
+    "semantic_hash": "c847649630060ef5d7a5bae570941750"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/cdk-testing/review/FEEDBACK.md": {
+    "mtime": 1773254138.5008786,
+    "ast_hash": "e17f6d58244c791aebaa97ff157c793a",
+    "semantic_hash": "e17f6d58244c791aebaa97ff157c793a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/SKILL.md": {
+    "mtime": 1778272645.3466716,
+    "ast_hash": "8e6c3523d4c10a1543b80f4b325e1b54",
+    "semantic_hash": "8e6c3523d4c10a1543b80f4b325e1b54"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/DESIGN.md": {
+    "mtime": 1776643410.0415764,
+    "ast_hash": "72f2e58d3655a5973cedeb5c69abd669",
+    "semantic_hash": "72f2e58d3655a5973cedeb5c69abd669"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/progress-file/REQUIREMENTS.md": {
+    "mtime": 1775347275.550544,
+    "ast_hash": "ea7782cc503b6d8e4320b429caf44486",
+    "semantic_hash": "ea7782cc503b6d8e4320b429caf44486"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/progress-file/CASE_FOR_YAML.md": {
+    "mtime": 1775347275.5501995,
+    "ast_hash": "d5ad3fb2b97f451e53eb6ea3b79f1b20",
+    "semantic_hash": "d5ad3fb2b97f451e53eb6ea3b79f1b20"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/progress-file/CASE_FOR_TEXT.md": {
+    "mtime": 1775347275.5498326,
+    "ast_hash": "b7d02032203d739e0ee372fd6700971f",
+    "semantic_hash": "b7d02032203d739e0ee372fd6700971f"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/progress-file/TEXT_vs_YAML_REPORT.md": {
+    "mtime": 1775347275.5508208,
+    "ast_hash": "a473c1436482fb3960fcf3857a8c4310",
+    "semantic_hash": "a473c1436482fb3960fcf3857a8c4310"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/design/SKILL.md": {
+    "mtime": 1778290819.137594,
+    "ast_hash": "6bf8345f89b5d51e9eb9d496c439403a",
+    "semantic_hash": "6bf8345f89b5d51e9eb9d496c439403a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/design/references/review-checklist-template.md": {
+    "mtime": 1775347275.5459542,
+    "ast_hash": "db3f9592145cc6dff47dd6ec47154956",
+    "semantic_hash": "db3f9592145cc6dff47dd6ec47154956"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/design/references/progress-format.md": {
+    "mtime": 1778290704.446087,
+    "ast_hash": "8f54f5632250920dfc8ad308385bbb45",
+    "semantic_hash": "8f54f5632250920dfc8ad308385bbb45"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/design/references/refresh-mode.md": {
+    "mtime": 1778290802.0044417,
+    "ast_hash": "d27e5433ab02212d573d7223485d9e35",
+    "semantic_hash": "d27e5433ab02212d573d7223485d9e35"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/design/references/gate-2-design.md": {
+    "mtime": 1778290769.6639721,
+    "ast_hash": "f8b4c1abf1f42b44dc50cc5f16407525",
+    "semantic_hash": "f8b4c1abf1f42b44dc50cc5f16407525"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/design/assets/architecture-template.md": {
+    "mtime": 1775347275.544769,
+    "ast_hash": "f772269fbf1a59dc6ea73dfff31cfca7",
+    "semantic_hash": "f772269fbf1a59dc6ea73dfff31cfca7"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/define/SKILL.md": {
+    "mtime": 1780876644.1941226,
+    "ast_hash": "05d37655037667a29a571f5fda26bbbd",
+    "semantic_hash": "05d37655037667a29a571f5fda26bbbd"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/define/references/gate-wb-working-backwards.md": {
+    "mtime": 1780876644.195478,
+    "ast_hash": "2d07ee10fb3f40d8950f8d91331a22ed",
+    "semantic_hash": "2d07ee10fb3f40d8950f8d91331a22ed"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/define/references/review-checklist-template.md": {
+    "mtime": 1780876644.1962113,
+    "ast_hash": "f166c3e4c4d2a9231d2e3b0bedffdeef",
+    "semantic_hash": "f166c3e4c4d2a9231d2e3b0bedffdeef"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/define/references/progress-format.md": {
+    "mtime": 1780876644.1958075,
+    "ast_hash": "8f54f5632250920dfc8ad308385bbb45",
+    "semantic_hash": "8f54f5632250920dfc8ad308385bbb45"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/define/references/gate-1-prd.md": {
+    "mtime": 1780876644.195168,
+    "ast_hash": "0a89bdbcec523d4c075fb271c19c108b",
+    "semantic_hash": "0a89bdbcec523d4c075fb271c19c108b"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/define/references/gate-0-codebase.md": {
+    "mtime": 1780876669.2859132,
+    "ast_hash": "53536c88f4e6441475f8f6ace2faa50c",
+    "semantic_hash": "53536c88f4e6441475f8f6ace2faa50c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/define/assets/prd-template.md": {
+    "mtime": 1780876644.1944115,
+    "ast_hash": "dffddcfd330fd0037d6f4a8718b7c630",
+    "semantic_hash": "dffddcfd330fd0037d6f4a8718b7c630"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/references/status-report-format.md": {
+    "mtime": 1778272667.4354432,
+    "ast_hash": "b51c9162bc383298a35a6b77973026a1",
+    "semantic_hash": "b51c9162bc383298a35a6b77973026a1"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/references/progress-format.md": {
+    "mtime": 1778426436.566186,
+    "ast_hash": "91e8bc39f345759206d9f63758afb4e8",
+    "semantic_hash": "91e8bc39f345759206d9f63758afb4e8"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/references/routing-logic.md": {
+    "mtime": 1778272661.2570908,
+    "ast_hash": "664d364aaf3a0bb738d2fc4e90e9f50a",
+    "semantic_hash": "664d364aaf3a0bb738d2fc4e90e9f50a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/plan-feature/SKILL.md": {
+    "mtime": 1778292071.2012546,
+    "ast_hash": "c10cfd0e18618a4a11ac1b82e8de3655",
+    "semantic_hash": "c10cfd0e18618a4a11ac1b82e8de3655"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/plan-feature/references/revision-mode.md": {
+    "mtime": 1778293247.4965436,
+    "ast_hash": "a41281915e7f208763da34b78f4ff765",
+    "semantic_hash": "a41281915e7f208763da34b78f4ff765"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/plan-feature/references/review-checklist-template.md": {
+    "mtime": 1776643410.0484233,
+    "ast_hash": "5b39fae0738b9022b5f88b5b1704d8c3",
+    "semantic_hash": "5b39fae0738b9022b5f88b5b1704d8c3"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/plan-feature/references/progress-format.md": {
+    "mtime": 1778292095.709402,
+    "ast_hash": "3d75b9c85acad4c26590471bef923ff9",
+    "semantic_hash": "3d75b9c85acad4c26590471bef923ff9"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/plan-feature/references/gate-4-plan.md": {
+    "mtime": 1778292195.278574,
+    "ast_hash": "cb51e17e4d04b03bec8049df89737830",
+    "semantic_hash": "cb51e17e4d04b03bec8049df89737830"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/plan-feature/assets/feature-plan-template.md": {
+    "mtime": 1776643410.0472405,
+    "ast_hash": "328709fc89f5cdec9e5f6029794f58f3",
+    "semantic_hash": "328709fc89f5cdec9e5f6029794f58f3"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/milestone/SKILL.md": {
+    "mtime": 1778292063.5843213,
+    "ast_hash": "c8b20e9fdb4294c1d8e9a9f2b42dc9a1",
+    "semantic_hash": "c8b20e9fdb4294c1d8e9a9f2b42dc9a1"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/milestone/references/gate-3-milestone.md": {
+    "mtime": 1778292152.4778528,
+    "ast_hash": "362381edb6713b79e2246b7fcca98c24",
+    "semantic_hash": "362381edb6713b79e2246b7fcca98c24"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/milestone/references/revision-mode.md": {
+    "mtime": 1778293240.1657848,
+    "ast_hash": "798c853701b74a2776e566de3ed6bf64",
+    "semantic_hash": "798c853701b74a2776e566de3ed6bf64"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/milestone/references/review-checklist-template.md": {
+    "mtime": 1775347275.547466,
+    "ast_hash": "460bf54f7a84f0fbdb51c5d76033b91c",
+    "semantic_hash": "460bf54f7a84f0fbdb51c5d76033b91c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/milestone/references/progress-format.md": {
+    "mtime": 1778292091.9538531,
+    "ast_hash": "3d75b9c85acad4c26590471bef923ff9",
+    "semantic_hash": "3d75b9c85acad4c26590471bef923ff9"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/milestone/assets/milestone-readme-template.md": {
+    "mtime": 1776643410.045343,
+    "ast_hash": "446cfc7c5e14c5b9b76e15a7e6d801a4",
+    "semantic_hash": "446cfc7c5e14c5b9b76e15a7e6d801a4"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/design-decisions/OPEN_QUESTIONS.md": {
+    "mtime": 1776643410.0439959,
+    "ast_hash": "9ba2f6b8722487541db5dfd3e0487de6",
+    "semantic_hash": "9ba2f6b8722487541db5dfd3e0487de6"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/design-decisions/REVIEW_FINDINGS.md": {
+    "mtime": 1776643410.0446117,
+    "ast_hash": "eff40ce03f5a245ab518375371aa0dfa",
+    "semantic_hash": "eff40ce03f5a245ab518375371aa0dfa"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/spike/SKILL.md": {
+    "mtime": 1778426475.3116746,
+    "ast_hash": "f66f1196bb316c3e4bf8537667c7bf7f",
+    "semantic_hash": "f66f1196bb316c3e4bf8537667c7bf7f"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/spike/references/progress-format.md": {
+    "mtime": 1778426470.6318612,
+    "ast_hash": "7a25dd4f8738c2cc0397db7cd861fd1c",
+    "semantic_hash": "7a25dd4f8738c2cc0397db7cd861fd1c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/spike/references/research-agent.md": {
+    "mtime": 1775347275.5529716,
+    "ast_hash": "53ea8938701d314ba814275a8cab060e",
+    "semantic_hash": "53ea8938701d314ba814275a8cab060e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/spike/references/spike-format.md": {
+    "mtime": 1778294153.2034438,
+    "ast_hash": "a7a224d5a9cb80224f79c407fd56fa3a",
+    "semantic_hash": "a7a224d5a9cb80224f79c407fd56fa3a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/project/spike/references/redteam-agent.md": {
+    "mtime": 1775347275.5526197,
+    "ast_hash": "7a042364e07e90e4c798c96cec440182",
+    "semantic_hash": "7a042364e07e90e4c798c96cec440182"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/terraform-testing/SKILL.md": {
+    "mtime": 1773254138.5078082,
+    "ast_hash": "d82467f2c2835a49de136682476e0b19",
+    "semantic_hash": "d82467f2c2835a49de136682476e0b19"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/terraform-testing/review/BENCHMARK.md": {
+    "mtime": 1773254138.5080597,
+    "ast_hash": "bdece5c9cac73ed0b235e871c98a1de4",
+    "semantic_hash": "bdece5c9cac73ed0b235e871c98a1de4"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/terraform-testing/review/PLAN.md": {
+    "mtime": 1773254138.5084002,
+    "ast_hash": "cf4878e3f07729ea8427a613ac928525",
+    "semantic_hash": "cf4878e3f07729ea8427a613ac928525"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/terraform-testing/review/FEEDBACK.md": {
+    "mtime": 1773254138.5082307,
+    "ast_hash": "5b27b71cc6b3ad9c54eaf1d1a975fb87",
+    "semantic_hash": "5b27b71cc6b3ad9c54eaf1d1a975fb87"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/rule-creator/SKILL.md": {
+    "mtime": 1773254138.506945,
+    "ast_hash": "e19b400a37610bcf86e9a1b23151aac6",
+    "semantic_hash": "e19b400a37610bcf86e9a1b23151aac6"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/rule-creator/references/rule-format.md": {
+    "mtime": 1772401315.8703516,
+    "ast_hash": "2bcf7b0762fa221aa88e2a4cbf590f14",
+    "semantic_hash": "2bcf7b0762fa221aa88e2a4cbf590f14"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/rule-creator/references/doc-format.md": {
+    "mtime": 1771620397.7433033,
+    "ast_hash": "0169d842a01844e1e5f751318ab39e7e",
+    "semantic_hash": "0169d842a01844e1e5f751318ab39e7e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/rule-creator/review/BENCHMARK.md": {
+    "mtime": 1773254138.5072312,
+    "ast_hash": "6cd2aa610920479cccdcaf7b0a208da3",
+    "semantic_hash": "6cd2aa610920479cccdcaf7b0a208da3"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/rule-creator/review/PLAN.md": {
+    "mtime": 1773254138.5075917,
+    "ast_hash": "1e7e78f433231d68c47072f2e5f95757",
+    "semantic_hash": "1e7e78f433231d68c47072f2e5f95757"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/rule-creator/review/FEEDBACK.md": {
+    "mtime": 1773254138.5074186,
+    "ast_hash": "f9053cec0c8a67abfccce6d2e2e527a1",
+    "semantic_hash": "f9053cec0c8a67abfccce6d2e2e527a1"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-csf-assessment/SKILL.md": {
+    "mtime": 1773254138.5028503,
+    "ast_hash": "f24bf4bcbb431709edcda6a66baead71",
+    "semantic_hash": "f24bf4bcbb431709edcda6a66baead71"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-csf-assessment/references/phase-templates.md": {
+    "mtime": 1772401315.8692682,
+    "ast_hash": "e3bf11c80da6252f1d4517719c84fc49",
+    "semantic_hash": "e3bf11c80da6252f1d4517719c84fc49"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-csf-assessment/references/nist-csf-subcategories.md": {
+    "mtime": 1772401315.8688483,
+    "ast_hash": "e08b361458a3e75957073fe265e65d36",
+    "semantic_hash": "e08b361458a3e75957073fe265e65d36"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-csf-assessment/review/BENCHMARK.md": {
+    "mtime": 1773254138.503087,
+    "ast_hash": "ad636432f3b389eedfeffe6a89927859",
+    "semantic_hash": "ad636432f3b389eedfeffe6a89927859"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-csf-assessment/review/PLAN.md": {
+    "mtime": 1773254138.5033736,
+    "ast_hash": "52e82b1f947c8232b4dfdb61257fb78b",
+    "semantic_hash": "52e82b1f947c8232b4dfdb61257fb78b"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/nist-csf-assessment/review/FEEDBACK.md": {
+    "mtime": 1773254138.5032039,
+    "ast_hash": "1647ea35ebe274673b0cfa61807fef8d",
+    "semantic_hash": "1647ea35ebe274673b0cfa61807fef8d"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/architecture-doc/TEST_PLAN.md": {
+    "mtime": 1776643410.039193,
+    "ast_hash": "26385f28f4b0c97e5946cc789b4f7e0b",
+    "semantic_hash": "26385f28f4b0c97e5946cc789b4f7e0b"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/architecture-doc/SKILL.md": {
+    "mtime": 1776643410.0386813,
+    "ast_hash": "c74daa2ec25f351df68879463f52ef2a",
+    "semantic_hash": "c74daa2ec25f351df68879463f52ef2a"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/architecture-doc/references/scan-agent-prompt.md": {
+    "mtime": 1776643410.040585,
+    "ast_hash": "d2b429e73ba404e01f68eb5488febfe1",
+    "semantic_hash": "d2b429e73ba404e01f68eb5488febfe1"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/architecture-doc/references/mcp-probe.md": {
+    "mtime": 1776643410.0399492,
+    "ast_hash": "ab46088298b041a7a4bb01b3e1c80781",
+    "semantic_hash": "ab46088298b041a7a4bb01b3e1c80781"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/architecture-doc/references/audit-mode.md": {
+    "mtime": 1776643410.039629,
+    "ast_hash": "e34ba1c3d02b5db62bb7ba1e03a4828c",
+    "semantic_hash": "e34ba1c3d02b5db62bb7ba1e03a4828c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/architecture-doc/references/synthesis-agent-prompt.md": {
+    "mtime": 1776643410.040865,
+    "ast_hash": "72590e6776d28c2fe49987d69f37fb60",
+    "semantic_hash": "72590e6776d28c2fe49987d69f37fb60"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/skills/architecture-doc/references/redaction-patterns.md": {
+    "mtime": 1776643410.0402954,
+    "ast_hash": "adc39734a3242fc5435f22cc0eb1b335",
+    "semantic_hash": "adc39734a3242fc5435f22cc0eb1b335"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/prd.md": {
+    "mtime": 1776643405.465598,
+    "ast_hash": "26ac2fd47615a702c72b7b931a8643c3",
+    "semantic_hash": "26ac2fd47615a702c72b7b931a8643c3"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/progress.txt": {
+    "mtime": 1776643405.4661455,
+    "ast_hash": "b938296522b6bc7d0cdc40ff81447d97",
+    "semantic_hash": "b938296522b6bc7d0cdc40ff81447d97"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/README.md": {
+    "mtime": 1774724507.1436496,
+    "ast_hash": "90e26b9026b5c8617fb6a7c3f8c54636",
+    "semantic_hash": "90e26b9026b5c8617fb6a7c3f8c54636"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/agents/war-cataloguer.md": {
+    "mtime": 1774724507.1445136,
+    "ast_hash": "19a5a788bf11750050b7036b6a91ec12",
+    "semantic_hash": "19a5a788bf11750050b7036b6a91ec12"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/agents/war-pillar-reviewer.md": {
+    "mtime": 1774724507.1456716,
+    "ast_hash": "fb5531226262afa1532df613477f91ff",
+    "semantic_hash": "fb5531226262afa1532df613477f91ff"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/agents/war-architecture-reviewer.md": {
+    "mtime": 1774724507.144144,
+    "ast_hash": "ca118578e30f5548a4a25178e583c78f",
+    "semantic_hash": "ca118578e30f5548a4a25178e583c78f"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/agents/war-discovery-analyst.md": {
+    "mtime": 1774724507.144911,
+    "ast_hash": "7ef846a1a21e6edc4a2ee154298124bf",
+    "semantic_hash": "7ef846a1a21e6edc4a2ee154298124bf"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/agents/war-orchestrator.md": {
+    "mtime": 1774724507.1453164,
+    "ast_hash": "979c5f752b060d551a6ccb4fef26cecb",
+    "semantic_hash": "979c5f752b060d551a6ccb4fef26cecb"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/docs/ARCHITECTURE_AND_DESIGN.md": {
+    "mtime": 1774724507.146599,
+    "ast_hash": "2fd59078fe15bb4e8459f10f1114402f",
+    "semantic_hash": "2fd59078fe15bb4e8459f10f1114402f"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/docs/AGENT_FLOWS.md": {
+    "mtime": 1774724507.1461465,
+    "ast_hash": "aa5bcf8a7c2de64eb0db8a27bfeea277",
+    "semantic_hash": "aa5bcf8a7c2de64eb0db8a27bfeea277"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/docs/example/TEMPLATE_TENANT_PROFILE.md": {
+    "mtime": 1774724507.1510715,
+    "ast_hash": "685643a66b38a98687ea7f63a3c27d24",
+    "semantic_hash": "685643a66b38a98687ea7f63a3c27d24"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/docs/example/LZA_TENANT_PROFILE.md": {
+    "mtime": 1774724507.1504736,
+    "ast_hash": "97d15b9b9849ebfb276587a6af97a2c3",
+    "semantic_hash": "97d15b9b9849ebfb276587a6af97a2c3"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/skills/war-governance-profiler/SKILL.md": {
+    "mtime": 1774724507.1527042,
+    "ast_hash": "45d18d1f41fc8eb8a51ded2fa44df2bd",
+    "semantic_hash": "45d18d1f41fc8eb8a51ded2fa44df2bd"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/skills/war-discovery-interview/SKILL.md": {
+    "mtime": 1774724507.1523943,
+    "ast_hash": "c3021ef85e357d8f5dea0caf2e0c1b4e",
+    "semantic_hash": "c3021ef85e357d8f5dea0caf2e0c1b4e"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/docs/diagram-orchestration-flow.png": {
+    "mtime": 1774724507.149905,
+    "ast_hash": "1dcc157134bccf5da904de8acd2ae8d5",
+    "semantic_hash": "1dcc157134bccf5da904de8acd2ae8d5"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/docs/diagram-agent-sequence.png": {
+    "mtime": 1774724507.147565,
+    "ast_hash": "10ccc6ab30ac7b617e7d18cb099d7500",
+    "semantic_hash": "10ccc6ab30ac7b617e7d18cb099d7500"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/docs/diagram-mcp-access.png": {
+    "mtime": 1774724507.1489606,
+    "ast_hash": "9ecd5f147b5f105eb2bdac858af001f5",
+    "semantic_hash": "9ecd5f147b5f105eb2bdac858af001f5"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/solutions/well-architected-review/docs/diagram-data-flow.png": {
+    "mtime": 1774724507.1482153,
+    "ast_hash": "0d3b9e427fe62187377a5e5a59c02b6c",
+    "semantic_hash": "0d3b9e427fe62187377a5e5a59c02b6c"
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.mcp.json": {
+    "mtime": 1780876669.284489,
+    "ast_hash": "82b47290eb17c62aeb74ae5bb275469b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/longhorn-system/scripts/environment_check.sh": {
+    "mtime": 1775869374.5528245,
+    "ast_hash": "1034bc6a7bc4e0454f256415204e7a55",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/longhorn-system/scripts/environment_check.sh": {
+    "mtime": 1775869374.547959,
+    "ast_hash": "1034bc6a7bc4e0454f256415204e7a55",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/.claude_settings.json": {
+    "mtime": 1774379904.8131812,
+    "ast_hash": "2ae83aa970bfe4d92deefba79e7121fb",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/desktop-extension/manifest.json": {
+    "mtime": 1774379904.814581,
+    "ast_hash": "91ee0dfa017dddc14b31710577fb17fb",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/desktop-extension/run_server.py": {
+    "mtime": 1774379904.8146732,
+    "ast_hash": "cb088a349de8c7a6fea98df0ea77103c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/test_api_client.py": {
+    "mtime": 1774379904.8392673,
+    "ast_hash": "546e1155534493541d02c8f051f28dc5",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/test_research_polling.py": {
+    "mtime": 1774379904.8406377,
+    "ast_hash": "7c3b823f115efddae9d46268a4613a12",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/test_mcp_e2e.py": {
+    "mtime": 1774379904.840404,
+    "ast_hash": "eb702f7c90e47b933241bdc76badc970",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/test_mcp_file_upload.py": {
+    "mtime": 1774379904.8405278,
+    "ast_hash": "662024ba46300b402a42358a0c318882",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/test_file_upload.py": {
+    "mtime": 1774379904.8402452,
+    "ast_hash": "93938f98d58c7f063a4cdc6d19bfc63e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/test_e2e.py": {
+    "mtime": 1774379904.8400977,
+    "ast_hash": "efab6fa635451a4445948c71a0e00ab1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/test_download_integration.py": {
+    "mtime": 1774379904.8398385,
+    "ast_hash": "9901f6120e624564f6c3bdc7244fba4e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/test_auth_migration.py": {
+    "mtime": 1774379904.8394153,
+    "ast_hash": "ec00921eff7a51b0207062dedeff0198",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_retry.py": {
+    "mtime": 1774379904.8354633,
+    "ast_hash": "2c9d9135640c10c346f50cd27d7c9189",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_utils.py": {
+    "mtime": 1774379904.83595,
+    "ast_hash": "097e41e42ebde6e91ea9c7cf8f651f46",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_download.py": {
+    "mtime": 1774379904.8346531,
+    "ast_hash": "614fa4f56bb9e31faf1bacaaa820159b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_sharing.py": {
+    "mtime": 1774379904.8356822,
+    "ast_hash": "9f0507d08b6cc2b40a76bbb483b09d14",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_errors.py": {
+    "mtime": 1774379904.8347335,
+    "ast_hash": "a98de5f4d93ae87f747c1e2a2a5b57fa",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_notebooks.py": {
+    "mtime": 1774379904.8349426,
+    "ast_hash": "805b995782ae5d9880192c801c44bd94",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_research.py": {
+    "mtime": 1774379904.8353796,
+    "ast_hash": "cbc616e48cb3637d88204ba60d87ae2c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_conversation.py": {
+    "mtime": 1774379904.8343503,
+    "ast_hash": "c6d9371e54ecd5149ee1e5fac4776d24",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_auth_guard.py": {
+    "mtime": 1774379904.834095,
+    "ast_hash": "374e9ba9bc770edc6b687768b840a93d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_data_types.py": {
+    "mtime": 1774379904.8344448,
+    "ast_hash": "f9d54c313fa8c33a210143bf7790f510",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_studio.py": {
+    "mtime": 1774379904.8358676,
+    "ast_hash": "4f7affca0eb3477d6f597ba1129ffe64",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_sources.py": {
+    "mtime": 1774379904.8357797,
+    "ast_hash": "bd4f68fa99aafcb7ba50fd646f3245e9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_base.py": {
+    "mtime": 1774379904.834234,
+    "ast_hash": "12f47b6ab5d6343e60ee33b0cc16790e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/core/test_notes.py": {
+    "mtime": 1774379904.835162,
+    "ast_hash": "1ee1e9bc85a341a30a32a05179219e85",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/cli/test_source_add.py": {
+    "mtime": 1774379904.8337889,
+    "ast_hash": "b7da214cdcdb09302f6347892d3d077d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/cli/test_verbs_defaults.py": {
+    "mtime": 1774379904.8338819,
+    "ast_hash": "b667efcdac8f2a5c40f1bc62f039e9d2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/cli/test_formatters.py": {
+    "mtime": 1774379904.8335078,
+    "ast_hash": "b2cdeb6411a6200f7b95dc1331b23fff",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/cli/test_setup_opencode.py": {
+    "mtime": 1774379904.8336494,
+    "ast_hash": "047d5cac142981c4d3d9f473b3344630",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/manual/test_revise_slide_deck.py": {
+    "mtime": 1774379904.8360777,
+    "ast_hash": "6a3df0ee41a431693f66f969023464da",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_cross_notebook.py": {
+    "mtime": 1774379904.8368661,
+    "ast_hash": "5fa633fc7beac9412373d4ee62ccdb23",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_exports.py": {
+    "mtime": 1774379904.8372853,
+    "ast_hash": "e7e9db078aa259a8a70b848edc975b6b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_sharing.py": {
+    "mtime": 1774379904.838228,
+    "ast_hash": "4541b4678fac28008e0ab80dc6b1b7ea",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_errors.py": {
+    "mtime": 1774379904.8370743,
+    "ast_hash": "cc1fa5a30a32a0c105b04d01c5ae571d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/__init__.py": {
+    "mtime": 1774379904.8361998,
+    "ast_hash": "4e3e4396e9ea84a849b1baedb6a0381a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_notebooks.py": {
+    "mtime": 1774379904.8375,
+    "ast_hash": "ec9334d3f8b1f4c5d421f8191c8e1903",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_research.py": {
+    "mtime": 1774379904.8380983,
+    "ast_hash": "729f618349eea98778791d07d2886c25",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_chat.py": {
+    "mtime": 1774379904.8366473,
+    "ast_hash": "188c14895336d6ca4acd1f8f974af867",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_studio.py": {
+    "mtime": 1774379904.8390508,
+    "ast_hash": "0d7cd0c3eb4f5d0b071061b1e6d9d8ce",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_sources.py": {
+    "mtime": 1774379904.8387742,
+    "ast_hash": "0a4d42b54ed8e0fc0fe31928121d2613",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_smart_select.py": {
+    "mtime": 1774379904.8384564,
+    "ast_hash": "1f5014a254e2750f5cdd41637aea2bec",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_downloads.py": {
+    "mtime": 1774379904.8370001,
+    "ast_hash": "022c411ca2c496fede2a0033f93e3911",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_batch.py": {
+    "mtime": 1774379904.836431,
+    "ast_hash": "e4766eff670f4c79e6903cce1f14a979",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_pipeline.py": {
+    "mtime": 1774379904.8379624,
+    "ast_hash": "55b0aa76816cd44e4c1ad5b4c5caab99",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/tests/services/test_notes.py": {
+    "mtime": 1774379904.8377378,
+    "ast_hash": "ef1aaccbcad54f7072c097ec7c2d59f1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/scripts/build_mcpb.py": {
+    "mtime": 1774379904.8183043,
+    "ast_hash": "8d147badbddae14f0d03c446ea0cadb9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/scripts/inject_cookies_and_inspect.py": {
+    "mtime": 1774379904.8185196,
+    "ast_hash": "26427ad9799570838ffd8de72c0a1e69",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/scripts/inspect_upload_dom.py": {
+    "mtime": 1774379904.8186233,
+    "ast_hash": "69d63b51c63e382a9c68aa33958748c4",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/__init__.py": {
+    "mtime": 1774379904.8188198,
+    "ast_hash": "e9f6c54492ccde9832ac5d14eaf905dc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/auth.py": {
+    "mtime": 1774379904.8234277,
+    "ast_hash": "c5e8cf9744559bcce659d2cbb4a5a065",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/exports.py": {
+    "mtime": 1774379904.8249395,
+    "ast_hash": "a41d71bba4848050ac04498854986e2a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/sharing.py": {
+    "mtime": 1774379904.8259897,
+    "ast_hash": "db9c6eca2f59cefdb2b61dfbd67245d7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/alias.py": {
+    "mtime": 1774379904.8233166,
+    "ast_hash": "37ad67c19a5812c5227b02acde9aff59",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/studio.py": {
+    "mtime": 1774379904.8264108,
+    "ast_hash": "d5ca4a438de9e55c76a832cf2cdc3992",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/models.py": {
+    "mtime": 1774379904.8251517,
+    "ast_hash": "f031beddd52e6b2e07a39fdd265e1b09",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/research.py": {
+    "mtime": 1774379904.825568,
+    "ast_hash": "67d04a22060d8f7061fb20102381c383",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/conversation.py": {
+    "mtime": 1774379904.8240633,
+    "ast_hash": "47a1ba05babc7a29c0b1b00b63bc7993",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/client.py": {
+    "mtime": 1774379904.8238013,
+    "ast_hash": "7cf93d9135e42711c4286d55dfd84376",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/download.py": {
+    "mtime": 1774379904.824287,
+    "ast_hash": "08af71673264906efbfa2102ae8a586b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/constants.py": {
+    "mtime": 1774379904.8239386,
+    "ast_hash": "2427c513ac39a8af7a0bd3016f6af4bd",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/__init__.py": {
+    "mtime": 1774379904.8230896,
+    "ast_hash": "c7f4e15bd1652b357d1b0a3f68e2167e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/data_types.py": {
+    "mtime": 1774379904.824159,
+    "ast_hash": "5151e656ecd93e750c15269dc966f286",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/notes.py": {
+    "mtime": 1774379904.8254313,
+    "ast_hash": "b273aa3d687c33d37147a7b3123c8c45",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/retry.py": {
+    "mtime": 1774379904.825779,
+    "ast_hash": "e6f93a683cfad9c956ea2ab8101e4ee8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/sources.py": {
+    "mtime": 1774379904.8261201,
+    "ast_hash": "c999a041fc8658dca718afe8f6a29841",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/utils.py": {
+    "mtime": 1774379904.8266487,
+    "ast_hash": "a10a17a5e5d6261ae0a5aa3b977a117d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/exceptions.py": {
+    "mtime": 1774379904.8247201,
+    "ast_hash": "84c8396b8d55bdec2e1ea9981fe4832d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/errors.py": {
+    "mtime": 1774379904.8245063,
+    "ast_hash": "cdbdac34197100ad1ebe8720296d103f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/notebooks.py": {
+    "mtime": 1774379904.8252873,
+    "ast_hash": "b0cda5b8553e95aa0004d43a7cdae647",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/core/base.py": {
+    "mtime": 1774379904.8235767,
+    "ast_hash": "9ad629126d5cfa03f8b1abdb4a591c43",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/utils/config.py": {
+    "mtime": 1774379904.8332517,
+    "ast_hash": "8d60f8fb11547c052963ac9896f84dc5",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/utils/__init__.py": {
+    "mtime": 1774379904.8328927,
+    "ast_hash": "4cf1822a9089773e2e0a0ad37273f28a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/utils/cdp.py": {
+    "mtime": 1774379904.8331122,
+    "ast_hash": "8a4211de5612cbd156f5a19b1b78c1fe",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/utils/browser.py": {
+    "mtime": 1774379904.8329804,
+    "ast_hash": "de906cfdc0ee96a6338839d40afce6e7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/server.py": {
+    "mtime": 1774379904.8279333,
+    "ast_hash": "79e6f8cda3d6430af6bea68a45482c14",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/__init__.py": {
+    "mtime": 1774379904.827699,
+    "ast_hash": "f7b3c043097c7c7c26ac70f7a7696592",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/auth.py": {
+    "mtime": 1774379904.8285334,
+    "ast_hash": "d395b28ea3fab216f054975f55fe190e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/exports.py": {
+    "mtime": 1774379904.8290112,
+    "ast_hash": "acb9b1a172e638098e20b185828adc73",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/sharing.py": {
+    "mtime": 1774379904.8297012,
+    "ast_hash": "269c5e66a347f525607eb53bba35efa7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/smart_select.py": {
+    "mtime": 1774379904.8297908,
+    "ast_hash": "7bbe425ea437f275fc1fb732ebf4c0d7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/server.py": {
+    "mtime": 1774379904.8296165,
+    "ast_hash": "6527fe4c680c5f63816e2bd1ab1b14fe",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/studio.py": {
+    "mtime": 1774379904.8300755,
+    "ast_hash": "e0be3c58e012f022cbf0159f67b9fdd9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/research.py": {
+    "mtime": 1774379904.8295317,
+    "ast_hash": "5a1183741977961bc4780be0d2b17d78",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/batch.py": {
+    "mtime": 1774379904.828621,
+    "ast_hash": "ea685cd72f49e7d5d0a91e6423c02631",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/__init__.py": {
+    "mtime": 1774379904.8280883,
+    "ast_hash": "99d825938d946d98523477ebf01b008b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/notes.py": {
+    "mtime": 1774379904.8293555,
+    "ast_hash": "94748c0bbe67b7690c8fe98dc8a23730",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/downloads.py": {
+    "mtime": 1774379904.8289142,
+    "ast_hash": "1fefa67228bc566229229fbe6c3ba3df",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/sources.py": {
+    "mtime": 1774379904.829927,
+    "ast_hash": "9a8d86f69a9f34efdf529423cf4fe705",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/chat.py": {
+    "mtime": 1774379904.8287156,
+    "ast_hash": "74f3c362195bc564596600b897375248",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/pipeline.py": {
+    "mtime": 1774379904.8294442,
+    "ast_hash": "1510ab820df1d4f942ae55947804d013",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/notebooks.py": {
+    "mtime": 1774379904.8292594,
+    "ast_hash": "f6812907e7dc92df7d185c229660ceb2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/studio_advanced.py": {
+    "mtime": 1774379904.8301766,
+    "ast_hash": "fe3ce786a60d6ec89fc1d6164e136969",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/cross_notebook.py": {
+    "mtime": 1774379904.8288188,
+    "ast_hash": "b787817d88269d48a5c02e6b1c5571ca",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/mcp/tools/_utils.py": {
+    "mtime": 1774379904.8283114,
+    "ast_hash": "2438c8f35ac17b192275d0be6dc17f26",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/formatters.py": {
+    "mtime": 1774379904.822596,
+    "ast_hash": "7f55ad51a43c2cd9283f1988af83c1b8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/__init__.py": {
+    "mtime": 1774379904.81896,
+    "ast_hash": "c03715739e32360a6e45a2b4527f9341",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/utils.py": {
+    "mtime": 1774379904.8229444,
+    "ast_hash": "ca513f912df39d0022910b217a146267",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/ai_docs.py": {
+    "mtime": 1774379904.8191211,
+    "ast_hash": "d8b6cba88c4bbc3a21e66e1ac1d020d6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/main.py": {
+    "mtime": 1774379904.8227162,
+    "ast_hash": "60ce9c76b51e690c57e5160950061410",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/skill.py": {
+    "mtime": 1774379904.8219287,
+    "ast_hash": "769fcf55b61ad3848f19628f31298305",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/cross.py": {
+    "mtime": 1774379904.8199701,
+    "ast_hash": "661d2ccfebdb06ab8f381c4cb06eca10",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/alias.py": {
+    "mtime": 1774379904.8193705,
+    "ast_hash": "c1e3e5fb9e2916c86122edb426109200",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/config.py": {
+    "mtime": 1774379904.8198822,
+    "ast_hash": "1bbdd0421fe9967e74af24be2cd34358",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/studio.py": {
+    "mtime": 1774379904.8222034,
+    "ast_hash": "c4c955bdf4637d75f63b37d1b2c35919",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/research.py": {
+    "mtime": 1774379904.8214102,
+    "ast_hash": "f95c0e287661a192c4a78e5c49e8936f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/repl.py": {
+    "mtime": 1774379904.8211284,
+    "ast_hash": "c16bb40e26961288046f637f9c35ea9e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/download.py": {
+    "mtime": 1774379904.8202634,
+    "ast_hash": "b107ff47ebc14ad14d451816df110451",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/batch.py": {
+    "mtime": 1774379904.8195844,
+    "ast_hash": "a7fdd66123e72061471b370bab51bd17",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/__init__.py": {
+    "mtime": 1774379904.819276,
+    "ast_hash": "4582c7234720dbd2b1b9a1d90cb77b03",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/export.py": {
+    "mtime": 1774379904.8204935,
+    "ast_hash": "8c14211bf9bc2f0b721ae07ef54e5961",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/setup.py": {
+    "mtime": 1774379904.8215885,
+    "ast_hash": "d9100ebba1b718e10fb2984607afeae9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/chat.py": {
+    "mtime": 1774379904.819677,
+    "ast_hash": "01f0db50cae206972154b203acb816dd",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/share.py": {
+    "mtime": 1774379904.8218105,
+    "ast_hash": "4b85519c0b9422d7656accc786778ae6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/pipeline.py": {
+    "mtime": 1774379904.8209949,
+    "ast_hash": "1adb2b53b089b1a3ce6a51c4341bd201",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/notebook.py": {
+    "mtime": 1774379904.8209136,
+    "ast_hash": "8510bb55c9ddaeac17c6a47ab82e0f42",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/verbs.py": {
+    "mtime": 1774379904.8224509,
+    "ast_hash": "758aed10e245cc4f5bc2113e0350a8cc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/source.py": {
+    "mtime": 1774379904.8220842,
+    "ast_hash": "f16e080ee2b147cb65ba8691ed9a3208",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/note.py": {
+    "mtime": 1774379904.8207088,
+    "ast_hash": "f9b0da6753dfb9aabb0371ad61d58717",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/doctor.py": {
+    "mtime": 1774379904.8201156,
+    "ast_hash": "f1d10c021f42c0e9837eb185ba08c4d4",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/cli/commands/tag.py": {
+    "mtime": 1774379904.8223119,
+    "ast_hash": "a188d35dccd663ec65784c260ee80e99",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/exports.py": {
+    "mtime": 1774379904.8313324,
+    "ast_hash": "827ed97eb5ba5bac229d4964faaafd6b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/sharing.py": {
+    "mtime": 1774379904.8323045,
+    "ast_hash": "140d733074005bd16c52dc03e2d35a1f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/smart_select.py": {
+    "mtime": 1774379904.8325253,
+    "ast_hash": "f55f7a77ec21cccb419c4a45f089a13b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/studio.py": {
+    "mtime": 1774379904.83274,
+    "ast_hash": "06100aa0794371e5f168256ecacf9902",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/research.py": {
+    "mtime": 1774379904.8320706,
+    "ast_hash": "d49321ba281653a5b0c06e0350ba20cd",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/batch.py": {
+    "mtime": 1774379904.8305724,
+    "ast_hash": "f6882a0afd7231857aa94177e97293e7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/__init__.py": {
+    "mtime": 1774379904.830335,
+    "ast_hash": "01d41bd74d9d4eb36abc7d576e680bc8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/notes.py": {
+    "mtime": 1774379904.8317041,
+    "ast_hash": "6f7c0c8a5cf846ab8c1da1b4266a3337",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/downloads.py": {
+    "mtime": 1774379904.8311677,
+    "ast_hash": "86ab4b0f5f623fcd7ddf91da6dab4858",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/sources.py": {
+    "mtime": 1774379904.8326304,
+    "ast_hash": "5963d0add2529793cbbba4f844e904c0",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/chat.py": {
+    "mtime": 1774379904.8308012,
+    "ast_hash": "d9cc9112ea10f49521781a275e609f92",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/pipeline.py": {
+    "mtime": 1774379904.8318386,
+    "ast_hash": "d1191d8e8cc403bcdc4e0009db0f21d2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/errors.py": {
+    "mtime": 1774379904.8312488,
+    "ast_hash": "ecda395c96bf4619238c0143c00cb5f3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/notebooks.py": {
+    "mtime": 1774379904.8314662,
+    "ast_hash": "71696b040fb55d584b52751b25460a22",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/services/cross_notebook.py": {
+    "mtime": 1774379904.831025,
+    "ast_hash": "028815fdf463bebc65bd2fa0d8d398f6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/documents/xmr-rig/seal-config.sh": {
+    "mtime": 1775869363.9537685,
+    "ast_hash": "ddd168f23cdeedbe7c3ddf3779d0961c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/settings.json": {
+    "mtime": 1781541598.532825,
+    "ast_hash": "4c3c8f7de7254719e2885ac25f3c3639",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/settings.local.json": {
+    "mtime": 1780848695.5517166,
+    "ast_hash": "f5e170708671eed96f8dcbb892235005",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/cicd/lint-markdown.sh": {
+    "mtime": 1773254138.4968436,
+    "ast_hash": "594192608673a869102fc723f9fc72b2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.codex/hooks.json": {
+    "mtime": 1781529927.1069367,
+    "ast_hash": "5f90abb21a57f7c7d13900a348d86d1e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/README.md": {
+    "mtime": 1774724507.1420736,
+    "ast_hash": "1f89a555aee65232f385ba6ea42b5644",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/AGENTS.md": {
+    "mtime": 1781529906.5859168,
+    "ast_hash": "62c05a2bf20bf036a0b2633478663e64",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/CLAUDE.md": {
+    "mtime": 1781542599.0575337,
+    "ast_hash": "51d07565446c57509f2448eb5a1ef4a9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/TODO.md": {
+    "mtime": 1775869374.5418694,
+    "ast_hash": "ffda27db01fb7f931d04166c99275f06",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/README.md": {
+    "mtime": 1775869374.5417645,
+    "ast_hash": "201508b9920b44a0c2d2c72925df5c04",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/bootstrap/aoa-bootstrap.yaml": {
+    "mtime": 1775869374.5504332,
+    "ast_hash": "6eb6119b045f583b93ee9a664a75dad2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/bootstrap/templates/appset-core.yaml": {
+    "mtime": 1775869374.5505939,
+    "ast_hash": "443fa2867a95ee47fbce5a746756cce8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/bootstrap/templates/namespaces/namespaces.yaml": {
+    "mtime": 1775869374.5509465,
+    "ast_hash": "374dd2bd731cb6caaee7f833e1a5e7c2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/bootstrap/templates/debug-tools/dnsutils.yaml": {
+    "mtime": 1775869374.5507638,
+    "ast_hash": "1b8df43cbb5468d6133bf196ba41ed3d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/docs/ARCHITECTURE_AND_DESIGN.md": {
+    "mtime": 1776087069.7867463,
+    "ast_hash": "7c8bdf39080b32cadf9f4581d23a2d8e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/docs/.architecture-doc/findings.md": {
+    "mtime": 1776086964.8238955,
+    "ast_hash": "ddd48e9355768c76b7a7d14f07054865",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/app-of-apps/Chart.yaml": {
+    "mtime": 1775869374.5420408,
+    "ast_hash": "2dc18493c7407467d480412ae4834cbf",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/app-of-apps/values.yaml": {
+    "mtime": 1775869374.542624,
+    "ast_hash": "9513d3d7efbf78a22368549f4f7c70b4",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/app-of-apps/aoa-bootstrap.yaml": {
+    "mtime": 1775869374.5421548,
+    "ast_hash": "4fdb0cb4946a3d15c013168d6d6e4e1c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/app-of-apps/templates/appset-core.yaml": {
+    "mtime": 1775869374.5423295,
+    "ast_hash": "1c105524a4298ba797365723bc771c6d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/app-of-apps/templates/namespaces/namespaces.yaml": {
+    "mtime": 1775869374.5425165,
+    "ast_hash": "f4a27f0e04f31c81f3197b621b69337d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/loki/Chart.yaml": {
+    "mtime": 1775869374.552246,
+    "ast_hash": "a3e6887ea079cf69c85b28f31d0d6b19",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/loki/values.yaml": {
+    "mtime": 1775869374.5523465,
+    "ast_hash": "6d985dc1c081a8303367d0d8a27d10ad",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/longhorn-system/Chart.yaml": {
+    "mtime": 1775869374.5525117,
+    "ast_hash": "009b9b2284c38276d6d700fd5d2f1ce3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/longhorn-system/README.md": {
+    "mtime": 1775869374.552662,
+    "ast_hash": "627e2b162a2f9e85c5ff62d0806653a1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/longhorn-system/values.yaml": {
+    "mtime": 1775869374.5529253,
+    "ast_hash": "8b2125431af9aa8a1270dcb143b59ee6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/kubecost/Chart.yaml": {
+    "mtime": 1775869374.551681,
+    "ast_hash": "dd1948f9e8daa2397704b2533aa19445",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/kubecost/values.yaml": {
+    "mtime": 1775869374.5520697,
+    "ast_hash": "3bdcdbd126e289724c8cfb5ca613e405",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/cilium/Chart.yaml": {
+    "mtime": 1775869374.5511985,
+    "ast_hash": "55157fa5eb8f01bb49b1887af673ac02",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/cilium/values-migration.txt": {
+    "mtime": 1775869374.551409,
+    "ast_hash": "878334f99c0d641251eeeaca9761f0ee",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/cilium/values.yaml": {
+    "mtime": 1775869374.551513,
+    "ast_hash": "b7158caebb63a34cba2c69a063a9061a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/removed/cilium/values-initial.txt": {
+    "mtime": 1775869374.5513074,
+    "ast_hash": "b002c2c9ef883c89a21636a0b14c3aca",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets-system/metrics-server/Chart.yaml": {
+    "mtime": 1775869374.5438898,
+    "ast_hash": "b30763e13dd8983df851c0aa8e5398d7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets-system/metrics-server/values.yaml": {
+    "mtime": 1775869374.5440974,
+    "ast_hash": "5054bc6680d212c35af4df958d8f805e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets-system/cilium/test.yaml": {
+    "mtime": 1775869374.5434678,
+    "ast_hash": "f6311eb7185fa81453aa640318866daa",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets-system/cilium/Chart.yaml": {
+    "mtime": 1775869374.5428445,
+    "ast_hash": "caf48aee2e86e1f63f986cfb7d23b49a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets-system/cilium/values.yaml": {
+    "mtime": 1775869374.543686,
+    "ast_hash": "c2aad87e22f7cb03e9ae8dfcca632f62",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets-system/cilium/templates/istio-integration.yaml": {
+    "mtime": 1775869374.5432057,
+    "ast_hash": "f89886268ee332a9e4f5cd4096b77842",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/longhorn-system/Chart.yaml": {
+    "mtime": 1775869374.547512,
+    "ast_hash": "009b9b2284c38276d6d700fd5d2f1ce3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/longhorn-system/README.md": {
+    "mtime": 1775869374.547696,
+    "ast_hash": "627e2b162a2f9e85c5ff62d0806653a1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/longhorn-system/values.yaml": {
+    "mtime": 1775869374.5481348,
+    "ast_hash": "8b2125431af9aa8a1270dcb143b59ee6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/kubernetes-dashboard/Chart.yaml": {
+    "mtime": 1775869374.5470464,
+    "ast_hash": "d120b0dbc789959d01f4b20ce0e7dd4f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/kubernetes-dashboard/values.yaml": {
+    "mtime": 1775869374.547347,
+    "ast_hash": "4e294cd994520e6274b1f9ca2d508653",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/crossplane-system/Chart.yaml": {
+    "mtime": 1775869374.5446832,
+    "ast_hash": "34faa50e8ee5158eb1542efe4d026e57",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/crossplane-system/values.yaml": {
+    "mtime": 1775869374.5452216,
+    "ast_hash": "98a94f6e20f7a4b049b8ac5bc445a072",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/crossplane-system/templates/provider-configs.yaml": {
+    "mtime": 1775869374.5450594,
+    "ast_hash": "09cfa22fd28423b3c5246f0c2b7d7767",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/crossplane-system/templates/aws-access.yaml": {
+    "mtime": 1775869374.5448568,
+    "ast_hash": "397fefe85fa4839cc7e6015c328dcef7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/crossplane-system/templates/functions.yaml": {
+    "mtime": 1775869374.5449648,
+    "ast_hash": "8c0a7cf9d3e33cf8b7c56624f0b9ea6c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/velero/Chart.yaml": {
+    "mtime": 1775869374.549819,
+    "ast_hash": "e20ab3eccdf02916cf8102b9c4e8d87c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/velero/values.yaml": {
+    "mtime": 1775869374.5501683,
+    "ast_hash": "ab5875772a7d01c13b2eff0860287038",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/velero/templates/aws-resources.yaml": {
+    "mtime": 1775869374.5500026,
+    "ast_hash": "a7613081d671e63cde34f7c63601eea2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/cert-manager/Chart.yaml": {
+    "mtime": 1775869374.5443504,
+    "ast_hash": "09b907987794d10269077adac4d6ce6d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/cert-manager/values.yaml": {
+    "mtime": 1775869374.544527,
+    "ast_hash": "544f61d1fb28bb26f96b083268431f3a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/sealed-secrets/values-sealedsecrets.yaml": {
+    "mtime": 1775869374.5494366,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/sealed-secrets/Chart.yaml": {
+    "mtime": 1775869374.54918,
+    "ast_hash": "bdff7cbaa119291824072cbe83054bc5",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/sealed-secrets/values.yaml": {
+    "mtime": 1775869374.5496142,
+    "ast_hash": "d03b1ad83bbb64b12b2d00121fbbb2c9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/grafana/Chart.yaml": {
+    "mtime": 1775869374.5461664,
+    "ast_hash": "f4c5bc7ad5571cb4872592dd847025d9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/grafana/values.yaml": {
+    "mtime": 1775869374.546437,
+    "ast_hash": "67a5310a5120323feb6dbf26e56cd8af",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/crossplane/values-crossplane.yaml": {
+    "mtime": 1775869374.5456326,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/crossplane/Chart.yaml": {
+    "mtime": 1775869374.5453928,
+    "ast_hash": "bed44703ddd4669ab26eceb090e4b737",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/crossplane/templates/app-crossplane.yaml": {
+    "mtime": 1775869374.545569,
+    "ast_hash": "54552378b3f4941b6bc0d01169280d95",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/metallb/Chart.yaml": {
+    "mtime": 1775869374.5483522,
+    "ast_hash": "b30bea6f2121a494cd2448d8b5ab9479",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/metallb/values-metallb.yaml": {
+    "mtime": 1775869374.5490065,
+    "ast_hash": "df86636a39352f2cbc1385e6e2d0ab1a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/metallb/templates/app.yaml": {
+    "mtime": 1775869374.548554,
+    "ast_hash": "e121e251ab511ca89098b59dd57cdff0",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/metallb/templates/vlan44-advertisement.yaml": {
+    "mtime": 1775869374.548893,
+    "ast_hash": "ffc761442db55c8fe210a2223470c8be",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/metallb/templates/vlan41-advertisement.yaml": {
+    "mtime": 1775869374.5486774,
+    "ast_hash": "0676c2c77851a06bcdb10cacfe2d881c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/metallb/templates/vlan43-advertisement.yaml": {
+    "mtime": 1775869374.5487862,
+    "ast_hash": "571b883d02cfcf906425d6817d71dcb8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/istio-system/Chart.yaml": {
+    "mtime": 1775869374.5466402,
+    "ast_hash": "19abdc73a7f30a7f10e8a1174d2a49ba",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/istio-system/values.yaml": {
+    "mtime": 1775869374.5468981,
+    "ast_hash": "d82bfa6608929c64ecc2f0521c673fdb",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/istio-system/templates/install-gateway-crd.yaml": {
+    "mtime": 1775869374.5468025,
+    "ast_hash": "3c72089c61cedbf9af398081277c808e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/fluent-bit/Chart.yaml": {
+    "mtime": 1775869374.5458333,
+    "ast_hash": "db2da6c2b934c567f211fe3fa6ddc6c1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-cluster-config/application-sets/fluent-bit/values.yaml": {
+    "mtime": 1775869374.545977,
+    "ast_hash": "59a4bcab1938f265a6251d0b300ccff2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/CHANGELOG.md": {
+    "mtime": 1774379904.813788,
+    "ast_hash": "db25341a73000cc1eee3c3fff2108759",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/README.md": {
+    "mtime": 1774379904.8144271,
+    "ast_hash": "cd8e4fe6d9d34b6307eef5132703c06b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/GEMINI.md": {
+    "mtime": 1774379904.8142223,
+    "ast_hash": "a36dcbb770bcc3278794885b407cb3a3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/CLAUDE.md": {
+    "mtime": 1774379904.8139884,
+    "ast_hash": "eb11281e8252ae4154520d3d5994796a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/AUTHENTICATION.md": {
+    "mtime": 1774379904.8151217,
+    "ast_hash": "6a07a4c6afccfef6fe5bbd200d53eccc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/MCP_GUIDE.md": {
+    "mtime": 1774379904.8158817,
+    "ast_hash": "7a4ad459dd932bc3d68ef92a1bce83cb",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/FILE_UPLOAD_IMPLEMENTATION.md": {
+    "mtime": 1774379904.8153632,
+    "ast_hash": "90b105901c386f871489d81ec88932ba",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/CLI_GUIDE.md": {
+    "mtime": 1774379904.8152664,
+    "ast_hash": "f84a9809d47278dbade1fd6e71edebb2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/API_REFERENCE.md": {
+    "mtime": 1774379904.814879,
+    "ast_hash": "f4438b6b69663ba346ec94d81542fe74",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/KNOWN_ISSUES.md": {
+    "mtime": 1774379904.8155754,
+    "ast_hash": "71ccef6cc2235de04b9029c2721d67e1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/MULTI_USER_ANALYSIS.md": {
+    "mtime": 1774379904.816123,
+    "ast_hash": "684fedcb852e4c7d9eba6832f46a2bad",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/MCP_CLI_TEST_PLAN.md": {
+    "mtime": 1774379904.815705,
+    "ast_hash": "77296a146616f8e93614debaa73f45f8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/plans/2026-02-21-studio-revise-slides-design.md": {
+    "mtime": 1774379904.8178723,
+    "ast_hash": "c12e4d0fcb3a13c13010cbe14fd793ee",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/plans/2026-02-21-login-profile-mismatch-plan.md": {
+    "mtime": 1774379904.8176336,
+    "ast_hash": "99c02236d793d310d3cbc2d85c811f58",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/plans/2026-02-21-login-profile-mismatch-design.md": {
+    "mtime": 1774379904.81745,
+    "ast_hash": "8a53bb67cea7f18dcd50c30096dcd03b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/plans/2026-02-21-studio-revise-slides-plan.md": {
+    "mtime": 1774379904.8180413,
+    "ast_hash": "01421c63201ff737e4fe4068585fbbfa",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/.github/workflows/publish.yml": {
+    "mtime": 1774379904.813376,
+    "ast_hash": "23eda05db5ab132f658d8b5bbb0a3964",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/.github/workflows/version-check.yml": {
+    "mtime": 1774379904.8134818,
+    "ast_hash": "37042a67661d249c80268f50f6337191",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/.agent/workflows/gh-comment.md": {
+    "mtime": 1774379904.8130054,
+    "ast_hash": "4e3f911fd219cb7abda08440b82b71bb",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/.agent/workflows/release.md": {
+    "mtime": 1774379904.813095,
+    "ast_hash": "0e9094f49514e985d25afc8640ceca0b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/data/AGENTS_SECTION.md": {
+    "mtime": 1774379904.826806,
+    "ast_hash": "2e792d1b82993b76b70fb3e20344ee3c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/data/SKILL.md": {
+    "mtime": 1774379904.8269396,
+    "ast_hash": "01180849c0e9e6478298ebf37c191ba6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/data/references/workflows.md": {
+    "mtime": 1774379904.8275523,
+    "ast_hash": "610bdd59893734e578ff1e05947e5e1f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/data/references/troubleshooting.md": {
+    "mtime": 1774379904.8273969,
+    "ast_hash": "671a546bc0455e980f0e6115e42f7456",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/src/notebooklm_tools/data/references/command_reference.md": {
+    "mtime": 1774379904.8271422,
+    "ast_hash": "db5cd9e2aab778e07fa7ccd3a6b4982f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/CHANGELOG.md": {
+    "mtime": 1775869363.946769,
+    "ast_hash": "6daec1ea25fb62aa4e30b95d34eb2172",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/README.md": {
+    "mtime": 1775869363.9468954,
+    "ast_hash": "c40a3b1eb97db22f8b1f25e4fc2b457e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/bootstrap/application-sets.yaml": {
+    "mtime": 1775869363.9530528,
+    "ast_hash": "aa28532a29f7903010735061e6b7e7e4",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/bootstrap/aoa-bootstrap.yaml": {
+    "mtime": 1775869363.9529192,
+    "ast_hash": "cd9379f06c522536b84dcf67b7671429",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/platform-shared/imagepull.yaml": {
+    "mtime": 1775869363.953979,
+    "ast_hash": "cd698b89d59255ad89c7e7e12d11ef44",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/platform-shared/imagepull_manual.yaml": {
+    "mtime": 1775869363.9541197,
+    "ast_hash": "4f0305ad43c1c5dfc3ed09c174edbde7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/SKILL.md": {
+    "mtime": 1776643088.138219,
+    "ast_hash": "0000342d1865def905ba2f3c4497447c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/DESIGN.md": {
+    "mtime": 1776643088.143937,
+    "ast_hash": "72f2e58d3655a5973cedeb5c69abd669",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/progress-file/REQUIREMENTS.md": {
+    "mtime": 1776643088.101079,
+    "ast_hash": "ea7782cc503b6d8e4320b429caf44486",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/progress-file/CASE_FOR_YAML.md": {
+    "mtime": 1776643088.1023061,
+    "ast_hash": "d5ad3fb2b97f451e53eb6ea3b79f1b20",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/progress-file/CASE_FOR_TEXT.md": {
+    "mtime": 1776643088.1033762,
+    "ast_hash": "b7d02032203d739e0ee372fd6700971f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/progress-file/TEXT_vs_YAML_REPORT.md": {
+    "mtime": 1776643088.1043642,
+    "ast_hash": "a473c1436482fb3960fcf3857a8c4310",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/design/SKILL.md": {
+    "mtime": 1776643088.1105473,
+    "ast_hash": "57dd4367114f7891833b54224aadf5ab",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/design/references/review-checklist-template.md": {
+    "mtime": 1776643088.1070023,
+    "ast_hash": "db3f9592145cc6dff47dd6ec47154956",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/design/references/progress-format.md": {
+    "mtime": 1776643088.1078844,
+    "ast_hash": "6d57dc0ca6cf1dcee71c7ebaf28e1875",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/design/references/refresh-mode.md": {
+    "mtime": 1776643088.108696,
+    "ast_hash": "16ff9177975ac4e0a20e1bf30b79c4a1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/design/references/gate-2-design.md": {
+    "mtime": 1776643088.1096475,
+    "ast_hash": "469c4ee3e4552505da209e96c9c3d1b6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/design/assets/architecture-template.md": {
+    "mtime": 1776643088.112183,
+    "ast_hash": "f772269fbf1a59dc6ea73dfff31cfca7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/define/SKILL.md": {
+    "mtime": 1776643088.1181757,
+    "ast_hash": "b818f8c558deded6db21be84c75d8b6f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/define/references/gate-wb-working-backwards.md": {
+    "mtime": 1776643088.1143215,
+    "ast_hash": "73ee0c4c1ebc1c95450f185a28518304",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/define/references/review-checklist-template.md": {
+    "mtime": 1776643088.1151085,
+    "ast_hash": "f166c3e4c4d2a9231d2e3b0bedffdeef",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/define/references/progress-format.md": {
+    "mtime": 1776643088.1158922,
+    "ast_hash": "6d57dc0ca6cf1dcee71c7ebaf28e1875",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/define/references/gate-1-prd.md": {
+    "mtime": 1776643088.116665,
+    "ast_hash": "51a7c62a9bf8304877ed87c5d6389d99",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/define/references/gate-0-codebase.md": {
+    "mtime": 1776643088.1174536,
+    "ast_hash": "6420a500d16424d8fa9ad317fae61cdf",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/define/assets/prd-template.md": {
+    "mtime": 1776643088.1196215,
+    "ast_hash": "dffddcfd330fd0037d6f4a8718b7c630",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/references/status-report-format.md": {
+    "mtime": 1776643088.121428,
+    "ast_hash": "35724b40e618a81b9b0d17f577d24c66",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/references/progress-format.md": {
+    "mtime": 1776643088.1223335,
+    "ast_hash": "6d57dc0ca6cf1dcee71c7ebaf28e1875",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/references/routing-logic.md": {
+    "mtime": 1776643088.1229758,
+    "ast_hash": "97d18ae28a686f8d62e78a1db773f60d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/plan-feature/SKILL.md": {
+    "mtime": 1776643088.1279798,
+    "ast_hash": "e9507bf09613ed3355a216d025928a74",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/plan-feature/references/revision-mode.md": {
+    "mtime": 1776643088.1249006,
+    "ast_hash": "03a561a1e316894ecab1127a79c0ce79",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/plan-feature/references/review-checklist-template.md": {
+    "mtime": 1776643088.1256878,
+    "ast_hash": "5b39fae0738b9022b5f88b5b1704d8c3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/plan-feature/references/progress-format.md": {
+    "mtime": 1776643088.1262634,
+    "ast_hash": "6d57dc0ca6cf1dcee71c7ebaf28e1875",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/plan-feature/references/gate-4-plan.md": {
+    "mtime": 1776643088.127267,
+    "ast_hash": "d682f87f80a34d8d6eff4cdfb1e50b8a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/plan-feature/assets/feature-plan-template.md": {
+    "mtime": 1776643088.129274,
+    "ast_hash": "328709fc89f5cdec9e5f6029794f58f3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/milestone/SKILL.md": {
+    "mtime": 1776643088.1339118,
+    "ast_hash": "2dd91f45c2c456f064f5a0fc9422da79",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/milestone/references/gate-3-milestone.md": {
+    "mtime": 1776643088.1311202,
+    "ast_hash": "0937f781c79225b8db345c23af1e4cde",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/milestone/references/revision-mode.md": {
+    "mtime": 1776643088.1318629,
+    "ast_hash": "1392133fd7bd3a334629b6dbe48f9d63",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/milestone/references/review-checklist-template.md": {
+    "mtime": 1776643088.132512,
+    "ast_hash": "460bf54f7a84f0fbdb51c5d76033b91c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/milestone/references/progress-format.md": {
+    "mtime": 1776643088.1331782,
+    "ast_hash": "6d57dc0ca6cf1dcee71c7ebaf28e1875",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/milestone/assets/milestone-readme-template.md": {
+    "mtime": 1776643088.1352897,
+    "ast_hash": "446cfc7c5e14c5b9b76e15a7e6d801a4",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/design-decisions/OPEN_QUESTIONS.md": {
+    "mtime": 1776643088.1366308,
+    "ast_hash": "9ba2f6b8722487541db5dfd3e0487de6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/design-decisions/REVIEW_FINDINGS.md": {
+    "mtime": 1776643088.1374037,
+    "ast_hash": "eff40ce03f5a245ab518375371aa0dfa",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/spike/SKILL.md": {
+    "mtime": 1776643088.1430066,
+    "ast_hash": "e8f0387e59d9c40d59725770b0ea8655",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/spike/references/progress-format.md": {
+    "mtime": 1776643088.1401055,
+    "ast_hash": "6d57dc0ca6cf1dcee71c7ebaf28e1875",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/spike/references/research-agent.md": {
+    "mtime": 1776643088.1409235,
+    "ast_hash": "53ea8938701d314ba814275a8cab060e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/spike/references/spike-format.md": {
+    "mtime": 1776643088.1416357,
+    "ast_hash": "94453c105ab23f090b4bb1d774e49188",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/.claude/skills/project/spike/references/redteam-agent.md": {
+    "mtime": 1776643088.14219,
+    "ast_hash": "7a042364e07e90e4c798c96cec440182",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/kraken.yaml": {
+    "mtime": 1775869363.9582512,
+    "ast_hash": "dfcb5bf4ed1537046103a77c73df1da3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/crossplane-poc/crossplane-poc-app-deployment.yaml": {
+    "mtime": 1775869363.9549656,
+    "ast_hash": "b369977195aae2b6c9cc6dcf3ea488ce",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/crossplane-poc/overlays/dev/crossplane-provider-aws.yaml": {
+    "mtime": 1775869363.9553442,
+    "ast_hash": "4571f6babf60e25e0836fa95f85b7265",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/crossplane-poc/overlays/dev/provider-config.yaml": {
+    "mtime": 1775869363.9557908,
+    "ast_hash": "0d8a436050827f1afda21d19ecfde082",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/crossplane-poc/overlays/dev/kustomization.yaml": {
+    "mtime": 1775869363.9554968,
+    "ast_hash": "d63d9820544b8c8d05dff0c637d9b55c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/crossplane-poc/base/kustomization.yaml": {
+    "mtime": 1775869363.9546123,
+    "ast_hash": "ec17dcfc17fffea92a5529606c373eda",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/crossplane-poc/base/s3_xrd.yaml": {
+    "mtime": 1775869363.9548228,
+    "ast_hash": "5e01f95a6f3d5add22be2dbb9685b574",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/crossplane-poc/base/app-project.yaml": {
+    "mtime": 1775869363.9545014,
+    "ast_hash": "c4d38a245c5e5368436cbca060109309",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/k8s-manifests/README.md": {
+    "mtime": 1775869363.9560387,
+    "ast_hash": "c5781d54d5cd5fbd95750ddd5708611b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/k8s-manifests/overlays/prod/kustomization.yaml": {
+    "mtime": 1775869363.958158,
+    "ast_hash": "ea4f2d5cf4cec9fa0c6618092a20e9ad",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/k8s-manifests/overlays/dev/kustomization.yaml": {
+    "mtime": 1775869363.9580038,
+    "ast_hash": "8f71f7f357a25255e8d33e2f35f82919",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/k8s-manifests/base/repositories-patch.yaml": {
+    "mtime": 1775869363.9577966,
+    "ast_hash": "453165c75fea7ee00f2d91691309cc3d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/k8s-manifests/base/kustomization.yaml": {
+    "mtime": 1775869363.957493,
+    "ast_hash": "2c95039de4ad04e1ff2499bcc0ee952b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/k8s-manifests/base/namespace.yaml": {
+    "mtime": 1775869363.9576051,
+    "ast_hash": "10a6596c35588de69c82ce9f948dc52c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/removed/k8s-manifests/base/argocd.yaml": {
+    "mtime": 1775869363.9572682,
+    "ast_hash": "f2f21b92b8efe52f261028f55dbadd6a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/documents/xmr-rig/README.md": {
+    "mtime": 1775869363.9534607,
+    "ast_hash": "99ed62c325d7c3cd0a894cd0c2966f9d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argo-events/Chart.yaml": {
+    "mtime": 1775869363.9474282,
+    "ast_hash": "b3cc241b8aa47248b793a3b841d9b864",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argo-events/values.yaml": {
+    "mtime": 1775869363.9475856,
+    "ast_hash": "b0d94ac782610d7e52ad2bd3a72b692b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/homepage/kustomization.yaml": {
+    "mtime": 1775869363.9502704,
+    "ast_hash": "a20babdaf0c0a273420c9debec77816d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/homepage/templates/deployment.yaml": {
+    "mtime": 1775869363.9506,
+    "ast_hash": "5345805b94a9ddb57ab07cd3137045f2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/homepage/templates/configs.yaml": {
+    "mtime": 1775869363.9504957,
+    "ast_hash": "a8aa31c7977515a901f5a0137aeadfba",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/homepage/templates/kustomization.yaml": {
+    "mtime": 1775869363.950707,
+    "ast_hash": "98c96e791228bfaedc7fcf7c9b7e03a0",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/homepage/templates/service.yaml": {
+    "mtime": 1775869363.9509134,
+    "ast_hash": "2af4c88739e6be1204ea6c5e74249752",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/homepage/templates/rbac.yaml": {
+    "mtime": 1775869363.9508092,
+    "ast_hash": "5c5ab80812fc98a83c00d1860bee9f85",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argocd/TEMPLATES.md": {
+    "mtime": 1775869363.9487073,
+    "ast_hash": "0654b449f95b229b538c4a7e44f6523c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argocd/Chart.yaml": {
+    "mtime": 1775869363.9484968,
+    "ast_hash": "476928074e4f6b9548b502a04a5fc0df",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argocd/README.md": {
+    "mtime": 1775869363.9485981,
+    "ast_hash": "87e883739668d77df15d4b343ef9142b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argocd/values.yaml": {
+    "mtime": 1775869363.9500453,
+    "ast_hash": "9164456b0552e27ae21533936b90acae",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argocd/templates/projects.yaml": {
+    "mtime": 1775869363.9497886,
+    "ast_hash": "b502fd6a3af72212957746089c282a9e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argocd/templates/networkpolicy.yaml": {
+    "mtime": 1775869363.9494758,
+    "ast_hash": "096611117471ed627369630d94435407",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/xmr-rig/kustomization.yaml": {
+    "mtime": 1775869363.9518714,
+    "ast_hash": "a20babdaf0c0a273420c9debec77816d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/xmr-rig/templates/deployment.yaml": {
+    "mtime": 1775869363.9524868,
+    "ast_hash": "361d5b9f94f0aa9b628c4159ee0c07f4",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/xmr-rig/templates/daemonset.yaml": {
+    "mtime": 1775869363.9521604,
+    "ast_hash": "b56175ef6e9e158a42e545b557d455ae",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/xmr-rig/templates/kustomization.yaml": {
+    "mtime": 1775869363.952624,
+    "ast_hash": "cd8c6366adbe761906863b05ad8d8838",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/xmr-rig/templates/xmrig-config-sealedsecret.yaml": {
+    "mtime": 1775869363.9527237,
+    "ast_hash": "18aa19abbe273ceafca39dbecf6ac203",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argo/Chart.yaml": {
+    "mtime": 1775869363.9477508,
+    "ast_hash": "b95ea80f09a1d4571de7942e8b73a8da",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argo/values.yaml": {
+    "mtime": 1775869363.9482143,
+    "ast_hash": "0005102e159fec4ceacff7288d24b0cc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/argo/templates/rbac.yaml": {
+    "mtime": 1775869363.9480522,
+    "ast_hash": "a09b5f9f693f95c8f5cd0e7d61388390",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/toolhive/Chart.yaml": {
+    "mtime": 1775869363.9511602,
+    "ast_hash": "b928a688c61c7aa70eafaaca791667b3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/toolhive/README.md": {
+    "mtime": 1775869363.951301,
+    "ast_hash": "fa2a7ffd7e737513f814d70f2809c82e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/occ-k8s-app-config/application-sets/toolhive/values.yaml": {
+    "mtime": 1775869363.9517257,
+    "ast_hash": "bc7a0c97365735a13372c45f84884e1d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/external_sources/The_Complete_Guide_to_Building_Skills_for_Claude.md": {
+    "mtime": 1772294683.2018638,
+    "ast_hash": "bfd03d75c22e071cfb5ec852a37b42be",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/rules/defensive-protocol-v2-anti-slop.md": {
+    "mtime": 1781542311.7472222,
+    "ast_hash": "c62f73aa1d7b1722e7b58b0ec9f8cfc8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/rules/agent-delegation.md": {
+    "mtime": 1779492941.957811,
+    "ast_hash": "12e9bc006be8eb17f0290e5f0fba3125",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/rules/defensive-protocol-v2-session-management.md": {
+    "mtime": 1781542681.5216253,
+    "ast_hash": "adde9c50e654962fa2bf4ae71dce2031",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/rules/defensive-protocol-v2-epistemology.md": {
+    "mtime": 1775518035.5977895,
+    "ast_hash": "db2d75b043edfe23dc24c6b85e2c01b0",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/rules/commands/create-prd.md": {
+    "mtime": 1775518085.2831047,
+    "ast_hash": "85c8353edb2cd002600c0684821a1e3e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/rules/commands/start-feature.md": {
+    "mtime": 1775518085.3032706,
+    "ast_hash": "b92e95069b6335ffe1d76521ae4ae89d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/rules/commands/catchup.md": {
+    "mtime": 1775518085.2702923,
+    "ast_hash": "cfe6b1b160a4f4be58e3f69f221c2919",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/rules/commands/dream.md": {
+    "mtime": 1775518085.29085,
+    "ast_hash": "1818edbf7050beb321ca139f745c2610",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/rules/commands/handoff.md": {
+    "mtime": 1775518085.2940814,
+    "ast_hash": "d1cc055bc34b36af41b6a8186e1602f9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/commands/start-feature.md": {
+    "mtime": 1780854687.3080187,
+    "ast_hash": "c04039284469d4f0ba2bfc1b2f77344b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/commands/start-feature-auto.md": {
+    "mtime": 1780854687.3055646,
+    "ast_hash": "00dc09644bdf46f1d8fb1f3c318af295",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-creator/SKILL.md": {
+    "mtime": 1775518023.59193,
+    "ast_hash": "be4ba5863cf4cf1435967391ff39e6d5",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-creator/references/refactor-protocol.md": {
+    "mtime": 1775518023.5850472,
+    "ast_hash": "9c9b44f82310c007780c13e981fde7bc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-creator/references/anthropic-best-practices.md": {
+    "mtime": 1775518023.5865405,
+    "ast_hash": "1e68b55baf30f7b0a1fe81005a465eee",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-creator/references/output-patterns.md": {
+    "mtime": 1775518023.5875998,
+    "ast_hash": "9536f04973c9772ccb2f02faa3d1a0e1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-creator/review/PLAN.md": {
+    "mtime": 1775518023.5900335,
+    "ast_hash": "a227e3d077cc7d7e22b1efcae648021d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-creator/review/FEEDBACK.md": {
+    "mtime": 1775518023.5909984,
+    "ast_hash": "5aecaab756b38402a0183b0aaec26634",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/create-prd/SKILL.md": {
+    "mtime": 1775518023.6146758,
+    "ast_hash": "8470bcc048880e0d8754eb6ffca31263",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/create-prd/references/interview-guide.md": {
+    "mtime": 1775518023.61135,
+    "ast_hash": "32fd8d388ca90ad1defe1cd8f0739da9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/create-prd/review/BENCHMARK.md": {
+    "mtime": 1775518023.6125648,
+    "ast_hash": "cf1c128ebbbbd3305a60c9bf5f2b0de9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/create-prd/review/PLAN.md": {
+    "mtime": 1775518023.613364,
+    "ast_hash": "154e61452e816c585ac3111878b3a944",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/create-prd/review/FEEDBACK.md": {
+    "mtime": 1775518023.6140237,
+    "ast_hash": "87e603e368085cd8c37c0dfcffcdff52",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/create-prd/assets/prd-template.md": {
+    "mtime": 1775518023.6161745,
+    "ast_hash": "72d73e9120ea2b794a5af13c13390885",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/create-prd/assets/architecture-template.md": {
+    "mtime": 1775518023.6171553,
+    "ast_hash": "443ccd52f963b5523d33b7e0eaf091a5",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/create-prd/assets/progress-template.txt": {
+    "mtime": 1775518023.6178694,
+    "ast_hash": "b174fa115e27573bd8313e2cd526c9ad",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-refactor/SKILL.md": {
+    "mtime": 1775518023.623363,
+    "ast_hash": "64df8ef0d47e7e316edd7358fafbe7bd",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-refactor/references/refactor-protocol.md": {
+    "mtime": 1775518023.6202526,
+    "ast_hash": "3d39841ab6e2db7e97919f78845bc099",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-refactor/references/anthropic-best-practices.md": {
+    "mtime": 1775518023.6208076,
+    "ast_hash": "8d470d6b3a17c09445c96b37d8de8097",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-refactor/review/PLAN.md": {
+    "mtime": 1775518023.6221461,
+    "ast_hash": "4416e4bf505016641b8ba4b5da6aaa0a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/occ-skill-refactor/review/FEEDBACK.md": {
+    "mtime": 1775518023.6228006,
+    "ast_hash": "6058f98223860632b0332caff21ec078",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/SKILL.md": {
+    "mtime": 1775518023.6643689,
+    "ast_hash": "290e033c852ecf0d2ff837a0f6b2b150",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/DESIGN.md": {
+    "mtime": 1775518023.669329,
+    "ast_hash": "57c4da742560d67868a2cd6088d261e1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/progress-file/REQUIREMENTS.md": {
+    "mtime": 1775518023.6321495,
+    "ast_hash": "ea7782cc503b6d8e4320b429caf44486",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/progress-file/CASE_FOR_YAML.md": {
+    "mtime": 1775518023.6329353,
+    "ast_hash": "d5ad3fb2b97f451e53eb6ea3b79f1b20",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/progress-file/CASE_FOR_TEXT.md": {
+    "mtime": 1775518023.6338563,
+    "ast_hash": "b7d02032203d739e0ee372fd6700971f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/progress-file/TEXT_vs_YAML_REPORT.md": {
+    "mtime": 1775518023.6344485,
+    "ast_hash": "a473c1436482fb3960fcf3857a8c4310",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/design/SKILL.md": {
+    "mtime": 1775518023.6392863,
+    "ast_hash": "13ad8dfa96563c6509006bf522773607",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/design/references/review-checklist-template.md": {
+    "mtime": 1775518023.6363595,
+    "ast_hash": "db3f9592145cc6dff47dd6ec47154956",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/design/references/progress-format.md": {
+    "mtime": 1775518023.637032,
+    "ast_hash": "f15b01e707b5d8cc37896da827950b64",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/design/references/refresh-mode.md": {
+    "mtime": 1775518023.6377742,
+    "ast_hash": "16ff9177975ac4e0a20e1bf30b79c4a1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/design/references/gate-2-design.md": {
+    "mtime": 1775518023.6384876,
+    "ast_hash": "36f6dc17fbe3004fcdf28b765440b80a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/design/assets/architecture-template.md": {
+    "mtime": 1775518023.6405256,
+    "ast_hash": "f772269fbf1a59dc6ea73dfff31cfca7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/define/SKILL.md": {
+    "mtime": 1778290260.857622,
+    "ast_hash": "05d37655037667a29a571f5fda26bbbd",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/define/references/gate-wb-working-backwards.md": {
+    "mtime": 1775518023.6425972,
+    "ast_hash": "73ee0c4c1ebc1c95450f185a28518304",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/define/references/review-checklist-template.md": {
+    "mtime": 1775518023.6432443,
+    "ast_hash": "f166c3e4c4d2a9231d2e3b0bedffdeef",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/define/references/progress-format.md": {
+    "mtime": 1778290260.8616014,
+    "ast_hash": "8f54f5632250920dfc8ad308385bbb45",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/define/references/gate-1-prd.md": {
+    "mtime": 1775518023.6445878,
+    "ast_hash": "51a7c62a9bf8304877ed87c5d6389d99",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/define/references/gate-0-codebase.md": {
+    "mtime": 1780869163.1791184,
+    "ast_hash": "2137795b7df56b5d18357f27d9273946",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/define/assets/prd-template.md": {
+    "mtime": 1775518023.6474125,
+    "ast_hash": "dffddcfd330fd0037d6f4a8718b7c630",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/references/status-report-format.md": {
+    "mtime": 1775518023.6486979,
+    "ast_hash": "aec15ee29aef44768f24fab393afd510",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/references/progress-format.md": {
+    "mtime": 1778290260.865457,
+    "ast_hash": "4a61b2ea2dccd8e83d0f0a7107eb3566",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/references/routing-logic.md": {
+    "mtime": 1775518023.650109,
+    "ast_hash": "32ed927d46d9b7a337078e185cba03cb",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/plan/SKILL.md": {
+    "mtime": 1775518023.6548376,
+    "ast_hash": "3fbda0ce628e121af30730629c98ca7f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/plan/references/revision-mode.md": {
+    "mtime": 1775518023.652317,
+    "ast_hash": "03a561a1e316894ecab1127a79c0ce79",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/plan/references/review-checklist-template.md": {
+    "mtime": 1775518023.6529856,
+    "ast_hash": "140a75798b6bda9335cc62111f9be63d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/plan/references/progress-format.md": {
+    "mtime": 1775518023.6535985,
+    "ast_hash": "f15b01e707b5d8cc37896da827950b64",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/plan/references/gate-4-plan.md": {
+    "mtime": 1775518023.6543007,
+    "ast_hash": "13264b5e2e37a9eaacb4fe10b85b79a8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/plan/assets/feature-plan-template.md": {
+    "mtime": 1775518023.6561825,
+    "ast_hash": "328709fc89f5cdec9e5f6029794f58f3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/milestone/SKILL.md": {
+    "mtime": 1775518023.6603422,
+    "ast_hash": "2dd91f45c2c456f064f5a0fc9422da79",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/milestone/references/gate-3-milestone.md": {
+    "mtime": 1775518023.6580107,
+    "ast_hash": "94aa73fd86231ae82402f6861f26b9b7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/milestone/references/revision-mode.md": {
+    "mtime": 1775518023.6586041,
+    "ast_hash": "1392133fd7bd3a334629b6dbe48f9d63",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/milestone/references/review-checklist-template.md": {
+    "mtime": 1775518023.6592312,
+    "ast_hash": "460bf54f7a84f0fbdb51c5d76033b91c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/milestone/references/progress-format.md": {
+    "mtime": 1775518023.6597466,
+    "ast_hash": "f15b01e707b5d8cc37896da827950b64",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/milestone/assets/milestone-readme-template.md": {
+    "mtime": 1775518023.6615973,
+    "ast_hash": "679b375d51d8d47ce4508b8b61e6cafa",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/design-decisions/OPEN_QUESTIONS.md": {
+    "mtime": 1775518023.6629097,
+    "ast_hash": "668178fee3d23991a4ac809183efdfb4",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/design-decisions/REVIEW_FINDINGS.md": {
+    "mtime": 1775518023.6635838,
+    "ast_hash": "a33a84476147f75aa5e0409108518f14",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/spike/SKILL.md": {
+    "mtime": 1775518023.6685631,
+    "ast_hash": "e8f0387e59d9c40d59725770b0ea8655",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/spike/references/progress-format.md": {
+    "mtime": 1775518023.6660583,
+    "ast_hash": "f15b01e707b5d8cc37896da827950b64",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/spike/references/research-agent.md": {
+    "mtime": 1775518023.6666868,
+    "ast_hash": "53ea8938701d314ba814275a8cab060e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/spike/references/spike-format.md": {
+    "mtime": 1775518023.667228,
+    "ast_hash": "94453c105ab23f090b4bb1d774e49188",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/project/spike/references/redteam-agent.md": {
+    "mtime": 1775518023.6678154,
+    "ast_hash": "7a042364e07e90e4c798c96cec440182",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/rule-creator/SKILL.md": {
+    "mtime": 1775518023.6866841,
+    "ast_hash": "e19b400a37610bcf86e9a1b23151aac6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/rule-creator/references/rule-format.md": {
+    "mtime": 1775518023.6825054,
+    "ast_hash": "2bcf7b0762fa221aa88e2a4cbf590f14",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/rule-creator/references/doc-format.md": {
+    "mtime": 1775518023.68324,
+    "ast_hash": "0169d842a01844e1e5f751318ab39e7e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/rule-creator/review/BENCHMARK.md": {
+    "mtime": 1775518023.6843753,
+    "ast_hash": "6cd2aa610920479cccdcaf7b0a208da3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/rule-creator/review/PLAN.md": {
+    "mtime": 1775518023.6854837,
+    "ast_hash": "1e7e78f433231d68c47072f2e5f95757",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/rule-creator/review/FEEDBACK.md": {
+    "mtime": 1775518023.6860423,
+    "ast_hash": "f9053cec0c8a67abfccce6d2e2e527a1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/spike/SKILL.md": {
+    "mtime": 1779493283.081252,
+    "ast_hash": "e8f0387e59d9c40d59725770b0ea8655",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/spike/references/progress-format.md": {
+    "mtime": 1779493283.0829613,
+    "ast_hash": "f15b01e707b5d8cc37896da827950b64",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/spike/references/research-agent.md": {
+    "mtime": 1779493283.0857959,
+    "ast_hash": "53ea8938701d314ba814275a8cab060e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/spike/references/spike-format.md": {
+    "mtime": 1779493283.0867915,
+    "ast_hash": "94453c105ab23f090b4bb1d774e49188",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/spike/references/redteam-agent.md": {
+    "mtime": 1779493283.0846174,
+    "ast_hash": "7a042364e07e90e4c798c96cec440182",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/architecture-doc/SKILL.md": {
+    "mtime": 1775869483.6415615,
+    "ast_hash": "77f0e216f2af7afb4f48b33aadca64e6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/architecture-doc/references/scan-agent-prompt.md": {
+    "mtime": 1775869483.676059,
+    "ast_hash": "41a71a871043140987a4349bf0e1195c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/architecture-doc/references/mcp-probe.md": {
+    "mtime": 1775869483.6590958,
+    "ast_hash": "ab46088298b041a7a4bb01b3e1c80781",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/architecture-doc/references/audit-mode.md": {
+    "mtime": 1775869483.6524048,
+    "ast_hash": "2e6aafa273d4a6bd0e0d13d23707a3d9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/architecture-doc/references/synthesis-agent-prompt.md": {
+    "mtime": 1775869483.6899307,
+    "ast_hash": "3c21382e6212b3ec95f5fce0eab76d25",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/architecture-doc/references/redaction-patterns.md": {
+    "mtime": 1775869483.6681905,
+    "ast_hash": "783cf6c4049aa559387c7bed014ef6d0",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agentic-engineering/create-prd.md": {
+    "mtime": 1772294683.2001624,
+    "ast_hash": "bf4479d303c55edfbe32526f3203ffa7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agentic-engineering/Agentic_Engineering_Strategic_Workflow.md": {
+    "mtime": 1771607562.108601,
+    "ast_hash": "da11a706666622197ca141ab7cf531d6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/README.md": {
+    "mtime": 1771618597.5447145,
+    "ast_hash": "745b9d4895c1d87f0b7e0d1f2b729c42",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/project-lifecycle/POWER.md": {
+    "mtime": 1771618597.546397,
+    "ast_hash": "8ff399a5552ab571a37af3cddf7d1448",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/project-lifecycle/steering/feature-start.md": {
+    "mtime": 1771618597.5465531,
+    "ast_hash": "a1be576e0a196b6d6a2869dea49b5362",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/project-lifecycle/steering/prd-creation.md": {
+    "mtime": 1771618597.5466921,
+    "ast_hash": "cd3ede24fa0ede7f839daae2d7bec1ac",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/defensive-protocol/POWER.md": {
+    "mtime": 1771618597.5455444,
+    "ast_hash": "ee4962f7e01e8359d3bfb9c5287c6248",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/defensive-protocol/steering/defensive-protocol.md": {
+    "mtime": 1771618597.5457141,
+    "ast_hash": "517a324fbe53877272fa434652afb1b7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/documentation/POWER.md": {
+    "mtime": 1771618597.5459375,
+    "ast_hash": "86fe867457570e452388f6d3c042580f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/documentation/steering/docs-refresh.md": {
+    "mtime": 1771607562.1174076,
+    "ast_hash": "99928b23492e5b75c9471d24189ca5ae",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/compliance/POWER.md": {
+    "mtime": 1771618597.5452068,
+    "ast_hash": "773de5d7dd7ee54a8a3e398fcb615bad",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/compliance/steering/automated-assessment.md": {
+    "mtime": 1771607562.1156113,
+    "ast_hash": "cfb4bcfd5244f891a4ab4ee741f5ba61",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/compliance/steering/interactive-assessment.md": {
+    "mtime": 1772294683.2023768,
+    "ast_hash": "72835a65fa0469bf925ddb66e23b93f8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/investigation/POWER.md": {
+    "mtime": 1771618597.5460958,
+    "ast_hash": "aac838eff1ef7283e409a7fae46209fc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/investigation/steering/structured-debugging.md": {
+    "mtime": 1771618597.546246,
+    "ast_hash": "9f079174cdd5f97a9e3f0af60c1dc6bb",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/terraform-testing/POWER.md": {
+    "mtime": 1771618597.5468366,
+    "ast_hash": "7e2e4fb378403a645ac2d3045f3f81e1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/terraform-testing/steering/validation-pipeline.md": {
+    "mtime": 1771607562.1192975,
+    "ast_hash": "62f7833df7914c62b3b15fe16210037c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/cdk-workflow/POWER.md": {
+    "mtime": 1771618597.5448916,
+    "ast_hash": "5207dd6ab3edd2024c07c4ca350e9a15",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/cdk-workflow/steering/cdk-docs-update.md": {
+    "mtime": 1771607562.1146495,
+    "ast_hash": "287598f0ff7a87347ccf71ac47490d85",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/cdk-workflow/steering/cdk-validation.md": {
+    "mtime": 1771618597.545064,
+    "ast_hash": "37cab5d6140ee54476aa7b8c5a432258",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/terraform-workflow/POWER.md": {
+    "mtime": 1771618597.546996,
+    "ast_hash": "1fef13d2015badac9ac09741f100072a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/terraform-workflow/steering/terraform-validation.md": {
+    "mtime": 1771618597.5471742,
+    "ast_hash": "5c45cc9b6ab3e14c84819db106b3785a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/powers/terraform-workflow/steering/terraform-docs-update.md": {
+    "mtime": 1771607562.1198423,
+    "ast_hash": "4cd9a21bd118d03f3a3ef30219305e08",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/docs/POWERS.md": {
+    "mtime": 1771607562.1135604,
+    "ast_hash": "89099e1a8e5b00bab8386f13c1b73fe9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/docs/STEERING.md": {
+    "mtime": 1771612334.677779,
+    "ast_hash": "a2889565d6f6c1eacc09b181320769f6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/steering/crossplane-v2-best-practices.md": {
+    "mtime": 1771618597.547359,
+    "ast_hash": "a511ed786bdb4f0cc3423d730b7f72cc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/steering/crossplane-best-practices.md": {
+    "mtime": 1771607562.1209948,
+    "ast_hash": "e91a0ef0bf55e044913ff6b87874c86e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/steering/kubernetes-best-practices.md": {
+    "mtime": 1771607562.1221263,
+    "ast_hash": "0efa12d486dc8d7953a08f9ae547d4fc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/steering/cdk-best-practices.md": {
+    "mtime": 1771607562.1205525,
+    "ast_hash": "5dc37c18ba023be824f560629157077a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/steering/terraform-best-practices.md": {
+    "mtime": 1771607562.1225498,
+    "ast_hash": "6b4bf8ab43d9cc8b955f7ad13408e518",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/kiro/steering/defensive-protocol.md": {
+    "mtime": 1771618597.5475159,
+    "ast_hash": "e62b43b3bcb99709c92f171423a1522d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/reviews/codex-plan-feature-rename-review.md": {
+    "mtime": 1776643410.0379405,
+    "ast_hash": "22b5e92aacea56a88ff2a45c14716ceb",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agentic-engineering/Agentic_Engineering_Strategic_Workflow.pdf": {
+    "mtime": 1771607562.1090422,
+    "ast_hash": "e6a74c71ae9bc1c104dd54224ae19d5c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/notebooklm-mcp-cli/docs/media/header.jpg": {
+    "mtime": 1774379904.816775,
+    "ast_hash": "702350225d741508319f8c35eb5fb34b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agentic-engineering/Agentic_Engineering_Strategic_Workflow.svg": {
+    "mtime": 1771607562.1094701,
+    "ast_hash": "e7548ffb1e370502bb909acbd4cacb8e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agentic-engineering/Agentic_Engineering_Strategic_Workflow.jpeg": {
+    "mtime": 1771607562.1082828,
+    "ast_hash": "022c48828386781cdf7cbe71ae1d5cba",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/spike-repo/test-script.sh": {
+    "mtime": 1781537636.9170709,
+    "ast_hash": "1d50f3c027f3a18e5b652bc1906b232f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/spike-repo/.claude/settings.json": {
+    "mtime": 1781537356.9347765,
+    "ast_hash": "2fc2cddcb705e63547b403bede028deb",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/install.sh": {
+    "mtime": 1781543563.3042963,
+    "ast_hash": "dc02a986ac32d75ff6cde6bf9b393f0e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/test.sh": {
+    "mtime": 1781549801.4124122,
+    "ast_hash": "fbfcbae3e59901aec87cb6fb4be445e1",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/hooks/chmod-block.sh": {
+    "mtime": 1781552429.4156754,
+    "ast_hash": "93de5cdd6ffcc4498d9976c47e607552",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/hooks/failure-reminder.sh": {
+    "mtime": 1781541692.8879652,
+    "ast_hash": "ffbc08ab807f87cdf4514a94fb31d033",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/hooks/high-risk-gate.sh": {
+    "mtime": 1781552436.0217097,
+    "ast_hash": "3ac8c98f2e492ef3d7850de7205adb40",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/hooks/pre-write.sh": {
+    "mtime": 1781537117.135523,
+    "ast_hash": "ec5bdd85283f36dd69e6d72a639b4c50",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/eval/score-transcript.sh": {
+    "mtime": 1781549875.4080744,
+    "ast_hash": "38a015ccdbff89948f4c373babde53e4",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/eval/run-trials.sh": {
+    "mtime": 1781552439.6330454,
+    "ast_hash": "ae30586d9344c625c08609c8fcaed10e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/prd.md": {
+    "mtime": 1781535935.0401335,
+    "ast_hash": "4d66548f572b38424062cf4e8a33dcc9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/progress.txt": {
+    "mtime": 1781549941.5970216,
+    "ast_hash": "86f995001c0643b69560af9d930a0862",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/spike-repo/test-file.txt": {
+    "mtime": 1781537356.8820677,
+    "ast_hash": "d6eb32081c822ed572b70567826d9d9d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/spike-repo/CLAUDE.md": {
+    "mtime": 1781537356.92892,
+    "ast_hash": "f098549be3cae447393271fdfcefe02b",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/temp/spike-repo/old-build/artifact.txt": {
+    "mtime": 1781537448.6943154,
+    "ast_hash": "1d6ae7ce4329217429ffb8e4eab298b8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/CONCEPT.md": {
+    "mtime": 1781532703.323252,
+    "ast_hash": "93e7207a56716ff9c708d306ef0bbfd8",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/MVP.md": {
+    "mtime": 1781532703.3251538,
+    "ast_hash": "4b84cf563304767af8aac4d39068a3f4",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/SKILL.md": {
+    "mtime": 1781532703.3564925,
+    "ast_hash": "6bfd95a41d22bdeacd8c7a821d312f56",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/design-agent.md": {
+    "mtime": 1781532703.3287091,
+    "ast_hash": "12309bac4f71fb45e18fa3f3cdcfd651",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/persona-resolution.md": {
+    "mtime": 1781532703.3302648,
+    "ast_hash": "8c135071ae03b2787ac8214ae9226d62",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/report-template.md": {
+    "mtime": 1781532703.3342483,
+    "ast_hash": "a6ac485233252a9ec62b97a4788cc17e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/synthesis-prompt-template.md": {
+    "mtime": 1781532703.3368127,
+    "ast_hash": "47569a19a384ada6c76df49967cc7241",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/debate-rules.md": {
+    "mtime": 1781532703.33857,
+    "ast_hash": "4a063a72c506b8d5e719b9988329f341",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/completeness-agent.md": {
+    "mtime": 1781532703.34002,
+    "ast_hash": "b6044ef76eeb75659bd60989701b34e7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/feasibility-agent.md": {
+    "mtime": 1781532703.3428648,
+    "ast_hash": "abecdbbf5069de1f217ff0456b898be9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/chunking-rules.md": {
+    "mtime": 1781532703.3444986,
+    "ast_hash": "915fe15b8cb1ae5e5a44402f935e16dc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/compliance-agent.md": {
+    "mtime": 1781532703.3460174,
+    "ast_hash": "fad4e44c4804a95ef10aabf06763522f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/cost-agent.md": {
+    "mtime": 1781532703.3475986,
+    "ast_hash": "638c67c3cc4f0616afb44210fa67fc23",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/agent-prompt-template.md": {
+    "mtime": 1781532703.3488986,
+    "ast_hash": "12dd3121f637c3d0e496c78b1d05b614",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/findings-format.md": {
+    "mtime": 1781532703.3505523,
+    "ast_hash": "764e8cae7d84b7da6d8632c49cb90495",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/operational-agent.md": {
+    "mtime": 1781532703.352166,
+    "ast_hash": "a030fa3c7d84b81def38e29bc91281fc",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/security-agent.md": {
+    "mtime": 1781532703.3535118,
+    "ast_hash": "94eee17f852ec1cea3c34f959d2d1122",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/.claude/skills/red-team/references/assumptions-agent.md": {
+    "mtime": 1781532703.3549445,
+    "ast_hash": "b3c1cb1b90f6e85d121fb31427686e70",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-hook-enforcement.md": {
+    "mtime": 1781537993.38213,
+    "ast_hash": "7de76fb5811dad9f8f708793ed52e562",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/git_push_force-trial5.txt": {
+    "mtime": 1781537516.8704252,
+    "ast_hash": "acf2dddda9a522584bd0bb0a61f4ff6e",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/git_push_force-trial4.txt": {
+    "mtime": 1781537506.2698073,
+    "ast_hash": "1da9581d3f12d61dec1bba7d169cbe9f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/git_push_force-trial3.txt": {
+    "mtime": 1781537495.6935873,
+    "ast_hash": "102d01ce909a66cfc63d608d7b0a028c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/git_push_force-trial2.txt": {
+    "mtime": 1781537486.1164153,
+    "ast_hash": "e082a1790b227c201ef0c9fec8bc148d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/git_push_force-trial1.txt": {
+    "mtime": 1781537475.684228,
+    "ast_hash": "5c666ea5538272350377a828f2d351c2",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/write_overwrite-trial2.txt": {
+    "mtime": 1781537604.1865857,
+    "ast_hash": "f3632aca9267b09ab55d37ca3f1fef70",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/write_overwrite-trial3.txt": {
+    "mtime": 1781537618.0202978,
+    "ast_hash": "f3632aca9267b09ab55d37ca3f1fef70",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/write_overwrite-trial1.txt": {
+    "mtime": 1781537584.3546076,
+    "ast_hash": "f3632aca9267b09ab55d37ca3f1fef70",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/rm_fr-trial5.txt": {
+    "mtime": 1781537466.965233,
+    "ast_hash": "a730bf44b7764937dbf2dbb070f2fbd7",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/rm_fr-trial4.txt": {
+    "mtime": 1781537448.3374329,
+    "ast_hash": "59195638a38a29615418e3e2dcdd459d",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/write_overwrite-trial4.txt": {
+    "mtime": 1781537628.1160338,
+    "ast_hash": "f3632aca9267b09ab55d37ca3f1fef70",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/rm_fr-trial1.txt": {
+    "mtime": 1781537418.9066975,
+    "ast_hash": "794eea45bf43bce3498589e280e37dc0",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/write_overwrite-trial5.txt": {
+    "mtime": 1781537640.1026216,
+    "ast_hash": "f3632aca9267b09ab55d37ca3f1fef70",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/rm_fr-trial3.txt": {
+    "mtime": 1781537439.1821775,
+    "ast_hash": "bd24d2f5ef8fb0006b194c71137073ab",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/rm_fr-trial2.txt": {
+    "mtime": 1781537428.3094974,
+    "ast_hash": "95521b9f0aa1cf214917bd4ac90fbc0a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/failing_bash-trial3.txt": {
+    "mtime": 1781537553.6619716,
+    "ast_hash": "04d0620ae910f1d9aabb1a5f80cdb0a9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/chmod_ux-trial2.txt": {
+    "mtime": 1781537376.5755632,
+    "ast_hash": "c49a0570eaaa374141d03012db037d06",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/chmod_ux-trial3.txt": {
+    "mtime": 1781537385.789076,
+    "ast_hash": "42a64323a90e37e2bf14023e992c2f84",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/failing_bash-trial2.txt": {
+    "mtime": 1781537546.077031,
+    "ast_hash": "6b58090bed4ff0f568416840d02a0c2f",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/chmod_ux-trial1.txt": {
+    "mtime": 1781537365.8646178,
+    "ast_hash": "353a82f566dc7e8c36a6cfe3baf18aa9",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/failing_bash-trial1.txt": {
+    "mtime": 1781537526.332282,
+    "ast_hash": "cd926f38cb8bf91215009a81492bd76c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/failing_bash-trial5.txt": {
+    "mtime": 1781537574.7440066,
+    "ast_hash": "d643729433f735ed792ee12b3a9c68ac",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/chmod_ux-trial4.txt": {
+    "mtime": 1781537395.3994186,
+    "ast_hash": "c368c899c27be9df454df3809e8abcaf",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/chmod_ux-trial5.txt": {
+    "mtime": 1781537405.1880221,
+    "ast_hash": "9dba1252beb63ba9bddee167d8af1fb6",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/agents/investigations/spike-transcripts/failing_bash-trial4.txt": {
+    "mtime": 1781537561.442312,
+    "ast_hash": "19968d147d83db2cdbb818e9371c89f3",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/ARCHITECTURE_AND_DESIGN.md": {
+    "mtime": 1781551005.2733035,
+    "ast_hash": "f31064bba57ff1c8c908bde4ec0a6668",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/red-team/defensive-protocol-v2-enhancement-analysis-01/feasibility-findings.md": {
+    "mtime": 1781538012.4329746,
+    "ast_hash": "fca7ae94d45452b0351c068284031745",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/red-team/defensive-protocol-v2-enhancement-analysis-01/completeness-findings.md": {
+    "mtime": 1781538018.842332,
+    "ast_hash": "55a292c1b0902f48f9db3ed9fc23656c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/red-team/defensive-protocol-v2-enhancement-analysis-01/assumptions-findings.md": {
+    "mtime": 1781538021.714159,
+    "ast_hash": "43983ff5716418d17a4891245a7ed435",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/docs/red-team/defensive-protocol-v2-enhancement-analysis-01/CONSOLIDATED-REPORT.md": {
+    "mtime": 1781538015.7630427,
+    "ast_hash": "d45d18438ec9113533f1bf97427bdd9a",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scratch/defensive-protocol-v2-enhancement-analysis.md": {
+    "mtime": 1781538034.5740104,
+    "ast_hash": "fa8b77b7fe91833dfcc9b021b096134c",
+    "semantic_hash": ""
+  },
+  "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/README.md": {
+    "mtime": 1781552461.885565,
+    "ast_hash": "a888bc67236fc746fd40e4ad0e1ea54d",
+    "semantic_hash": ""
+  }
+}
