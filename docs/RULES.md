@@ -6,7 +6,6 @@ Rules are always-on behavioral guidelines loaded automatically via `.claude/rule
 
 | Rule | File | Purpose | Details |
 |---|---|---|---|
-| Defensive Protocol (v1) | `rules/defensive-protocol.md` | Defensive epistemology for agentic coding — original comprehensive reference | [View](rules/defensive-protocol.md) |
 | Defensive Protocol v2 — Anti-Slop | `rules/defensive-protocol-v2-anti-slop.md` | Core guardrails: stop on failure, verification cadence, autonomy boundaries | [View](rules/defensive-protocol-v2-anti-slop.md) |
 | Defensive Protocol v2 — Epistemology | `rules/defensive-protocol-v2-epistemology.md` | Reasoning framework: tiered prediction protocol, investigation methodology | [View](rules/defensive-protocol-v2-epistemology.md) |
 | Defensive Protocol v2 — Session Management | `rules/defensive-protocol-v2-session-management.md` | Session continuity: checkpoints, handoffs, context window awareness | [View](rules/defensive-protocol-v2-session-management.md) |
@@ -38,15 +37,15 @@ Rules are always-on behavioral guidelines loaded automatically via `.claude/rule
 
 ### Defensive Protocol Evolution
 
-The defensive protocol exists in two generations:
+v2 is the current generation, split into three independent focused files:
 
-- **v1** (`defensive-protocol.md`) — the original comprehensive single-file protocol. Preserved as reference.
-- **v2** — split into three independent, focused files for modularity:
-  - **Anti-Slop** — critical guardrails (stop on failure, verify, autonomy checks)
-  - **Epistemology** — reasoning framework (prediction protocol, investigation methodology)
-  - **Session Management** — continuity (checkpoints, handoffs, context awareness)
+- **Anti-Slop** — critical guardrails (stop on failure, verify, autonomy checks)
+- **Epistemology** — reasoning framework (prediction protocol, investigation methodology)
+- **Session Management** — continuity (checkpoints, handoffs, context awareness)
 
-Consumers can load all three v2 files or pick the ones relevant to their project. The v1 file provides historical context and can be used as an alternative single-file option.
+v1 (`docs/rules/defensive-protocol.md`) was a single comprehensive file. It has been retired; the source file (`rules/defensive-protocol.md`) was deleted in commit `9e0a6e6`. The description is preserved at `docs/rules/defensive-protocol.md` for historical reference only.
+
+Consumers should load all three v2 files.
 
 ## Consuming Rules
 
@@ -64,6 +63,14 @@ cp rules/crossplane-v2-best-practices.md             <target-repo>/.claude/rules
 cp rules/kubernetes-best-practices.md                <target-repo>/.claude/rules/
 cp rules/agent-delegation.md                         <target-repo>/.claude/rules/   # or use installer (below)
 ```
+
+**Note on the Defensive Protocol v2 trio:** The three v2 rules ship with a hook enforcement layer — `chmod +x` hard-block, destructive-command gate, native-tool overwrite reminder, and a post-failure reminder — wired into `.claude/settings.json`. The bare `cp` above installs the rule *text* only, leaving the guardrails self-applied with no hooks. To install the rules **and** the enforcing hooks, use the installer:
+
+```bash
+bash scripts/defensive-protocol/install.sh <target-repo-path>
+```
+
+It copies the trio and the hook scripts, merges the hook entries idempotently, appends the CLAUDE.md Active-Rules block, and creates the `agents/` state directories. See [scripts/defensive-protocol/README.md](scripts/defensive-protocol/README.md) and [SCRIPTS.md](SCRIPTS.md#defensive-protocol-v2).
 
 **Note on `agent-delegation.md`:** This rule depends on a `UserPromptSubmit` hook in `.claude/settings.json` to be reliably consulted (see § Setup / Installation in the rule file). Prefer the installer over a bare `cp`:
 
