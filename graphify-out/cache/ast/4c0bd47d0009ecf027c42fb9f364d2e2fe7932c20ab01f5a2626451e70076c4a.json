@@ -1,1 +1,1 @@
-{"nodes": [{"id": "users_christian_git_repos_occ_github_agentic_ai_scripts_defensive_protocol_hooks_chmod_block_sh", "label": "chmod-block.sh", "file_type": "code", "source_file": "/Users/christian/git-repos/OCC-github/agentic-ai/scripts/defensive-protocol/hooks/chmod-block.sh", "source_location": "L1"}], "edges": []}
+{"nodes": [{"id": "repo_scripts_defensive_protocol_hooks_chmod_block_sh", "label": "chmod-block.sh", "file_type": "code", "source_file": "./scripts/defensive-protocol/hooks/chmod-block.sh", "source_location": "L1"}], "edges": []}

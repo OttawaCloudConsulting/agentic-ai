@@ -1653,7 +1653,7 @@ Nodes (15): Authentication Lifecycle, CLI Demos, code:bash (# Using uv), Contrib
 
 ### Community 231 - "Community 231"
 Cohesion: 0.12
-Nodes (15): code:python (# New exception in core/exceptions.py), code:python (# Updated save_profile signature), code:block3 (Authenticating profile: work), code:block4 (Authenticating profile: work (kobystam@gmail.com)), code:block5 (Warning: Connected to an already-running Chrome instance.), Design, Design: Fix `nlm login` Profile Account Mismatch, Files Changed (+7 more)
+Nodes (15): code:python (# New exception in core/exceptions.py), code:python (# Updated save_profile signature), code:block3 (Authenticating profile: work), code:block4 (Authenticating profile: work (redacted@example.com)), code:block5 (Warning: Connected to an already-running Chrome instance.), Design, Design: Fix `nlm login` Profile Account Mismatch, Files Changed (+7 more)
 
 ### Community 232 - "Community 232"
 Cohesion: 0.12
