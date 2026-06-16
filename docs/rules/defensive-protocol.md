@@ -1,6 +1,8 @@
 # Defensive Coding Protocol
 
-**Source:** `rules/defensive-protocol.md`
+> **RETIRED — Historical Reference Only.** This describes the v1 single-file protocol. The canonical source (`rules/defensive-protocol.md`) was deleted in commit `9e0a6e6`. Use the three v2 modules instead: `rules/defensive-protocol-v2-anti-slop.md`, `rules/defensive-protocol-v2-epistemology.md`, `rules/defensive-protocol-v2-session-management.md`.
+
+**Source:** `rules/defensive-protocol.md` *(deleted — v1 retired)*
 **Scope:** All project types — language-agnostic behavioral guidelines for agentic coding sessions
 **Activation:** Automatic — loaded when placed in `.claude/rules/`
 

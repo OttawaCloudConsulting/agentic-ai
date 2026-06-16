@@ -1,5 +1,7 @@
 # Epistemology for Agentic Coding
 
+> **Description document.** This summarizes the installable rule at `rules/defensive-protocol-v2-epistemology.md`. Copy that file to `.claude/rules/` in the target repo — do not copy this file.
+
 **Source:** `rules/defensive-protocol-v2-epistemology.md`
 **Scope:** All project types — language-agnostic reasoning framework for agentic coding sessions
 **Activation:** Automatic — loaded when placed in `.claude/rules/`
@@ -87,4 +89,4 @@ Documentation is O(1). Random code is O(n).
 
 - `rules/defensive-protocol-v2-anti-slop.md` — Companion v2 module providing the core guardrails (failure response, autonomy boundaries, pushing back).
 - `rules/defensive-protocol-v2-session-management.md` — Companion v2 module covering checkpoints, context window management, and handoffs.
-- `rules/defensive-protocol.md` — The original full-featured defensive protocol from which this module was extracted.
+- `docs/rules/defensive-protocol.md` — The original single-file protocol (v1, retired) from which this module was extracted.

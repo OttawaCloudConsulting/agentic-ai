@@ -5,3 +5,8 @@ temp
 .gemini
 .planning
 working/
+
+# Local agent config, runtime state, and disposable scratch
+.codex/
+agents/
+scratch/

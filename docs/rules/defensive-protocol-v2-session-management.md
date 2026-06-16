@@ -1,5 +1,7 @@
 # Session Management Protocol
 
+> **Description document.** This summarizes the installable rule at `rules/defensive-protocol-v2-session-management.md`. Copy that file to `.claude/rules/` in the target repo — do not copy this file.
+
 **Source:** `rules/defensive-protocol-v2-session-management.md`
 **Scope:** All project types — session continuity and quality guidelines for long agentic coding sessions
 **Activation:** Automatic — loaded when placed in `.claude/rules/`
@@ -29,11 +31,19 @@ A checkpoint is not "I believe this works." A checkpoint is "I ran it, here's wh
 
 Addresses context degradation over long sessions where early reasoning scrolls out and assumptions go stale.
 
-**Every approximately 10 actions in long tasks, checkpoint understanding:**
+**Checkpoint understanding when any of these events occur:**
+
+- A degradation signal is noticed (see below).
+- Starting a new phase of work.
+- Context compression occurs (`PreCompact` event) — reconfirm goal and open decisions before continuing.
+- Returning to a feature after an interruption.
+- Uncertain about the original goal or current state.
+
+To checkpoint:
 
 1. Review the original goal and constraints.
 2. Verify current understanding still matches the user's intent.
-3. Write current state to a checkpoint file — goal, progress, blockers, decisions made, open questions.
+3. Write current state to a checkpoint file (`agents/memory/` or `scratch/`) — goal, progress, blockers, decisions made, open questions.
 4. If unclear on anything, stop and ask the user.
 
 **Degradation signals to watch for in own output:**
@@ -73,4 +83,4 @@ For these: pause, state what you are about to do and why, and verify with the us
 
 - `rules/defensive-protocol-v2-anti-slop.md` — Companion v2 module providing the core guardrails (failure response, autonomy boundaries, pushing back).
 - `rules/defensive-protocol-v2-epistemology.md` — Companion v2 module covering reasoning, investigation, and prediction protocols.
-- `rules/defensive-protocol.md` — The original full-featured defensive protocol from which this module was extracted.
+- `docs/rules/defensive-protocol.md` — The original single-file protocol (v1, retired) from which this module was extracted.

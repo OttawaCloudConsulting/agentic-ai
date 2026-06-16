@@ -1,5 +1,7 @@
 # Anti-Slop Discipline
 
+> **Description document.** This summarizes the installable rule at `rules/defensive-protocol-v2-anti-slop.md`. Copy that file to `.claude/rules/` in the target repo — do not copy this file.
+
 **Source:** `rules/defensive-protocol-v2-anti-slop.md`
 **Scope:** All project types — language-agnostic behavioral guardrails for agentic coding sessions
 **Activation:** Automatic — loaded when placed in `.claude/rules/`
@@ -16,7 +18,11 @@ Anti-Slop Discipline is the minimum viable safety net for agentic coding session
 
 ### Failure Response
 
-A strict three-step protocol when anything fails:
+Two-tier protocol based on failure severity:
+
+**Trivial / expected failures** (a linter flag being actively fixed, a test already known to be failing): state what failed and continue.
+
+**Substantive failures** (unexpected, tool errors, non-zero exits from commands that should succeed):
 
 1. **Stop** — no retry, no next tool call.
 2. **Report** — exact error, theory of why it happened, proposed action, expected outcome.
@@ -40,12 +46,17 @@ Distinguishes between beliefs (theories, unverified) and verified facts (tested,
 
 ### Verification Cadence
 
-Uses a tiered approach:
+Verify when an event demands it — not on a fixed count.
 
-- **Unfamiliar or risky work:** 3 actions, then verify.
-- **Established patterns or routine work:** 5 actions, then verify.
+Trigger events that require verification before continuing:
 
-Verification means observable confirmation: running the test, reading the output, and confirming the result matches expectations. If it does not match, stop — do not continue building on a false assumption. More than 5 actions without verification equals accumulated unjustified beliefs.
+- After editing a file that has not yet been tested.
+- After a command whose output has not been read.
+- After any action on unfamiliar code.
+- After changing an interface, configuration, or dependency.
+- After a surprising or unexpected result.
+
+Verification means observable confirmation: running the test, reading the output, and confirming the result matches expectations. If it does not match, stop — do not continue building on a false assumption. Unverified changes compound silently; verify at the event, not after an arbitrary count.
 
 ### Error Handling
 
@@ -85,7 +96,15 @@ When the user says stop, undo, or revert:
 
 ### Script Safety
 
-Never set the executable bit on script files. Always execute scripts explicitly with their interpreter (e.g., `bash scripts/my-script.sh`). Do not add shebangs — they imply direct execution. Do not run `chmod +x`. Explicit interpreter invocation makes the execution mechanism visible and auditable.
+Never set the executable bit on script files. Always execute scripts explicitly with their interpreter (e.g., `bash scripts/my-script.sh`). Shebangs (`#!/usr/bin/env bash`) may be included for documentation purposes but do not imply direct execution is allowed. Do not run `chmod +x` — never set the executable bit. Explicit interpreter invocation makes the execution mechanism visible and auditable.
+
+### Native-Tool Writes
+
+`Write`, `Edit`, and MCP tool calls that overwrite or delete files trigger an advisory reminder before the action runs. When this reminder appears:
+
+- Confirm the target file is the one intended to be modified.
+- If the file has uncommitted changes, state DOING/EXPECT/IF MISMATCH before proceeding (see the epistemology rule).
+- The reminder is advisory — it does not block. Treat it as a mandatory pause, not decoration.
 
 ### Claude-Specific Guidance
 
@@ -97,6 +116,6 @@ Identifies the primary failure mode as optimizing for completion by batching man
 
 ## Related Rules
 
-- `rules/defensive-protocol.md` — The original full-featured defensive protocol. Anti-Slop is a focused extraction of its core guardrails.
+- `docs/rules/defensive-protocol.md` — The original single-file protocol (v1, retired). Anti-Slop is a focused extraction of its core guardrails.
 - `rules/defensive-protocol-v2-epistemology.md` — Companion v2 module covering reasoning, investigation, and prediction protocols.
 - `rules/defensive-protocol-v2-session-management.md` — Companion v2 module covering checkpoints, context window management, and handoffs.
