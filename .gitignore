@@ -10,3 +10,6 @@ working/
 .codex/
 agents/
 scratch/
+
+# Generated knowledge-graph cache (local-only; rebuilt by graphify)
+graphify-out/

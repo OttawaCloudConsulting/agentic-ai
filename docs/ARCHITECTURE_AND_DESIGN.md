@@ -2,7 +2,7 @@
 
 > Implementation design reference, **derived from** the authoritative parent issue
 > doc `agents/issues/34-over-engineering-gate.md` (source of truth) and its
-> deep-dive set `agents/issues/34-over-engineering/01..06`. PRD: `prd.md`.
+> deep-dive set `agents/issues/34-over-engineering/01..06`.
 > Where this doc and the parent issue doc disagree, the parent issue doc wins.
 
 ## Overview
@@ -148,7 +148,7 @@ unjustified complexity was found.
 | 3 | `rules/defensive-protocol-v2-over-engineering.md` | Markdown (dp2 rule) | Always-loaded self-applied rule (Feature 3). |
 | 4 | `scripts/defensive-protocol/hooks/over-engineering-reminder.sh` | Bash (`UserPromptSubmit`) | Pre-build reminder injection (Feature 3). |
 | 5 | `scripts/defensive-protocol/install.sh` (extended) | Bash + jq | Idempotent installer (Feature 3). |
-| 6 | `skills/over-engineering-review/SKILL.md` | Markdown (skill) + `.claude/skills/` mirror | On-demand detection pass (Feature 4). |
+| 6 | `skills/over-engineering-review/SKILL.md` | Markdown (skill) | On-demand detection pass (Feature 4). |
 
 ## Design Decisions
 
@@ -219,15 +219,13 @@ Graph — these are three lenses on the same six artifacts, not three copies):
 
 ```
 project-root/
-├── prd.md
-├── progress.txt
 ├── docs/ARCHITECTURE_AND_DESIGN.md
 ├── agent-profiles/over-engineering-reviewer.md           # F2 (new top-level dir)
 ├── rules/defensive-protocol-v2-over-engineering.md       # F3 (rule source)
 ├── scripts/defensive-protocol/
 │   ├── install.sh                                         # F3 (installer, extended)
 │   └── hooks/over-engineering-reminder.sh                 # F3 (hook)
-└── skills/over-engineering-review/SKILL.md                # F4 (+ .claude/skills/ mirror)
+└── skills/over-engineering-review/SKILL.md                # F4 (skill source)
 ```
 
 ## Deployment Workflow
@@ -241,8 +239,10 @@ Per-artifact, independent (no shared deploy):
   `scripts/defensive-protocol/hooks/`, jq-merges the `UserPromptSubmit` entry into
   `.claude/settings.json`, and appends the sentinel-guarded rule to CLAUDE.md.
   Idempotent; restart Claude Code in the target to load.
-- **Feature 4 (skill):** drop `SKILL.md` into `skills/over-engineering-review/`
-  (+ `.claude/skills/` mirror). Invoked via `/over-engineering-review`.
+- **Feature 4 (skill):** the committed source is
+  `skills/over-engineering-review/SKILL.md`; consumers copy the bundle into their
+  target repo's `.claude/skills/` to activate (standard skill consume step).
+  Invoked via `/over-engineering-review`.
 
 ## Dependency Graph
 
