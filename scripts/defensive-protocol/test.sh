@@ -50,6 +50,13 @@ else
   _fail "installer.bats"
 fi
 
+_header "Tier 1b2: Over-engineering installer tests (tests/installer-over-engineering.bats)"
+if bats "$PROJECT_ROOT/tests/installer-over-engineering.bats"; then
+  _ok "installer-over-engineering.bats"
+else
+  _fail "installer-over-engineering.bats"
+fi
+
 # ── Tier 1c: Rule-sync check ──────────────────────────────────────────────────
 
 _header "Tier 1c: Rule-sync (rules/ == .claude/rules/ for dp2 files)"
