@@ -58,8 +58,23 @@
            matching high-risk-gate.sh convention. 13/13 manual smoke cases pass (punctuation
            fires; rebuild/builder/redevelop stay quiet); 8/8 installer bats still green.
 
-[ ] Feature 4: over-engineering-review Skill / Command
+[x] Feature 4: over-engineering-review Skill / Command
     - skills/over-engineering-review/SKILL.md (+ .claude/skills/ mirror)
     - Thin wrapper composing /simplify + /code-review + the discriminator
     - Cost-gated partial different-model counterfactual; classified findings
-    NOTES:
+    NOTES: Started 2026-06-16.
+           SUMMARY: On-demand discriminator pass as a Claude Code skill. Resolves target
+                    (diff/file/plan), freezes requirement ledger, runs /simplify + /code-review
+                    as sub-passes, runs discriminator per element, cost-gates a partial
+                    different-model counterfactual for qualifying targets, emits classified
+                    findings (safe-remove/needs-decision/keep/harmful-theater).
+           FILES IDENTIFIED: skills/over-engineering-review/SKILL.md (new dir),
+                             .claude/skills/over-engineering-review/SKILL.md (mirror, identical)
+           KEY DECISIONS: #12 thin wrapper over /simplify + /code-review (DRY);
+                          #8 counterfactual different-model, escalation-only;
+                          #13 flags not scores; #5 minimal default, flag aggressively
+           DEPENDENCIES: None (zero-dependency per brief)
+           EXECUTION: Inline — 2 files (identical), bounded markdown scope
+           CODE COMPLETE: 2 files created (skills/over-engineering-review/SKILL.md +
+                          .claude/skills/ mirror, identical); tests: n/a (markdown); lint: n/a.
+           Completed 2026-06-16.
