@@ -9,6 +9,7 @@ Rules are always-on behavioral guidelines loaded automatically via `.claude/rule
 | Defensive Protocol v2 — Anti-Slop | `rules/defensive-protocol-v2-anti-slop.md` | Core guardrails: stop on failure, verification cadence, autonomy boundaries | [View](rules/defensive-protocol-v2-anti-slop.md) |
 | Defensive Protocol v2 — Epistemology | `rules/defensive-protocol-v2-epistemology.md` | Reasoning framework: tiered prediction protocol, investigation methodology | [View](rules/defensive-protocol-v2-epistemology.md) |
 | Defensive Protocol v2 — Session Management | `rules/defensive-protocol-v2-session-management.md` | Session continuity: checkpoints, handoffs, context window awareness | [View](rules/defensive-protocol-v2-session-management.md) |
+| Defensive Protocol v2 — Over-Engineering | `rules/defensive-protocol-v2-over-engineering.md` | Self-applied gate: 3-clause discriminator flags the agent over-engineering its own deliverables; paired `UserPromptSubmit` pre-build reminder | [View](rules/defensive-protocol-v2-over-engineering.md) |
 | CDK Best Practices | `rules/cdk-best-practices.md` | AWS CDK guidelines: construct design, security, testing, deployment safety | [View](rules/cdk-best-practices.md) |
 | Terraform Best Practices | `rules/terraform-best-practices.md` | Terraform guidelines: state management, module design, security, naming | [View](rules/terraform-best-practices.md) |
 | Crossplane v1 Best Practices | `rules/crossplane-v1-best-practices.md` | Crossplane/Upbound guidelines: XR design, compositions, managed resources | [View](rules/crossplane-v1-best-practices.md) |
@@ -56,6 +57,7 @@ Copy rule files from `rules/` into `.claude/rules/` in the target repository:
 cp rules/defensive-protocol-v2-anti-slop.md         <target-repo>/.claude/rules/
 cp rules/defensive-protocol-v2-epistemology.md       <target-repo>/.claude/rules/
 cp rules/defensive-protocol-v2-session-management.md <target-repo>/.claude/rules/
+cp rules/defensive-protocol-v2-over-engineering.md   <target-repo>/.claude/rules/   # or use installer (below)
 cp rules/cdk-best-practices.md                       <target-repo>/.claude/rules/
 cp rules/terraform-best-practices.md                 <target-repo>/.claude/rules/
 cp rules/crossplane-v1-best-practices.md             <target-repo>/.claude/rules/
@@ -64,13 +66,13 @@ cp rules/kubernetes-best-practices.md                <target-repo>/.claude/rules
 cp rules/agent-delegation.md                         <target-repo>/.claude/rules/   # or use installer (below)
 ```
 
-**Note on the Defensive Protocol v2 trio:** The three v2 rules ship with a hook enforcement layer — `chmod +x` hard-block, destructive-command gate, native-tool overwrite reminder, and a post-failure reminder — wired into `.claude/settings.json`. The bare `cp` above installs the rule *text* only, leaving the guardrails self-applied with no hooks. To install the rules **and** the enforcing hooks, use the installer:
+**Note on the Defensive Protocol v2 family:** The v2 rules ship with a hook enforcement layer — `chmod +x` hard-block, destructive-command gate, native-tool overwrite reminder, a post-failure reminder, and an over-engineering pre-build reminder — wired into `.claude/settings.json`. The bare `cp` lines above install the rule *text* only, leaving the guardrails self-applied with no hooks. To install the rules **and** the enforcing hooks, use the installer:
 
 ```bash
 bash scripts/defensive-protocol/install.sh <target-repo-path>
 ```
 
-It copies the trio and the hook scripts, merges the hook entries idempotently, appends the CLAUDE.md Active-Rules block, and creates the `agents/` state directories. See [scripts/defensive-protocol/README.md](scripts/defensive-protocol/README.md) and [SCRIPTS.md](SCRIPTS.md#defensive-protocol-v2).
+It copies the rule files (the anti-slop/epistemology/session-management trio **plus** `defensive-protocol-v2-over-engineering.md`) and the hook scripts, merges the hook entries idempotently, appends the CLAUDE.md Active-Rules block, and creates the `agents/` state directories. The over-engineering rule's companion `UserPromptSubmit` hook injects the 3-clause discriminator reminder on build/implement intent. See [scripts/defensive-protocol/README.md](scripts/defensive-protocol/README.md) and [SCRIPTS.md](SCRIPTS.md#defensive-protocol-v2).
 
 **Note on `agent-delegation.md`:** This rule depends on a `UserPromptSubmit` hook in `.claude/settings.json` to be reliably consulted (see § Setup / Installation in the rule file). Prefer the installer over a bare `cp`:
 

@@ -24,6 +24,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | OCC Skill Refactor | `/occ-skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/occ-skill-refactor.md) |
 | Project Codex Skills | `$project` | Codex project suite -- bootstraps state, reports status, routes to the next explicit `$project-*` skill | [View](skills/project.md) |
 | Rule Creator | `/rule-creator` | Interactive rule generation with documentation and catalog updates | [View](skills/rule-creator.md) |
+| Over-Engineering Review | `/over-engineering-review` | On-demand 3-clause discriminator pass over a diff/file/plan; classifies findings safe-remove / needs-decision / keep / harmful-theater; composes `/simplify` and `/code-review` | [View](skills/over-engineering-review.md) |
 
 ## How Skills Work
 
@@ -82,6 +83,7 @@ cp -r skills/occ-skill-creator/         <target-repo>/.claude/skills/occ-skill-c
 cp -r skills/occ-skill-refactor/        <target-repo>/.claude/skills/occ-skill-refactor/
 cp -r skills/project/                   <target-repo>/.claude/skills/project/
 cp -r skills/rule-creator/              <target-repo>/.claude/skills/rule-creator/
+cp -r skills/over-engineering-review/   <target-repo>/.claude/skills/over-engineering-review/
 ```
 
 Skills take effect immediately on the next Claude Code conversation in that repository.

@@ -1,253 +1,273 @@
-# Architecture and Design: Defensive Protocol v2 — Enforcement Layer
+# Architecture and Design: Over-Engineering Gate
 
-> Authoritative design reference. PRD: `prd.md`. Source analysis: `scratch/defensive-protocol-v2-enhancement-analysis.md`. Red-team report: `docs/red-team/defensive-protocol-v2-enhancement-analysis-01/CONSOLIDATED-REPORT.md`. All Claude Code hook mechanics verified against the live hooks reference (`https://code.claude.com/docs/en/hooks.md`) on 2026-06-15.
+> Implementation design reference, **derived from** the authoritative parent issue
+> doc `agents/issues/34-over-engineering-gate.md` (source of truth) and its
+> deep-dive set `agents/issues/34-over-engineering/01..06`.
+> Where this doc and the parent issue doc disagree, the parent issue doc wins.
 
 ## Overview
 
-The Defensive Protocol v2 rule trio is loaded into every session as passive context and is reliably routed around by the model's completion bias. This project adds a **deterministic enforcement layer** that makes the highest-value rules fire at the moment they matter, using Claude Code hooks as the trigger mechanism. The layer has five parts: (1) a `PreToolUse` gate that pauses destructive commands and hard-blocks `chmod +x`; (2) a `PostToolUseFailure` reminder that injects the failure protocol when a tool actually fails; (3) rule-text edits that convert un-trackable action counts into event triggers and add a CLAUDE.md "Active Rules" pointer; (4) an idempotent installer; and (5) a documentation cleanup. The entire hook track is gated behind a **feasibility spike** that must empirically prove a hook changes model behavior before any hook is built — because the enforcement-effectiveness premise is the one thing the source analysis could not verify on paper.
+The over-engineering gate catches an AI coding agent over-engineering its **own
+deliverables** — the design and code it produces in response to a request — judged
+against KISS, DRY, and YAGNI. The whole gate collapses to **one discriminator plus
+modifiers**, not a set of separate detectors. It ships as **three discrete,
+zero-dependency artifacts**, each a working gate at its own tier; any subset can be
+adopted, in any order, with no reference to the others.
 
-The design's load-bearing constraint, verified against live docs: **`additionalContext` is a reminder Claude reads on the *next* model request — it cannot pause an action.** Only `permissionDecision` (`ask`/`deny`) and `exit 2` stop a `PreToolUse` action before it runs. Likewise, **`PostToolUse` fires on success only**; failures route to the dedicated `PostToolUseFailure` event. The earlier draft of the analysis got both wrong; this architecture is built on the corrected mechanics.
+The root cause the gate exists to counter is inherent and un-removable: RLHF
+thoroughness/length bias makes the agent inflate ambiguous asks into
+"production-ready" output. Because the bias is in the producer, the correction must
+be **external** to the producer — a separate pass that does not share the artifact's
+authoring context. That is why the gate exists as tooling, not as a reminder the
+author gives itself.
+
+## The Discriminator (the spine)
+
+For each element of a deliverable:
+
+> Does it trace to **(1)** a stated requirement, **(2)** an observed failure, or
+> **(3)** a correctness/security defect on a reachable path at a trust boundary?
+> **If none → flag.**
+
+Modifiers (tune the response, not the existence of the flag):
+
+- **Context tunes severity, not detection.** The discriminator fires context-free.
+  Context (blast radius × lifespan, plus an explicit security/data-sensitivity
+  signal) tunes the cost threshold and the enforcement posture (advise vs. block),
+  not whether the flag fires. Default when context is absent: **minimal /
+  prototype-grade, flag aggressively** — but never below the clause-3 floor.
+- **Reversibility licenses a seam, not a feature.** A one-way door (persisted data,
+  published contract, wire format, public name) justifies a cheap *reversal seam*
+  (a nullable column, a documented migration path) — never the speculative feature.
+  Score by the blast-radius-escape test ("if I ship and reverse this later, who/what
+  outside the current diff must change?"): **0 triggers → defer** (YAGNI applies);
+  **1 trigger → build the seam, not the feature**; **2+ triggers → surface to the
+  user.** Burden of proof: name all four — the irreversible surface, the plausible
+  future change, the concrete later cost, the smallest present action — or YAGNI
+  wins. The modifier never downgrades the discriminator; an unproven one-way claim
+  is treated as two-way and deferred.
+- **Counterfactual is escalation-only.** The cheap static discriminator is
+  detection-primary; the counterfactual is the selective falsification test. Trigger
+  it for design-stage artifacts, large deltas, "production-ready" phrase clusters,
+  many-axes-triggered, or safety-inversion risk — not on every target. **Partial**
+  counterfactual (re-derive one layer/section from the frozen ledger **by a
+  different model**, original removed from context) is the default; a full rewrite
+  is reserved for structural over-engineering (axis 2) where the shape is the excess.
+  A full counterfactual on a trivial/reversible target is itself axis-8
+  over-engineering.
+- **Cause-agnostic.** The gate acts on the output signature (an element that fails
+  the discriminator), not on why the agent produced it.
+
+**Clause 3 IS the correctness/safety floor.** Floor items (`set -euo pipefail`,
+parameterized queries, applying the saved plan) are **not exempt** — they *pass*
+clause 3. There is no parallel "exempt list." The floor and Axis 4 (defensive
+bloat) are one predicate, two verdicts: delete the element — does a plausible
+in-scope input now produce a wrong result, lost/corrupted data, a security hole, or
+a silently-swallowed failure on a reachable path at a trust boundary? Yes → floor
+(keep). Loses only convenience / future flexibility / hypothetical robustness →
+excess (flag).
+
+**Boundary cases — one rule: trust boundary + reachability + named failure mode.**
+
+| Element | Floor (passes clause 3) | Excess (flag) |
+|---------|-------------------------|---------------|
+| Retries | transient/idempotent op, bounded attempts, surfaced failure (named dependency) | unbounded / on non-idempotent / masks the failure |
+| Logging | required output/audit, or stderr insufficient to operate the workflow | decorative / duplicates available signal |
+| Input validation | external/untrusted boundary on a reachable path | internal trusted caller |
+| Error handling | preserves an invariant/cleanup, or sharpens a reachable failure | swallows/masks, or wraps infallible code |
+
+## The 8-Axis Taxonomy (reference)
+
+The discriminator is the test; the axes are the vocabulary for *what kind* of
+unjustified complexity was found.
+
+| # | Axis | Principle |
+|---|------|-----------|
+| 1 | Speculative scope | YAGNI |
+| 2 | Premature abstraction | KISS |
+| 3 | Premature optimization | KISS |
+| 4 | Defensive bloat | (clause-3 predicate, flag side) |
+| 5 | Robustness / ops theater | YAGNI |
+| 6 | Test / doc ceremony | DRY / YAGNI |
+| 7 | Data / schema / API over-modeling | YAGNI (houses the reversibility loophole) |
+| 8 | Process over-engineering (meta) | the agent over-applying its own machinery |
 
 ## Component Diagram
 
 ```
-┌──────────────────────────── consumer repo / .claude ─────────────────────────────┐
-│                                                                                    │
-│  settings.json ── hooks ───────────────────────────────────────────────────────┐  │
-│   PreToolUse  matcher=Bash   if=Bash(rm*),Bash(git push --force*),Bash(git      │  │
-│                              reset --hard*),Bash(git rebase*),Bash(git branch    │  │
-│                              -D*),Bash(*DROP*),Bash(*drop*),Bash(*migrate*)      │  │
-│                              → permissionDecision:"ask"   (PAUSE, user confirm)  │  │
-│   PreToolUse  matcher=Bash   if=Bash(chmod*) → jq parse → exit 2 (HARD BLOCK)    │  │
-│   PreToolUse  matcher=Edit|Write|mcp__.*     → additionalContext (REMIND)        │  │
-│   PostToolUseFailure         → additionalContext  FAILED/THEORY/PROPOSE          │  │
-│  ───────────────────────────────────────────────────────────────────────────────┘ │
-│        │ reads (on stop / next request)                                            │
-│        ▼                                                                            │
-│  rules/{anti-slop,epistemology,session-management}.md   (== .claude/rules, byte ID)│
-│  CLAUDE.md  ── "Active Rules" sentinel block + agents/ path convention             │
-│  agents/{investigations,memory}/   (installer mkdir -p)                            │
-└────────────────────────────────────────────────────────────────────────────────────┘
-            ▲ installed by scripts/defensive-protocol/install.sh  (jq merge, markers,
-            │ CLAUDE.md sentinel, prereq hard-fail, mkdir, atomic temp write)
-   ┌────────┴──────────────────────────────────────────────────────┐
-   │ FEATURE 2 SPIKE — temp/ disposable repo, claude -p headless,   │
-   │ 5-trial quick gate. GO ⇒ build hooks. KILL ⇒ stop + redesign.  │
-   └────────────────────────────────────────────────────────────────┘
+                 3-clause discriminator + 4 modifiers
+                 ONE concept — embedded 3x, no shared import
+                              |
+        +---------------------+---------------------+
+        |                     |                     |
+   Feature 2             Feature 3             Feature 4
+   Agent profile         dp2 Rule + hook       Skill / command
+   agent-profiles/       rules/ + installer    skills/<name>/
+   over-engineering-     defensive-protocol-   over-engineering-
+   reviewer.md           v2-over-engineering   review/SKILL.md
+        |                     |                     |
+   active detect;        always-loaded rule    active on-demand
+   isolated context;     + UserPromptSubmit     detect; composes
+   diff-model bias-      hook reminder on       /simplify +
+   break                 build intent           /code-review
+        |                     |                     |
+   ── tier 3 ──          ── tier 1 ──           ── tier 2 ──
+   isolated/diff-        cheap always-on        on-demand
+   model detection       reminder (can't        detection
+   for high stakes       detect, only remind)
 ```
 
-## Data Flow
+## Data Flow (the discriminator pass)
 
-**High-risk Bash command (e.g. `rm -fr build/`):**
-
-1. Model issues a `Bash` tool call. Claude Code evaluates `PreToolUse` hooks.
-2. The `if` permission-rule condition (`Bash(rm*)`) matches → the hook runs.
-3. Hook emits `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"…state DOING/EXPECT/IF MISMATCH"}}`.
-4. Claude Code surfaces a confirm prompt **before** the command runs. The model cannot batch past it.
-5. The reason text + the loaded `epistemology` rule prompt the prediction; the user confirms or denies.
-
-**`chmod +x` (hard block):**
-
-1. `PreToolUse` `if=Bash(chmod*)` matches → hook parses the command with `jq` from stdin.
-2. If the command sets an executable bit (symbolic `+x`/`u+x`/`+rx` or numeric odd-exec mode), the hook writes guidance to stderr and `exit 2`.
-3. Claude Code blocks the tool call; stderr is shown to the model (anti-slop Script Safety).
-
-**Tool failure (e.g. a failing test command):**
-
-1. The Bash tool runs and exits non-zero. Claude Code fires `PostToolUseFailure` (NOT `PostToolUse`).
-2. Hook reads `error`/`tool_name`/`tool_input`, emits `additionalContext` with the two-tier FAILED/THEORY/PROPOSE reminder.
-3. The model reads it on the next request — appropriate, since the failure has already happened and the protocol is "stop and report," not "prevent."
-
-**Native-tool overwrite (`Write` to an uncommitted file):** `PreToolUse matcher=Edit|Write|mcp__.*` injects a reminder (advisory only in v1 — a precise low-false-positive block condition is deferred).
+1. **Resolve target** — a diff, a file, a plan, or a design doc.
+2. **Freeze the requirement ledger** — extract stated requirements, observed
+   failures, and named safety properties (e.g. "human eyes on the plan before
+   apply"), tagging each requirement's provenance (user-stated vs. agent-inferred).
+   Freeze it before review so post-hoc requirement invention ("I needed it because I
+   built it") and upstream gold-plating cannot contaminate the baseline. An
+   agent-inferred requirement that justifies nothing escalates upstream, it does not
+   enter the ledger.
+3. **Run the discriminator per element** — check clause 1/2/3; if none pass → flag,
+   tagged with an axis and a severity.
+4. **Apply modifiers** (these govern the *response*, never whether the flag fires) —
+   context tunes severity; reversibility routes a flag to defer / build-a-seam /
+   surface per the blast-radius-escape count; qualifying targets escalate to the
+   partial different-model counterfactual.
+5. **Classify and emit** — each element is tagged `safe-remove` / `needs-decision` /
+   `keep` / `harmful-theater`. Flagged items (`safe-remove`, `harmful-theater`) cite
+   absence of all three clauses; `keep` cites the clause it passes (often clause 3,
+   the floor); `needs-decision` is the contested middle, surfaced to the user, not
+   auto-resolved.
 
 ## Component Inventory
 
 | # | Component | Type / Technology | Purpose |
 |---|-----------|-------------------|---------|
-| 1 | High-risk Bash gate | `PreToolUse` hook, jq, `if` rules | Pause destructive commands (`ask`) |
-| 2 | chmod hard-block | `PreToolUse` hook, jq, `exit 2` | Block executable-bit changes |
-| 3 | Native-tool reminder | `PreToolUse` hook, `Edit\|Write\|mcp__.*` | Advisory on overwrite/delete |
-| 4 | Failure reminder | `PostToolUseFailure` hook, jq | Inject FAILED/THEORY/PROPOSE |
-| 5 | Rule trio (edited) | Markdown (`rules/`, `.claude/rules/`) | Behavioral text, count→event |
-| 6 | CLAUDE.md Active-Rules block | Markdown + sentinel | Salience pointer + path convention |
-| 7 | State dirs | `agents/{investigations,memory}/` | Homes for investigation/checkpoint/handoff |
-| 8 | Installer | `scripts/defensive-protocol/install.sh` (bash + jq) | Idempotent wiring into consumer repo |
-| 9 | Mechanical test suite | `bats-core` | Deterministic hook + installer tests |
-| 10 | Behavioral eval harness | `claude -p` headless + transcript parser | Probabilistic fire-rate measurement |
-| 11 | Spike harness | `temp/` repo + bash | GO/NO-GO feasibility proof |
-
-## Security Model
-
-### Access Control
-
-Hooks run local shell with the user's privileges. The gate **reduces** risk (it cannot escalate). `permissionDecision: "ask"` routes through Claude Code's existing permission UI; the hook does not bypass it.
-
-### Edge Protection
-
-The `chmod +x` hard-block (`exit 2`) is the only deny-by-default control, deliberately narrow (anti-slop Script Safety is unambiguous; destructive commands use `ask` to avoid blocking legitimate work).
-
-### Audit and Logging
-
-Spike and eval transcripts are archived under `agents/investigations/`. Hook decisions are visible in the Claude Code transcript. No secrets are read or written by any hook.
-
-### Input Handling (hook payloads)
-
-Hooks parse untrusted tool-input JSON from stdin with `jq` (no `eval` of command strings). The command string is **matched**, never executed, by the hook. `jq` failure is fail-loud, never swallowed.
-
-## File Organization
-
-```
-project-root/
-├── prd.md                                   # requirements
-├── docs/
-│   ├── ARCHITECTURE_AND_DESIGN.md           # this file
-│   └── red-team/…                            # red-team report (source)
-├── scratch/
-│   └── defensive-protocol-v2-enhancement-analysis.md   # source analysis
-├── rules/                                   # canonical rule sources (edited in F3.3)
-│   └── defensive-protocol-v2-*.md
-├── .claude/
-│   ├── rules/defensive-protocol-v2-*.md     # installed copies (byte-identical)
-│   └── settings.json                         # hooks merged here (F3.1/3.2)
-├── scripts/defensive-protocol/
-│   ├── install.sh                            # idempotent installer (F4.1)
-│   ├── hooks/                                # hook command scripts (jq)
-│   │   ├── high-risk-gate.sh
-│   │   ├── chmod-block.sh
-│   │   └── failure-reminder.sh
-│   ├── test.sh                               # local one-command test entry point (F6.1)
-│   └── eval/                                 # behavioral eval harness (F6.1)
-│       ├── run-trials.sh                     # claude -p headless, N trials
-│       └── score-transcript.* 
-├── tests/                                    # bats suites (F6.1)
-│   ├── hooks.bats
-│   └── installer.bats
-├── temp/                                     # disposable spike repo (gitignored)
-└── agents/{investigations,memory}/          # state homes (installer mkdir)
-```
-
-## Configuration
-
-### Required
-
-| Parameter | Type | Validation | Description |
-|-----------|------|------------|-------------|
-| target repo path | path arg | must be a dir containing/creating `.claude/` | consumer repo to install into |
-
-### Optional — Behavior
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `--state-path` | enum | `agents` | `agents` (installer mkdir) or `scratch` |
-| `--gate` | enum | `ask` | `ask` (confirm destructive) or `deny` (block); `chmod +x` always `exit 2` |
-
-## Outputs
-
-| Output | Type | Description |
-|--------|------|-------------|
-| merged hook entries | JSON in `.claude/settings.json` | PreToolUse + PostToolUseFailure |
-| CLAUDE.md block | sentinel-wrapped markdown | Active-Rules pointer + paths |
-| `agents/{investigations,memory}/` | dirs | state homes |
-| `agents/investigations/spike-hook-enforcement.md` | markdown | spike transcripts + verdict |
-| test report | stdout | bats results + eval fire-rates |
-
-## Matcher Coverage Table (F3.1)
-
-Commands caught by the `PreToolUse` Bash gate vs. known advisory-only misses.
-
-### Caught (hard-blocked or ask-gated)
-
-| Command form | Gate | Script |
-|---|---|---|
-| `chmod +x`, `chmod u+x`, `chmod a+x`, `chmod g+x`, `chmod +rx`, `chmod +X` | exit 2 | `chmod-block.sh` |
-| `chmod 755`, `chmod 700`, `chmod 711`, any numeric mode with odd octal digit | exit 2 | `chmod-block.sh` |
-| `rm -rf`, `rm -fr`, `rm -rRfF` (any combo up to 4 chars) | ask | `high-risk-gate.sh` |
-| `rm -r -f`, `rm -f -r` (separate flags) | ask | `high-risk-gate.sh` |
-| `git push --force`, `git push -f` | ask | `high-risk-gate.sh` |
-| `git push --delete` | ask | `high-risk-gate.sh` |
-| `git push origin +refspec` (any arg starting with `+`) | ask | `high-risk-gate.sh` |
-| `git reset --hard` | ask | `high-risk-gate.sh` |
-| `git rebase` (any form) | ask | `high-risk-gate.sh` |
-| `git branch -D` (force delete) | ask | `high-risk-gate.sh` |
-| `git commit --amend` | ask | `high-risk-gate.sh` |
-| `DROP …` / `drop …` (case-insensitive; inside quotes too) | ask | `high-risk-gate.sh` |
-| `migrate` / `db:migrate` / `rake … migrate` | ask | `high-risk-gate.sh` |
-| `Write`/`Edit`/`mcp__.*` tool calls | reminder (`additionalContext`) | `pre-write.sh` |
-
-### Advisory-only (not caught — documented coverage boundary)
-
-| Command form | Why not caught |
-|---|---|
-| `rm file.txt` (no recursive/force flags) | Non-recursive single-file rm is not high-risk |
-| `alias del='rm -rf'; del dir/` | Alias expansion not visible in the command string |
-| `CMD="rm -rf"; $CMD dir/` | Env-indirected commands not visible |
-| `base64 -d <<< '...' \| bash` | Obfuscated execution; no matcher can catch |
-| `chmod` via Python/Node `os.chmod()` | Not a Bash tool call |
-| `git push --force-with-lease` | Safer variant; not gated (has built-in protection) |
+| 1 | `docs/ARCHITECTURE_AND_DESIGN.md` | Markdown | This design (Feature 1). |
+| 2 | `agent-profiles/over-engineering-reviewer.md` | Markdown (agent profile) | Isolated/diff-model reviewer (Feature 2). |
+| 3 | `rules/defensive-protocol-v2-over-engineering.md` | Markdown (dp2 rule) | Always-loaded self-applied rule (Feature 3). |
+| 4 | `scripts/defensive-protocol/hooks/over-engineering-reminder.sh` | Bash (`UserPromptSubmit`) | Pre-build reminder injection (Feature 3). |
+| 5 | `scripts/defensive-protocol/install.sh` (extended) | Bash + jq | Idempotent installer (Feature 3). |
+| 6 | `skills/over-engineering-review/SKILL.md` | Markdown (skill) | On-demand detection pass (Feature 4). |
 
 ## Design Decisions
 
-| # | Decision | Rationale | Alternatives considered |
-|---|----------|-----------|-------------------------|
-| 1 | Gate high-risk actions with `permissionDecision: "ask"`, not `additionalContext` | Verified: `additionalContext` is read on the *next* model request — it cannot pause a pre-action. `ask` forces a confirm before execution. | `additionalContext` reminder (rejected: post-action); `deny` (rejected as default: too much friction for legitimate work) |
-| 2 | Hard-block `chmod +x` with `exit 2`, not `ask` | anti-slop Script Safety is unambiguous; `exit 2` blocks `PreToolUse` and shows stderr to the model. The only deny-by-default control. | `ask` (rejected: the rule is absolute, not a judgment call) |
-| 3 | Use the `PostToolUseFailure` event for the failure reminder | Verified: `PostToolUse` fires on success only; failures route to `PostToolUseFailure`, which carries the `error` field. | `PostToolUse` (rejected — original analysis error; never fires on failure) |
-| 4 | Prefer the hook `if` permission-rule syntax (`Bash(rm *)`) over in-command `case`-globs | Live docs define a Bash-matching table for subcommands/`$()`/backticks; `case`-globs tested as missing `rm -fr`, `git push +main`, lowercase `drop`, `chmod u+x`. | ad-hoc `case` substring globs (rejected: proven coverage holes) |
-| 5 | Standardize hooks on `jq`; no python3 at runtime | Installer already needs `jq`; the existing UserPromptSubmit hook uses `jq`. One runtime dependency; removes the python3-absent silent-no-op risk. | python3 (rejected: second dep, and the prior sketch's `2>/dev/null\|\|true` silently disabled enforcement) |
-| 6 | Feasibility spike is a hard GO/NO-GO gate (Feature 2), before any hook build | The enforcement-effectiveness premise is unproven on paper (red-team Finding 4). A 5-trial spike converts the central risk to evidence cheaply. | build-then-validate (rejected: risks full build on a false premise) |
-| 7 | Spike = 5-trial quick gate; strict ≥90%/20-trial bar deferred to the F6.1 eval | Two-stage: cheap go/no-go first, statistical acceptance later. Avoids paying 20-trial cost before knowing the mechanism wires up at all. | single-pass smoke (weaker); 20-trial spike (slower, premature) |
-| 8 | Behavioral acceptance is probabilistic (≥90% consult/pause over ≥20 trials; hard-blocks 100%), not a binary assert | LLM behavior is non-deterministic; a binary unit test would be flaky or false. Fire-rate is the honest metric. | binary pass/fail (rejected: misrepresents non-determinism) |
-| 9 | `exit 2` hard-blocks must fire 100% at every tier (spike + eval) | Deterministic shell logic; anything below 100% is a bug, not variance. | thresholded like the behavioral signal (rejected: deterministic control) |
-| 10 | State files live under `agents/{investigations,memory}/`, created by `mkdir -p` in the installer | Matches the `/handoff`,`/catchup` command-doc conventions; the dirs do not exist today (red-team Finding 9), so the installer must create them. | `scratch/` only (simpler but diverges from commands); assume-exists (rejected: failed writes) |
-| 11 | Drive the behavioral eval with `claude -p` headless + a transcript parser | Automatable to ≥20 trials/scenario; transcript JSONL gives objective gate-fire / rule-consult signals. | manual review (rejected: subjective, slow); keyword heuristic (kept as a fallback scorer) |
-| 12 | Spike runs in a `temp/` disposable repo inside this project | Isolated, nothing pollutes tracked files; `temp/` already exists and is gitignored; transcripts archived back to `agents/investigations/`. | git worktree (more setup); committed fixtures (nested-repo maintenance) |
-| 13 | Native-tool (`Write`/`Edit`/MCP) coverage ships as reminder-only in v1 | A precise, low-false-positive *block* condition for "overwrite of an uncommitted file" is undesigned; reminder closes the worst blind spot without false positives. Hard-gate deferred. | hard-gate now (rejected: false-positive risk undesigned); ignore (rejected: largest blind spot) |
-| 14 | Installer idempotency via versioned hook markers + a CLAUDE.md begin/end sentinel | Re-runs must not duplicate; the agent-delegation installer already proves the marker+jq-merge pattern. CLAUDE.md needs its own sentinel (second idempotency surface). | blind append (rejected: duplicates on re-run) |
-| 15 | Installer is fail-loud on missing `jq` / invalid settings JSON | A silent no-op of the safety layer is the exact failure anti-slop forbids ("silent fallbacks convert hard failures into silent corruption"). | `\|\| true` swallow (rejected: silently disables enforcement) |
-| 16 | Count-based cadences rewritten to event triggers in the rule text | The "every N actions" cadence assumes a self-count the model is unlikely to track; events ("after an untested edit", "after a failed call") are self-evident. No counter hook in v1. | counter hook (deferred: concurrency/session-id/reset complexity, verified) |
-| 17 | Documentation cleanup (F5.1) is independent of the spike gate | The doc fixes are high-confidence, observed-on-disk facts; they need no enforcement proof and can proceed in parallel. | bundle behind the gate (rejected: needlessly blocks safe work) |
-| 18 | Mechanical suite is local-only in v1 (`bash scripts/defensive-protocol/test.sh`); CI parked | User decision; suite is written CI-ready (non-zero exit) so a GitHub Action is a later drop-in. | CI now (deferred); no entry point (rejected: undiscoverable) |
-| 19 | Scripts are invoked via interpreter (`bash …`), never `chmod +x` | The project's own anti-slop Script Safety rule; the layer must not violate the rule it enforces. | `+x` scripts (rejected: dogfooding violation) |
+| # | Decision | Rationale |
+|---|----------|-----------|
+| 1 | The gate is **one discriminator + modifiers**, not separate detectors. | Emerged from 10 sub-agent reviews; separate machinery per axis would itself be over-engineering (axis 8). |
+| 2 | The three artifacts share a **concept, not a dependency**; each embeds its own copy. | Zero-dependency discreteness is the brief. A shared library for a single adopter is premature abstraction (axis 2 / named DRY trade-off). |
+| 3 | **No deterministic/static detection.** | No reliable syntactic signal for over-engineering exists; detection needs an agent reasoning pass. Hooks can remind/trigger, not detect. |
+| 4 | The correctness/safety floor is **clause 3 of the discriminator**, not an exempt list. | An exempt list is a blind spot (floor items can themselves be over-applied). One predicate, two verdicts prevents building two gates. |
+| 5 | **Minimal/prototype-grade default** when context is absent, flag aggressively. | The gate exists *because* the agent inflates ambiguous asks. Defaulting to maximal would encode the exact bias the gate catches. A flag is cheap; silent inflation is costly. |
+| 6 | Context = **blast_radius × lifespan**, with security/data-sensitivity kept explicit. | Load-bearing pair carries most signal; security stays explicit so minimal-default never drops below the floor. `audience`/`change_frequency` are derived — dropped to cut capture cost. |
+| 7 | Reversibility output is **"build a seam," never "build the feature."** | A one-way door reframed as permission-to-build is the loophole the bias weaponizes; axis 7 is its existence proof. The door licenses a reversal point only. |
+| 8 | The counterfactual is **different-model, escalation-only.** | A different model breaks the artifact-anchored bias that same-model self-review cannot. Restricting to high-stakes targets stops the counterfactual itself becoming axis-8 bloat. |
+| 9 | Inferred repo signals **tune severity + stop/ask posture, not flag existence.** | Keeps the discriminator context-free and falsifiable; a context-independent class of smells (rollback theater, swallowed errors, one-impl interfaces) fires regardless of context. |
+| 10 | Feature 3 **extends the dp2 family**, reusing its rule format, installer, and CLAUDE.md sentinel block. | dp2 already carries the autonomy/blast-radius posture; this rule specializes it, not duplicates it (Chesterton on our own rules). |
+| 11 | Feature 3 pairs the rule with a **`UserPromptSubmit` hook**. | The repo's own spike proved rule-text-alone is routed around by completion bias; the hook deterministically **injects a reminder** at the build-intent moment. Whether that reminder only advises or also blocks is enforcement mode — deferred (D1); the hook reminds, it does not detect or stop. |
+| 12 | The skill (Feature 4) is a **thin wrapper** over `/simplify` + `/code-review`. | Reuses existing tooling (DRY); adds only the requirement-ledger freeze and the discriminator. Reimplementing them would be redundant. |
+| 13 | Findings are **surfaced as flags, never scored numerically.** | A number invites gaming and false precision; the gate reports classified findings with cited clause-absence. |
+| 14 | Installer is **fail-loud** (jq required, no silent fallback) and never sets the executable bit. | Matches dp2's tested-installer bar and the repo's anti-slop "let it crash"; `chmod +x` is hard-blocked repo policy. |
+| 15 | Per-domain examples are **illustrative, review-owned, never canon.** | Maintain the *test*, not a curated list — a frozen checklist rots and re-imports the "to be safe" loophole. |
 
-## Deployment Workflow (phased — gated)
+## Deferred Design Decisions
+
+Intentionally unresolved; decide during implementation, not now.
+
+| # | Decision | Status |
+|---|----------|--------|
+| D1 | **Feature 3 enforcement mode: advise-only vs. block.** A `UserPromptSubmit` hook injects context Claude reads on the *next* request (cannot pause); only `permissionDecision` ask/deny or `exit 2` on a `PreToolUse` action can stop execution. | **Deferred** (user, 2026-06-16). Lean advise-only unless implementation evidence warrants a block. |
+| D2 | Whether to centralize the discriminator once all three artifacts are adopted. | Deferred — centralize only if all three artifacts are adopted AND the duplication is causing drift; until then, duplication keeps them discrete. |
+| D3 | Exact context-sourcing precedence when explicit PRD/architecture text and inferred repo signals disagree. | Deferred — design says ask-user only when sources conflict AND the finding is high-cost. |
+
+## Security Model
+
+Right-sized to the actual surface (a tooling project: markdown + bash hooks + a jq
+installer). Deliberately not expanded into theater — over-hardening here would
+violate the gate's own ethos (axis 5).
+
+### Execution surface
+
+- The `UserPromptSubmit` hook is a bash script that **emits text only** (a reminder
+  string); it does not read secrets, make network calls, or mutate state.
+- **Untrusted prompt text is data, never code:** the prompt is read via `jq` from
+  stdin and *matched*, never executed — all expansions quoted, no `eval` / `source`
+  / command substitution on prompt content. (This is the real attack surface: a
+  prompt is attacker-influencable input entering a shell.)
+- Scripts are invoked via `bash script.sh`; the executable bit is never set
+  (repo policy, hard-blocked).
+
+### Installer surface
+
+- The installer modifies `.claude/settings.json` (jq merge) and the CLAUDE.md
+  Active-Rules block (sentinel-guarded append). Settings writes are
+  **jq-to-temp-then-atomic-move**, validated before replacing the original, so a
+  failed merge cannot corrupt `.claude/settings.json`. Both surfaces are
+  **idempotent** and **fail-loud** — a missing jq or invalid JSON aborts rather than
+  silently corrupting state.
+- No network access, no credential handling, no data at rest.
+
+### Audit and logging
+
+- None required. The gate produces findings to stdout / injected context; it keeps
+  no audit trail. Adding one would be axis-5 ops theater for this scope.
+
+## File Organization
+
+Pure layout (purpose lives in Component Inventory; relationships in Dependency
+Graph — these are three lenses on the same six artifacts, not three copies):
 
 ```
-Phase 0  F1  Architecture doc (this file)
-Phase 1  F2  SPIKE in temp/ → GO ───────────────┐  (KILL → stop, update F1, consult user)
-                                                 ▼
-Phase 2  F3.1 high-risk gate   F3.2 failure reminder   F3.3 rule text + CLAUDE.md block
-Phase 3  F4.1 installer (mkdir agents/, jq merge, markers, sentinel, prereq check)
-Phase 4  F5.1 documentation cleanup            (parallel-safe — not gated by the spike)
-Phase 5  F6.1 test suite (bats) + behavioral eval (claude -p, ≥20 trials, ≥90%)
-Phase 6  End-to-end: fresh-repo install → trigger scenarios → confirm → idempotent re-install
+project-root/
+├── docs/ARCHITECTURE_AND_DESIGN.md
+├── agent-profiles/over-engineering-reviewer.md           # F2 (new top-level dir)
+├── rules/defensive-protocol-v2-over-engineering.md       # F3 (rule source)
+├── scripts/defensive-protocol/
+│   ├── install.sh                                         # F3 (installer, extended)
+│   └── hooks/over-engineering-reminder.sh                 # F3 (hook)
+└── skills/over-engineering-review/SKILL.md                # F4 (skill source)
 ```
+
+## Deployment Workflow
+
+Per-artifact, independent (no shared deploy):
+
+- **Feature 2 (agent profile):** drop the markdown file into `agent-profiles/`. No
+  wiring. Invoked via the Agent tool.
+- **Feature 3 (rule + hook):** `bash scripts/defensive-protocol/install.sh <target>`
+  — copies the rule to `<target>/.claude/rules/`, the hook to
+  `scripts/defensive-protocol/hooks/`, jq-merges the `UserPromptSubmit` entry into
+  `.claude/settings.json`, and appends the sentinel-guarded rule to CLAUDE.md.
+  Idempotent; restart Claude Code in the target to load.
+- **Feature 4 (skill):** the committed source is
+  `skills/over-engineering-review/SKILL.md`; consumers copy the bundle into their
+  target repo's `.claude/skills/` to activate (standard skill consume step).
+  Invoked via `/over-engineering-review`.
 
 ## Dependency Graph
 
 ```
-F1 architecture
- └── F2 spike (GO) ── gates ──▶ F3.1, F3.2, F3.3
-                                   └── F4.1 installer ── depends on ── F3.1/3.2/3.3
-                                          └── F6.1 tests/eval ── depends on ── F3.*, F4.1, F2 scenarios
-F5.1 docs cleanup  (independent — no spike dependency)
+Feature 1 (this doc)
+    └── source: agents/issues/34-over-engineering-gate.md (authoritative)
+
+Feature 2  ──┐
+Feature 3  ──┤── share the DISCRIMINATOR CONCEPT only (no build/runtime dependency)
+Feature 4  ──┘
+
+Feature 4 (skill)
+    └── composes (runtime): /simplify, /code-review   # reuse, not a build dep
+Feature 3 (installer)
+    └── requires: jq, bash   # fail-loud if jq absent
 ```
-
-## Testing and Validation (design)
-
-- **Tier 0 — Spike (F2, completed):** the F2 feasibility spike used a disposable `temp/` repo (`git init`, wire candidate hooks, 5 trials/scenario via `claude -p`) to prove the gate fired before the full build. Verdict was GO; the spike driver and its candidate hooks (`spike.sh`, `pre-bash.sh`, `post-failure.sh`) were removed post-GO as dead scaffolding — results archived to `agents/investigations/spike-hook-enforcement.md`. Superseded by the production hooks below.
-- **Tier 1 — Mechanical (bats):** `tests/hooks.bats` feeds sample stdin payloads per high-risk command, asserts emitted `permissionDecision`/`exit 2`/`additionalContext`; negative tests for documented misses; success-payload test asserts no failure-reminder. `tests/installer.bats` asserts twice-run empty diff and loud exit on missing `jq`/invalid JSON. Rule-sync test: `diff rules/ .claude/rules/`.
-- **Tier 2 — Behavioral (eval):** `scripts/defensive-protocol/eval/run-trials.sh` drives ≥20 `claude -p` trials/scenario; `score-transcript` extracts gate-fire / DOING-EXPECT / FAILED-THEORY-PROPOSE signals; reports per-scenario fire-rate vs. ≥90% (hard-blocks 100%).
-- **Tier 3 — End-to-end:** fresh repo, one `install.sh`, trigger each scenario once, confirm via transcript, re-install → empty diff.
-- **Entry point:** `bash scripts/defensive-protocol/test.sh` runs Tier 1 (+ Tier 3 smoke); Tier 2 documented and run on demand (cost).
 
 ## Out of Scope
 
 | Item | Rationale |
 |------|-----------|
-| Forcing the model to emit prediction text | Hooks stop/block actions; they cannot compel model output (verified). Prediction stays advisory. |
-| Catching obfuscated destructive commands | No matcher can (aliases, `base64\|sh`). Coverage boundary published, not hidden. |
-| Action-counter hook | Concurrency/session/reset complexity; events used instead. Future enhancement. |
-| Native-tool hard-block | Undesigned low-false-positive condition; reminder-only in v1. |
-| `kiro/` steering cleanup | Separate subsystem; follow-up sweep. |
-| CI wiring | Local-only by decision; suite is CI-ready. |
-| Windows / non-POSIX | jq + POSIX shell; macOS/Linux consumers. |
+| Deterministic/static over-engineering detection | No reliable syntactic signal; needs an agent pass (Decision #3). |
+| A shared library imported by all three artifacts | Zero-dependency brief; premature for a single adopter (Decision #2). |
+| Numeric over-engineering score | Invites gaming (Decision #13). |
+| Auto-fixing flagged elements | Gate detects and reports; remediation is user-driven. |
+| Reimplementing `/simplify` or `/code-review` | Feature 4 composes them (Decision #12). |
+| Over-engineering of agent/AI architecture | Out of frame — the gate targets the *deliverable*, generic software over-engineering. |
+| Audit trail / monitoring for the gate | Axis-5 ops theater at this scope (Security Model). |

@@ -11,7 +11,7 @@ For Claude Code skills (SKILL.md bundles), see [SKILLS.md](SKILLS.md).
 |---|---|---|
 | Benchmark | Measure whether a skill produces better output than a baseline or previous version; issue a scored promotion verdict | [View](scripts/benchmark/README.md) |
 | Agent Delegation | Install the `agent-delegation` rule and its `UserPromptSubmit` hook into a target Claude Code project | [View](scripts/agent-delegation/README.md) |
-| Defensive Protocol v2 | Install the Defensive Protocol v2 rule trio plus the hooks that enforce it (chmod hard-block, destructive-command gate, overwrite reminder, failure reminder) into a target project | [View](scripts/defensive-protocol/README.md) |
+| Defensive Protocol v2 | Install the Defensive Protocol v2 rules (anti-slop/epistemology/session-management trio + over-engineering gate) plus the hooks that enforce them (chmod hard-block, destructive-command gate, overwrite reminder, failure reminder, over-engineering pre-build reminder) into a target project | [View](scripts/defensive-protocol/README.md) |
 
 ## How Scripts Work
 
@@ -86,19 +86,19 @@ The installer is idempotent — re-running does not duplicate the hook. Idempote
 
 ## Defensive Protocol v2
 
-Installs the Defensive Protocol v2 rule trio (`rules/defensive-protocol-v2-{anti-slop,epistemology,session-management}.md`) into a target project **along with the hooks that enforce it**. The rules alone are self-applied behavioral guidance; the hooks make the high-risk guardrails deterministic — they fire before the agent acts, regardless of whether the rule text was consulted.
+Installs the Defensive Protocol v2 rules (`rules/defensive-protocol-v2-{anti-slop,epistemology,session-management,over-engineering}.md`) into a target project **along with the hooks that enforce them**. The rules alone are self-applied behavioral guidance; the hooks make the high-risk guardrails deterministic — they fire before the agent acts, regardless of whether the rule text was consulted.
 
 **Scripts:** `install.sh`, `test.sh`, `eval/run-trials.sh`, `eval/score-transcript.sh`
 **Documentation:** [scripts/defensive-protocol/README.md](scripts/defensive-protocol/README.md)
-**Companion rules:** [docs/rules/defensive-protocol-v2-anti-slop.md](rules/defensive-protocol-v2-anti-slop.md), [epistemology](rules/defensive-protocol-v2-epistemology.md), [session-management](rules/defensive-protocol-v2-session-management.md)
+**Companion rules:** [docs/rules/defensive-protocol-v2-anti-slop.md](rules/defensive-protocol-v2-anti-slop.md), [epistemology](rules/defensive-protocol-v2-epistemology.md), [session-management](rules/defensive-protocol-v2-session-management.md), [over-engineering](rules/defensive-protocol-v2-over-engineering.md)
 
 ### Effects on the Target
 
 | Path | Result |
 |------|--------|
-| `<target>/.claude/rules/defensive-protocol-v2-*.md` | Rule trio copied (added \| updated \| unchanged) |
-| `<target>/scripts/defensive-protocol/hooks/*.sh` | Four hook scripts copied |
-| `<target>/.claude/settings.json` | Four hook entries merged; existing keys preserved; created with `{}` if missing |
+| `<target>/.claude/rules/defensive-protocol-v2-*.md` | Four rule files copied (added \| updated \| unchanged) |
+| `<target>/scripts/defensive-protocol/hooks/*.sh` | Five hook scripts copied |
+| `<target>/.claude/settings.json` | Five hook entries merged; existing keys preserved; created with `{}` if missing |
 | `<target>/CLAUDE.md` | Active-Rules sentinel block appended (created if missing) |
 | `<target>/agents/{investigations,memory}/` | State directories created |
 
@@ -110,7 +110,8 @@ Installs the Defensive Protocol v2 rule trio (`rules/defensive-protocol-v2-{anti
 | `high-risk-gate.sh` | `PreToolUse` / `Bash` | `permissionDecision: ask` on `rm -rf`, force push, `reset --hard`, `rebase`, `branch -D`, `commit --amend`, `DROP`, `migrate` |
 | `pre-write.sh` | `PreToolUse` / `Edit\|Write\|mcp__.*` | Advisory overwrite/delete reminder (does not block) |
 | `failure-reminder.sh` | `PostToolUseFailure` | Two-tier `FAILED/THEORY/PROPOSE` reminder |
+| `over-engineering-reminder.sh` | `UserPromptSubmit` / `*` | Injects the 3-clause discriminator reminder on build/implement intent keywords (`implement`, `build`, `develop`, `add a`, `write a`); reminds only, does not detect |
 
-The installer is idempotent — re-running produces an empty diff (verified by `tests/installer.bats`). Hook merges are keyed off versioned markers (`# dp2-chmod-block v1`, etc.); the CLAUDE.md block is keyed off the `<!-- BEGIN DEFENSIVE-PROTOCOL-V2 -->` sentinel. Bump a marker suffix (`v1` → `v2`) in `install.sh` to force re-installation.
+The installer is idempotent — re-running produces an empty diff (verified by `tests/installer.bats` and `tests/installer-over-engineering.bats`). Hook merges are keyed off versioned markers (`# dp2-chmod-block v1`, etc.); the CLAUDE.md block is keyed off the `<!-- BEGIN DEFENSIVE-PROTOCOL-V2 -->` sentinel. Bump a marker suffix (`v1` → `v2`) in `install.sh` to force re-installation.
 
 Requires `jq` (installer + hooks) and, for the test suite, `bats-core`. Verify an install with `bash scripts/defensive-protocol/test.sh`.

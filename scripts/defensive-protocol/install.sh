@@ -86,11 +86,13 @@ _copy_file() {
 _copy_file "$RULES_SRC/defensive-protocol-v2-anti-slop.md"          "$CLAUDE_RULES_DST/defensive-protocol-v2-anti-slop.md"          "Rule"
 _copy_file "$RULES_SRC/defensive-protocol-v2-epistemology.md"       "$CLAUDE_RULES_DST/defensive-protocol-v2-epistemology.md"       "Rule"
 _copy_file "$RULES_SRC/defensive-protocol-v2-session-management.md" "$CLAUDE_RULES_DST/defensive-protocol-v2-session-management.md" "Rule"
+_copy_file "$RULES_SRC/defensive-protocol-v2-over-engineering.md"   "$CLAUDE_RULES_DST/defensive-protocol-v2-over-engineering.md"   "Rule"
 
-_copy_file "$HOOKS_SRC/chmod-block.sh"      "$HOOKS_DST/chmod-block.sh"      "Hook script"
-_copy_file "$HOOKS_SRC/high-risk-gate.sh"   "$HOOKS_DST/high-risk-gate.sh"   "Hook script"
-_copy_file "$HOOKS_SRC/failure-reminder.sh" "$HOOKS_DST/failure-reminder.sh" "Hook script"
-_copy_file "$HOOKS_SRC/pre-write.sh"        "$HOOKS_DST/pre-write.sh"        "Hook script"
+_copy_file "$HOOKS_SRC/chmod-block.sh"               "$HOOKS_DST/chmod-block.sh"               "Hook script"
+_copy_file "$HOOKS_SRC/high-risk-gate.sh"            "$HOOKS_DST/high-risk-gate.sh"            "Hook script"
+_copy_file "$HOOKS_SRC/failure-reminder.sh"          "$HOOKS_DST/failure-reminder.sh"          "Hook script"
+_copy_file "$HOOKS_SRC/pre-write.sh"                 "$HOOKS_DST/pre-write.sh"                 "Hook script"
+_copy_file "$HOOKS_SRC/over-engineering-reminder.sh" "$HOOKS_DST/over-engineering-reminder.sh" "Hook script"
 
 # ── 3. settings.json — validate / create ─────────────────────────────────────
 
@@ -175,6 +177,14 @@ _merge_hook \
 bash scripts/defensive-protocol/hooks/failure-reminder.sh" \
   "failure-reminder (PostToolUseFailure)"
 
+# UserPromptSubmit: over-engineering pre-build reminder
+_merge_hook \
+  "# dp2-oe-reminder v1" \
+  "UserPromptSubmit" "*" \
+  "# dp2-oe-reminder v1
+bash scripts/defensive-protocol/hooks/over-engineering-reminder.sh" \
+  "over-engineering-reminder (UserPromptSubmit/*)"
+
 # ── 5. CLAUDE.md — Active-Rules sentinel block ────────────────────────────────
 # Idempotent: checks for BEGIN sentinel before writing.
 # Block content matches this project's canonical CLAUDE.md block (Feature 3.3).
@@ -220,6 +230,31 @@ else
   printf '\n' >> "$CLAUDE_MD"
   _claude_md_block >> "$CLAUDE_MD"
   printf '==> CLAUDE.md: Active-Rules block appended\n'
+fi
+
+# ── 6. CLAUDE.md — Over-Engineering Gate sentinel block ───────────────────────
+# Separate sentinel from the dp2 block — independently idempotent.
+
+OE_SENTINEL_BEGIN='<!-- BEGIN DP2-OVER-ENGINEERING -->'
+
+_oe_claude_md_block() {
+  cat << 'BLOCK_EOF'
+<!-- BEGIN DP2-OVER-ENGINEERING -->
+### Over-Engineering Gate (dp2 extension)
+
+Loaded rule: `.claude/rules/defensive-protocol-v2-over-engineering.md`
+
+- **Pre-build reminder** fires on `implement`/`build`/`develop`/`add a`/`write a` — injects: "Before building: run the 3-clause discriminator; default minimal; justify every addition."
+<!-- END DP2-OVER-ENGINEERING -->
+BLOCK_EOF
+}
+
+if grep -qF "$OE_SENTINEL_BEGIN" "$CLAUDE_MD"; then
+  printf '==> CLAUDE.md: over-engineering block already present\n'
+else
+  printf '\n' >> "$CLAUDE_MD"
+  _oe_claude_md_block >> "$CLAUDE_MD"
+  printf '==> CLAUDE.md: over-engineering block appended\n'
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
