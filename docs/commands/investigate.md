@@ -30,7 +30,7 @@ Can be invoked with or without a description. If no description is provided, the
 
 | Output | Location | Description |
 |---|---|---|
-| Investigation file | `agents/investigations/[slug].md` | Structured document with facts, theories, tests performed, and resolution |
+| Investigation file | `agents/investigations/[slug]/[slug].md` | Structured document with facts, theories, tests performed, and resolution |
 | Resolution report | Console (stdout) | Summary of root cause, fix applied, and prevention strategy |
 
 ## Workflow
@@ -47,7 +47,7 @@ Creates a slug from the topic (e.g., `circular-dependency`, `aurora-connection-t
 
 ### Step 2 — Create investigation file
 
-Writes `agents/investigations/[slug].md` with this structure:
+Writes `agents/investigations/[slug]/[slug].md` with this structure:
 
 ```markdown
 # Investigation: [Title]
@@ -103,14 +103,16 @@ Works through the theories systematically:
 3. **Record every test** in the Tests Performed table — even negative results are valuable data.
 4. **Update Facts and Theories** as learning progresses — promotes confirmed theories to facts, eliminates disproven ones.
 5. **Maintain 3+ hypotheses** — if down to one unconfirmed theory, generates more alternatives.
+6. **Codex review of the hypotheses** — once 3+ competing hypotheses are recorded and before running the tests, hands the investigation file (plus the implicated source files) to Codex for an independent read. Codex is asked for non-distinct hypotheses, hypotheses contradicted by the recorded Facts, missing hypotheses the evidence supports, and tests that cannot discriminate between theories. Valid findings are folded back into Facts/Theories before testing; rejected findings get a one-line reason. Skipped entirely when codex is unavailable.
 
 ### Step 4 — Resolve
 
 When the root cause is found:
 
 1. Fills in the Resolution section with root cause, fix applied, and prevention strategy.
-2. Changes Status from `Active` to `Resolved`.
-3. Reports to the user:
+2. **Codex review of the resolution** — hands the completed investigation file to Codex to verify the root cause is supported by the recorded Facts and Tests (not asserted), the fix addresses the root cause rather than the symptom, no competing hypothesis was left un-eliminated, and Prevention is concrete. Valid findings are addressed before closing; an unsupported root cause keeps the investigation `Active` and returns to Step 3. Skipped entirely when codex is unavailable.
+3. Changes Status from `Active` to `Resolved`.
+4. Reports to the user:
 
 ```
 INVESTIGATION RESOLVED: [title]
@@ -118,11 +120,21 @@ INVESTIGATION RESOLVED: [title]
 Root cause: [one sentence]
 Fix: [what was changed]
 Prevention: [how to avoid in future]
+Codex review: [X valid / Y rejected — or "skipped (codex unavailable)"]
 
-Full investigation: agents/investigations/[slug].md
+Full investigation: agents/investigations/[slug]/[slug].md
 ```
 
 If the investigation represents a permanent learning (likely to recur, non-obvious), suggests adding it to CLAUDE.md via the `/memory` command.
+
+### Codex Review
+
+Both review points share one mechanism, documented in the command under `## Codex Review`:
+
+- **Availability guard** — `command -v codex`. If codex or `.claude/scripts/codex-review.sh` is missing, the review is skipped and the investigation continues; the skip is recorded in the file and the report. Review tooling is never a gate.
+- **Invocation** — `bash .claude/scripts/codex-review.sh <investigation file> [source files...] -p "<review questions>"`. The hardened wrapper is used instead of a hand-rolled `codex exec` (closed stdin, timeout, `-s read-only` sandbox). Exit `0` = PASS, `1` = FAIL, `2` = review failed (treated as "no verdict", never as PASS).
+- **Alternative** — the `codex:codex-rescue` agent when the `codex` plugin is installed.
+- **Triage** — every finding is classified VALID (reproducible against the recorded Facts/Tests or the real source) or REJECTED (one-line reason). Codex output is never auto-applied to the investigation file.
 
 ## When to Use
 
