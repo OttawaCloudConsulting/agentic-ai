@@ -64,11 +64,18 @@ For each unchecked `[ ]` sub-feature, in order:
 
 ### 1. Read Sub-Feature Description
 
-Read the sub-feature's description from the plan. Also read:
+The sections below are **feature-level** — identical for every sub-feature. Read
+them **once** when the loop starts, not on each iteration. Re-reading the
+architecture doc per sub-feature is wasted context:
+
 - The feature's **Approach** section for implementation strategy
 - The feature's **Interface Contracts** section for signatures and data shapes
 - The feature's **Files to Create/Modify** section for target file paths
 - `.project/<slug>/docs/ARCHITECTURE_AND_DESIGN.md` for architectural constraints
+
+On each iteration, read only **this sub-feature's** description from the plan.
+Re-open a feature-level section above only if this sub-feature specifically
+requires it (e.g. an Interface Contract you have not applied yet).
 
 ### 2. Implement the Sub-Feature
 
@@ -82,7 +89,9 @@ follow the deviation recording spec in `references/deviation-recording.md`.
 
 ### 3. Commit the Sub-Feature (D-03)
 
-Each completed sub-feature gets its own commit. Use the message format:
+Each completed sub-feature gets its own commit. Create it with
+`bash .claude/scripts/gcommit` (see **Commit Command Protocol** below) — never a
+heredoc or multi-line `-m`. Use the message format:
 
 ```
 feat(<feature-slug>): SF-N <sub-feature-name>
@@ -92,6 +101,7 @@ Where `<feature-slug>` is derived from the feature plan filename (e.g.,
 `session-management` from `session-management.md`).
 
 Example:
+
 ```
 feat(session-management): SF-2 implement data access layer
 ```
@@ -157,6 +167,7 @@ Change the feature marker from `[~]` to `[x]`. Set `Sub-features:` to `N/N
 complete`. Add `Completed: <ISO date>` to the Notes line.
 
 Before:
+
 ```
 [~] Feature 01.2: Session Management
     Plan: .project/{slug}/milestones/01-core-auth/plans/session-management.md
@@ -165,6 +176,7 @@ Before:
 ```
 
 After:
+
 ```
 [x] Feature 01.2: Session Management
     Plan: .project/{slug}/milestones/01-core-auth/plans/session-management.md
@@ -244,20 +256,44 @@ feat(<feature-slug>): SF-N <sub-feature-name>
 ```
 
 Where:
+
 - `<feature-slug>` is kebab-case derived from the feature plan filename (e.g.,
   `session-management` from `session-management.md`)
 - `N` is the sub-feature number
 - `<sub-feature-name>` is a brief description
 
 The codebase assessment refresh commit uses:
+
 ```
 docs(assessment): refresh codebase assessment for <feature-name>
 ```
 
 State file update commits on feature completion use:
+
 ```
 chore(<feature-slug>): update state files for feature completion
 ```
+
+## Commit Command Protocol (D-03)
+
+Every commit in this loop MUST be created with the file-based helper, never a
+heredoc or a multi-line `-m` (heredoc quoting failures are a recurring, avoidable
+interruption — and the repo enforces this via the `block-heredoc-commit`
+PreToolUse hook, which will deny such commits):
+
+```bash
+bash .claude/scripts/gcommit "feat(<feature-slug>): SF-N <sub-feature-name>"
+# or, for a multi-line body, write it to a file first:
+#   printf 'subject\n\nbody...\n' | bash .claude/scripts/gcommit
+```
+
+`gcommit` writes the message to a file and runs `git commit -F`, so quoting can
+never break. This applies to sub-feature, assessment-refresh, and state-file
+commits alike.
+
+The `bash .claude/scripts/...` paths assume the working directory is the repo
+root (equivalent to `$CLAUDE_PROJECT_DIR`); prefix with the repo root if running
+from a subdirectory.
 
 ## Session Continuity (D-02)
 

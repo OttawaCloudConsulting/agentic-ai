@@ -39,10 +39,10 @@ The exact markdown template for a new spike artifact. All 8 sections are require
 <What the research agent investigated and how -- methodology from research findings>
 
 ## Findings
-<Research agent's discoveries, organized by sub-question or theme -- from /tmp/spike-research-findings.md>
+<Research agent's discoveries, organized by sub-question or theme -- from ${TMPDIR:-/tmp}/spike-<slug>-research-findings.md>
 
 ## Red-Team Assessment
-<Red-team agent's critique -- from /tmp/spike-redteam-findings.md. This is an EQUAL PEER section to Findings. Do not merge, summarize, or suppress any red-team concerns.>
+<Red-team agent's critique -- from ${TMPDIR:-/tmp}/spike-<slug>-redteam-findings.md. This is an EQUAL PEER section to Findings. Do not merge, summarize, or suppress any red-team concerns.>
 
 ## Recommendation
 <Clear pick with rationale. States the recommended approach, why it is recommended, what risks remain after red-team review, and conditions under which the recommendation should be revisited.>
@@ -57,8 +57,8 @@ open
 **Section notes:**
 
 - **Question** and **Available Tooling** are transcribed verbatim from user input (SPIKE-01).
-- **Methodology** and **Findings** are populated from `/tmp/spike-research-findings.md`.
-- **Red-Team Assessment** is populated from `/tmp/spike-redteam-findings.md`. Per D-10, this section is never edited, merged into Findings, or summarized. It stands as the red-team agent's independent output.
+- **Methodology** and **Findings** are populated from `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md`.
+- **Red-Team Assessment** is populated from `${TMPDIR:-/tmp}/spike-<slug>-redteam-findings.md`. Per D-10, this section is never edited, merged into Findings, or summarized. It stands as the red-team agent's independent output.
 - **Recommendation** is synthesized by the parent SKILL.md after reading both agent outputs. Per D-11, it contains a clear pick with rationale, remaining risks, and revisitation conditions.
 - **Status** starts as `open` for all new spikes.
 - **Follow-Up Log** starts with the placeholder `(no follow-ups yet)`.
@@ -97,11 +97,11 @@ How the parent SKILL.md assembles the final spike artifact from agent outputs:
 
 1. **Create `.project/{project-slug}/docs/spikes/` directory** if it does not exist: `mkdir -p .project/{project-slug}/docs/spikes`
 
-2. **Read `/tmp/spike-research-findings.md`** for:
+2. **Read `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md`** for:
    - Methodology section content (from the research agent's Methodology section)
    - Findings section content (from the research agent's Findings Summary and Per-Tool Analysis)
 
-3. **Read `/tmp/spike-redteam-findings.md`** for:
+3. **Read `${TMPDIR:-/tmp}/spike-<slug>-redteam-findings.md`** for:
    - Red-Team Assessment section content (use the full red-team output -- do not summarize or filter)
 
 4. **Write the Recommendation section** by synthesizing both agent outputs:
@@ -116,7 +116,7 @@ How the parent SKILL.md assembles the final spike artifact from agent outputs:
 
 7. **Write the complete artifact** to `.project/{project-slug}/docs/spikes/<topic-slug>.md` using the New Spike Template
 
-8. **Clean up temp files:** Remove `/tmp/spike-research-findings.md` and `/tmp/spike-redteam-findings.md`
+8. **Clean up temp files:** Remove `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md` and `${TMPDIR:-/tmp}/spike-<slug>-redteam-findings.md`
 
 ## Resolution
 
@@ -125,13 +125,17 @@ Per D-07 and SPIKE-06, when the user signals that a spike is resolved:
 1. **Update the spike artifact:** Change `## Status` from `open` to `resolved`
 
 2. **Update progress.txt:** Change the spike entry from:
+
    ```
    [ ] Spike Name  .project/{project-slug}/docs/spikes/<topic>.md
    ```
+
    to:
+
    ```
    [x] Spike Name  .project/{project-slug}/docs/spikes/<topic>.md  Resolved: YYYY-MM-DD
    ```
+
    where `YYYY-MM-DD` is the current date.
 
 3. Resolution is a user-initiated action -- the skill never auto-resolves a spike. After each follow-up, the skill offers the user an option to resolve (D-08).
