@@ -1,18 +1,26 @@
 # Multi-Agent Delegation
 
-> Delegate bulk discovery, repetitive generation, and repo-wide search to specialized sub-agents. The coordinator (Sonnet) keeps architectural ownership. State the delegation decision before the first tool call on any bulk task.
+> Delegate bulk discovery, repetitive generation, and repo-wide search to specialized sub-agents. The main thread (coordinator) keeps architectural ownership. State the delegation decision before the first tool call on any bulk task.
 
 ---
 
 ## Trigger Card
 
+Maps to agents actually spawnable in this harness (the `Agent` tool's `subagent_type`,
+plus `model` overrides). Names like Gemini/Sonnet/Haiku/Opus are NOT spawnable agent
+types here — use the real agents below, and the `model` override for cost/depth tuning.
+
 ```text
 Bulk discovery (read-only)             → Explore
-Log retrieval / output parsing         → Haiku
-Repo-wide search / dependency map      → Gemini
-Architecture / unresolved blocker      → Opus
-Terminal / scripting workflows         → Codex
-Default                                → Sonnet (me)
+Locate code / "where is X" (compressed)→ cavecrew-investigator
+Multi-step search / research           → general-purpose
+Architecture / planning                → Plan
+1-2 file surgical edit                 → cavecrew-builder
+Diff / branch review                   → cavecrew-reviewer
+Terminal / scripting / second-opinion  → codex:codex-rescue
+Cheap localized task                   → Agent + model: haiku
+Deep reasoning / hard blocker          → Agent + model: opus
+Default                                → main thread (me)
 ```
 
 ---
@@ -41,9 +49,9 @@ Delegation should optimize for:
 
 ---
 
-## Primary Coordinator (Sonnet)
+## Primary Coordinator (main thread)
 
-Sonnet is the default development and orchestration agent.
+The main thread is the default development and orchestration agent.
 
 Responsibilities:
 
@@ -54,7 +62,7 @@ Responsibilities:
 - Validate correctness before merge
 - Handle nuanced reasoning and refactoring
 
-Even when delegation occurs, Sonnet remains responsible for:
+Even when delegation occurs, the main thread remains responsible for:
 
 - final integration
 - consistency validation
@@ -65,14 +73,29 @@ Even when delegation occurs, Sonnet remains responsible for:
 
 ## Delegation Matrix
 
-| Agent       | Delegate When... | Strengths | Weaknesses |
-|-------------|------------------|-----------|------------|
-| **Sonnet**  | Default for feature development, refactoring, debugging, and coordinated multi-file changes | Best balance of reasoning, context retention, and architectural cohesion | Less cost-efficient for repetitive boilerplate |
-| **Haiku**   | Generating tests, documentation, schema mappings, repetitive CRUD, simple UI/CSS updates, log retrieval and output parsing | Extremely fast and low-cost for localized implementation tasks | Weak at deep architectural reasoning and complex dependencies |
-| **Opus**    | Resolving unresolved system failures, security design, difficult debugging, or core architecture decisions | Maximum reasoning depth and abstract systems thinking | Highest latency and cost |
-| **Codex**   | Terminal workflows, shell scripts, deterministic implementation tasks, regex transformations, tooling glue code | Strong execution-oriented accuracy and structured implementation | Smaller effective context and weaker project-wide cohesion |
-| **Gemini**  | Repository-wide discovery, large log analysis, legacy codebase scanning, long-document ingestion | Massive context window enables large-scale analysis | Lower implementation precision; requires validation before merge |
-| **Explore** | Bulk read-only discovery, multi-file enumeration, "where is X defined / which files reference Y", initial codebase reconnaissance | Built-in Claude Code subagent; preserves the main context window; supports quick / medium / very-thorough search breadth | Read-only (cannot edit); reads excerpts, not whole files — misses content past its read window; not for cross-file consistency checks or open-ended analysis |
+These are the real spawnable agents in this harness (`Agent` tool `subagent_type`). For
+cost/depth tuning, pass a `model` override (`haiku`/`sonnet`/`opus`) on an `Agent` call
+rather than treating the model name as an agent type.
+
+| Agent | Delegate When... | Strengths | Weaknesses |
+|-------|------------------|-----------|------------|
+| **main thread (me)** | Default for feature development, refactoring, debugging, and coordinated multi-file changes | Holds architectural context; integrates delegated outputs | Consumes the primary context window on bulk work |
+| **Explore** | Bulk read-only discovery, multi-file enumeration, "where is X defined / which files reference Y", initial codebase reconnaissance | Built-in subagent; preserves the main context window; quick / medium / very-thorough breadth | Read-only; reads excerpts not whole files; not for cross-file consistency checks |
+| **cavecrew-investigator** | Locate code: "where is X defined", "what calls Y", "list uses of Z", map a directory | Read-only locator; caveman-compressed output (~60% fewer tokens back to main) | Refuses to suggest fixes; locate-only |
+| **general-purpose** | Multi-step search/research, open-ended "find the thing" when first tries may miss, repo-wide dependency tracing | Full toolset; persistent multi-step reasoning | Heavier than Explore; validate output before merge |
+| **Plan** | Architecture decisions, designing an implementation strategy before coding | Returns step-by-step plans, identifies critical files, weighs trade-offs | Read-only (cannot edit); planning only |
+| **cavecrew-builder** | Surgical 1-2 file edit: typo fix, single-function rewrite, mechanical rename, comment removal | Bounded edits; caveman diff receipt | Hard-refuses 3+ file scope; not for new features/files |
+| **cavecrew-reviewer** | Diff / branch / file review, PR audit | One line per finding, severity-tagged, no scope creep | Review only; skips pure formatting nits |
+| **codex:codex-rescue** | Terminal/scripting workflows, second implementation/diagnosis pass, deeper root-cause, hand off a substantial coding task to Codex | Strong execution-oriented accuracy; independent engine for second opinion | External runtime; validate before merge |
+| **Agent + `model: haiku`** | Cheap localized tasks: tests, docs, schema mappings, repetitive CRUD, log/output parsing | Fast, low-cost | Weak at deep architectural reasoning |
+| **Agent + `model: opus`** | Unresolved failures, security design, hard debugging, core architecture | Maximum reasoning depth | Highest latency and cost |
+
+**Plugin availability.** `cavecrew-*` agents come from the `caveman` plugin and
+`codex:codex-rescue` from the `codex` plugin — neither ships with Claude Code. In a
+harness without them, route those rows to the built-ins: `cavecrew-investigator` →
+`Explore`, `cavecrew-builder` → `Agent + model: haiku` (or the main thread),
+`cavecrew-reviewer` → `general-purpose`, `codex:codex-rescue` → `general-purpose`.
+Check the available-agents list in your session before delegating to a plugin agent.
 
 ---
 
@@ -116,12 +139,12 @@ When beneficial, use multiple specialized agents simultaneously.
 
 Example workflow:
 
-- **Explore** → in-session bulk reads and multi-file enumeration
-- **Gemini** → cross-repository discovery and long-context dependency tracing
-- **Haiku** → tests, docs, and repetitive support code
-- **Codex** → scripts, tooling, transformations, terminal workflows
-- **Sonnet** → orchestration, implementation coordination, integration
-- **Opus** → escalation for unresolved architectural or reasoning issues
+- **Explore** / **cavecrew-investigator** → in-session bulk reads, enumeration, code-locate
+- **general-purpose** → repo-wide discovery and multi-step dependency tracing
+- **Agent + `model: haiku`** → tests, docs, and repetitive support code
+- **codex:codex-rescue** → scripts, tooling, transformations, terminal workflows
+- **main thread (me)** → orchestration, implementation coordination, integration
+- **Agent + `model: opus`** → escalation for unresolved architectural or reasoning issues
 
 Parallel delegation should improve throughput without fragmenting architectural ownership.
 
@@ -131,29 +154,31 @@ Parallel delegation should improve throughput without fragmenting architectural 
 
 | Trigger Phrase | Delegate To | Purpose |
 |---|---|---|
-| "Generate exhaustive unit tests for..." | Haiku | Fast low-cost test generation |
-| "Update docs / comments / schema mappings..." | Haiku | Repetitive maintenance tasks |
-| "Find where X is defined..." | Explore | In-session bulk read and search |
+| "Generate exhaustive unit tests for..." | Agent + `model: haiku` | Fast low-cost test generation |
+| "Update docs / comments / schema mappings..." | Agent + `model: haiku` | Repetitive maintenance tasks |
+| "Find where X is defined..." | cavecrew-investigator | Compressed code-locate |
 | "Enumerate files matching..." | Explore | Multi-file read-only enumeration |
-| "Scan the repository for..." | Gemini | Repository-wide discovery |
-| "Trace all usages of..." | Gemini | Long-context dependency analysis |
-| "Design the architecture for..." | Opus | Deep systems reasoning |
-| "Investigate unresolved multi-system failures..." | Opus | Advanced debugging escalation |
-| "Refactor this subsystem safely..." | Sonnet | Coordinated multi-file refactoring |
-| "Implement production-ready feature..." | Sonnet | Default execution path |
-| "Write a shell script to..." | Codex | CLI and scripting workflows |
-| "Transform files using regex or automation..." | Codex | Deterministic transformation tasks |
+| "Scan the repository for..." | general-purpose | Repository-wide discovery |
+| "Trace all usages of..." | general-purpose | Multi-step dependency tracing |
+| "Review this diff / PR..." | cavecrew-reviewer | Severity-tagged diff review |
+| "Design the architecture for..." | Plan | Implementation strategy + critical files |
+| "Investigate unresolved multi-system failures..." | Agent + `model: opus` | Advanced debugging escalation |
+| "Second opinion / root-cause this..." | codex:codex-rescue | Independent diagnosis pass |
+| "Refactor this subsystem safely..." | main thread (me) | Coordinated multi-file refactoring |
+| "Implement production-ready feature..." | main thread (me) | Default execution path |
+| "Write a shell script to..." | codex:codex-rescue | CLI and scripting workflows |
+| "Surgical 1-2 file edit / rename..." | cavecrew-builder | Bounded format-preserving edit |
 
 ---
 
 ## Escalation Logic
 
-1. Start with **Sonnet**
-2. Use **Explore** for in-session bulk reads and search
-3. Delegate repetitive or localized tasks to **Haiku**
-4. Use **Gemini** for repository-wide analysis or long-context work
-5. Use **Codex** for execution-heavy or tooling-oriented workflows
-6. Escalate to **Opus** when:
+1. Start on the **main thread (me)**
+2. Use **Explore** / **cavecrew-investigator** for in-session bulk reads, search, code-locate
+3. Delegate repetitive or localized tasks to **Agent + `model: haiku`**
+4. Use **general-purpose** for repository-wide or multi-step discovery work
+5. Use **codex:codex-rescue** for execution-heavy, tooling, or second-opinion workflows
+6. Escalate to **Agent + `model: opus`** when:
    - blocked after multiple iterations
    - architectural uncertainty persists
    - debugging becomes non-deterministic
@@ -165,21 +190,21 @@ Escalation should be intentional, not automatic.
 
 ## Repository Discovery Guidance
 
-Use **Explore** when:
+Use **Explore** (or **cavecrew-investigator** for compressed locate-only output) when:
 
 - searching the current repository in-session
 - enumerating files by pattern
 - locating where a symbol or string is defined
 - preserving the main context window during reconnaissance
 
-Use **Gemini** when:
+Use **general-purpose** when:
 
-- searching legacy or massive repositories
-- tracing dependency chains across millions of lines
-- analyzing extensive logs
-- ingesting long technical documentation
+- the search is open-ended and the first few tries may miss
+- tracing dependency chains across many files
+- multi-step research that needs the full toolset, not just excerpts
+- analyzing logs or long documents in a separate context
 
-The split: Explore for in-session reads where the context window is not the bottleneck; Gemini for long-context workloads where it is. Both are discovery tools — implementation generated from their analysis must be validated by Sonnet or Opus before merge.
+The split: Explore/cavecrew-investigator for fast in-session reads; general-purpose for open-ended multi-step discovery that needs persistence and the full toolset. Both are discovery agents — implementation generated from their analysis must be validated on the main thread (escalate to `model: opus` for hard calls) before merge.
 
 ---
 
