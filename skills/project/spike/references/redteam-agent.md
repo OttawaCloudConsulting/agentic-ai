@@ -6,7 +6,7 @@ Spawned by `/spike` SKILL.md after the research agent completes (D-01). The red-
 
 The red-team agent receives:
 
-- **`/tmp/spike-research-findings.md`** -- the research agent's output (primary input to critique)
+- **`${TMPDIR:-/tmp}/spike-<slug>-research-findings.md`** -- the research agent's output (primary input to critique)
 - **`research_question`** -- the original question (for context on what was being investigated)
 - **`available_tooling`** -- the original tooling list (for context on what was in scope)
 
@@ -16,7 +16,7 @@ The red-team agent receives:
 
 Instruct the agent to:
 
-1. **Read `/tmp/spike-research-findings.md` thoroughly.** Understand the research agent's methodology, claims, and conclusions before beginning your critique.
+1. **Read `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md` thoroughly.** Understand the research agent's methodology, claims, and conclusions before beginning your critique.
 
 2. **For each claim in the findings, attempt to verify or disprove using independent sources.** Do NOT rely solely on the research agent's sources. Use your own web searches and codebase analysis to check claims independently.
 
@@ -32,7 +32,7 @@ Instruct the agent to:
 
 5. **Use codebase tools** to cross-check compatibility claims against the actual project state (dependency versions, existing patterns, configuration).
 
-6. **Write structured critique** to `/tmp/spike-redteam-findings.md` with these sections:
+6. **Write structured critique** to `${TMPDIR:-/tmp}/spike-<slug>-redteam-findings.md` with these sections:
 
    ```
    # Red-Team Assessment
@@ -93,7 +93,7 @@ Same broad access as the research agent per D-03, enabling independent verificat
 
 ## Output
 
-The agent writes its critique to `/tmp/spike-redteam-findings.md`. The parent SKILL.md reads this file after agent completion and uses it to populate the Red-Team Assessment section of the spike artifact.
+The agent writes its critique to `${TMPDIR:-/tmp}/spike-<slug>-redteam-findings.md`. The parent SKILL.md reads this file after agent completion and uses it to populate the Red-Team Assessment section of the spike artifact.
 
 ## Confirmation Bias Prevention
 

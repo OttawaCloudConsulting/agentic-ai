@@ -27,6 +27,14 @@ Create a complete project foundation through a structured interview process. Pro
 - Working directory is the project root (or subdirectory where the project will live)
 - Check whether any of the three output files exist (`prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`,
   `progress.txt`) — confirm with the user before overwriting any that are present
+- **Coexistence with `/project` (schema guard).** `/create-prd` writes a *light* `progress.txt`
+  (inline `[ ] Feature X.Y` lines) and routes to `/start-feature`. `/project` owns a *gated*
+  `progress.txt` (`## Gates` / `## Milestones` sections, with milestones under `.project/<slug>/`).
+  The two schemas are incompatible in one file. If the `progress.txt` in the working directory
+  contains `## Gates` or `## Milestones`, this repo is under `/project` management — **stop** and
+  tell the user: either continue with `/project`, or run `/create-prd` from a dedicated
+  subdirectory (its own working dir = its own `progress.txt`, no collision). Never overwrite a
+  gated `progress.txt` with the light schema.
 
 ## Step 1 — Seed the PRD
 

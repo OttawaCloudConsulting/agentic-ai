@@ -20,6 +20,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | Plan Feature | `/plan-feature` | Per-feature implementation plan with sub-feature sizing and test commands (Gate 4) | [View](skills/plan-feature.md) |
 | Build | `/build` | Sub-feature implementation from Gate 4-approved plans with test gating and deviation tracking | [View](skills/build.md) |
 | Spike | `/spike` | Adversarial technical research with red-team validation and follow-up support | [View](skills/spike.md) |
+| Red-Team | `/red-team` | Adversarial review of any artifact — spawns parallel sub-agents with different adversarial lenses | [View](skills/red-team.md) |
 | OCC Skill Creator | `/occ-skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/occ-skill-creator.md) |
 | OCC Skill Refactor | `/occ-skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/occ-skill-refactor.md) |
 | Project Codex Skills | `$project` | Codex project suite -- bootstraps state, reports status, routes to the next explicit `$project-*` skill | [View](skills/project.md) |
@@ -63,27 +64,83 @@ license: Apache-2.0                 # Optional. License identifier.
 
 ## Consuming Skills
 
-Copy the entire skill directory from `skills/` into `.claude/skills/` in the target repository:
+Most skills are copied by hand. The one exception is the **gated project suite**, which
+`scripts/claude-toolkit/install.sh` installs for you — along with the helper scripts it depends on
+and the correct flattened layout:
 
 ```bash
-# Copy a skill bundle
-cp -r skills/cdk-testing/       <target-repo>/.claude/skills/cdk-testing/
-cp -r skills/terraform-testing/  <target-repo>/.claude/skills/terraform-testing/
+bash scripts/claude-toolkit/install.sh <target-repo-path>   # project suite + scripts + hooks
+bash scripts/claude-toolkit/install.sh --no-skills <target> # scripts + hooks only
+```
+
+Everything else is a directory copy from `skills/` into `.claude/skills/` in the target repository:
+
+```bash
+# Standalone skills — one directory each
+cp -r skills/architecture-doc/          <target-repo>/.claude/skills/architecture-doc/
+cp -r skills/cdk-testing/               <target-repo>/.claude/skills/cdk-testing/
+cp -r skills/terraform-testing/         <target-repo>/.claude/skills/terraform-testing/
 cp -r skills/itsg-assessment/           <target-repo>/.claude/skills/itsg-assessment/
 cp -r skills/nist-fedramp-assessment/   <target-repo>/.claude/skills/nist-fedramp-assessment/
 cp -r skills/nist-csf-assessment/       <target-repo>/.claude/skills/nist-csf-assessment/
 cp -r skills/create-prd/                <target-repo>/.claude/skills/create-prd/
-cp -r skills/project/milestone/          <target-repo>/.claude/skills/project/milestone/
-cp -r skills/project/plan-feature/        <target-repo>/.claude/skills/project/plan-feature/
-cp -r skills/project/spike/               <target-repo>/.claude/skills/project/spike/
-cp -r skills/project/define/              <target-repo>/.claude/skills/project/define/
-cp -r skills/project/design/              <target-repo>/.claude/skills/project/design/
-cp -r skills/project/build/               <target-repo>/.claude/skills/project/build/
+cp -r skills/red-team/                  <target-repo>/.claude/skills/red-team/
 cp -r skills/occ-skill-creator/         <target-repo>/.claude/skills/occ-skill-creator/
 cp -r skills/occ-skill-refactor/        <target-repo>/.claude/skills/occ-skill-refactor/
-cp -r skills/project/                   <target-repo>/.claude/skills/project/
 cp -r skills/rule-creator/              <target-repo>/.claude/skills/rule-creator/
 cp -r skills/over-engineering-review/   <target-repo>/.claude/skills/over-engineering-review/
+
+# Gated project suite — MUST be flattened; see "Flatten the project suite" below.
+# Prefer the installer, which does this for you.
+cp -r skills/project/build/             <target-repo>/.claude/skills/build/
+cp -r skills/project/define/            <target-repo>/.claude/skills/define/
+cp -r skills/project/design/            <target-repo>/.claude/skills/design/
+cp -r skills/project/milestone/         <target-repo>/.claude/skills/milestone/
+cp -r skills/project/plan-feature/      <target-repo>/.claude/skills/plan-feature/
+cp -r skills/project/spike/             <target-repo>/.claude/skills/spike/
+# ...then the orchestrator itself, WITHOUT re-copying the sub-skill dirs above:
+mkdir -p                                <target-repo>/.claude/skills/project/
+cp    skills/project/SKILL.md           <target-repo>/.claude/skills/project/
+cp -r skills/project/references/        <target-repo>/.claude/skills/project/references/
+```
+
+### Flatten the project suite
+
+This library nests the gated suite as `skills/project/<sub>/` for authoring, but that is **not** a
+valid installed layout. Claude Code scans `.claude/skills/` exactly one level deep, and a skill's
+slash command comes from its **directory name** — for project and personal skills the `name:`
+frontmatter only sets the display label shown in listings.
+
+| Installed path | Result |
+|---|---|
+| `.claude/skills/build/SKILL.md` | Discovered as `/build` |
+| `.claude/skills/project/build/SKILL.md` | Never discovered — one level too deep |
+
+Copying `skills/project/` wholesale into `.claude/skills/project/` therefore yields a `/project`
+orchestrator whose six sub-skills are all invisible — and `/project` routes to them by bare name
+(`/build`, `/define`, ...), so the workflow dead-ends at the first gate. Flatten the suite, as shown
+above, or let the installer do it:
+
+```bash
+bash scripts/claude-toolkit/install.sh <target-repo-path>
 ```
 
 Skills take effect immediately on the next Claude Code conversation in that repository.
+
+### Prerequisite: the Claude Toolkit scripts
+
+`/build` and `/start-feature-auto` invoke helper scripts by path. Copying the skill alone leaves
+those instructions pointing at files that do not exist:
+
+| Consumer | Requires | Why |
+|---|---|---|
+| `skills/project/build/` (`/build`) | `.claude/scripts/gcommit` | Commit Command Protocol D-03 — every sub-feature and assessment-refresh commit is file-based |
+| `commands/start-feature-auto.md` | `.claude/scripts/codex-review.sh` | Step 7 Codex review before the feature closes |
+
+A default `bash scripts/claude-toolkit/install.sh <target-repo-path>` installs both the suite and
+these scripts together, so the dependency is satisfied automatically. It matters when the pieces are
+installed separately — a hand-copied suite, or an install run with `--no-skills`. Without the
+scripts, `/build` still runs but its commit step fails on a missing `gcommit`, and
+`/start-feature-auto` records the review as skipped rather than blocking.
+
+See [SCRIPTS.md](SCRIPTS.md#claude-toolkit) for everything the installer writes to the target.

@@ -40,7 +40,13 @@ skill on every subsequent invocation. Read-only after bootstrap.
 Read `progress.txt` from the project root.
 
 - If the file **does not exist**, proceed to Step 2 (Bootstrap).
-- If the file **exists**, proceed to Step 3 (Read State).
+- If the file **exists but is a *light* `progress.txt`** (inline `[ ] Feature X.Y` lines and no
+  `## Gates` / `## Milestones` sections), it is owned by `/create-prd` + `/start-feature`, not the
+  gated workflow. **Stop** and tell the user: this directory is under the light workflow — use
+  `/start-feature` here, or run `/project` from a directory with no light `progress.txt`. Do not
+  parse it as gated state and do not overwrite it.
+- If the file **exists** with the gated schema (`## Gates` / `## Milestones`), proceed to Step 3
+  (Read State).
 
 ## Step 2 -- Bootstrap
 

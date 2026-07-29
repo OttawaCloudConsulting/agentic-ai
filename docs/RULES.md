@@ -15,7 +15,7 @@ Rules are always-on behavioral guidelines loaded automatically via `.claude/rule
 | Crossplane v1 Best Practices | `rules/crossplane-v1-best-practices.md` | Crossplane/Upbound guidelines: XR design, compositions, managed resources | [View](rules/crossplane-v1-best-practices.md) |
 | Crossplane v2 Best Practices | `rules/crossplane-v2-best-practices.md` | Crossplane v2 specifics: namespaced XRs, spec.crossplane, Configuration packages | [View](rules/crossplane-v2-best-practices.md) |
 | Kubernetes Best Practices | `rules/kubernetes-best-practices.md` | Kubernetes guidelines: resource management, security, RBAC, networking | [View](rules/kubernetes-best-practices.md) |
-| Agent Delegation | `rules/agent-delegation.md` | Multi-agent delegation matrix with `UserPromptSubmit` hook to force consultation before bulk tasks | [View](rules/agent-delegation.md) |
+| Agent Delegation | `rules/agent-delegation.md` | Delegation matrix routing to real spawnable harness agents (Explore, cavecrew-*, general-purpose, Plan, codex:codex-rescue, Agent+model overrides), with a `UserPromptSubmit` hook to force consultation before bulk tasks | [View](rules/agent-delegation.md) |
 
 ## How Rules Work
 

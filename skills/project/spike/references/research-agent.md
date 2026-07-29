@@ -37,7 +37,7 @@ Instruct the agent to:
    - Find existing usage of related tools or patterns
    - Understand integration points where the evaluated tools would connect
 
-6. **Write structured findings** to `/tmp/spike-research-findings.md` with these sections:
+6. **Write structured findings** to `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md` with these sections:
 
    ```
    # Research Findings
@@ -82,7 +82,7 @@ These tools allow documentation lookup via web search, codebase scanning for exi
 
 ## Output
 
-The agent writes its findings to `/tmp/spike-research-findings.md`. The parent SKILL.md reads this file after agent completion and uses it to populate the Methodology and Findings sections of the spike artifact.
+The agent writes its findings to `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md`. The parent SKILL.md reads this file after agent completion and uses it to populate the Methodology and Findings sections of the spike artifact.
 
 ## Edge Cases
 

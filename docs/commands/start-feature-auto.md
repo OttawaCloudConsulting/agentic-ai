@@ -100,10 +100,32 @@ Executes using the recorded model. Inline proceeds directly. Sub-agent launches 
 agent in a worktree with the full feature context. Team launches one agent per work stream in
 parallel, then merges results.
 
-### Step 7 — Close the feature
+### Step 7 — Codex review of the completed change set
 
-Appends `CODE COMPLETE` and `Completed YYYY-MM-DD` to NOTES, changes status to `[x]`, and
-reports to the user with execution model, files changed, and the next feature.
+> **Requires** `.claude/scripts/codex-review.sh` from the Claude Toolkit bundle
+> (`bash scripts/claude-toolkit/install.sh <target-repo-path>`) plus the `codex` CLI. When either is
+> absent the step records `CODEX REVIEW: skipped (codex unavailable — <reason>)` and the feature
+> still closes.
+
+After implementation finishes and local tests/linters pass, reviews the work with Codex before
+closing: assembles the change set and acceptance criteria, writes a review brief, runs the
+hardened wrapper (`bash .claude/scripts/codex-review.sh --diff` — never a hand-rolled
+`codex exec`; exit 0 = PASS, 1 = FAIL, 2 = no verdict and never inferred as PASS), then triages
+every finding as VALID (confirmed against the code) or REJECTED (with a one-line reason).
+Codex unavailability is non-fatal — recorded and reported, never blocking.
+
+### Step 8 — Refactor on valid findings (conditional)
+
+Clean review (or only REJECTED findings) skips straight to close. Valid findings are addressed
+using the same execution model recorded in NOTES, staying within feature scope, HIGH before LOW;
+tests and linters re-run, with at most one confirming Codex re-review. An unresolved valid HIGH
+finding leaves the feature `[~]` and reports instead of closing.
+
+### Step 9 — Close the feature
+
+Appends `CODE COMPLETE`, `CODEX REVIEW`, `REFACTOR`, and `Completed YYYY-MM-DD` to NOTES,
+changes status to `[x]`, and reports to the user with execution model, files changed, review
+outcome, and the next feature.
 
 ## NOTES Structure
 
@@ -117,8 +139,10 @@ The NOTES block has a consistent structure written in two passes:
 | `KEY DECISIONS` | Step 4 — before implementation | Relevant design decisions |
 | `DEPENDENCIES` | Step 4 — before implementation | Feature and external deps |
 | `EXECUTION` | Step 5 — before implementation | Chosen model and rationale |
-| `CODE COMPLETE` | Step 7 — after implementation | Files changed, test and lint status |
-| `Completed` | Step 7 — after implementation | Completion date |
+| `CODE COMPLETE` | Step 9 — after implementation | Files changed, test and lint status |
+| `CODEX REVIEW` | Step 9 — after review | Finding counts (H/M/L), valid vs rejected with reasons |
+| `REFACTOR` | Step 9 — after refactor | What changed to resolve valid findings, or "none (review clean)" |
+| `Completed` | Step 9 — after implementation | Completion date |
 
 ## Error Handling
 

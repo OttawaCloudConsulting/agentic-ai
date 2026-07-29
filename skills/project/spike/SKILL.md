@@ -49,6 +49,7 @@ user to run `/project` to re-bootstrap.
 Gather the user's research question and available tooling list per
 D-05/SPIKE-01. If the user provided these in their invocation message, use
 them directly. If not provided, use `AskUserQuestion` to ask for:
+
 - Research question (what technical question to investigate)
 - Available tooling (libraries, tools, approaches to evaluate -- can be empty)
 
@@ -56,6 +57,7 @@ them directly. If not provided, use `AskUserQuestion` to ask for:
 Read `references/spike-format.md` for the Topic Slug Generation rules.
 Generate the slug from the topic. Check if
 `.project/{slug}/docs/spikes/{topic-slug}.md` exists on disk.
+
 - If file exists: enter follow-up mode (Step 5).
 - If file does not exist: enter new spike mode (Step 2).
 - If slug collision (file exists but different question): use
@@ -69,9 +71,11 @@ specification.
 
 Spawn a sub-agent using the `Agent` tool following the research agent spec.
 Pass the research question and available tooling list to the agent prompt.
-The agent writes findings to `/tmp/spike-research-findings.md`.
+The agent writes findings to `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md` — substitute the actual
+spike `<slug>` (from Step 1) so concurrent spikes never collide on a shared temp file. Pass the
+concrete slug-filled path to the agent.
 
-After the agent completes, read `/tmp/spike-research-findings.md` to verify
+After the agent completes, read `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md` to verify
 it was produced. If missing, report error and offer retry or manual input.
 
 ## Step 3 -- Red-Team Agent
@@ -80,10 +84,10 @@ Read `references/redteam-agent.md` for the complete red-team agent
 specification.
 
 Spawn a sub-agent using the `Agent` tool following the red-team agent spec.
-The agent reads `/tmp/spike-research-findings.md` (research output) and
-writes critique to `/tmp/spike-redteam-findings.md`.
+The agent reads `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md` (research output) and
+writes critique to `${TMPDIR:-/tmp}/spike-<slug>-redteam-findings.md`.
 
-After the agent completes, read `/tmp/spike-redteam-findings.md` to verify
+After the agent completes, read `${TMPDIR:-/tmp}/spike-<slug>-redteam-findings.md` to verify
 it was produced. If missing, report error and offer retry.
 
 ## Step 4 -- Assemble Spike Artifact
@@ -92,6 +96,7 @@ Read `references/spike-format.md` for the artifact template and assembly
 instructions.
 
 Follow the assembly instructions to:
+
 1. Create `.project/{slug}/docs/spikes/` directory if it does not
    exist.
 2. Build the spike artifact using the New Spike Template.
@@ -121,6 +126,7 @@ agents (Steps 2-3) with the follow-up question as the research question
 and the same available tooling from the original spike.
 
 After both agents complete:
+
 1. Read the existing spike artifact from
    `.project/{slug}/docs/spikes/{topic-slug}.md`.
 2. Append a new Follow-Up Log entry per the dated entry format (per D-08,

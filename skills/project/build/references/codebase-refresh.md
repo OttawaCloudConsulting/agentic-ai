@@ -72,7 +72,7 @@ default to `claude`.
 If the user explicitly requests a different engine, update the marker on the first
 line of `.project/<slug>/docs/codebase-assessment.md` and use the new value.
 
-**`claude` (or marker absent):** Proceed to [Claude Sub-Agent Refresh](#claude-sub-agent-refresh) below.
+**`claude` (or marker absent):** Proceed to [Claude Sub-Agent Refresh](#claude-sub-agent-refresh-build-02) below.
 
 **`gemini`:** Proceed to [Gemini Delta Scan](#gemini-delta-scan-gem-04) below.
 On any failure, fall back silently to the Claude sub-agent. Never re-prompt —
@@ -82,7 +82,7 @@ the persisted marker is the engine choice.
 
 When the engine marker is `gemini` and files have changed, run an incremental
 delta scan via Gemini. On any failure, fall back silently to
-[Claude Sub-Agent Refresh](#claude-sub-agent-refresh). Never re-prompt — the
+[Claude Sub-Agent Refresh](#claude-sub-agent-refresh-build-02). Never re-prompt — the
 persisted marker is the engine choice.
 
 ### Optional Liveness Probe (GEM-05)
@@ -98,7 +98,7 @@ gemini -m <model-id> -p "ok" --approval-mode plan --skip-trust -o json 2>/dev/nu
 ```
 
 **Probe failure:** Fall back silently to
-[Claude Sub-Agent Refresh](#claude-sub-agent-refresh).
+[Claude Sub-Agent Refresh](#claude-sub-agent-refresh-build-02).
 
 ### Prepare the Delta Prompt
 
@@ -168,7 +168,7 @@ Capture `$DELTA_FINDINGS` as `<delta-findings>`. Check `$GEMINI_EXIT` and `$DELT
 
 ### Failure Conditions → Fallback
 
-Fall back silently to [Claude Sub-Agent Refresh](#claude-sub-agent-refresh) if
+Fall back silently to [Claude Sub-Agent Refresh](#claude-sub-agent-refresh-build-02) if
 any of:
 
 - `$GEMINI_EXIT` is non-zero (check before parsing — do not rely on the pipeline's `$?`).
@@ -178,7 +178,7 @@ any of:
 - `$DELTA_FINDINGS` is empty or whitespace-only.
 - `$DELTA_FINDINGS` contains none of the expected section headings.
 - `## Recent Changes` is absent from the delta.
-- Any top-level `## ` heading in the delta is not one of the expected headings
+- Any top-level `##` heading in the delta is not one of the expected headings
   (unrecognized or wrong case).
 
 ### Apply Delta
@@ -187,14 +187,14 @@ When `<delta-findings>` is valid, Claude (the parent skill, not a sub-agent)
 applies the delta directly:
 
 1. Read `.project/<slug>/docs/codebase-assessment.md` (current content).
-2. For each top-level `## ` heading in `<delta-findings>` (matched
-   byte-for-byte, including case and the `## ` prefix):
+2. For each top-level `##` heading in `<delta-findings>` (matched
+   byte-for-byte, including case and the `##` prefix):
    - Locate the matching heading in the current assessment.
    - If the heading is not found in the current assessment, fall back silently
-     to [Claude Sub-Agent Refresh](#claude-sub-agent-refresh) and abort the
+     to [Claude Sub-Agent Refresh](#claude-sub-agent-refresh-build-02) and abort the
      delta apply entirely.
-   - A section spans from its `## ` heading up to (but not including) the next
-     top-level `## ` heading or EOF. Nested `### ` and deeper headings are
+   - A section spans from its `##` heading up to (but not including) the next
+     top-level `##` heading or EOF. Nested `###` and deeper headings are
      part of that section.
    - Replace the entire section (heading + content) with the corresponding
      section from `<delta-findings>`.
@@ -269,10 +269,12 @@ regardless of the marker value.
 ## Standalone Commit (D-07)
 
 After the Gemini delta is applied or the Claude sub-agent completes, commit the updated assessment separately from
-any implementation commits:
+any implementation commits. Create it with the file-based helper — never a heredoc
+or multi-line `-m` (this refresh commit happens **before** the build loop loads the
+Commit Command Protocol in `build-execution.md`, so the rule applies here too):
 
-```
-docs(assessment): refresh codebase assessment for <feature-name>
+```bash
+bash .claude/scripts/gcommit "docs(assessment): refresh codebase assessment for <feature-name>"
 ```
 
 The commit covers `.project/<slug>/docs/codebase-assessment.md`.
