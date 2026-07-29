@@ -33,11 +33,11 @@ Reads `progress.txt` from the project root. Gathers the user's research question
 
 ### 2. Research Agent
 
-Spawns a sub-agent to investigate the research question. The agent uses web search (WebFetch), codebase tools (Read, Glob, Grep, Bash), and documentation to research each tool in the available tooling list. Produces structured findings including methodology, per-tool analysis (version, compatibility, documentation, community activity, known issues, integration), comparison matrix, and findings summary. Writes results to `/tmp/spike-research-findings.md`.
+Spawns a sub-agent to investigate the research question. The agent uses web search (WebFetch), codebase tools (Read, Glob, Grep, Bash), and documentation to research each tool in the available tooling list. Produces structured findings including methodology, per-tool analysis (version, compatibility, documentation, community activity, known issues, integration), comparison matrix, and findings summary. Writes results to `${TMPDIR:-/tmp}/spike-<slug>-research-findings.md` (slug-namespaced so concurrent spikes never collide).
 
 ### 3. Red-Team Agent
 
-After the research agent completes, spawns a second sub-agent with an explicitly adversarial posture. The red-team agent reads the research findings and independently verifies claims using its own tool access (same tools as research agent per D-03). Challenges factual errors, missing alternatives, flawed reasoning, unverified assumptions, and version/compatibility issues. Quantifies verification effort (N of M claims checked). Writes structured critique to `/tmp/spike-redteam-findings.md`.
+After the research agent completes, spawns a second sub-agent with an explicitly adversarial posture. The red-team agent reads the research findings and independently verifies claims using its own tool access (same tools as research agent per D-03). Challenges factual errors, missing alternatives, flawed reasoning, unverified assumptions, and version/compatibility issues. Quantifies verification effort (N of M claims checked). Writes structured critique to `${TMPDIR:-/tmp}/spike-<slug>-redteam-findings.md`.
 
 ### 4. Artifact Assembly
 

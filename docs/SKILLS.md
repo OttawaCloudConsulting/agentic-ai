@@ -20,6 +20,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | Plan Feature | `/plan-feature` | Per-feature implementation plan with sub-feature sizing and test commands (Gate 4) | [View](skills/plan-feature.md) |
 | Build | `/build` | Sub-feature implementation from Gate 4-approved plans with test gating and deviation tracking | [View](skills/build.md) |
 | Spike | `/spike` | Adversarial technical research with red-team validation and follow-up support | [View](skills/spike.md) |
+| Red-Team | `/red-team` | Adversarial review of any artifact — spawns parallel sub-agents with different adversarial lenses | [View](skills/red-team.md) |
 | OCC Skill Creator | `/occ-skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/occ-skill-creator.md) |
 | OCC Skill Refactor | `/occ-skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/occ-skill-refactor.md) |
 | Project Codex Skills | `$project` | Codex project suite -- bootstraps state, reports status, routes to the next explicit `$project-*` skill | [View](skills/project.md) |

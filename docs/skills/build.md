@@ -34,11 +34,11 @@ Before reading the feature plan, performs an incremental refresh of `.project/{s
 
 ### 3. Sub-Feature Execution
 
-Loads the feature plan from the path recorded in `milestone-status.txt`. Parses the Sub-Features checklist and finds the first unchecked `[ ]` sub-feature (auto-resume mechanism for multi-session builds). For each sub-feature in order:
+Loads the feature plan from the path recorded in `milestone-status.txt`. Parses the Sub-Features checklist and finds the first unchecked `[ ]` sub-feature (auto-resume mechanism for multi-session builds). Feature-level sections (Approach, Interface Contracts, architecture doc) are read **once** when the loop starts — not re-read per sub-feature. For each sub-feature in order:
 
-1. Reads the sub-feature description, Approach, Interface Contracts, Files to Create/Modify, and architecture doc
+1. Reads only this sub-feature's description from the plan (re-opening a feature-level section only when it specifically applies)
 2. Implements the sub-feature -- writes actual code in the user's codebase
-3. Commits the sub-feature with message format `feat(<feature-slug>): SF-N <name>`
+3. Commits the sub-feature via `bash .claude/scripts/gcommit` (Commit Command Protocol D-03 — never a heredoc or multi-line `-m`) with message format `feat(<feature-slug>): SF-N <name>`
 4. Marks the sub-feature `[x]` in the feature plan
 5. Updates `milestone-status.txt` sub-feature count
 6. Displays the full Sub-Features checklist with current marks and announces the next sub-feature

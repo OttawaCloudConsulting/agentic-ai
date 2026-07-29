@@ -104,6 +104,7 @@ Presents a summary: artifact names, feature count, configuration parameter count
 - Updating an existing PRD — edit the file directly
 - Projects so small they don't warrant a PRD (a single function, a one-off script)
 - When the architecture is already fully defined and you only need a progress file
+- When the working directory's `progress.txt` contains `## Gates` / `## Milestones` sections — that repo is under `/project` (gated) management. The skill stops rather than overwrite a gated `progress.txt` with the light schema; continue with `/project`, or run `/create-prd` from a dedicated subdirectory
 
 ## Related Skills
 
