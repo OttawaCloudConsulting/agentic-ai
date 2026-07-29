@@ -17,20 +17,41 @@ bash scripts/claude-toolkit/install.sh --base-branch develop <target-repo-path>
 
 Restart Claude Code in the target repo afterwards.
 
-### Scope: scripts and hooks only
+### Scope
 
-This installer copies **scripts and hooks**. It does **not** install skills, commands, or rules —
-those are copied with `cp -r` (see [docs/SKILLS.md](../../docs/SKILLS.md#consuming-skills) and
-[docs/COMMANDS.md](../../docs/COMMANDS.md#consuming-commands)).
+Installs **scripts, hooks, and the gated project skill suite**. Commands and rules are not installed
+— copy those with `cp` (see [docs/COMMANDS.md](../../docs/COMMANDS.md#consuming-commands) and
+[docs/RULES.md](../../docs/RULES.md)). Pass `--no-skills` for scripts and hooks only.
 
-It is, however, a prerequisite for two of them, which invoke these scripts by path:
+Installing the suite here is deliberate: `/build` invokes `gcommit` and `/start-feature-auto`
+invokes `codex-review.sh` by path, so shipping the skills alongside the scripts they call keeps the
+pair consistent.
 
 | Consumer | Requires | Effect if missing |
 |---|---|---|
-| `/build` (`skills/project/build/`) | `gcommit` | Commit step fails on a missing script |
-| `/start-feature-auto` (`commands/start-feature-auto.md`) | `codex-review.sh` | Review records as skipped; feature still closes |
+| `/build` | `gcommit` | Commit step fails on a missing script |
+| `/start-feature-auto` (copy the command separately) | `codex-review.sh` | Review records as skipped; feature still closes |
 
-Install the toolkit first, then copy the skills.
+### Skill layout: the suite is flattened
+
+The library nests the suite as `skills/project/<sub>/` for authoring, but Claude Code scans
+`.claude/skills/` **one level deep** and derives each slash command from the **directory name**. The
+installer therefore flattens:
+
+```
+skills/project/SKILL.md + references/   ->  .claude/skills/project/     -> /project
+skills/project/build/                   ->  .claude/skills/build/       -> /build
+skills/project/define/                  ->  .claude/skills/define/      -> /define
+        (design, milestone, plan-feature, spike likewise)
+```
+
+A wholesale `cp -r skills/project/ <target>/.claude/skills/project/` would leave all six sub-skills
+one level too deep to be discovered, while `/project` routes to them by bare name — the workflow
+would dead-end at the first gate.
+
+Skill copies are an **overlay**: files you add inside an installed skill directory survive an
+upgrade, and nothing is deleted. A stale file from an older version is not pruned — remove the skill
+directory by hand for a clean reinstall.
 
 ## What gets installed
 

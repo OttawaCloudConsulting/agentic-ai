@@ -7,21 +7,42 @@ All scripts are invoked with an explicit interpreter (`bash <script>`) — nothi
 ## install.sh
 
 ```bash
-bash scripts/claude-toolkit/install.sh [--base-branch NAME] <target-repo-path>
+bash scripts/claude-toolkit/install.sh [--base-branch NAME] [--no-skills] <target-repo-path>
 ```
 
 | Aspect | Detail |
 |---|---|
-| Copies | Six scripts → `<target>/.claude/scripts/`; two hooks → `<target>/.claude/hooks/` |
+| Copies | Six scripts → `<target>/.claude/scripts/`; two hooks → `<target>/.claude/hooks/`; the gated project suite → `<target>/.claude/skills/` (flattened, see below) |
+| `--no-skills` | Skip the skill suite; install scripts and hooks only |
 | settings.json | jq-merges two hook entries with versioned markers; migrates pre-existing unmarked entries invoking the same hook scripts |
 | CLAUDE.md | Appends the `<!-- BEGIN CLAUDE-TOOLKIT -->` sentinel block; hard-fails on a malformed (unpaired) sentinel |
 | `--base-branch NAME` | Writes `<target>/.cc-base-branch` only if the file is absent; a differing existing file is warned about and left unchanged |
 | Hard prerequisites | `jq`, `node` |
 | Warn-only | `markdownlint-cli2`, `codex` CLI |
-| Does **not** install | Skills, commands, or rules — those are copied with `cp -r` (see [SKILLS.md](../../SKILLS.md#consuming-skills), [COMMANDS.md](../../COMMANDS.md#consuming-commands)) |
+| Does **not** install | Commands or rules — copy those with `cp` (see [COMMANDS.md](../../COMMANDS.md#consuming-commands), [RULES.md](../../RULES.md)) |
 
-`/build` requires the installed `gcommit` and `/start-feature-auto` requires the installed
-`codex-review.sh`, so run this installer **before** copying those skills/commands into a target repo.
+### Skill layout (flattened)
+
+Claude Code scans `.claude/skills/` one level deep and derives each slash command from the
+**directory name**; for project skills the `name:` frontmatter only sets the display label. The
+library's authoring nesting is flattened on install:
+
+| Source | Installed | Command |
+|---|---|---|
+| `skills/project/SKILL.md` + `references/` | `.claude/skills/project/` | `/project` |
+| `skills/project/build/` | `.claude/skills/build/` | `/build` |
+| `skills/project/define/` | `.claude/skills/define/` | `/define` |
+| `skills/project/design/` | `.claude/skills/design/` | `/design` |
+| `skills/project/milestone/` | `.claude/skills/milestone/` | `/milestone` |
+| `skills/project/plan-feature/` | `.claude/skills/plan-feature/` | `/plan-feature` |
+| `skills/project/spike/` | `.claude/skills/spike/` | `/spike` |
+
+The orchestrator directory receives no copy of the sub-skills. Skill copies are an overlay —
+consumer-added files survive an upgrade and nothing is deleted, so a stale file from an older
+version is not pruned (remove the directory by hand for a clean reinstall).
+
+`/start-feature-auto` is a command, not a skill: copy it separately, and note it requires the
+installed `codex-review.sh`.
 
 ## gcommit
 

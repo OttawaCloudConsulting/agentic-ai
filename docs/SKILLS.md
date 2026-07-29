@@ -64,12 +64,16 @@ license: Apache-2.0                 # Optional. License identifier.
 
 ## Consuming Skills
 
-Skills are copied, not installed — there is **no installer for skills**. (The only installers in this
-repository are `scripts/agent-delegation/install.sh`, `scripts/defensive-protocol/install.sh`, and
-`scripts/claude-toolkit/install.sh`; each installs its own rules/scripts/hooks and wires
-`settings.json`. None of them copy skills.)
+Most skills are copied by hand. The one exception is the **gated project suite**, which
+`scripts/claude-toolkit/install.sh` installs for you — along with the helper scripts it depends on
+and the correct flattened layout:
 
-Copy the entire skill directory from `skills/` into `.claude/skills/` in the target repository:
+```bash
+bash scripts/claude-toolkit/install.sh <target-repo-path>   # project suite + scripts + hooks
+bash scripts/claude-toolkit/install.sh --no-skills <target> # scripts + hooks only
+```
+
+Everything else is a directory copy from `skills/` into `.claude/skills/` in the target repository:
 
 ```bash
 # Standalone skills — one directory each
@@ -86,17 +90,39 @@ cp -r skills/occ-skill-refactor/        <target-repo>/.claude/skills/occ-skill-r
 cp -r skills/rule-creator/              <target-repo>/.claude/skills/rule-creator/
 cp -r skills/over-engineering-review/   <target-repo>/.claude/skills/over-engineering-review/
 
-# Gated project suite — the orchestrator plus its nested sub-skills.
-# One copy takes the whole suite (build, define, design, milestone, plan-feature, spike):
-cp -r skills/project/                   <target-repo>/.claude/skills/project/
+# Gated project suite — MUST be flattened; see "Flatten the project suite" below.
+# Prefer the installer, which does this for you.
+cp -r skills/project/build/             <target-repo>/.claude/skills/build/
+cp -r skills/project/define/            <target-repo>/.claude/skills/define/
+cp -r skills/project/design/            <target-repo>/.claude/skills/design/
+cp -r skills/project/milestone/         <target-repo>/.claude/skills/milestone/
+cp -r skills/project/plan-feature/      <target-repo>/.claude/skills/plan-feature/
+cp -r skills/project/spike/             <target-repo>/.claude/skills/spike/
+# ...then the orchestrator itself, WITHOUT re-copying the sub-skill dirs above:
+mkdir -p                                <target-repo>/.claude/skills/project/
+cp    skills/project/SKILL.md           <target-repo>/.claude/skills/project/
+cp -r skills/project/references/        <target-repo>/.claude/skills/project/references/
+```
 
-# ...or cherry-pick sub-skills (skills/project/SKILL.md is required either way):
-cp -r skills/project/build/             <target-repo>/.claude/skills/project/build/
-cp -r skills/project/define/            <target-repo>/.claude/skills/project/define/
-cp -r skills/project/design/            <target-repo>/.claude/skills/project/design/
-cp -r skills/project/milestone/         <target-repo>/.claude/skills/project/milestone/
-cp -r skills/project/plan-feature/      <target-repo>/.claude/skills/project/plan-feature/
-cp -r skills/project/spike/             <target-repo>/.claude/skills/project/spike/
+### Flatten the project suite
+
+This library nests the gated suite as `skills/project/<sub>/` for authoring, but that is **not** a
+valid installed layout. Claude Code scans `.claude/skills/` exactly one level deep, and a skill's
+slash command comes from its **directory name** — for project and personal skills the `name:`
+frontmatter only sets the display label shown in listings.
+
+| Installed path | Result |
+|---|---|
+| `.claude/skills/build/SKILL.md` | Discovered as `/build` |
+| `.claude/skills/project/build/SKILL.md` | Never discovered — one level too deep |
+
+Copying `skills/project/` wholesale into `.claude/skills/project/` therefore yields a `/project`
+orchestrator whose six sub-skills are all invisible — and `/project` routes to them by bare name
+(`/build`, `/define`, ...), so the workflow dead-ends at the first gate. Flatten the suite, as shown
+above, or let the installer do it:
+
+```bash
+bash scripts/claude-toolkit/install.sh <target-repo-path>
 ```
 
 Skills take effect immediately on the next Claude Code conversation in that repository.
@@ -111,13 +137,10 @@ those instructions pointing at files that do not exist:
 | `skills/project/build/` (`/build`) | `.claude/scripts/gcommit` | Commit Command Protocol D-03 — every sub-feature and assessment-refresh commit is file-based |
 | `commands/start-feature-auto.md` | `.claude/scripts/codex-review.sh` | Step 7 Codex review before the feature closes |
 
-Install them first — this is the one install script involved in setting up the project suite, and it
-installs **scripts and hooks only, never skills**:
+A default `bash scripts/claude-toolkit/install.sh <target-repo-path>` installs both the suite and
+these scripts together, so the dependency is satisfied automatically. It matters when the pieces are
+installed separately — a hand-copied suite, or an install run with `--no-skills`. Without the
+scripts, `/build` still runs but its commit step fails on a missing `gcommit`, and
+`/start-feature-auto` records the review as skipped rather than blocking.
 
-```bash
-bash scripts/claude-toolkit/install.sh <target-repo-path>
-```
-
-See [SCRIPTS.md](SCRIPTS.md#claude-toolkit) for what it writes to the target. Without it, `/build`
-still runs but its commit step fails on a missing `gcommit`; `/start-feature-auto` records the review
-as skipped rather than blocking.
+See [SCRIPTS.md](SCRIPTS.md#claude-toolkit) for everything the installer writes to the target.

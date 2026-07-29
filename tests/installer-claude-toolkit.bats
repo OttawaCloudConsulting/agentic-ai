@@ -31,6 +31,59 @@ teardown() {
   [ -f "$TARGET/.claude/hooks/lint-md-on-edit.js" ]
 }
 
+@test "project suite installed FLAT — every SKILL.md exactly one level deep" {
+  bash "$INSTALLER" "$TARGET"
+  local s="$TARGET/.claude/skills"
+  # Claude Code scans .claude/skills/ one level deep and derives the command
+  # from the directory name, so each skill must be at <skills>/<name>/SKILL.md.
+  for name in project build define design milestone plan-feature spike; do
+    [ -f "$s/$name/SKILL.md" ]
+  done
+  # No SKILL.md deeper than one level (would be undiscoverable).
+  run bash -c "find '$s' -mindepth 3 -name SKILL.md | wc -l | tr -d ' '"
+  [ "$output" -eq 0 ]
+}
+
+@test "orchestrator directory carries no nested sub-skill copies" {
+  bash "$INSTALLER" "$TARGET"
+  for name in build define design milestone plan-feature spike; do
+    [ ! -e "$TARGET/.claude/skills/project/$name" ]
+  done
+  [ -f "$TARGET/.claude/skills/project/SKILL.md" ]
+}
+
+@test "skill resource directories are copied with the bundle" {
+  bash "$INSTALLER" "$TARGET"
+  [ -d "$TARGET/.claude/skills/build/references" ]
+  [ -f "$TARGET/.claude/skills/build/references/build-execution.md" ]
+}
+
+@test "--no-skills installs scripts and hooks only" {
+  bash "$INSTALLER" --no-skills "$TARGET"
+  [ ! -d "$TARGET/.claude/skills" ]
+  [ -f "$TARGET/.claude/scripts/gcommit" ]
+  [ -f "$TARGET/.claude/hooks/lint-md-on-edit.js" ]
+}
+
+@test "idempotent — second run reports skills unchanged and leaves no temp dirs" {
+  bash "$INSTALLER" "$TARGET"
+  run bash "$INSTALLER" "$TARGET"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"unchanged project"* ]]
+  [[ "$output" == *"unchanged build"* ]]
+  [[ "$output" != *"updated build"* ]]
+  run bash -c "ls '${TMPDIR:-/tmp}' | grep -c 'cc-toolkit-project' || true"
+  [ "$output" -eq 0 ]
+}
+
+@test "skill overlay preserves consumer-added files" {
+  bash "$INSTALLER" "$TARGET"
+  printf 'local note\n' > "$TARGET/.claude/skills/build/LOCAL-NOTES.md"
+  bash "$INSTALLER" "$TARGET"
+  [ -f "$TARGET/.claude/skills/build/LOCAL-NOTES.md" ]
+  [ -f "$TARGET/.claude/skills/build/SKILL.md" ]
+}
+
 @test "no executable bits set on installed files" {
   bash "$INSTALLER" "$TARGET"
   local f

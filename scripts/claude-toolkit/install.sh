@@ -1,18 +1,33 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016
+# The hook commands intentionally embed a literal $CLAUDE_PROJECT_DIR: it must
+# reach settings.json unexpanded so Claude Code resolves it at hook runtime, not
+# to this installer's environment at install time.
 set -euo pipefail
 
 # scripts/claude-toolkit/install.sh
-# Idempotent installer for the Claude Code toolkit (scripts + hooks).
+# Idempotent installer for the Claude Code toolkit (scripts + hooks + project skills).
 #
 # Installs into a target Claude Code project:
 #   - Helper scripts       -> <target>/.claude/scripts/
 #   - Tool hooks (node)    -> <target>/.claude/hooks/
+#   - Gated project suite  -> <target>/.claude/skills/        (flattened — see below)
 #   - Hook entries         -> <target>/.claude/settings.json  (jq-merged, versioned markers)
 #   - Git/review guidance  -> <target>/CLAUDE.md              (sentinel-guarded)
 #   - Base branch pin      -> <target>/.cc-base-branch        (only with --base-branch, only if absent)
 #
 # Usage:
-#   bash scripts/claude-toolkit/install.sh [--base-branch NAME] <target-repo-path>
+#   bash scripts/claude-toolkit/install.sh [--base-branch NAME] [--no-skills] <target-repo-path>
+#
+# Skill layout: this library nests the suite as skills/project/<sub>/ for
+#   authoring, but Claude Code resolves a slash command from the skill
+#   directory's own name. The orchestrator invokes its sub-skills as bare
+#   commands (/build, /define, ...) and each SKILL.md declares a bare `name:`,
+#   so the sub-skills are FLATTENED on install:
+#     skills/project/SKILL.md + references/  ->  .claude/skills/project/
+#     skills/project/build/                  ->  .claude/skills/build/
+#     skills/project/define/                 ->  .claude/skills/define/   (etc.)
+#   This matches the layout proven in the source consumer repo.
 #
 # Prerequisites (hard): jq, node  — the hooks are node scripts, so node is a hard
 #   prereq here (a deliberate extension of the defensive-protocol installer idiom).
@@ -24,6 +39,10 @@ set -euo pipefail
 # Never sets the executable bit — invoke everything via `bash <script>`.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SKILLS_SRC="$REPO_ROOT/skills/project"
+# Sub-skills of the gated suite, flattened to top level on install.
+PROJECT_SUBSKILLS=(build define design milestone plan-feature spike)
 
 # ── Prerequisites ─────────────────────────────────────────────────────────────
 
@@ -48,20 +67,24 @@ command -v codex >/dev/null 2>&1 \
 
 # ── Arguments ─────────────────────────────────────────────────────────────────
 
+USAGE='Usage: bash scripts/claude-toolkit/install.sh [--base-branch NAME] [--no-skills] <target-repo-path>'
 BASE_BRANCH=""
 TARGET_INPUT=""
+WITH_SKILLS=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --base-branch)
       [[ $# -ge 2 ]] || { printf 'ERROR: --base-branch requires a value.\n' >&2; exit 1; }
       BASE_BRANCH="$2"; shift 2 ;;
+    --no-skills)
+      WITH_SKILLS=0; shift ;;
     -*)
       printf 'ERROR: Unknown option: %s\n' "$1" >&2
-      printf 'Usage: bash scripts/claude-toolkit/install.sh [--base-branch NAME] <target-repo-path>\n' >&2
+      printf '%s\n' "$USAGE" >&2
       exit 1 ;;
     *)
       if [[ -n "$TARGET_INPUT" ]]; then
-        printf 'Usage: bash scripts/claude-toolkit/install.sh [--base-branch NAME] <target-repo-path>\n' >&2
+        printf '%s\n' "$USAGE" >&2
         exit 1
       fi
       TARGET_INPUT="$1"; shift ;;
@@ -69,7 +92,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$TARGET_INPUT" ]]; then
-  printf 'Usage: bash scripts/claude-toolkit/install.sh [--base-branch NAME] <target-repo-path>\n' >&2
+  printf '%s\n' "$USAGE" >&2
   exit 1
 fi
 if [[ ! -d "$TARGET_INPUT" ]]; then
@@ -80,15 +103,38 @@ fi
 TARGET="$(cd "$TARGET_INPUT" && pwd)"
 SCRIPTS_DST="$TARGET/.claude/scripts"
 HOOKS_DST="$TARGET/.claude/hooks"
+SKILLS_DST="$TARGET/.claude/skills"
 SETTINGS="$TARGET/.claude/settings.json"
 CLAUDE_MD="$TARGET/CLAUDE.md"
 
+# Skills ship from the library tree, so a bundle copied out on its own cannot
+# install them. Degrade to scripts+hooks rather than failing the whole install.
+if [[ "$WITH_SKILLS" -eq 1 && ! -d "$SKILLS_SRC" ]]; then
+  printf 'WARN: %s not found — installing scripts and hooks only.\n' "$SKILLS_SRC" >&2
+  printf '      (Run this installer from a full checkout of the library to get the project skills.)\n' >&2
+  WITH_SKILLS=0
+fi
+
 printf '==> Installing Claude Code toolkit into %s\n' "$TARGET"
+
+# Temp paths cleaned on any exit. Declared at file scope (not `local`) so the
+# trap can still resolve them if a step fails mid-function — a `local` would be
+# out of scope by trap time and, under `set -u`, the trap body itself would fail
+# and leak the file. One trap, set once: a second `trap ... EXIT` would silently
+# replace this one.
+ORCH_TMP=""
+_TMP_SETTINGS=""
+trap 'rm -rf "${ORCH_TMP:-}"; rm -f "${_TMP_SETTINGS:-}"' EXIT
 
 # ── 1. Directories ────────────────────────────────────────────────────────────
 
 mkdir -p "$SCRIPTS_DST" "$HOOKS_DST"
-printf '==> Dirs:  .claude/scripts/  .claude/hooks/\n'
+if [[ "$WITH_SKILLS" -eq 1 ]]; then
+  mkdir -p "$SKILLS_DST"
+  printf '==> Dirs:  .claude/scripts/  .claude/hooks/  .claude/skills/\n'
+else
+  printf '==> Dirs:  .claude/scripts/  .claude/hooks/\n'
+fi
 
 # ── 2. File copy (scripts + hooks) ───────────────────────────────────────────
 
@@ -118,6 +164,59 @@ _copy_file "$SCRIPT_DIR/check.sh"        "$SCRIPTS_DST/check.sh"        "Script"
 
 _copy_file "$SCRIPT_DIR/hooks/block-heredoc-commit.js" "$HOOKS_DST/block-heredoc-commit.js" "Hook"
 _copy_file "$SCRIPT_DIR/hooks/lint-md-on-edit.js"      "$HOOKS_DST/lint-md-on-edit.js"      "Hook"
+
+# ── 2b. Skill copy (gated project suite, flattened) ──────────────────────────
+# Overlay copy, never a delete: files present in the target but absent upstream
+# are left alone, so a consumer's local additions survive an upgrade. A stale
+# file from an older version is therefore not pruned — remove the skill
+# directory by hand for a clean reinstall.
+
+_copy_skill_dir() {
+  local src="$1" dst="$2" name="$3"
+  if [[ ! -f "$src/SKILL.md" ]]; then
+    printf 'ERROR: Not a skill bundle (no SKILL.md): %s\n' "$src" >&2
+    exit 1
+  fi
+
+  if [[ ! -d "$dst" ]]; then
+    mkdir -p "$dst"
+    cp -R "$src/." "$dst/"
+    printf '==> %-14s  added     %s\n' "Skill" "$name"
+    return
+  fi
+
+  # Compare only the files this installer owns; extras in the target are ignored.
+  if diff -rq "$src" "$dst" 2>/dev/null | grep -qv '^Only in '; then
+    cp -R "$src/." "$dst/"
+    printf '==> %-14s  updated   %s\n' "Skill" "$name"
+  elif diff -rq "$src" "$dst" 2>/dev/null | grep -q "^Only in $src"; then
+    cp -R "$src/." "$dst/"
+    printf '==> %-14s  updated   %s\n' "Skill" "$name"
+  else
+    printf '==> %-14s  unchanged %s\n' "Skill" "$name"
+  fi
+}
+
+if [[ "$WITH_SKILLS" -eq 1 ]]; then
+  # Orchestrator: SKILL.md + its own resource dirs, WITHOUT the nested
+  # sub-skills (those are installed flattened, below).
+  ORCH_TMP="$(mktemp -d "${TMPDIR:-/tmp}/cc-toolkit-project.XXXXXX")"
+  cp -R "$SKILLS_SRC/." "$ORCH_TMP/"
+  for sub in "${PROJECT_SUBSKILLS[@]}"; do
+    rm -rf "${ORCH_TMP:?}/$sub"
+  done
+  _copy_skill_dir "$ORCH_TMP" "$SKILLS_DST/project" "project"
+  rm -rf "$ORCH_TMP"
+  ORCH_TMP=""
+
+  for sub in "${PROJECT_SUBSKILLS[@]}"; do
+    if [[ ! -d "$SKILLS_SRC/$sub" ]]; then
+      printf 'ERROR: Expected sub-skill missing from the library: %s\n' "$SKILLS_SRC/$sub" >&2
+      exit 1
+    fi
+    _copy_skill_dir "$SKILLS_SRC/$sub" "$SKILLS_DST/$sub" "$sub"
+  done
+fi
 
 # ── 3. settings.json — validate / create ─────────────────────────────────────
 
@@ -172,12 +271,6 @@ _assert_hook_shape() {
     exit 1
   fi
 }
-
-# Temp file for in-flight settings.json rewrites. Declared at file scope so the
-# EXIT trap can still resolve it if a jq/mv step fails mid-function (a `local`
-# would be out of scope by trap time, leaking the temp file under `set -u`).
-_TMP_SETTINGS=""
-trap 'rm -f "${_TMP_SETTINGS:-}"' EXIT
 
 _merge_hook() {
   local marker="$1" event="$2" matcher="$3" cmd="$4" timeout="$5" status_msg="$6" script_name="$7" label="$8"

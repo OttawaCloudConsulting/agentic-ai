@@ -12,7 +12,7 @@ For Claude Code skills (SKILL.md bundles), see [SKILLS.md](SKILLS.md).
 | Benchmark | Measure whether a skill produces better output than a baseline or previous version; issue a scored promotion verdict | [View](scripts/benchmark/README.md) |
 | Agent Delegation | Install the `agent-delegation` rule and its `UserPromptSubmit` hook into a target Claude Code project | [View](scripts/agent-delegation/README.md) |
 | Defensive Protocol v2 | Install the Defensive Protocol v2 rules (anti-slop/epistemology/session-management trio + over-engineering gate) plus the hooks that enforce them (chmod hard-block, destructive-command gate, overwrite reminder, failure reminder, over-engineering pre-build reminder) into a target project | [View](scripts/defensive-protocol/README.md) |
-| Claude Toolkit | Install battle-tested Claude Code helper scripts (file-based `gcommit`, hardened Codex review wrapper, branch-sync, quiet runner, state digest, self-test) plus two tool hooks (heredoc-commit block, markdown auto-fix) into a target project | [View](scripts/claude-toolkit/REFERENCE.md) |
+| Claude Toolkit | Install the gated project skill suite (flattened for discovery) plus battle-tested helper scripts (file-based `gcommit`, hardened Codex review wrapper, branch-sync, quiet runner, state digest, self-test) and two tool hooks (heredoc-commit block, markdown auto-fix) into a target project | [View](scripts/claude-toolkit/REFERENCE.md) |
 
 ## How Scripts Work
 
@@ -121,6 +121,8 @@ Requires `jq` (installer + hooks) and, for the test suite, `bats-core`. Verify a
 
 Installs battle-tested Claude Code session helpers — extracted from a production GitOps repository after weeks of live use — into a target project: a file-based commit helper that can never break on quoting, a hardened Codex review wrapper with machine-readable verdicts, post-squash-merge branch syncing, quiet command execution, a gated-workflow state digest, and a self-test harness. Two node hooks make the commit and markdown hygiene deterministic.
 
+It also installs the **gated project skill suite** (`/project`, `/build`, `/define`, `/design`, `/milestone`, `/plan-feature`, `/spike`), flattening the library's authoring nesting into the layout Claude Code can actually discover. The suite and the scripts ship together because `/build` invokes `gcommit` by path. Use `--no-skills` for scripts and hooks only.
+
 **Scripts:** `install.sh`, `gcommit`, `branch-sync.sh`, `codex-review.sh`, `run-quiet.sh`, `state-status.sh`, `check.sh`
 **Documentation:** [scripts/claude-toolkit/REFERENCE.md](scripts/claude-toolkit/REFERENCE.md) · bundle entry point: `scripts/claude-toolkit/README.md`
 
@@ -130,6 +132,7 @@ Installs battle-tested Claude Code session helpers — extracted from a producti
 |------|--------|
 | `<target>/.claude/scripts/*` | Six scripts copied (added \| updated \| unchanged) |
 | `<target>/.claude/hooks/*.js` | Two node hooks copied |
+| `<target>/.claude/skills/{project,build,define,design,milestone,plan-feature,spike}/` | Gated project suite, **flattened** from the library's `skills/project/<sub>/` nesting so each is discoverable one level deep. Overlay copy — consumer-added files survive, nothing is deleted. Skip with `--no-skills` |
 | `<target>/.claude/settings.json` | Two hook entries merged (versioned markers, timeout + statusMessage); existing keys preserved; pre-existing **unmarked** entries invoking the same hook scripts are migrated, not duplicated |
 | `<target>/CLAUDE.md` | `CLAUDE-TOOLKIT` sentinel block appended (Git/commit + review guidance); created if missing; malformed sentinel pairs fail the install |
 | `<target>/.cc-base-branch` | Only with `--base-branch NAME`, only if absent — never overwritten |
