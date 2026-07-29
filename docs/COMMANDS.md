@@ -94,6 +94,17 @@ cp commands/dream.md                   <target-repo>/.claude/commands/
 
 Commands take effect immediately on the next Claude Code conversation in that repository.
 
+**Prerequisite for `/start-feature-auto`:** its Step 7 Codex review invokes
+`bash .claude/scripts/codex-review.sh`, which is installed by the Claude Toolkit bundle, not by
+copying the command:
+
+```bash
+bash scripts/claude-toolkit/install.sh <target-repo-path>
+```
+
+Without it the review step records `CODEX REVIEW: skipped (codex unavailable)` and the feature still
+closes — the command degrades rather than failing. See [SCRIPTS.md](SCRIPTS.md#claude-toolkit).
+
 ### Choosing Commands
 
 | Project Type | Recommended Commands |

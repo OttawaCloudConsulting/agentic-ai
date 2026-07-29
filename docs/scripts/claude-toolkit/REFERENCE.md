@@ -18,6 +18,10 @@ bash scripts/claude-toolkit/install.sh [--base-branch NAME] <target-repo-path>
 | `--base-branch NAME` | Writes `<target>/.cc-base-branch` only if the file is absent; a differing existing file is warned about and left unchanged |
 | Hard prerequisites | `jq`, `node` |
 | Warn-only | `markdownlint-cli2`, `codex` CLI |
+| Does **not** install | Skills, commands, or rules — those are copied with `cp -r` (see [SKILLS.md](../../SKILLS.md#consuming-skills), [COMMANDS.md](../../COMMANDS.md#consuming-commands)) |
+
+`/build` requires the installed `gcommit` and `/start-feature-auto` requires the installed
+`codex-review.sh`, so run this installer **before** copying those skills/commands into a target repo.
 
 ## gcommit
 

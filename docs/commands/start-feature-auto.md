@@ -102,6 +102,11 @@ parallel, then merges results.
 
 ### Step 7 — Codex review of the completed change set
 
+> **Requires** `.claude/scripts/codex-review.sh` from the Claude Toolkit bundle
+> (`bash scripts/claude-toolkit/install.sh <target-repo-path>`) plus the `codex` CLI. When either is
+> absent the step records `CODEX REVIEW: skipped (codex unavailable — <reason>)` and the feature
+> still closes.
+
 After implementation finishes and local tests/linters pass, reviews the work with Codex before
 closing: assembles the change set and acceptance criteria, writes a review brief, runs the
 hardened wrapper (`bash .claude/scripts/codex-review.sh --diff` — never a hand-rolled

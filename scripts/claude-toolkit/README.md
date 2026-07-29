@@ -17,6 +17,21 @@ bash scripts/claude-toolkit/install.sh --base-branch develop <target-repo-path>
 
 Restart Claude Code in the target repo afterwards.
 
+### Scope: scripts and hooks only
+
+This installer copies **scripts and hooks**. It does **not** install skills, commands, or rules —
+those are copied with `cp -r` (see [docs/SKILLS.md](../../docs/SKILLS.md#consuming-skills) and
+[docs/COMMANDS.md](../../docs/COMMANDS.md#consuming-commands)).
+
+It is, however, a prerequisite for two of them, which invoke these scripts by path:
+
+| Consumer | Requires | Effect if missing |
+|---|---|---|
+| `/build` (`skills/project/build/`) | `gcommit` | Commit step fails on a missing script |
+| `/start-feature-auto` (`commands/start-feature-auto.md`) | `codex-review.sh` | Review records as skipped; feature still closes |
+
+Install the toolkit first, then copy the skills.
+
 ## What gets installed
 
 | Item | Destination | Effect |

@@ -3,6 +3,7 @@
 **Source:** `skills/project/build/`
 **Command:** `/build`
 **Activation:** Manual only (`disable-model-invocation: true`) -- invoked via slash command. Not auto-triggered by conversational phrases.
+**Requires:** `.claude/scripts/gcommit` — every commit in the build loop is file-based (Commit Command Protocol D-03). Install it with `bash scripts/claude-toolkit/install.sh <target-repo-path>`; see [SCRIPTS.md](../SCRIPTS.md#claude-toolkit).
 
 ## Purpose
 

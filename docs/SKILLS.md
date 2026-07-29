@@ -64,27 +64,60 @@ license: Apache-2.0                 # Optional. License identifier.
 
 ## Consuming Skills
 
+Skills are copied, not installed — there is **no installer for skills**. (The only installers in this
+repository are `scripts/agent-delegation/install.sh`, `scripts/defensive-protocol/install.sh`, and
+`scripts/claude-toolkit/install.sh`; each installs its own rules/scripts/hooks and wires
+`settings.json`. None of them copy skills.)
+
 Copy the entire skill directory from `skills/` into `.claude/skills/` in the target repository:
 
 ```bash
-# Copy a skill bundle
-cp -r skills/cdk-testing/       <target-repo>/.claude/skills/cdk-testing/
-cp -r skills/terraform-testing/  <target-repo>/.claude/skills/terraform-testing/
+# Standalone skills — one directory each
+cp -r skills/architecture-doc/          <target-repo>/.claude/skills/architecture-doc/
+cp -r skills/cdk-testing/               <target-repo>/.claude/skills/cdk-testing/
+cp -r skills/terraform-testing/         <target-repo>/.claude/skills/terraform-testing/
 cp -r skills/itsg-assessment/           <target-repo>/.claude/skills/itsg-assessment/
 cp -r skills/nist-fedramp-assessment/   <target-repo>/.claude/skills/nist-fedramp-assessment/
 cp -r skills/nist-csf-assessment/       <target-repo>/.claude/skills/nist-csf-assessment/
 cp -r skills/create-prd/                <target-repo>/.claude/skills/create-prd/
-cp -r skills/project/milestone/          <target-repo>/.claude/skills/project/milestone/
-cp -r skills/project/plan-feature/        <target-repo>/.claude/skills/project/plan-feature/
-cp -r skills/project/spike/               <target-repo>/.claude/skills/project/spike/
-cp -r skills/project/define/              <target-repo>/.claude/skills/project/define/
-cp -r skills/project/design/              <target-repo>/.claude/skills/project/design/
-cp -r skills/project/build/               <target-repo>/.claude/skills/project/build/
+cp -r skills/red-team/                  <target-repo>/.claude/skills/red-team/
 cp -r skills/occ-skill-creator/         <target-repo>/.claude/skills/occ-skill-creator/
 cp -r skills/occ-skill-refactor/        <target-repo>/.claude/skills/occ-skill-refactor/
-cp -r skills/project/                   <target-repo>/.claude/skills/project/
 cp -r skills/rule-creator/              <target-repo>/.claude/skills/rule-creator/
 cp -r skills/over-engineering-review/   <target-repo>/.claude/skills/over-engineering-review/
+
+# Gated project suite — the orchestrator plus its nested sub-skills.
+# One copy takes the whole suite (build, define, design, milestone, plan-feature, spike):
+cp -r skills/project/                   <target-repo>/.claude/skills/project/
+
+# ...or cherry-pick sub-skills (skills/project/SKILL.md is required either way):
+cp -r skills/project/build/             <target-repo>/.claude/skills/project/build/
+cp -r skills/project/define/            <target-repo>/.claude/skills/project/define/
+cp -r skills/project/design/            <target-repo>/.claude/skills/project/design/
+cp -r skills/project/milestone/         <target-repo>/.claude/skills/project/milestone/
+cp -r skills/project/plan-feature/      <target-repo>/.claude/skills/project/plan-feature/
+cp -r skills/project/spike/             <target-repo>/.claude/skills/project/spike/
 ```
 
 Skills take effect immediately on the next Claude Code conversation in that repository.
+
+### Prerequisite: the Claude Toolkit scripts
+
+`/build` and `/start-feature-auto` invoke helper scripts by path. Copying the skill alone leaves
+those instructions pointing at files that do not exist:
+
+| Consumer | Requires | Why |
+|---|---|---|
+| `skills/project/build/` (`/build`) | `.claude/scripts/gcommit` | Commit Command Protocol D-03 — every sub-feature and assessment-refresh commit is file-based |
+| `commands/start-feature-auto.md` | `.claude/scripts/codex-review.sh` | Step 7 Codex review before the feature closes |
+
+Install them first — this is the one install script involved in setting up the project suite, and it
+installs **scripts and hooks only, never skills**:
+
+```bash
+bash scripts/claude-toolkit/install.sh <target-repo-path>
+```
+
+See [SCRIPTS.md](SCRIPTS.md#claude-toolkit) for what it writes to the target. Without it, `/build`
+still runs but its commit step fails on a missing `gcommit`; `/start-feature-auto` records the review
+as skipped rather than blocking.
