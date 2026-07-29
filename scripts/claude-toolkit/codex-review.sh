@@ -69,6 +69,20 @@ case "$MODE" in
   files)
     : > "$CTX"
     for f in "${FILES[@]}"; do
+      # Fail fast: a silently-omitted file yields a review of incomplete context,
+      # which can return VERDICT: PASS on code that was never actually read.
+      if [[ ! -f "$f" ]]; then
+        echo "codex-review: no such file: $f" >&2
+        exit 2
+      fi
+      if [[ ! -r "$f" ]]; then
+        echo "codex-review: file is not readable: $f" >&2
+        exit 2
+      fi
+      if ! grep -Iq . "$f" 2>/dev/null; then
+        echo "codex-review: refusing to review binary file: $f" >&2
+        exit 2
+      fi
       printf '\n===== %s =====\n' "$f" >> "$CTX"
       cat "$f" >> "$CTX"
     done

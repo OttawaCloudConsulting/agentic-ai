@@ -22,7 +22,11 @@ process.stdin.on('end', () => {
   const isCommit = /git\s+([^\n;|&]*\s)?commit/.test(cmd);
   if (!isCommit) process.exit(0);
 
-  const usesHeredoc = /<<-?\s*['"]?[A-Za-z_]+/.test(cmd);
+  // Covers `<<EOF`, `<<-EOF`, `<< EOF`, `<<'EOF'`, `<<"EOF"`, `<<\EOF` and
+  // digit-leading delimiters like `<<1EOF`. Excludes `<<<` (herestring) and
+  // bare-numeric `<< 2` (left-shift) so arithmetic in a commit command is not
+  // mistaken for a heredoc.
+  const usesHeredoc = /(?<!<)<<(?!<)-?\s*\\?['"]?(?:[A-Za-z_]|[0-9]+[A-Za-z_])/.test(cmd);
   const multilineDashM = /(^|\s)-m\b/.test(cmd) && cmd.includes('\n');
 
   if (usesHeredoc || multilineDashM) {

@@ -122,6 +122,31 @@ OUT="$(printf '%s' '{"tool_input":{"command":"git commit -F .git/msg"}}' | node 
 [[ -z "$OUT" ]] && ok "file-based commit allowed" || bad "file-based commit allowed"
 OUT="$(printf '%s' '{"tool_input":{"command":"cat <<EOF\nhello\nEOF"}}' | node "$HOOK_DIR/block-heredoc-commit.js")"
 [[ -z "$OUT" ]] && ok "non-commit heredoc allowed" || bad "non-commit heredoc allowed"
+# delimiter variants: quoted, dash-suffixed, spaced, backslash-escaped, digit-leading.
+# jq builds the JSON so shell quoting never distorts the probe.
+HEREDOC_DELIMS=("<<'EOF'" '<<"EOF"' '<<-EOF' '<< EOF' '<<\EOF' '<<1EOF')
+for D in "${HEREDOC_DELIMS[@]}"; do
+  OUT="$(jq -nc --arg c "git commit -F - ${D}"$'\nmsg\nEOF' '{tool_input:{command:$c}}' \
+    | node "$HOOK_DIR/block-heredoc-commit.js")"
+  grep -q '"permissionDecision":"deny"' <<< "$OUT" && ok "heredoc delimiter denied: $D" || bad "heredoc delimiter denied: $D"
+done
+# left-shift arithmetic in a commit command must NOT be mistaken for a heredoc
+OUT="$(jq -nc --arg c 'git commit -F .git/msg && n=$((1 << 2))' '{tool_input:{command:$c}}' \
+  | node "$HOOK_DIR/block-heredoc-commit.js")"
+[[ -z "$OUT" ]] && ok "left-shift arithmetic allowed" || bad "left-shift arithmetic allowed"
+# herestring is not a heredoc
+OUT="$(jq -nc --arg c 'git commit -F /dev/stdin <<< "msg"' '{tool_input:{command:$c}}' \
+  | node "$HOOK_DIR/block-heredoc-commit.js")"
+[[ -z "$OUT" ]] && ok "herestring allowed" || bad "herestring allowed"
+
+echo "== codex-review files mode preflight =="
+CR_D="$(mktemp -d "${TMPDIR:-/tmp}/check-codex.XXXXXX")"
+bash "$HERE/codex-review.sh" "$CR_D/does-not-exist.txt" >/dev/null 2>&1
+[[ $? -eq 2 ]] && ok "missing file rejected (exit 2)" || bad "missing file rejected (exit 2)"
+printf '\x00\x01\x02binary\x00' > "$CR_D/blob.bin"
+bash "$HERE/codex-review.sh" "$CR_D/blob.bin" >/dev/null 2>&1
+[[ $? -eq 2 ]] && ok "binary file rejected (exit 2)" || bad "binary file rejected (exit 2)"
+rm -rf "$CR_D"
 
 echo "== run-quiet =="
 bash "$HERE/run-quiet.sh" true >/dev/null 2>&1 && ok "success path rc=0" || bad "success path rc=0"

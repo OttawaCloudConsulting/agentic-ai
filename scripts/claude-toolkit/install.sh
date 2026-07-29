@@ -154,6 +154,31 @@ _unmarked_present() {
     "$SETTINGS" >/dev/null 2>&1
 }
 
+# Guard against a hand-edited settings.json where .hooks or .hooks[$event] is not
+# the expected type — jq would otherwise fail with an opaque "object and array
+# cannot be added" message deep inside the merge.
+_assert_hook_shape() {
+  local event="$1"
+  if ! jq -e '(.hooks // {}) | type == "object"' "$SETTINGS" >/dev/null 2>&1; then
+    printf 'ERROR: %s has a ".hooks" key that is not an object.\n' "$SETTINGS" >&2
+    printf '       Repair it (or remove the key) before re-running.\n' >&2
+    exit 1
+  fi
+  if ! jq -e --arg e "$event" '(.hooks[$e] // []) | type == "array"' "$SETTINGS" >/dev/null 2>&1; then
+    printf 'ERROR: %s has ".hooks.%s" set to a %s; an array is required.\n' \
+      "$SETTINGS" "$event" \
+      "$(jq -r --arg e "$event" '.hooks[$e] | type' "$SETTINGS" 2>/dev/null || echo 'value of unexpected type')" >&2
+    printf '       Repair it (or remove the key) before re-running.\n' >&2
+    exit 1
+  fi
+}
+
+# Temp file for in-flight settings.json rewrites. Declared at file scope so the
+# EXIT trap can still resolve it if a jq/mv step fails mid-function (a `local`
+# would be out of scope by trap time, leaking the temp file under `set -u`).
+_TMP_SETTINGS=""
+trap 'rm -f "${_TMP_SETTINGS:-}"' EXIT
+
 _merge_hook() {
   local marker="$1" event="$2" matcher="$3" cmd="$4" timeout="$5" status_msg="$6" script_name="$7" label="$8"
 
@@ -162,9 +187,11 @@ _merge_hook() {
     return
   fi
 
+  _assert_hook_shape "$event"
+
   local TMP
   TMP="$(mktemp "$TARGET/.claude/settings.json.XXXXXX")"
-  trap 'rm -f "$TMP"' EXIT
+  _TMP_SETTINGS="$TMP"
 
   if _unmarked_present "$script_name" "$marker"; then
     # Migrate: drop hand-wired entries that invoke the same hook script.
@@ -179,6 +206,7 @@ _merge_hook() {
     ' "$SETTINGS" > "$TMP"
     mv "$TMP" "$SETTINGS"
     TMP="$(mktemp "$TARGET/.claude/settings.json.XXXXXX")"
+    _TMP_SETTINGS="$TMP"
     printf '==> Hook  migrated unmarked entry: %s\n' "$label"
   fi
 
@@ -191,7 +219,7 @@ _merge_hook() {
                                        timeout: $timeout, statusMessage: $msg }] }]
   ' "$SETTINGS" > "$TMP"
   mv "$TMP" "$SETTINGS"
-  trap - EXIT
+  _TMP_SETTINGS=""
 
   printf '==> Hook  added: %s\n' "$label"
 }

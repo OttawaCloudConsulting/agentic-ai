@@ -143,6 +143,18 @@ EOF
   grep -qF '<!-- BEGIN CLAUDE-TOOLKIT -->' "$TARGET/CLAUDE.md"
 }
 
+@test "wrong-typed .hooks[event] fails with a clear error and leaves no temp files" {
+  mkdir -p "$TARGET/.claude"
+  printf '{"hooks":{"PreToolUse":{"bad":"hand-edit"}}}' > "$TARGET/.claude/settings.json"
+  run bash "$INSTALLER" "$TARGET"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"array is required"* ]]
+  # settings.json untouched, and no settings.json.XXXXXX left behind
+  [ "$(jq -r '.hooks.PreToolUse.bad' "$TARGET/.claude/settings.json")" = "hand-edit" ]
+  run bash -c "ls '$TARGET/.claude/' | grep -c 'settings\.json\.'"
+  [ "$output" -eq 0 ]
+}
+
 @test "malformed sentinel (BEGIN without END) fails the install" {
   printf '# My Project\n\n<!-- BEGIN CLAUDE-TOOLKIT -->\npartial block, no end\n' > "$TARGET/CLAUDE.md"
   run bash "$INSTALLER" "$TARGET"

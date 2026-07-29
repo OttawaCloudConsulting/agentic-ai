@@ -168,16 +168,16 @@ After implementation, Codex review, and any refactoring are complete:
 
 1. Append to the feature's NOTES block in `progress.txt`:
 
-```
-       CODE COMPLETE: [N files changed; tests: pass/fail; lint: pass/fail].
-       CODEX REVIEW: [N findings — H/M/L counts; X valid, Y rejected (one-line reasons)].
-       REFACTOR: [what changed to resolve valid findings; re-test result — or "none (review clean)"].
-       Completed YYYY-MM-DD.
-```
+   ```
+          CODE COMPLETE: [N files changed; tests: pass/fail; lint: pass/fail].
+          CODEX REVIEW: [N findings — H/M/L counts; X valid, Y rejected (one-line reasons)].
+          REFACTOR: [what changed to resolve valid findings; re-test result — or "none (review clean)"].
+          Completed YYYY-MM-DD.
+   ```
 
-1. Change the feature status from `[~]` to `[x]`.
+2. Change the feature status from `[~]` to `[x]`.
 
-2. Report to the user:
+3. Report to the user:
 
 ```
 COMPLETED: Feature X.Y — [Title]
