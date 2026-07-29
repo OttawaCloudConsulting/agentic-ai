@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# gcommit — commit via message file (git commit -F). Never heredocs, never multi-line -m.
+# Ends the recurring heredoc-quoting commit failures.
+#
+# Usage:
+#   gcommit "subject line"                      # subject-only commit
+#   gcommit path/to/message.txt                 # message from an existing file
+#   printf 'subject\n\nbody...\n' | gcommit     # full message on stdin
+set -euo pipefail
+
+GIT_DIR="$(git rev-parse --git-dir)"
+MSG_FILE="$GIT_DIR/CLAUDE_COMMIT_MSG"
+
+if [[ $# -ge 1 && -f "$1" ]]; then
+  cp "$1" "$MSG_FILE"
+elif [[ $# -ge 1 ]]; then
+  printf '%s\n' "$*" > "$MSG_FILE"
+elif [[ ! -t 0 ]]; then
+  cat > "$MSG_FILE"
+else
+  echo "usage: gcommit \"subject\" | gcommit msgfile | printf 'msg' | gcommit" >&2
+  exit 64
+fi
+
+if [[ ! -s "$MSG_FILE" ]]; then
+  echo "gcommit: empty commit message" >&2
+  exit 1
+fi
+
+SUBJECT="$(head -n 1 "$MSG_FILE")"
+if [[ -z "${SUBJECT// /}" ]]; then
+  echo "gcommit: first line (subject) is empty" >&2
+  exit 1
+fi
+
+echo "gcommit: $SUBJECT"
+git commit -F "$MSG_FILE"
