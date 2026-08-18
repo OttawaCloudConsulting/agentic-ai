@@ -13,3 +13,6 @@ scratch/
 
 # Generated knowledge-graph cache (local-only; rebuilt by graphify)
 graphify-out/
+# Python bytecode (skills/itsg-assessment/scripts)
+__pycache__/
+*.pyc

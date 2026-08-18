@@ -8,7 +8,8 @@
 
 ## NIST
 
-- [NIST SP 800-53 Rev 5](https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final) — ITSG-33 Annex 3A adopts the same control IDs
+- [NIST SP 800-53 Rev 4](https://csrc.nist.gov/pubs/sp/800/53/r4/final) — the revision ITSG-33 Annex 3A follows; use this as the Phase 4 fallback source
+- [NIST SP 800-53 Rev 5](https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final) — later revision; control statements were rewritten in outcome form and parts re-lettered, so it is **not** a part-for-part match for Annex 3A
 
 ## AWS
 

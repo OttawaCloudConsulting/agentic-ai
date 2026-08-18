@@ -30,6 +30,10 @@ Each skill follows the same bundle structure:
 | `references/<controls>.md` | Framework-specific control/subcategory tables |
 | `references/phase-templates.md` | Output format templates for all four assessment documents |
 | `references/official-references.md` | Links to official documentation (ITSG and FedRAMP skills) |
+| `assets/control-evidence-template.md` | Per-control SA&A evidence document template (itsg-assessment only) |
+| `references/control-evidence-checklist.md` | Completeness gate for evidence documents (itsg-assessment only) |
+| `references/control-evidence-example.md` | Completed CP-9 evidence document (itsg-assessment only) |
+| `scripts/extract-control.py` | Deterministic Annex 3A control-text extractor (itsg-assessment only) |
 
 Framework-specific reference files:
 
@@ -168,6 +172,24 @@ The `nist-csf-assessment` executive summary additionally includes CSF version us
 
 Presents the executive summary and top recommended actions.
 
+### Phase 4 -- Control Evidence Documents (itsg-assessment only)
+
+Opt-in phase, offered after the Phase 3 summary and never run automatically. It produces the per-control artifact a GC assessor requests during SA&A: one formal document per control at `docs/compliance/controls/<CONTROL-ID>.md`, carrying the official control wording, tailoring decisions, selected parameter values, and a per-requirement evidence response with stable artifact IDs.
+
+The `nist-fedramp-assessment` and `nist-csf-assessment` skills do not have this phase.
+
+**Scope.** Every control in `phase2-control-mapping.md` not marked Not Applicable. The count and list are reported before generation, and the user can narrow it.
+
+**Standalone entry.** A request naming specific controls ("write the evidence document for AC-2") enters Phase 4 directly, reading the Phase 2 mapping if present or running a targeted single-control discovery if not. Evidence documents are commonly rewritten one at a time as assessor comments come back.
+
+**Control text resolution.** Sections 2.1 and 2.2 of each document require official ITSG-33 wording. Resolution order: project-local cache at `docs/compliance/.control-text/` (valid only when its raw capture is retained), then `scripts/extract-control.py` against the Annex 3A URL, then NIST SP 800-53 Rev 4 as a labelled parallel, and finally a `[VERIFY-SOURCE]` marker. Search-engine snippets are explicitly not an acceptable source -- they return wording stripped of list structure. The skill never generates control wording from memory; fabricated control text voids an evidence package.
+
+**Control decomposition.** Annex 3A states each control as an ordered list styled `list-style-type: upper-alpha`, so parts render as A., B., C. Those markers are CSS-generated and are lost by tag-stripping extraction, which makes a control look like unlettered prose. Parts are taken from the top-level list items; nested `lower-alpha` sub-items stay within their parent part. NIST 800-53 Rev 4 is the fallback because it is the revision Annex 3A follows -- Rev 5 rewrote control statements and re-lettered parts.
+
+**Control enhancements are out of scope** for evidence documents and the limitation is declared at the checkpoint.
+
+**Checkpoint.** Reports the files generated, every unresolved `[VERIFY-SOURCE]` marker by control ID, and any control whose per-part verdicts disagree with its Phase 2 status.
+
 ### Smart Re-run
 
 Before starting any phase, each skill checks for existing phase outputs. If found:
@@ -187,6 +209,7 @@ Before starting any phase, each skill checks for existing phase outputs. If foun
 | `docs/compliance/phase2-csf-mapping.md` | CSF subcategory mapping (nist-csf-assessment) |
 | `docs/compliance/phase3-gap-analysis.md` | Risk-rated gap entries with remediation recommendations |
 | `docs/compliance/assessment-summary.md` | Executive summary with posture and risk dashboards |
+| `docs/compliance/controls/<CONTROL-ID>.md` | Per-control SA&A evidence document (itsg-assessment, Phase 4) |
 
 ## Error Handling
 
@@ -198,6 +221,7 @@ All three skills include explicit error handling for common failure scenarios:
 | Phase 0 returns unexpected format (nist-csf-assessment) | Do not overwrite the reference file; report what was received; proceed with existing version |
 | No IaC files detected | Report what was searched. ITSG and FedRAMP skills ask the user if controls exist outside the codebase. |
 | No architecture docs found | Proceed with code-only analysis, note reduced confidence in Phase 1 output |
+| Phase 4 control text unavailable (itsg-assessment) | Emit `[VERIFY-SOURCE]` in sections 2.1 and 2.2, continue the document, report the marker at the checkpoint |
 | Empty or minimal codebase | Report insufficient evidence for assessment. Ask user for additional context before proceeding. |
 | Ambiguous control status | Mark "Partially Implemented" with notes explaining uncertainty; flag for user review at checkpoint |
 | Subcategory reference file missing or corrupt (nist-csf-assessment) | Stop and report. User must restore `references/nist-csf-subcategories.md` before proceeding. |

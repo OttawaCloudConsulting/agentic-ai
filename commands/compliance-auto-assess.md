@@ -42,3 +42,4 @@ This skill dispatches the ITSG-33 / CCCS Medium compliance assessment as a sub-a
 - **Always dispatch via Task tool** — do NOT execute the assessment instructions in the main conversation. This is the entire purpose of this skill.
 - The instructions file contains all phase definitions, control tables, output templates, and assessment rules.
 - The sub-agent writes all output to `docs/compliance/` within the project.
+- **Phase 4 (per-control evidence documents) is interactive-only and is not run by this dispatcher.** The phase range above stays at 0 through 3 deliberately — generating formal SA&A documents for every in-scope control is a decision the user makes, not an unattended side effect. Run `/itsg-assessment` directly to produce them.

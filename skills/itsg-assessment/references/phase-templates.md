@@ -196,3 +196,9 @@ Output templates for each phase of the ITSG-33 compliance assessment. All output
 | Control Mapping | docs/compliance/phase2-control-mapping.md |
 | Gap Analysis | docs/compliance/phase3-gap-analysis.md |
 ```
+
+## Phase 4 — Control Evidence Documents
+
+**Files:** `docs/compliance/controls/<CONTROL-ID>.md` — one per in-scope control.
+
+This output is not templated here. Copy `assets/control-evidence-template.md` and fill it. Verify the result against `references/control-evidence-checklist.md`; see `references/control-evidence-example.md` for a completed document.
