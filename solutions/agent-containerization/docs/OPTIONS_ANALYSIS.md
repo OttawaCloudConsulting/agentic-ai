@@ -4,7 +4,7 @@ Three architectural options for running Claude Code, OpenAI Codex, and Google An
 
 Supporting evidence, version numbers, exact paths and citations are in [`RESEARCH_FINDINGS.md`](RESEARCH_FINDINGS.md). This document is the decision material.
 
-**Research date:** 2026-09-02.
+**Research date:** 2026-09-02. **Revised 2026-09-03** after an adversarial review against four published standards — see [`red-team/options-analysis-01/`](red-team/options-analysis-01/CONSOLIDATED-REPORT.md) for the 28 findings and [`DISPOSITION.md`](red-team/options-analysis-01/DISPOSITION.md) for how each was handled. The recommendation is unchanged; several of the reasons given for it were wrong and have been rewritten, and the comparison table has been corrected on four axes where it overstated the design.
 
 ## Contents
 
@@ -13,28 +13,60 @@ Supporting evidence, version numbers, exact paths and citations are in [`RESEARC
 - [Option 2 — Compose pod with egress mediator](#option-2--compose-pod-with-egress-mediator)
 - [Option 3 — Per-agent microVM, host-enforced egress](#option-3--per-agent-microvm-host-enforced-egress)
 - [Comparison](#comparison)
+- [Controls No Option Provides](#controls-no-option-provides)
 - [Cross-Cutting Concerns](#cross-cutting-concerns)
 - [Security Warning — Antigravity Terms of Service](#security-warning--antigravity-terms-of-service)
+- [Open Decisions](#open-decisions)
 - [Recommendation](#recommendation)
 
 ## Design Constraints
 
 ### The three agents are not symmetric
 
-| Agent | Container artifact | Notes |
-|---|---|---|
-| Claude Code | `npm i -g @anthropic-ai/claude-code` (Node) | Refuses to start as root with `--dangerously-skip-permissions`; container must run non-root |
-| OpenAI Codex | Static musl binary (Rust) | Trivial to put in a distroless image |
-| Google Antigravity | `agy` Go binary via install script | Headless mode is first-class; do **not** containerize the desktop GUI |
+| Agent | Container artifact | Notes | Integrity at build time |
+|---|---|---|---|
+| Claude Code | `npm i -g @anthropic-ai/claude-code` (Node) | Refuses to start as root with `--dangerously-skip-permissions`; container must run non-root | Pin the exact version and commit a lockfile; rely on its integrity hash. A bare `npm i -g` resolves to whatever is current that day |
+| OpenAI Codex | Static musl binary (Rust) | Trivial to put in a distroless image | Fetch the released `codex-*-unknown-linux-musl.tar.gz` and verify its published checksum |
+| Google Antigravity | `agy` Go binary | Headless mode is first-class; do **not** containerize the desktop GUI | **Do not use the install script.** Fetch the released binary and verify it by checksum, per `REQUIREMENTS.md` R7.7 |
+
+All three sit on a digest-pinned base image. The first version of this table recorded acquisition as a packaging detail and named an install script without comment. That sits badly against R7.7 (contents "verified by checksum or signature", with `curl | bash` prohibited at runtime), R10.2 (versions and digests pinned) and R10.3 (auto-updaters disabled, "so a pinned build stays pinned") — the strongest enforcement boundary is worth nothing if the thing inside it was substituted before the boundary existed.
+
+### stdio MCP servers execute inside the blast radius under all three options
+
+Every enforcement point below is a network mediator. MCP has two common transports, and only one of them crosses a network at all: Streamable HTTP does, stdio does not. A stdio MCP server is a subprocess of the agent, running inside the sandbox, exchanging JSON-RPC over `stdin`/`stdout`. Its tool calls, tool results and capability negotiation are invisible to the `sbx` proxy, to the Option 2 mediator, and to host `pf`/`nftables` alike. Only the server's own subsequent outbound HTTP calls are visible, and those are indistinguishable from the agent's.
+
+Containerizing the agents does satisfy the MCP guidance's strongest stdio recommendation — that stdio servers run inside a sandboxed execution boundary — so the *confinement* is right. The *visibility* is absent in all three options, and no option should be selected on the belief that its audit trail covers the MCP path. It does not.
 
 ### Threat model
 
-The primary threat is not a malicious user — it is a **compromised agent**: indirect prompt injection from a repository, a web page, an MCP server response, or a dependency, causing the agent to exfiltrate data or reach systems it should not.
+The primary threat is not a malicious user — it is a **compromised agent**. Specifically, and stated in the order the harm actually occurs:
 
-That threat model has two consequences that drive every option below:
+**The compromise.** Indirect prompt injection, from a repository, a web page, a dependency, or an MCP server. The MCP surface is wider than a hostile tool *result*: tool names, descriptions and parameter schemas are ingested during capability negotiation, before any tool is invoked, and the model chooses which tool to call based on them. That makes **tool poisoning** (malicious instructions in tool metadata), **tool-name shadowing**, and the **rug pull** (a server benign at approval time, malicious after) injection vectors that no filter on tool output would ever see.
 
-1. The agent has legitimate outbound network access (it must reach its model API), so egress control must be selective, not binary.
-2. The agent runs arbitrary code by design, so any control the agent process can itself modify is not a control. **The enforcement point must sit outside the blast radius.** This is the single axis on which the three options differ.
+**The harm.** Exfiltration of data, and lateral reach to systems and peers the agent should not touch.
+
+**None of the three options below mitigates the compromise. All three bound the harm.** This is the single most important thing to understand about this document, and the first version of it did not say so. Nothing in any option inspects an input, separates privileged instructions from untrusted content, or validates a tool call before execution. The agent, once injected, still executes the injected instruction — it reads its credential volume, rewrites the project, and calls the tools it holds. What the architecture constrains is where the result can be sent and how far the agent can reach.
+
+The primary threat this document designs against is therefore **exfiltration and lateral reach by an already-compromised agent**. That framing is defensible and matches what the options actually do.
+
+Two consequences drive every option below:
+
+1. The agent has legitimate outbound network access (it must reach its model API), so egress control must be selective, not binary. Note that this leaves the highest-bandwidth exfiltration channel — the model API itself — open by necessity in every option.
+2. The agent runs arbitrary code by design, so any control the agent process can itself modify is not a control. **The enforcement point must sit outside the blast radius.** This is the axis on which the three options differ most, and the one this analysis weighs most heavily. It is not the only axis on which they differ, and it says nothing about controls none of them have — see [Controls No Option Provides](#controls-no-option-provides).
+
+### Non-goal — ingress filtering
+
+Input inspection, prompt-injection filtering, context-boundary enforcement and deterministic tool-call mediation are **out of scope for this iteration**, and their absence is a deliberate, recorded decision rather than an oversight.
+
+The reason is that we consume three third-party agent products. Their input-handling pipelines are not ours to instrument, and building a guardrail layer that intercepts every action across three different agent harnesses is a substantially larger undertaking than the sandbox itself. The residual risk is that a successful injection is neither prevented nor detected at the point of injection; it is bounded afterwards, and visible only if it attempts a blocked destination.
+
+Recorded as gap G9 in [`STANDARDS_MAPPING.md`](STANDARDS_MAPPING.md). The relevant Safeguards are CIS AI/LLM §16.10 and §16.11, and CIS AI Agents §16.10, §9.3, §9.6 and §10.1. Where an option can host such a layer later, that is a point in its favour and is scored in the comparison.
+
+### Assumption — unattended operation
+
+Every option assumes the agent runs unattended with permission prompts bypassed. That is the reason the sandbox exists, and it is a deliberate deviation from published guidance: Five Eyes L723–724 names "network egress" explicitly as a class of action warranting a human approval checkpoint.
+
+The compensating control is that egress is constrained by policy rather than by a prompt. The gap this leaves is that no option as specified can hold a connection and ask an operator about a novel destination — though one of them could be extended to, which the comparison now scores.
 
 ### Enforcement point per option
 
@@ -69,9 +101,22 @@ sbx policy deny  network "169.254.169.254,10.0.0.0/8"
 - Resources accept hostnames, wildcard subdomains (`*.example.com`), IP addresses, **CIDR ranges**, and optional port suffixes (`example.com:443`).
 - **Deny rules always take precedence over allow rules.**
 - Presets: `open` (allow all), `balanced` (default-deny plus a baseline allowlist of AI provider APIs, package managers, code hosts, registries), `locked-down` (nothing leaves, including model provider APIs).
-- Scope is global by default; `--sandbox <name>` scopes a rule to one sandbox.
+- **Scope is global by default**; `--sandbox <name>` scopes a rule to one sandbox. Under the default, every agent receives the union of all three agents' allowlists — so the per-sandbox isolation this option offers is a filesystem and VM property, not an egress-policy one. Every rule must be `--sandbox` scoped for per-agent egress policy to exist at all.
 - Only HTTP/HTTPS is fully intercepted through the proxy. Non-HTTP TCP (including SSH) can be permitted with a hostname rule.
 - **UDP and ICMP are blocked at the network layer and cannot be unblocked by policy.** This closes the DNS-exfiltration hole by construction — no other option gets this for free.
+
+### The vendor is a service provider on the traffic path
+
+This option interposes a closed-source third party that terminates HTTP/HTTPS for all agent traffic. The first version of this document assessed that vendor on two dimensions — auditability and lock-in, and the Antigravity terms-of-service question — and never as a provider that will see prompts, source code, tool output and credential-bearing headers in the clear.
+
+That is the wrong order of operations. Published guidance (CIS AI Agents §15.5, §15.1) asks for the assessment *before* integration: what the provider can observe, its runtime isolation between tenants, its retention period, its deletion guarantees, and its breach-notification path.
+
+**That assessment has not been done, and the terms are not established.** Two consequences follow, and both are load-bearing:
+
+- Docker Sandboxes should be treated as an unassessed processor of decrypted agent traffic until the retention and data-handling terms are read.
+- The proving-ground run in the sequence below is therefore constrained: synthetic repository, throwaway credentials, no production code. It was originally written as "a representative repository", which would have routed real source and real credentials through an unassessed third-party MITM proxy as the very first step.
+
+This is recorded as an open decision below and as gap G8 in [`STANDARDS_MAPPING.md`](STANDARDS_MAPPING.md).
 
 ### Assessment
 
@@ -90,41 +135,74 @@ Agent containers on an isolated network with no route out; a single sidecar is t
 ### Shape
 
 ```text
-[claude] ─┐
-[codex]  ─┼── agents-net  (internal: true — no default route, no DNS to internet)
-[agy]    ─┘        │
-                   └── [egress-mediator] ── external network ── internet
-                         iron-proxy (Go, Apache-2.0) or Squid CONNECT-allowlist
-                         + authoritative DNS resolver for the pod
+[claude] ── claude-net ─┐   each internal: true — no default route, no DNS to internet
+[codex]  ── codex-net  ─┼── [egress-mediator] ── external network ── internet
+[agy]    ── agy-net    ─┘     multi-homed onto all three agent networks
+                              iron-proxy (Go, Apache-2.0) or Squid CONNECT-allowlist
+                              + authoritative DNS resolver for the pod
+                              + per-agent client identity (mTLS)
 ```
 
-- Agent containers: `network: internal`, `cap_drop: ALL`, `security_opt: no-new-privileges`, read-only root filesystem with `tmpfs` for scratch, non-root user, project directories bind-mounted (`:ro` where the agent does not need to write).
-- One container per agent, one state volume per agent. Claude Code cannot read Codex's `auth.json`.
-- **DNS is served by the mediator.** The agent network has no route to port 53 on the internet, so DNS tunnelling is structurally impossible rather than merely filtered. This is the fix for the hole in both vendor reference firewalls.
-- Each agent's own native controls are layered inside as defence in depth: `srt` for Claude Code, `features.network_proxy` for Codex, `agy --sandbox` for Antigravity.
+**One network per agent, not one shared network.** This is a correction. The first version of this document placed all three agents on a single `agents-net` and claimed "Cross-agent isolation: Per container". That claim was false: `internal: true` removes the default route to the internet, but Docker bridge networks by default "allow unrestricted communication between containers on the same bridge" (Docker's own bridge-driver documentation). A compromised Claude Code container could reach the Codex and Antigravity containers directly on any port, and the mediator would never see it, because the traffic never left the segment.
+
+The three agents do not hold symmetric privilege — the Antigravity container may hold only a `GEMINI_API_KEY` while the Claude container holds a one-year OAuth token — so a compromised low-value agent reaching a high-value peer is a real escalation path, not a theoretical one.
+
+The remedy used here is verified against Docker's documentation: containers on separate bridge networks "cannot communicate with each other by name or IP address", and a container reaches multiple networks only by being explicitly attached to each. The mediator is attached to all three; the agents are attached to one each.
+
+An alternative is a single network with inter-container connectivity disabled via the bridge driver's ICC option (`com.docker.network.bridge.enable_icc`, passed through `driver_opts`). The `driver_opts` mechanism is confirmed and the bridge driver does expose an inter-container-connectivity option, but the exact key name is **UNVERIFIED** here — confirm it against the Docker version in use before relying on it. Per-agent networks need no such confirmation, which is why they are the primary form.
+
+- Agent containers: `cap_drop: ALL`, `security_opt: no-new-privileges`, read-only root filesystem with `tmpfs` for scratch, non-root user, project directories bind-mounted (`:ro` where the agent does not need to write).
+- **Resource limits** (`deploy.resources`): CPU, memory and PID ceilings per agent. Not optional decoration — without them a prompt-injected agent stuck in a loop exhausts the host and burns the model subscription while generating only allowlisted traffic the design logs as normal. Option 3 gets these for free from its VM boundary; Option 2 must declare them.
+- **Inbound listeners bind `127.0.0.1`.** Any MCP HTTP listener binds loopback only, with Origin validation enabled and SDK DNS-rebinding protection explicitly turned on — both the TypeScript and Python MCP SDKs ship with rebinding protection *off* by default (CVE-2025-66414, CVE-2025-66416).
+- One container per agent, one state volume per agent. Claude Code cannot read Codex's `auth.json` — a filesystem property, and with per-agent networks it is now a network property too.
+- **DNS is served by the mediator.** The agent networks have no route to port 53 on the internet, so DNS tunnelling is structurally impossible rather than merely filtered. This is the fix for the hole in both vendor reference firewalls.
+- Each agent's own native controls are layered inside as defence in depth: `srt` for Claude Code, `features.network_proxy` for Codex, `agy --sandbox` for Antigravity. **All three are reachable by the agent process**, so by this document's own principle none is a control — they are worth enabling and worth nothing as a boundary. One of them has a property worth naming specifically: `srt` hard-denies writes to `.mcp.json`, `.claude/commands` and `.claude/agents` at the project root, which is a partial mitigation for the configuration-integrity problem below. It covers Claude Code only.
+
+### Preconditions
+
+Two of these must be true before Option 2 is built. They are not enhancements.
+
+**Per-agent identity at the mediator.** Credential brokering without caller authentication is worse than no brokering at all. A mediator that injects an upstream credential because "a request arrived from the pod network" hands every agent every brokered credential — a compromised Claude Code container no longer needs to read Codex's `auth.json`, it just sends the request and the mediator attaches the OpenAI token for it. Because the mediator is also the policy decision point, the resulting audit records look legitimate. This is a textbook confused-deputy pattern.
+
+Therefore: each agent container is issued a distinct client certificate or workload identity; the mediator requires mTLS; each brokered credential is bound to exactly one client identity and cross-binding is refused; the client identity is recorded on every audit line. **Until this exists, brokering is mutually exclusive with a shared agent network, and only one agent may be brokered per pod.** Recorded as gap G3 in [`STANDARDS_MAPPING.md`](STANDARDS_MAPPING.md).
+
+**Network isolation between agents**, per the topology above.
+
+### Mediator hardening
+
+The mediator holds the brokered credentials for all three agents, terminates TLS wherever interception is used, holds the CA private key, serves DNS for the pod, and writes the audit log. It is the single component whose compromise yields everything. The first version of this document specified hardening for the agent containers in precise detail and none at all for the mediator.
+
+- `cap_drop: ALL`, `no-new-privileges`, read-only root filesystem, non-root user — the same baseline the agent containers get.
+- Its secrets and CA private key are injected at runtime from a secret manager, not baked into the image and not stored on a volume an agent can reach.
+- It exposes exactly one port to each agent network — the proxy listener — and nothing else. It does not expose a management or metrics port to the agent networks.
+- **The audit log is written inside the mediator or shipped directly off-host. It is never written to a volume shared with an agent container.** Five Eyes L658 makes this a control in its own right: "Isolate agents into enclaves with no write access to logs." A log the agent can edit is not evidence.
 
 ### Egress policy
 
-Two independent controls, in order:
+Three independent controls, in order:
 
 1. **Allowlist** of domains (exact and wildcard) and CIDRs, evaluated at CONNECT/SNI.
 2. **Post-resolution CIDR denylist** — even for an allowlisted domain, the connection is refused if the resolved IP falls in a blocked range. This catches CDN IP rotation and DNS rebinding, which an `ipset` snapshot built at container start cannot.
+3. **Per-agent rate and concurrency limits.** The mediator already terminates and rewrites requests, so the hook point exists. Without it, nothing bounds a runaway loop against the model API — a cost-exhaustion failure that generates only allowlisted traffic and so is invisible to controls 1 and 2. Network controls cannot detect semantic cost.
 
 Cloud metadata (`169.254.169.254`), loopback, and private ranges are blocked by default in `iron-proxy`.
 
-Optional **credential brokering**: long-lived tokens live in the mediator and are injected as upstream headers, so the agent container never holds a secret. `codex-responses-api-proxy` is a ready-made primitive for this on the OpenAI side — it forwards only `POST /v1/responses` and 403s everything else.
+Optional **credential brokering**, subject to the per-agent identity precondition above: long-lived tokens live in the mediator and are injected as upstream headers, so the agent container never holds *that* secret. `codex-responses-api-proxy` is a ready-made primitive for this on the OpenAI side — it forwards only `POST /v1/responses` and 403s everything else.
 
-Every attempted destination is logged. You see the injection attempt, not just the block.
+**Brokering covers the model-provider API only.** A proxy that 403s everything except `POST /v1/responses` brokers nothing for a GitHub, Jira, database or cloud MCP server; those credentials still live in the agent container. The pattern extends per-destination, but each extension is a design decision to be recorded, not an automatic property. Any unqualified claim that tokens "never enter the agent container" stops being true the moment an MCP server with a downstream integration is added.
+
+**What the log actually contains.** Every attempted destination is logged. You see an outbound attempt to a non-allowlisted destination; you do **not** see what caused it. There is no session identifier, no agent identity, no tool call and no command in that record — package-manager fetches, model API calls and injected tool fetches all arrive as an undifferentiated CONNECT stream from one source IP. This is a destination log, not an agent action log, and closing that gap requires per-agent identity first (see [`STANDARDS_MAPPING.md`](STANDARDS_MAPPING.md) G1 and G3).
 
 ### Assessment
 
 | Pros | Cons |
 |---|---|
-| The only option where FQDN rules work correctly (L7 CONNECT/SNI inspection) | You own and maintain it. Days, not hours. |
+| The only option where FQDN rules work correctly (L7 CONNECT/SNI inspection) | You own and maintain it. Days, not hours — and the identity work in Preconditions is part of that, not an extra |
 | Allowlist + denylist + post-resolution CIDR deny | Splice-only gives domain granularity; URL-path rules require TLS MITM and CA distribution |
 | Identical on macOS and Linux hosts | Codex defaults to **WebSocket** transport — the proxy must permit `Upgrade` on 443 or streaming silently degrades to HTTP/SSE |
-| Full audit trail of attempted destinations | More moving parts than a managed product |
-| Credential brokering keeps tokens out of the agent container | Requires care so that a misconfigured `internal: true` does not silently become routable |
+| Destination-level audit trail, self-owned. Not an agent action log | More moving parts than a managed product |
+| Credential brokering keeps the model-provider token out of the agent container, given per-agent identity | Requires care so that a misconfigured internal network does not silently become routable — and nothing in the sequence currently tests for it except the new validation step |
+| **The only enforcement point that can be extended** — per-agent identity, an operator hold on a novel destination, rate limiting, an MCP gateway | **Worst recovery-to-known-good of the three.** Persistent named volumes, a hand-built mediator with hand-built state, and a self-owned log. Options 1 and 3 destroy and recreate a microVM trivially |
 
 CA distribution if MITM is used: Claude Code reads `NODE_EXTRA_CA_CERTS`; Codex reads `CODEX_CA_CERTIFICATE` (and uses rustls **with native roots**, so the usual "Rust binary ignores the system trust store" pitfall does not apply); `agy` CA handling is unverified — and see the ToS warning before intercepting its traffic at all.
 
@@ -151,6 +229,8 @@ Note: gVisor is not an option on a macOS host.
 
 ## Comparison
 
+This table covers only the axes on which the three options actually differ. Controls that none of them provides are listed separately in the next section, so that a reader does not mistake an absent row for a satisfied requirement — which is how the first version of this table was misread.
+
 | | 1 · `sbx` | 2 · Compose + mediator | 3 · Per-agent microVM |
 |---|---|---|---|
 | Enforcement location | Outside guest (vendor) | Separate container | Outside guest kernel (self-built) |
@@ -159,11 +239,36 @@ Note: gVisor is not an option on a macOS host.
 | IP / CIDR denylist | Yes | Yes, plus post-resolution | Yes |
 | DNS exfiltration closed | Yes, by construction | Yes, by routing | Yes |
 | Covers all three agents | Partial — Antigravity via `shell` | Yes | Yes |
-| Cross-agent isolation | Per sandbox | Per container | Per VM |
-| Audit log | Vendor-provided | Full, self-owned | Full, self-owned |
+| Credential / filesystem isolation | Per sandbox | Per container and volume | Per VM |
+| **Agent-to-agent network reachability** | Blocked between sandboxes | **Blocked only with per-agent networks** — unrestricted on a shared bridge | Blocked between VMs |
+| Per-agent egress policy | **Only if every rule is `--sandbox` scoped**; global by default | Yes, per network | Yes |
+| **Egress audit log** | Vendor-provided, destination-level | Destination-level, self-owned | Destination-level, self-owned |
+| **Log reachable by the agent?** | Unverifiable — closed source | No, if written inside the mediator | No |
+| **Enforcement-point extensibility** — per-agent identity, operator hold on a novel destination, rate limiting, MCP gateway | **No** — closed-source policy engine, network resources only | **Yes** — self-owned and extensible | No — `pf`/`nftables` is network-only |
+| **Runtime MCP install blockable** | No — cannot distinguish `npm i lodash` from `npx evil-mcp-server` | Possible via a registry mirror or pull-through cache | No |
+| **Resource containment** | VM ceiling by construction | Only if `deploy.resources` limits are declared | VM ceiling by construction |
+| **Containment and recovery to known-good** | Trivial — destroy and recreate the microVM | **Hardest** — persistent volumes, hand-built mediator state, self-owned log | Trivial — destroy and recreate the VM |
 | Host portability | macOS / Windows only | macOS and Linux | Platform-specific |
-| Vendor dependency | High | None | None |
+| Tooling vendor dependency | High | None | None |
 | Effort | Hours | Days | 1–2 weeks |
+
+The "Tooling vendor dependency" row was previously titled "Vendor dependency", which invited the reading that Options 2 and 3 have no vendor exposure. They depend entirely on three SaaS model providers whose behaviour is the substrate of the whole system. That dependency is identical across all three options and is treated under [Provider governance](#provider-governance).
+
+## Controls No Option Provides
+
+These are named rather than omitted, because a comparison table that silently drops an axis reads as though the axis is covered. On every control below, all three options score identically: absent. They are therefore not discriminators — but they are the difference between what this architecture does and what published guidance asks for, and each is a forfeited control rather than a solved problem.
+
+| Control | Guidance | Why it is absent |
+|---|---|---|
+| Input inspection / prompt-injection filtering | CIS AI/LLM §16.10, §16.11; CIS AI Agents §9.3, §9.6, §10.1; Five Eyes L519–525 | Declared a non-goal above. We do not control three third-party agents' input pipelines |
+| Deterministic mediation of agent *actions* — tool calls, not packets | CIS AI Agents §16.10 | No option intercepts a tool call. Writing to a bind mount, `git push` to an allowlisted host, or `terraform apply` is unmediated everywhere |
+| stdio MCP tool-invocation visibility | CIS MCP §8.2, L616–617 | The transport never crosses a network. See Design Constraints |
+| Agent action log — tool calls, file writes, privilege changes | CIS AI Agents §8.5, §8.8; Five Eyes L679–681 | All three options log destinations only. Requires per-agent identity first |
+| Model-provider governance — version pinning, retention, training opt-out | CIS AI/LLM §4.1, §15.2 | Identical across options; see [Provider governance](#provider-governance) |
+| Content-level DLP on the model API channel | CIS AI/LLM §3.13; Five Eyes L541 | Follows from the splice-only decision below. The channel carrying 100% of prompt and completion content is inspected for hostname and byte count only |
+| Human approval checkpoint on a novel destination | Five Eyes L723–724 | Unattended operation is assumed. Option 2 is the only one that *could* host this later |
+
+The honest summary: this architecture bounds what a compromised agent can reach and records where it tried to go. It does not detect the compromise, constrain what the agent does inside the boundary, or attribute an action to an agent.
 
 ## Cross-Cutting Concerns
 
@@ -193,14 +298,93 @@ Two host-specific notes for this machine:
 
 **Treat every one of these volumes as a secret.** They hold long-lived refresh tokens. Anthropic states the point plainly for its own devcontainer: with `--dangerously-skip-permissions`, the container "does not prevent a malicious project from exfiltrating anything accessible inside the container, including the Claude Code credentials stored in `~/.claude`." That is the argument for credential brokering under Option 2.
 
+#### These volumes are also long-term memory, not just credential stores
+
+Confidentiality is one property; the volumes need three more decisions that the first version of this document did not make. The host `~/.codex` directory being 1.5 GB of session history is not only a reason to mount a fresh volume — it is a preview of what the fresh volume becomes. Session transcripts hold prompts, tool output and repository contents in plaintext, and they accumulate without bound.
+
+- **At rest and in backup.** Confirm the volume path is FileVault-covered. Exclude these volumes from host backup (Time Machine, any cloud-sync folder) and from version control. A routine host backup otherwise captures every agent's refresh token.
+- **Retention.** State a posture even if the answer is "unbounded, accepted". Claude Code's `cleanupPeriodDays` defaults to 30; Codex has `codex exec --ephemeral` for runs that should persist nothing.
+- **Teardown.** State what destroying the sandbox does to them, and that the answer is not "nothing".
+
+#### Configuration integrity — the volumes hold capability declarations
+
+These same volumes are where each agent records **which MCP servers it loads**. `~/.claude.json` — which the `CLAUDE_CONFIG_DIR` setting deliberately pulls *inside* the persistent volume — holds personal MCP servers and per-project trust. MCP config also lives under `~/.gemini`.
+
+They are writable by design, because requirement 4 demands that auth survive a restart. So a compromised agent can write a new MCP server declaration into its own config volume, and it persists across restarts precisely because persistence is the volume's purpose. That is attacker persistence inside a sandbox whose governing principle is that "any control the agent process can itself modify is not a control" — and MCP server configuration is exactly such a control.
+
+The same class of defect has been CVE'd twice against repository-carried config (CVE-2025-66580; CVE-2025-64109, RCE via a malicious `.cursor/mcp.json` in a repo), which matters here because project directories are bind-mounted writable by default.
+
+Partial mitigation, Claude Code only: `srt` hard-denies writes to `.mcp.json`, `.claude/commands` and `.claude/agents` at the project root. Options 1 and 3 have no equivalent, and no equivalent exists for Codex or `agy`. Record which paths inside each state volume are capability declarations, and treat changes to them as configuration changes requiring review.
+
+### Credential lifecycle (requirements 4 and 6)
+
+The design persists long-lived refresh tokens and, for headless Claude Code, may mint a one-year `CLAUDE_CODE_OAUTH_TOKEN`. That token sits on a volume this document concedes a malicious project can read — a twelve-month replay window. The first version offered it as guidance with no invalidation path attached.
+
+**Recorded as an accepted risk**, with these conditions:
+
+- Prefer the shortest viable credential lifetime. Prefer in-container login over `setup-token` where a human is available to perform it. If the one-year token is chosen, state why in the use-case profile.
+- Compensating controls are the per-agent volumes, secret handling, and backup exclusion above.
+- A revocation path is documented and tested per credential type, with a stated maximum time from detection to revocation. Anthropic tokens revoke through the console; Codex through the OpenAI account; `agy` through the Google account or by rotating `GEMINI_API_KEY`.
+- **Review trigger:** revisit when brokered short-lived agent credentials become available from any of the three providers.
+
+Note what identity-free credentials cost beyond theft risk: because no agent carries an identity, nothing in the egress or host logs distinguishes "the operator did this" from "Claude Code did this on the operator's behalf". Non-repudiation is unsatisfiable by construction until per-agent identity exists. See [`STANDARDS_MAPPING.md`](STANDARDS_MAPPING.md) G3 and G5.
+
+### MCP and tool governance
+
+MCP appeared once in the first version of this document, as a source of hostile input, and never as software that runs inside the sandbox holding the agent's full egress allowlist. Both are true, and the second is the one with design consequences.
+
+- **Default off.** Tools, plugins and MCP servers are disabled unless explicitly approved. This document applies default-deny rigorously to the network and, until now, not at all to tools — an asymmetry with no justification.
+- **Inventoried and version-pinned** per use-case profile, recording risk tier (read-only / write / irreversible) and a capability baseline, so that capability *drift* is detectable and not just new servers.
+- **Egress declared by the server, not inherited from the agent.** An MCP server currently inherits an allowlist sized for the agent. It should declare the destinations it needs.
+- **Installed from an approved source.** See the third trap below.
+- Subject to every control that applies to the agent itself.
+
+Recorded as gap G4 in [`STANDARDS_MAPPING.md`](STANDARDS_MAPPING.md). Only Option 2 has an enforcement point that can grow into the gateway-mediated pattern the MCP guidance names as its recommended default for high-impact workflows; Option 1 forecloses it.
+
+### Provider governance
+
+Anthropic, OpenAI and Google are not merely destinations to allowlist — they are AI service providers, and this dependency is identical under all three options.
+
+Per agent, record: the model version pinning capability or its absence; the history-retention and training-opt-out settings in use; the data classification permitted to leave the sandbox; and the provider's incident-notification path. A provider-side model change can silently alter agent behaviour, and published guidance warns that unpinned upgrades "break existing guardrails" — which is unfalsifiable here, since this architecture has no guardrails to break.
+
+### TLS interception — splice, not MITM (proposed, needs owner)
+
+The first version left this decision open for two of three agents while recommending "Build Option 2", which meant selecting an architecture with its principal content-inspection decision unmade.
+
+**Proposed: SNI/CONNECT splice for all three agents. No TLS interception anywhere.** Rationale: it is required for Antigravity on terms-of-service grounds (below), consistency avoids running two trust models side by side, and it removes CA generation, distribution, rotation and per-agent trust-store configuration from the build — work that was never scoped in the "Days, not hours" estimate.
+
+**State the cost plainly.** Splice was previously booked only as the loss of URL-path granularity. It is more than that:
+
+- No content-level DLP on the model API channel — the destinations carrying 100% of prompt and completion content are inspected for hostname and byte count only. This is precisely where guidance says the data-loss vector is largest.
+- Remote MCP tool invocations to allowlisted hosts cannot be inspected or logged.
+
+Content-level DLP is therefore **out of scope**, and destination narrowing plus the audit log is the accepted residual control. If MITM is later adopted for Claude Code and Codex: Claude Code reads `NODE_EXTRA_CA_CERTS`; Codex reads `CODEX_CA_CERTIFICATE` and uses rustls with native roots.
+
+### If an agent is compromised
+
+The first version designed a detection surface and stopped at it. The one place it produces a signal was followed by nothing. A response path is needed before the sandbox is used, not after the first incident.
+
+| Need | Action |
+|---|---|
+| Cut egress immediately | Option 1: `sbx policy deny network`. Option 2: denylist entry at the mediator, or detach the agent's network |
+| Isolate one agent without stopping the others | Option 2: stop that container; per-agent networks mean the others are unaffected |
+| Rotate credentials | Per credential type, per the revocation paths in Credential lifecycle above. The one-year `CLAUDE_CODE_OAUTH_TOKEN` is the longest-lived and the priority |
+| Disable one MCP server or tool across all agents | **No mechanism exists today.** Requires the MCP governance layer above |
+| Return to known-good | Options 1 and 3: destroy and recreate the microVM. Option 2: rebuild containers, and decide what happens to the persistent state volumes — a contaminated volume cannot currently be distinguished from a clean one |
+
+Define what constitutes an event versus an incident before go-live. Recorded as gap G6 in [`STANDARDS_MAPPING.md`](STANDARDS_MAPPING.md).
+
 ### Egress policy (requirement 5)
 
 Default-deny allowlist is the primary control; the denylist is a second, independent control layered on top. Deny takes precedence over allow in every option.
 
-Minimum allowlists per agent are tabulated in [`RESEARCH_FINDINGS.md`](RESEARCH_FINDINGS.md). Two traps worth repeating here:
+Minimum allowlists per agent are tabulated in [`RESEARCH_FINDINGS.md`](RESEARCH_FINDINGS.md). Three traps worth repeating here:
 
 - **Do not copy the vendor reference allowlists.** Anthropic's is stale: it permits retired telemetry hosts (`sentry.io`, `statsig.com`) while omitting `claude.ai` and `platform.claude.com`, which OAuth sign-in and token refresh require.
 - **DNS must be owned.** Both vendor firewalls permit UDP/53 to any destination.
+- **A registry allowlist is not a software allowlist.** This is the trap the first version missed, and it is the one that undermines everything above it. `*.npmjs.org` and `*.pypi.org` are not data destinations — they are arbitrary-code inbound channels, and the installation channel for arbitrary MCP servers. `npx <any-mcp-server>` succeeds inside every option's sandbox; the server is unreviewed, unpinned, unhashed, and inherits the agent's container privileges and its whole egress allowlist. Typosquatting is unmitigated. A wildcard registry entry is also an exfiltration destination — a publish to an attacker-controlled package name is indistinguishable from a fetch at the domain level.
+
+  Prefer registry access absent at runtime, with packages installed at build time; or narrow it to specific package paths through a pull-through cache or mirror. Note that the `balanced` preset used for the discovery run permits package managers and registries wholesale, so this flaw propagates by construction into the durable policy unless it is corrected deliberately.
 
 ## Security Warning — Antigravity Terms of Service
 
@@ -216,21 +400,63 @@ Concrete guidance:
 
 This guidance is an interpretation of the published terms, not an official Google position. Google staff declined to clarify the boundary when asked on the developer forum.
 
+### Decision (proposed, needs owner)
+
+Because the interpretation is explicitly unofficial and the vendor declined to clarify, this risk cannot be closed by further analysis. It needs an accepted position rather than more research.
+
+**Proposed: take the `GEMINI_API_KEY` (or Vertex AI ADC) route**, which sidesteps the clause entirely by leaving the Antigravity OAuth relationship rather than proxying it. Set `"modelProvider": "gemini"` in settings **and** the environment variable — the variable alone is a documented no-op. This routes to the public Gemini API on your own billing rather than the Antigravity account quota, which is the accepted cost.
+
+**The route itself is UNVERIFIED.** [`RESEARCH_FINDINGS.md`](RESEARCH_FINDINGS.md) records a conflict: the current official install page documents this path, but a June 2026 maintainer statement says Gemini API keys are not supported. Test it against the pinned `agy` version before committing to it. If it does not work, the fallback is Antigravity OAuth with splice-only and no proxy tooling — which leaves the ToS question open rather than sidestepping it.
+
+Splice-only for the Antigravity container remains the position if the OAuth route is used instead. Avoid all third-party OAuth wrapper and proxy tooling either way — that is the one pattern with a documented history of account suspension.
+
+- **Owner:** unassigned — needs a named person.
+- **Review trigger:** Google clarifies the boundary, the Additional Terms change, or the billing cost of the public-API route becomes material.
+
+## Open Decisions
+
+Three decisions are proposed above but not settled. Each needs an owner before build starts. They are listed here so they are not lost in the prose.
+
+| # | Decision | Proposed position | Blocking? |
+|---|---|---|---|
+| 1 | TLS interception posture | Splice-only for all three agents; content-level DLP accepted as out of scope | No — but it changes the effort estimate if reversed |
+| 2 | Antigravity access route | `GEMINI_API_KEY` / Vertex ADC, sidestepping the ToS clause | No — affects Antigravity only |
+| 3 | Docker Sandboxes provider assessment | Not done. Step 1 is constrained to a synthetic repository and throwaway credentials until it is | No — the constraint *is* the mitigation. Would block only a run against a representative repository |
+
 ## Recommendation
 
-**Build Option 2. Validate the policy with Option 1 first.**
+**Build Option 2, subject to its Preconditions. Seed the policy with Option 1 first.**
 
-Option 1 produces a working sandbox within hours and independently validates the allow/deny list against real agent traffic. Its microVM boundary is genuinely stronger than plain Docker, and its inability to unblock UDP/ICMP closes the DNS hole without any work. It is excellent as a proving ground and a fallback.
+The recommendation is unchanged from the first version of this document. Three of the four reasons originally given for it were wrong, and are restated here on ground that survives review.
 
-It cannot be the durable answer, though: Antigravity is not a supported agent, the CLI is closed-source, it is macOS/Windows-only, and it creates a vendor dependency inside what is meant to be a reusable, portable artifact.
+Option 1 produces a working sandbox within hours and seeds the allow/deny list from real agent traffic. Its microVM boundary is genuinely stronger than plain Docker, and its inability to unblock UDP/ICMP closes the DNS hole without any work. It is a good proving ground and a good fallback.
 
-Option 2 meets all five requirements without a vendor dependency, is the only option where FQDN rules are evaluated correctly at Layer 7, is the only one that yields an audit trail of what a compromised agent attempted, and is the only one that can broker credentials so tokens never enter the agent container.
+It cannot be the durable answer: Antigravity is not a supported agent, the CLI is closed-source, it is macOS/Windows-only, it creates a vendor dependency inside what is meant to be a reusable portable artifact, and — the reason that matters most — its policy engine expresses network resources only and cannot be extended to enforce anything about identity, tools or MCP servers.
+
+**Why Option 2:**
+
+1. It is the only option where FQDN rules are evaluated correctly at Layer 7. Unchanged and still true.
+2. **It is the only enforcement point that can be extended.** Per-agent identity, an operator hold on a novel destination, rate limiting, and an MCP gateway are all buildable at a self-owned mediator and at neither of the alternatives. Given how much of the gap list above is an application-layer problem, extensibility is the strongest argument for Option 2 — and the first version of this document never made it.
+3. It yields a **destination-level** audit trail that is self-owned and outside the agent's reach. Note the correction: this is not an agent action log, and on action logging all three options score identically at zero.
+4. It can broker the **model-provider** credential, given per-agent identity at the mediator. Without that identity the feature is worse than useless, which is why it is a precondition rather than a benefit.
+
+**What Option 2 costs**, stated because the comparison now carries it: recovery to known-good is the worst of the three. Persistent volumes, hand-built mediator state and a self-owned log mean a contaminated environment is slower and less certain to rebuild than a destroyed microVM. That is a real trade against Options 1 and 3, accepted in exchange for reasons 2 and 3.
 
 Option 3 is warranted only if container escape is inside the threat model. Revisit if the agents will handle untrusted third-party repositories or if the sandbox becomes multi-tenant.
 
 ### Suggested sequence
 
-1. Stand up Option 1 and run the three agents against a representative repository. Capture the real set of destinations each agent contacts.
-2. Turn that capture into the allowlist, and add the denylist overlay (metadata endpoint, RFC1918, link-local, any known-bad indicators).
-3. Build Option 2 with that policy. Keep each agent's native sandbox enabled inside as defence in depth.
-4. Re-evaluate Option 3 only if the threat model changes.
+0. **Assess Docker Sandboxes as a service provider** — what its proxy observes, its retention period for intercepted traffic, its deletion and breach-notification terms. This has not been done. Until it is, step 1 runs constrained as written below.
+1. **Discovery run, not a production session.** Stand up Option 1 under `locked-down` plus a minimal seed allowlist, and widen only on observed failures — not under `balanced`, which starts at maximum permitted access and would run the agents at their widest policy against real code, which is the exact inverse of progressive deployment. Use a **synthetic repository and throwaway credentials**, per step 0 and `REQUIREMENTS.md` R12.4. Run **one agent at a time with `--sandbox` scoping**, or the capture yields a union of all three allowlists rather than a per-agent policy.
+2. **Seed** — not validate — the allowlist from that capture, and add the denylist overlay (metadata endpoint, RFC1918, link-local, known-bad indicators). One closed-source observation point cannot establish completeness: `sbx` fully intercepts only HTTP/HTTPS and blocks UDP/ICMP entirely, so a legitimate UDP dependency is invisible here and surfaces as a novel failure later. Cross-validate against a second source — the agents' own verbose logging, or `tcpdump` on the mediator during a shadow run — and treat the allowlist as provisional until both agree. Correct the package-registry entries per the third trap above rather than carrying them over.
+3. **Build Option 2** with that policy, satisfying both Preconditions. Keep each agent's native sandbox enabled inside as defence in depth, remembering that none of them is a boundary.
+4. **Test the boundary adversarially before using it for real work.** Everything above validates that the allowlist is *sufficient*; nothing yet validates that the boundary is *effective*. Run the acceptance matrix in `REQUIREMENTS.md` (T1–T20, SC-1 to SC-3), and at minimum exercise:
+   - DNS exfiltration
+   - whether the internal networks are genuinely non-routable — this document names a silently-routable network as a failure mode and it has no visible symptom
+   - post-resolution CIDR deny against a rotating CDN
+   - policy modification attempted from inside a container
+   - reach from one agent container to the other two
+   - a repository seeded with injected instructions targeting a non-allowlisted collector — confirming the attempt is blocked, appears in the log, and is attributable
+
+   Record which of the injection sources named in the threat model are exercised and which are not. On current design, the MCP vector is not, because stdio never crosses the enforcement point.
+5. Re-evaluate Option 3 only if the threat model changes.

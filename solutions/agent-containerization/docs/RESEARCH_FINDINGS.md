@@ -4,6 +4,8 @@ Evidence base for [`OPTIONS_ANALYSIS.md`](OPTIONS_ANALYSIS.md). Verified 2026-09
 
 Claims that could not be confirmed are marked **UNVERIFIED**. Version-pinned facts in this space go stale within weeks — re-check before building.
 
+**Revised 2026-09-03** after the red-team run in [`red-team/options-analysis-01/`](red-team/options-analysis-01/CONSOLIDATED-REPORT.md). That review produced findings about `OPTIONS_ANALYSIS.md`, not new research, so the changes here are small: one verified fact about Docker bridge networking added below, and three items added to [Unverified Items](#unverified-items). Several red-team findings were cases of `OPTIONS_ANALYSIS.md` failing to use facts already recorded in this document — those were fixed by referencing this file, not by duplicating it.
+
 ## Contents
 
 - [Host Platform](#host-platform)
@@ -310,10 +312,11 @@ This is actively enforced — Google has suspended paid subscribers, including A
 | **Codex `features.network_proxy`** | Per-agent local policy proxy | Domains allow/deny, deny wins, private ranges blocked by default. Defence in depth, not a boundary. |
 | **Claude Code `sandbox.network.*` / `srt`** | Per-agent proxy outside the sandbox | `allowedDomains` / `deniedDomains` / `strictAllowlist`. Defence in depth, not a boundary. |
 
-Two structural points that recur across all of the above:
+Three structural points that recur across all of the above:
 
 - **FQDN rules only work at Layer 7.** An IP-based firewall resolves names once and stores the result; CDN rotation, round-robin DNS and rebinding all defeat it. Only a CONNECT/SNI-aware proxy evaluates the hostname per connection.
 - **DNS must be owned, not filtered.** The reliable fix is to give the agent no route to port 53 at all and serve DNS from the enforcement point. Filtering UDP/53 by destination does not stop tunnelling.
+- **`internal: true` is not container-to-container isolation.** Verified against Docker's bridge-driver documentation, 2026-09-03: a bridge network by default allows "unrestricted communication between containers on the same bridge and the host, while blocking access from external networks." `internal: true` removes the default route out; it does nothing about peer traffic on the same segment. Containers on *separate* bridge networks "cannot communicate with each other by name or IP address", and a container reaches more than one network only by being explicitly attached to each — so per-service networks with a multi-homed mediator is the verified way to isolate agents from one another. The bridge driver also exposes an inter-container-connectivity option settable through Compose `driver_opts` (the `com.docker.network.bridge.*` family is confirmed to work there), but the exact key name for ICC is **UNVERIFIED** — see Unverified Items.
 
 ## Prior Art
 
@@ -355,6 +358,12 @@ Carried forward deliberately — do not treat these as established:
 - Whether `api.openai.com` is contacted at all in Codex ChatGPT-subscription mode.
 - Docker Sandboxes' credential-persistence mechanism — not documented at the level needed to design against.
 - Exact per-version Antigravity Linux packaging (the download page lists .deb/.rpm/.tar.gz; community reports say tarball-only for some builds).
+
+Added 2026-09-03:
+
+- **The exact Compose/driver key for disabling inter-container connectivity.** `com.docker.network.bridge.enable_icc` is the expected name and the `driver_opts` mechanism is confirmed, but two documentation queries returned the option only as a described capability ("managing inter-container connectivity") without the literal key. Confirm against the Docker version in use before relying on it. Per-agent networks achieve the same isolation and need no such confirmation.
+- **The default MCP transport for each of the three agents** — stdio versus Streamable HTTP, per agent and per configured server. This determines whether MCP traffic crosses a network enforcement point at all, and the answer drives whether any egress audit trail covers the MCP vector. Not established for any of the three.
+- **Docker Sandboxes' retention and data-handling terms for intercepted traffic.** Its proxy terminates HTTP/HTTPS, so it processes decrypted prompts, source and credential-bearing headers. What it retains, for how long, with what tenant isolation and what deletion guarantee, is not documented at the level needed to assess it as a service provider.
 
 ## Sources
 

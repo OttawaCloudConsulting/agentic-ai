@@ -2,7 +2,7 @@
 
 Every source consulted for the agent containerization research, organised by topic. Use this as the starting point for follow-up research rather than re-searching from scratch.
 
-**All 107 URLs verified reachable on 2026-09-02**, except where marked bot-blocked. Verification method:
+**All 107 URLs verified reachable on 2026-09-02**, except where marked bot-blocked. One further URL — the CIS MCP Companion Guide download — was added and verified on 2026-09-03, bringing the total to 108. Verification method:
 
 ```bash
 curl -sSL -o /dev/null --max-time 20 -A "Mozilla/5.0" -w "%{http_code}|%{url_effective}" "<url>"
@@ -171,6 +171,7 @@ Published standards bearing on agentic AI and container hardening. Analysis in [
 | <https://www.cisecurity.org/insights/white-papers/controls-v8-1-ai-llm-companion-guide> | **AI and LLM Companion Guide** (2026-04-20) — prompt injection, retrieval poisoning, context boundaries |
 | <https://learn.cisecurity.org/controls-v8-1-ai-agent-companion-guide> | AI Agents guide download |
 | <https://learn.cisecurity.org/controls-v8-1-ai-llm-companion-guide> | AI and LLM guide download |
+| <https://learn.cisecurity.org/controls-v8-1-mcp-companion-guide> | **MCP Companion Guide** download — Controls v8.1 applied to the Model Context Protocol layer. Verified 2026-09-03. No `insights/white-papers/` landing page found for this guide |
 | <https://learn.cisecurity.org/benchmarks> | Benchmark downloads |
 | <https://www.cisa.gov/resources-tools/resources/careful-adoption-agentic-ai-services> | **Careful Adoption of Agentic AI Services** (2026-05-01, Five Eyes) — the most actionable published guidance for this project |
 | <https://www.cisa.gov/news-events/news/cisa-us-and-international-partners-release-guide-secure-adoption-agentic-ai> | Release announcement with the full authoring agency list |
