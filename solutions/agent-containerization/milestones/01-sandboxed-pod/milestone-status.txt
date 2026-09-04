@@ -1,0 +1,19 @@
+# Milestone 01: Sandboxed Pod
+# Status: [ ] pending  5 features, 0 complete
+
+## Features
+
+[ ] Feature 01.1: Pre-build verification, provider governance and egress discovery
+    Plan: (not yet planned)
+
+[ ] Feature 01.2: Pod topology, hardened runtime and minimal profile
+    Plan: (not yet planned)
+
+[ ] Feature 01.3: Egress mediator
+    Plan: (not yet planned)
+
+[ ] Feature 01.4: Agent authentication and state persistence
+    Plan: (not yet planned)
+
+[ ] Feature 01.5: Pack composition, policy compiler and build pipeline
+    Plan: (not yet planned)

@@ -1,0 +1,19 @@
+# Milestone 03: AWS Access
+# Status: [ ] pending  5 features, 0 complete
+
+## Features
+
+[ ] Feature 03.1: AWS estate provisioning, entitlement design and third-party record
+    Plan: (not yet planned)
+
+[ ] Feature 03.2: Credential broker — the mediator's fifth role
+    Plan: (not yet planned)
+
+[ ] Feature 03.3: AWS CLI tool pack, synthetic config and scoped egress
+    Plan: (not yet planned)
+
+[ ] Feature 03.4: SC-5 empirical validation — identity, entitlement scope and least privilege
+    Plan: (not yet planned)
+
+[ ] Feature 03.5: Boundary re-validation, revocation and AWS go-live
+    Plan: (not yet planned)

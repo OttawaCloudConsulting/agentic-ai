@@ -423,3 +423,42 @@ Minimum verification set. Each test maps to a success criterion.
 | T16 Audit completeness | Review logs after T3–T7 | Every attempt is present with destination and verdict | SC-7 |
 | T17 Startup self-check | Corrupt the policy, then start | Startup aborts with a clear error | SC-7 |
 | T18 Clean rebuild | Rebuild from version control on a clean machine | Functionally identical environment, no manual steps | SC-8 |
+
+### Extended Matrix — T21–T45
+
+Added at Gate 2 (2026-09-04). The matrix above (T1–T20) predates the requirements added at Gate 1
+and covers none of them. The 30 requirements newly defined at Gate 1 are covered below, plus T45
+for the CI-published base image introduced by design decision D21.
+
+Rationale and the component mapping for each test are in
+[`docs/ARCHITECTURE_AND_DESIGN.md`](docs/ARCHITECTURE_AND_DESIGN.md) § Requirements Traceability
+and Test Extension. The fourth column here is the requirement covered, not the success criterion —
+these tests verify requirements that no success criterion reaches directly.
+
+| Test | Method | Passes when | Covers |
+|---|---|---|---|
+| T21 Optional mounts default-off | Start the default profile; enumerate mounts inside each agent container | Only the project directory and that agent's state volume are present. No socket is forwarded | R2.8 |
+| T22 Git config scrubbing | Enable the host gitconfig mount; inspect it inside the container | Mounted `:ro`; no `credential.helper` entry present | R2.9 |
+| T23 Per-agent build cache | Enable the build cache for two agents; write from one | Caches are distinct paths; neither agent can write the other's | R2.10 |
+| T24 `AUTH_MODE` matrix | For each agent, run each mode it supports, headless | Each authenticates with no interactive terminal, and the default is the safest mode that agent supports | R4.12 |
+| T25 Credential mount shape | Under `oauth-mount`: inspect the mount, then force an OAuth refresh | Mount is `:ro`, is a directory not a file, and the refreshed credential lands on the state volume with the host file unchanged | R4.13, R4.14, R4.15 |
+| T26 Long-lived token inventory and revocation | Enumerate persisted refresh tokens; execute the documented revocation for each type and time it | Every persisted token is inventoried with its compensating controls named; revocation succeeds within the stated maximum time | R4.16, R13.1 |
+| T27 `oauth-mount` risk recording | Enable `oauth-mount` in a profile that does not record the accepted-risk decision | The build or startup refuses until the decision is recorded with file, mount mode, revocation path and blast radius | R4.17 |
+| T28 TLS splice verification | Inspect the connection from inside each agent container; attempt to read plaintext at the mediator | No mediator CA is presented to any agent; the mediator holds no plaintext. Antigravity traffic is never intercepted | R5.15, R5.13 |
+| T29 MCP inventory and drift | Add an uninventoried MCP server; then change an inventoried server's capabilities | The uninventoried server is refused; the capability change is reported as drift, not silently accepted | R7.14 |
+| T30 MCP transport declaration | Inspect the inventory for every configured server | Each records its transport and names the enforcement point covering it — or explicitly states that none does | R7.15 |
+| T31 MCP install channel | Attempt `npx <server>` for a server not in the pinned registry | Refused. No wholesale package-registry egress entry permits arbitrary server installation | R7.16 |
+| T32 Capability-declaration integrity | From inside each agent, attempt to write that agent's MCP capability declaration file | Blocked for Claude Code via `srt`. For agents where it is not blocked, the test records the gap rather than passing | R7.17 |
+| T33 Build-time-only packages | Inspect installed package versions; then attempt a package install as the agent user at runtime | Versions match the profile pins and the declared repository; the runtime install fails for want of both privilege and write access | R7.18, R7.19 |
+| T34 Per-agent workload identity | Present agent A's client certificate for a credential bound to agent B; inspect audit lines | Cross-binding is refused; every audit line carries the issuing agent's identity | R8.8 |
+| T35 Agent action log | Perform a tool invocation and a file modification in a session; inspect the sink. Then edit the on-volume transcript retroactively and re-inspect | Both actions are recorded outside the agent's blast radius and correlate with the egress log by session ID and timestamp. The retroactive edit does not propagate to the sink | R9.7, R9.8 |
+| T36 Export toggle cannot disable recording | Disable each of the four exports in turn; inspect the sink | Recording continues in every case; each disabled export is explicitly recorded | R9.9 |
+| T37 Human authorization gate | Attempt an action the profile classifies as irreversible or high-impact, unattended | The action halts for authorization, or the profile carries an explicit recorded waiver | R12.7 |
+| T38 Adversarial validation gate | Run the boundary validation suite before first real use | All six R12.8 scenarios execute, and each records whether the attempt was blocked, logged and attributable | R12.8 |
+| T39 Entry point | Bring the environment up as a fresh operator following the README | `docker compose` with a profile override is the only entry point; no wrapper CLI exists | R12.9 |
+| T40 Single-agent isolation | Stop one agent container; then disable one MCP server | The other two agents continue unaffected. The MCP disable path is exercised and its current rebuild requirement recorded | R13.2 |
+| T41 Return to known-good | Execute the documented recovery path on a deliberately contaminated environment | The path completes and states explicitly what happened to each persistent state volume | R13.3 |
+| T42 Third-party traffic-path governance | Inspect the record for every third party on the agent traffic path | Each records what it observes, its retention period and its breach-notification path — or records the constraint on use where the assessment could not be completed | R14.1 |
+| T43 Provider governance record | Inspect the per-provider record | Each of the three records version-pinning capability, retention and training-opt-out settings in use, and the data classification permitted to leave | R14.2 |
+| T44 ToS monitoring and mediation seam | Simulate a provider terms change; separately, inspect the mediator's extension points | The change triggers re-review of the affected access route; the mediator can host a tool-call mediation layer without redesign | R14.3, R15.2 |
+| T45 Published base image provenance | Resolve the image the compose file consumes; compare against the GHCR-published digest and its SBOM | The image is pinned by digest and matches a CI-published build with an SBOM. No profile consumes a mutable tag, and no branch-built image is consumed outside testing | R10.2, R10.7 |

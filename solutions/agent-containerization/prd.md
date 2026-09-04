@@ -76,31 +76,67 @@ Promoted from `REQUIREMENTS.md` § Non-Goals. Listed so they are not silently as
 
 ## Milestones
 
-Scoping intent settled at Gate 1. The detailed feature breakdown is produced by `/milestone`
-after Gate 3 — this records the shape, not the plan.
+Scoping intent settled at Gate 1. The milestone plan below was approved during **Gate 3 milestone
+planning (2026-09-04)** after an adversarial review. `/milestone` produces the per-milestone
+feature breakdown in
+`milestones/<NN>-<name>/README.md` — this section records the plan, not the breakdown.
 
-**Two milestones.**
+**Three milestones.**
 
-| # | Milestone | Outcome |
-|---|---|---|
-| M1 | Working sandbox | All three agents run authenticated inside the pod with state surviving restart (SC-4), behind a seeded egress policy, with the AWS CLI pack available |
-| M2 | Hardening | Adversarial validation passes (SC-1, SC-2, SC-3), remaining tool packs compose without hand-editing policy (SC-6), audit and reproducibility land (SC-7, SC-8) |
+1. **Sandboxed pod** — `milestones/01-sandboxed-pod/`. All three agents run authenticated inside the
+   pod with state surviving restart (SC-4), behind a seeded default-deny egress policy, on a
+   hardened runtime with the mediator as the only path out. The sandbox works; it is not yet
+   proven, and R12.8 bars real work until Milestone 02.
+2. **Proven and composable** — `milestones/02-proven-and-composable/`. Adversarial validation passes
+   (SC-1, SC-2, SC-3), the remaining tool packs compose without hand-editing policy (SC-6), and
+   audit and reproducibility land (SC-7, SC-8). **Unlocks real work without AWS** — SC-5 is not in
+   scope here, so a session that needs AWS still waits for Milestone 03.
+3. **AWS access** — `milestones/03-aws-access/`. Brokered short-lived credentials (Model B) against a
+   dedicated least-privilege role, with entitlement scope verified empirically from inside the
+   container (SC-5). Gated on Q9; re-runs the adversarial matrix on completion, because the pack
+   adds both egress entries and credential material to a boundary already validated without them.
 
-Three consequences worth stating now, because they shape the M1 breakdown:
+**Mapping to the Gate 1 shape.** Gate 1 recorded two milestones: M1 "working sandbox" *including*
+the AWS CLI pack, and M2 "hardening". Gate 3 split and resequenced them:
 
-- **M1 is large.** Including the AWS pack pulls in all of R6, plus R8.8 (per-agent workload
-  identity) and Model B brokering, which R8.8 gates. `/milestone` may need to subdivide it.
-- **M1's output must not be used for real work until M2 completes.** R12.8 requires
-  adversarial validation before real use, and that lands in M2. M1 produces a sandbox that
-  works, not a sandbox that is proven.
-- **Q1 and Q9 remain open and both sit inside M1.** Q1 (which AWS accounts and services)
-  determines whether R6.4.3's bucket-level allowlisting is practical; Q9 (whether a dedicated
-  Identity Center principal can be created) determines whether Model B has a principal to
-  broker from.
+| Gate 1 | Gate 3 |
+|---|---|
+| M1 — working sandbox, AWS pack included | **Milestone 01** (pod, auth, egress) + **Milestone 03** (AWS) |
+| M2 — hardening | **Milestone 02** |
+
+Two departures from the Gate 1 sequencing, both deliberate. **The AWS pack is carved out** of the
+first milestone, which is the scoping decision D13a explicitly deferred to Gate 3: a negative Q9
+leaves no compliant AWS credential model, and carving the pack out means that gates one milestone
+rather than the whole sandbox. **Hardening now precedes AWS**, because Q9 is an external dependency
+on the operator's organisation with unknown lead time — a gated milestone in second position would
+block the third — and because the AWS milestone depends on per-agent workload identity (R8.8, D6)
+while the hardening milestone degrades gracefully without it (R9.8 records what happened, not who).
+
+`docs/ARCHITECTURE_AND_DESIGN.md` was written against the two-milestone shape and says "sits inside
+M1" or "until M2 completes" in several places. Those are Gate-1 labels; read them through the table
+above, not as references to the numbered milestones.
+
+Three consequences worth stating now, because they shape the breakdown:
+
+- **Milestone 01 is still the large one.** Five features covering the pod, the mediator, per-agent
+  authentication and the composition mechanism. R8.8 per-agent workload identity sits here rather
+  than with the brokering it gates, for two reasons: R8.8 is a MUST, and deferring it to Milestone
+  03 puts a MUST behind Q9, where a negative answer would orphan it permanently; and the component
+  inventory already lists a client certificate as an interface on every agent container, so the
+  service definitions and proxy configuration of three other features assume it. Deferring reopens
+  them.
+- **Neither Milestone 01's nor Milestone 02's output may be used for real work until Milestone 02
+  completes.** R12.8 requires adversarial validation before real use and that lands in 02.
+  Milestone 01 produces a sandbox that works, not a sandbox that is proven.
+- **Q1 and Q9 remain open and now both sit inside Milestone 03.** Q1 (which AWS accounts and
+  services) determines whether R6.4.3's bucket-level allowlisting is practical; Q9 (whether a
+  dedicated Identity Center principal can be created) determines whether any compliant credential
+  model exists at all (D13a). Both should be raised with the operator's organisation during
+  Milestone 01, since the lead time is not ours to control.
 
 **Discovery approach:** egress discovery uses Docker Sandboxes against a synthetic repository
 with throwaway credentials only. The constraint is the mitigation — Open Decision 3 stays open
-without blocking M1, and no real code or credential crosses the vendor path (R14.1).
+without blocking Milestone 01, and no real code or credential crosses the vendor path (R14.1).
 
 ## Configuration
 
@@ -122,6 +158,7 @@ is passed ad hoc on the command line.
 | AWS CLI pack | bool | off | Adds the agent role's reach to the blast radius (R6.3, R7.11) |
 | Terraform pack | bool | off | Adds Terraform state — plaintext secrets and a map of the estate |
 | Kubernetes pack | bool | off | Adds `kubeconfig`, often broadly scoped in practice |
+| GitHub CLI pack | bool | off | Adds a GitHub token — repository read and write reach, and a legitimately allowlisted destination to push to (R7.10) |
 | Language runtimes pack | bool | off | Node, Python, Go toolchains |
 | OS packages | list, pinned | empty | Declared per pack, version-pinned, from a declared repository. Installed at image build only (R7.18). The agent cannot install at runtime (R7.19) |
 | Build cache mount | bool | **off** | Per-agent. A shared cache is a cross-agent write channel (R2.10) |
