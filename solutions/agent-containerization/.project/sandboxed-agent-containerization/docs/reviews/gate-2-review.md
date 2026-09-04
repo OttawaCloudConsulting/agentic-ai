@@ -1,6 +1,6 @@
 # Gate 2 Review — Design Review
 
-**Artifact:** docs/ARCHITECTURE_AND_DESIGN.md
+**Artifact:** .project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md
 **Status:** [x] Approved
 **Reviewer(s):** cturner@ottawacloudconsulting.com
 **Date:** 2026-09-04

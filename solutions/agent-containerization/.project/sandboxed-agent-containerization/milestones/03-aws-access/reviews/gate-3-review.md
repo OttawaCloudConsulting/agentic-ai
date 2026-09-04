@@ -1,6 +1,6 @@
 # Gate 3 Review -- Milestone Planning
 
-**Artifact:** milestones/03-aws-access/README.md
+**Artifact:** .project/sandboxed-agent-containerization/milestones/03-aws-access/README.md
 **Status:** [x] Approved
 **Reviewer(s):** Operator; adversarial review by Codex; design review by advisor
 **Date:** 2026-09-04

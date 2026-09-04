@@ -1,6 +1,6 @@
 # Gate 3 Review -- Milestone Planning
 
-**Artifact:** milestones/01-sandboxed-pod/README.md
+**Artifact:** .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/README.md
 **Status:** [x] Approved
 **Reviewer(s):** Operator; adversarial review by Codex (session 01a06c42-349d-7453-a4ae-32a419c3431a); design review by advisor
 **Date:** 2026-09-04

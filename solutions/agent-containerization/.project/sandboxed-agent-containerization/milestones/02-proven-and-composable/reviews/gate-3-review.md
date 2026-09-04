@@ -1,6 +1,6 @@
 # Gate 3 Review -- Milestone Planning
 
-**Artifact:** milestones/02-proven-and-composable/README.md
+**Artifact:** .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/README.md
 **Status:** [x] Approved
 **Reviewer(s):** Operator; adversarial review by Codex; design review by advisor
 **Date:** 2026-09-04
