@@ -201,6 +201,7 @@ solutions/agent-containerization/
 │   ├── OPTIONS_ANALYSIS.md        # option evaluation; Option 2 ratified here as D1
 │   ├── RESEARCH_FINDINGS.md       # measured facts and UNVERIFIED register
 │   ├── STANDARDS_MAPPING.md       # G1–G9 gaps → requirement IDs
+│   ├── records/                   # R14.1/R14.2/R14.3 governance records; SF-2/SF-3 verification logs (01.1)
 │   └── red-team/options-analysis-01/
 ├── references/                    # link-checked source index + local standards copies
 │
@@ -478,8 +479,8 @@ downstream, named here so it is not discovered late.
 |---|---|---|---|
 | **Q1** — which AWS accounts and services the agent must reach | Open | Whether R6.4.3 bucket-level allowlisting is practical. Sits inside M1 | Operator |
 | **Q9** — whether a dedicated Identity Center principal can be created | Open | **The entire AWS CLI pack.** Model B needs a principal to broker from; Model A needs a dedicated Identity Center user or group (R6.5.2 MUST); Model C is prohibited (R6.5.1). A negative answer leaves no compliant model, and M1 includes the AWS pack — see D13a. Sits inside M1 | Operator's organisation |
-| **Open Decision 3** — Docker Sandboxes retention and data-handling terms | Open, governed by R14.1 | Only a discovery run against a *representative* repository. The synthetic-repo constraint is the mitigation (D17) | Unassigned |
-| **Antigravity ToS position** | Settled as a decision (D9), but the interpretation is explicitly unofficial and Google declined to clarify | Nothing today. Review trigger: Google clarifies, the terms change, or public-API billing becomes material (R14.3) | **Unassigned — needs a named person** |
+| **Open Decision 3** — Docker Sandboxes retention and data-handling terms | **Incomplete, constrained (01.1 SF-1, 2026-09-04).** Docker's own docs neither confirm nor deny that the `sbx` proxy decrypts traffic, and publish no retention, deletion, or breach-notification terms. See `docs/records/third-party-assessments.md` | Only a discovery run against a *representative* repository. The synthetic-repo + throwaway-credential constraint is the mitigation (D17) — unconditional on whichever reading of "does it decrypt" is correct | Recorded, 01.1 SF-1 |
+| **Antigravity ToS position** | **Resolved (01.1 SF-1, 2026-09-04) — owner named.** Interpretation itself remains explicitly unofficial; Google declined to clarify | Nothing today. Review trigger: Google clarifies, the terms change, or public-API billing becomes material (R14.3) | **Ottawa Cloud Consulting** |
 | **`agy` + `GEMINI_API_KEY` route** | **UNVERIFIED** — official install page documents it; a June 2026 maintainer statement contradicts it | D9's default. Test against the pinned `agy` version early in M1; fallback is OAuth with splice-only, which reopens the ToS question | Build |
 | **Whether `agy` honours `HTTPS_PROXY`, and its CA-trust mechanism** | UNVERIFIED | **D1 itself, for one agent.** On an `internal: true` network a client that ignores proxy configuration has no route at all and simply fails. Verify against the pinned `agy` version before the M1 build, not during it | Build |
 | **ICC driver_opts key name** | UNVERIFIED | Nothing — D2 uses per-agent networks precisely to avoid depending on it | — |

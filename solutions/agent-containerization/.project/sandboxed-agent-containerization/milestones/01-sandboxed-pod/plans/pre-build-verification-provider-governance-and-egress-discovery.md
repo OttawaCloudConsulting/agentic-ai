@@ -101,7 +101,7 @@ enforces the split so 01.5's policy compiler inherits a per-agent policy rather 
 
 ## Sub-Features
 
-- [ ] **SF-1: Third-party and provider governance records** — Four R14.1 records (Docker Sandboxes,
+- [x] **SF-1: Third-party and provider governance records** — Four R14.1 records (Docker Sandboxes,
   Anthropic, OpenAI, Google), three R14.2 provider records, and the R14.3 named owner with its
   review trigger. Converts the existing upstream research in `docs/RESEARCH_FINDINGS.md` — which is
   vendor-documented but not assessed — into records in the form R14.1 demands. Incomplete
