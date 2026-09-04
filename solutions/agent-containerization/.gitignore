@@ -1,0 +1,7 @@
+# Live credentials — never committed
+references/.env_keys
+*.env
+*.env.*
+
+# SF-2 fixture scratch (throwaway PKI, proxy logs, agent workspaces)
+.build-scratch/

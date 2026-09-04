@@ -110,7 +110,7 @@ Auth precedence, highest first: cloud provider vars (`CLAUDE_CODE_USE_BEDROCK` /
 ### Proxy and TLS
 
 - `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`. **SOCKS proxies are not supported.** Basic auth supported in the URL.
-- `NODE_EXTRA_CA_CERTS` for a custom CA. `CLAUDE_CODE_CERT_STORE=bundled,system` selects trust sources. mTLS via `CLAUDE_CODE_CLIENT_CERT` / `_KEY` / `_KEY_PASSPHRASE`.
+- `NODE_EXTRA_CA_CERTS` for a custom CA. `CLAUDE_CODE_CERT_STORE=bundled,system` selects trust sources. mTLS via `CLAUDE_CODE_CLIENT_CERT` / `_KEY` / `_KEY_PASSPHRASE`. **Confirmed 2026-09-04** (`docs/records/agent-verification.md`, 01.1 SF-2, live-verified on 2.1.260): both `HTTPS_PROXY` honouring and client-certificate presentation work as documented, for `http://` and `https://`-scheme proxy URLs alike. Claude is the only one of the three agents that can complete a client-cert TLS handshake against a proxy listener today.
 - Important for background agents in containers: set these in the `env` block of `settings.json` or managed settings, **not** as a shell export — the background-agent supervisor is one shared process that may inherit no shell environment.
 - Egress reduction: `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` (also disables Remote Control), `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING`, `DISABLE_AUTOUPDATER=1`. `skipWebFetchPreflight: true` in settings is the only way to stop WebFetch calling `api.anthropic.com`.
 
@@ -190,7 +190,7 @@ domains = { "api.openai.com" = "allow", "example.com" = "deny" }
 
 ### Proxy and TLS
 
-- Respects `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` and lowercase variants.
+- Respects `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` and lowercase variants. **Caveat found 2026-09-04** (`docs/records/agent-verification.md`, 01.1 SF-2, live-verified on 0.152.1): this holds only for an `http://`-scheme proxy URL. An `https://`-scheme `HTTPS_PROXY` (a TLS-terminated proxy listener) is rejected at URL-parse time — `URL error: Proxy URL scheme not supported` — on both codex's primary WebSocket transport and its HTTPS fallback, before any network attempt. No client-certificate variable exists either way, but the scheme rejection is the harder constraint for 01.3: codex cannot reach an HTTPS-scheme mediator listener at all, regardless of certificate support.
 - `respect_system_proxy` (platform settings and PAC/WPAD first) is **off by default**.
 - **Uses rustls with `rustls-tls-native-roots`** — it *does* load the OS trust store. The usual "Rust binary ignores the system CA store" concern does not apply.
 - Explicit custom-CA path: `CODEX_CA_CERTIFICATE`, falling back to `SSL_CERT_FILE`. Fails fast with a precise error rather than silently falling back.
@@ -253,7 +253,7 @@ Correction to a common belief: the original Nov 2025 Antigravity was a VS Code f
 
 ### Headless mode
 
-Install: `curl -fsSL https://antigravity.google/cli/install.sh | bash` → binary at `~/.local/bin/agy`. Flags `--skip-aliases`, `--skip-path` for non-interactive installs.
+Install: `curl -fsSL https://antigravity.google/cli/install.sh | bash` → binary at `~/.local/bin/agy`. Flags `--skip-aliases`, `--skip-path` for non-interactive installs. **No version-pinning capability** (confirmed 2026-09-04, `docs/records/agent-verification.md`, 01.1 SF-2): the script has no version/channel flag and always installs whatever its live manifest currently serves — a build run minutes apart from a prior install pulled a newer version (1.1.26 vs. 1.1.23). Direct consequence for 01.2/R10.6: `agy` cannot be pinned by this installer the way `claude`/`codex` can; the image build must either vendor a specific downloaded binary or accept re-verification after every rebuild.
 
 - `agy -p "prompt"` — single-shot, streams to stdout, diagnostics to stderr.
 - `--output-format text | json | stream-json`. The JSON envelope carries `conversation_id`, `status`, `response`, `duration_seconds`, `num_turns`, `usage`, `error`. `stream-json` emits NDJSON `init` / `step_update` / `result`.
@@ -285,7 +285,7 @@ Auth options, ranked for containers:
 - `aiplatform.googleapis.com` — required for enterprise/project endpoints.
 - `github.com` and `githubusercontent.com` — required for extensions.
 - Full allowlist is **not published by Google** — **UNVERIFIED**; plan to capture traffic.
-- `HTTPS_PROXY` support is **UNVERIFIED** — not in official documentation. Corporate-proxy failures are reported as ETIMEDOUT / 407 / 403 plus SSL-inspection certificate failures.
+- `HTTPS_PROXY` support is **UNVERIFIED** — not in official documentation. Corporate-proxy failures are reported as ETIMEDOUT / 407 / 403 plus SSL-inspection certificate failures. **Resolved 2026-09-04** (`docs/records/agent-verification.md`, 01.1 SF-2, live-verified against `agy` 1.1.26): `agy` honours `HTTPS_PROXY` for both `http://` and `https://` proxy URL schemes. CA-trust for a proxy-hop certificate is via `SSL_CERT_FILE` (confirmed by discriminating it from `CACERT_PATH`, which the binary strings also reference but does not use for this purpose).
 
 ### GUI-in-container, if ever required
 
@@ -349,8 +349,8 @@ Stale or dead — do not build on these:
 Carried forward deliberately — do not treat these as established:
 
 - Whether Anthropic's reference firewall actually breaks interactive OAuth. The domain absence is verified; the consequence is inference.
-- Whether `agy` honours `HTTPS_PROXY`, and its CA-trust mechanism.
-- Whether `agy` currently accepts `GEMINI_API_KEY` — official docs and a June 2026 maintainer statement conflict.
+- ~~Whether `agy` honours `HTTPS_PROXY`, and its CA-trust mechanism.~~ **Resolved 2026-09-04** — see `docs/records/agent-verification.md` (01.1 SF-2). Yes for both proxy URL schemes; CA-trust via `SSL_CERT_FILE`.
+- ~~Whether `agy` currently accepts `GEMINI_API_KEY` — official docs and a June 2026 maintainer statement conflict.~~ **Resolved 2026-09-04** — see `docs/records/agent-verification.md` (01.1 SF-2). Confirmed working on `agy` 1.1.26 with `modelProvider: "gemini"` set; the June 2026 maintainer statement is superseded.
 - Any Antigravity environment variable other than `GEMINI_API_KEY` (`AV_API_KEY`, `ANTIGRAVITY_API_KEY`, `AGY_API_KEY` all appear in blogs, none in official docs).
 - The complete Antigravity egress allowlist — not published by Google.
 - Whether Claude Code's container login is a true RFC 8628 device-code grant or a browser paste-back code.
@@ -362,7 +362,7 @@ Carried forward deliberately — do not treat these as established:
 Added 2026-09-03:
 
 - **The exact Compose/driver key for disabling inter-container connectivity.** `com.docker.network.bridge.enable_icc` is the expected name and the `driver_opts` mechanism is confirmed, but two documentation queries returned the option only as a described capability ("managing inter-container connectivity") without the literal key. Confirm against the Docker version in use before relying on it. Per-agent networks achieve the same isolation and need no such confirmation.
-- **The default MCP transport for each of the three agents** — stdio versus Streamable HTTP, per agent and per configured server. This determines whether MCP traffic crosses a network enforcement point at all, and the answer drives whether any egress audit trail covers the MCP vector. Not established for any of the three.
+- ~~**The default MCP transport for each of the three agents**~~ **Resolved 2026-09-04** — see `docs/records/agent-verification.md` (01.1 SF-2). No forced default for any of the three; transport is per-server (stdio vs. HTTP/SSE, whichever key the config entry uses). stdio MCP subprocess egress has no application-layer enforcement point — it is covered only by the pod network-namespace-level enforcement 01.3 builds, not by any per-app proxy setting.
 - **Docker Sandboxes' retention and data-handling terms for intercepted traffic.** Its proxy terminates HTTP/HTTPS, so it processes decrypted prompts, source and credential-bearing headers. What it retains, for how long, with what tenant isolation and what deletion guarantee, is not documented at the level needed to assess it as a service provider. **Re-checked 2026-09-04** (`docs/records/third-party-assessments.md`, 01.1 SF-1): Docker's own isolation/FAQ docs still publish no retention, deletion, or breach-notification terms — and additionally do not confirm the premise above that the proxy decrypts payload content at all; the isolation page describes only routing. Remains UNVERIFIED on both counts; the synthetic-repo/throwaway-credential constraint (D17) is unconditional on which reading is correct.
 - **Which file, if any, Linux `agy` reads for its OAuth credential with no Secret Service present.** The macOS host offers `~/.gemini/oauth_creds.json` as the only candidate, and its mtime does not suggest it is the live store. This is the question that decides whether the `oauth-mount` auth mode is available for `agy` at all.
 - **Per-session refresh-token revocation.** Whether any of the three providers can invalidate one refresh token without invalidating the account's others. If none can, then a second login under a separate config directory offers no containment over sharing the operator's live credential, and only a separate provider account does. This decides whether the D-dedicated auth mode is meaningful.

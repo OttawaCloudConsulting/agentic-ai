@@ -107,7 +107,7 @@ enforces the split so 01.5's policy compiler inherits a per-agent policy rather 
   vendor-documented but not assessed — into records in the form R14.1 demands. Incomplete
   assessments are recorded with their resulting constraint, not deferred.
 
-- [ ] **SF-2: Agent client verification (go/no-go gate on 01.2-01.5; prerequisite of SF-3)** — Choose
+- [x] **SF-2: Agent client verification (go/no-go gate on 01.2-01.5; prerequisite of SF-3)** — Choose
   and record the three version pins — required by SF-3, whose capture is only valid against them
   (R10.6) — then against those pins verify: `agy` `HTTPS_PROXY` honouring, `GEMINI_API_KEY`
   route, and CA-trust mechanism; client-certificate presentation for all three agents; default MCP
