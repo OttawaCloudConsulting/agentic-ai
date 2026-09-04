@@ -36,7 +36,7 @@ Format:
 
 ## Gate 0: Codebase Assessment -- Static Items
 
-These items always appear in `docs/reviews/gate-0-review.md`:
+These items always appear in `.project/<slug>/docs/reviews/gate-0-review.md`:
 
 - `[ ] Are the detected patterns accurate for the current codebase?`
 - `[ ] Are there patterns listed as "carry forward" that should be changed?`
@@ -46,7 +46,7 @@ These items always appear in `docs/reviews/gate-0-review.md`:
 
 ## Gate WB: Working Backwards -- Static Items
 
-These items always appear in `docs/reviews/gate-wb-review.md`:
+These items always appear in `.project/<slug>/docs/reviews/gate-wb-review.md`:
 
 - `[ ] Does the press release describe a clear customer outcome?`
 - `[ ] Is the problem statement accurate and specific?`
@@ -56,7 +56,7 @@ These items always appear in `docs/reviews/gate-wb-review.md`:
 
 ## Gate 1: Scope Review -- Static Items
 
-These items always appear in `docs/reviews/gate-1-review.md`:
+These items always appear in `.project/<slug>/docs/reviews/gate-1-review.md`:
 
 - `[ ] Are the goals specific and measurable?`
 - `[ ] Are the non-goals clearly justified?`

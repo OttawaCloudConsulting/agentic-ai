@@ -36,7 +36,7 @@ Format:
 
 ## Gate 2: Design Review -- Static Items
 
-These items always appear in `docs/reviews/gate-2-review.md`:
+These items always appear in `.project/<slug>/docs/reviews/gate-2-review.md`:
 
 - `[ ] Are the design decisions sound? Are tradeoffs acceptable?`
 - `[ ] Is the component inventory complete?`
@@ -45,7 +45,7 @@ These items always appear in `docs/reviews/gate-2-review.md`:
 
 ## Content-Specific [Auto] Items
 
-Claude generates content-specific items based on the actual `docs/ARCHITECTURE_AND_DESIGN.md` content. These items are prefixed with `[Auto]` and target specific elements of the architecture document. Examples:
+Claude generates content-specific items based on the actual `.project/<slug>/docs/ARCHITECTURE_AND_DESIGN.md` content. These items are prefixed with `[Auto]` and target specific elements of the architecture document. Examples:
 
 - `[ ] [Auto] Verify decision: "{specific decision from Design Decisions table}"`
 - `[ ] [Auto] Confirm component: "{component name}" interfaces are complete`
