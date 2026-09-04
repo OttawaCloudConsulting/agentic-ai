@@ -7,14 +7,17 @@
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pre-build-verification-provider-governance-and-egress-discovery.md
     Sub-features: 0/3 complete
 
-[ ] Feature 01.2: Pod topology, hardened runtime and minimal profile
-    Plan: (not yet planned)
+[~] Feature 01.2: Pod topology, hardened runtime and minimal profile
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pod-topology-hardened-runtime-and-minimal-profile.md
+    Sub-features: 0/5 complete
 
-[ ] Feature 01.3: Egress mediator
-    Plan: (not yet planned)
+[~] Feature 01.3: Egress mediator
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/egress-mediator.md
+    Sub-features: 0/8 complete
 
-[ ] Feature 01.4: Agent authentication and state persistence
-    Plan: (not yet planned)
+[~] Feature 01.4: Agent authentication and state persistence
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
+    Sub-features: 0/5 complete
 
 [ ] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: (not yet planned)
