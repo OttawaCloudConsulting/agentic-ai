@@ -87,8 +87,9 @@ Read `progress.txt` from disk (fresh read -- STATE-03). Parse:
 - All spike entries in the `## Spikes` section (status, name, path, resolution date).
 
 For each milestone found, read its `milestone-status.txt` at
-`.project/<slug>/milestones/<NN>-<name>/milestone-status.txt` (path derived from the
-milestone summary line's directory path, resolved against the artifact base path).
+`.project/<slug>/milestones/<NN>-<name>/milestone-status.txt` (the directory path is read
+verbatim from the milestone summary line, which already carries the resolved
+`.project/<slug>/` base path -- do not prepend the base path again).
 
 Read `references/routing-logic.md` for validation rules, then perform:
 
