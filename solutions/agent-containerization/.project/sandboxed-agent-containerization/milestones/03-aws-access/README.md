@@ -1,13 +1,13 @@
 # Milestone 03: AWS Access
 
-> **Authority.** [`REQUIREMENTS.md`](../../REQUIREMENTS.md) is the authoritative register (R1–R15,
+> **Authority.** [`REQUIREMENTS.md`](../../../../REQUIREMENTS.md) is the authoritative register (R1–R15,
 > SC-1…SC-8, T1–T45). [`docs/ARCHITECTURE_AND_DESIGN.md`](../../docs/ARCHITECTURE_AND_DESIGN.md) is
 > the ratified design (D1–D21). This document cites both by ID and restates neither. Where they
 > disagree with anything here, they win.
 >
 > **Gate-1 label.** The architecture document was written against the two-milestone Gate 1 shape and
 > places the AWS pack, Q1 and Q9 "inside M1". Gate 3 carved them out into this milestone — see
-> [`prd.md` § Milestones](../../prd.md). D13 and D13a's "sits inside M1" notes read as this milestone.
+> [`prd.md` § Milestones](../../../../prd.md). D13 and D13a's "sits inside M1" notes read as this milestone.
 
 ## Goal
 

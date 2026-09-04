@@ -1,6 +1,6 @@
 # Architecture and Design: Sandboxed Agent Containerization
 
-> **Authority.** [`REQUIREMENTS.md`](../REQUIREMENTS.md) is the authoritative requirement
+> **Authority.** [`REQUIREMENTS.md`](../../../REQUIREMENTS.md) is the authoritative requirement
 > register (157 requirements, R1–R15; success criteria SC-1…SC-8; acceptance tests T1–T20).
 > This document ratifies an architecture against that register and cites requirement IDs by
 > reference. Where the two disagree, `REQUIREMENTS.md` wins — except for the acceptance-test

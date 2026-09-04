@@ -1,13 +1,13 @@
 # Milestone 02: Proven and Composable
 
-> **Authority.** [`REQUIREMENTS.md`](../../REQUIREMENTS.md) is the authoritative register (R1–R15,
+> **Authority.** [`REQUIREMENTS.md`](../../../../REQUIREMENTS.md) is the authoritative register (R1–R15,
 > SC-1…SC-8, T1–T45). [`docs/ARCHITECTURE_AND_DESIGN.md`](../../docs/ARCHITECTURE_AND_DESIGN.md) is
 > the ratified design (D1–D21). This document cites both by ID and restates neither. Where they
 > disagree with anything here, they win.
 >
 > **Gate-1 label.** The architecture document was written against the two-milestone Gate 1 shape and
 > says "until M2 completes" in several places. Gate 3 mapped Gate-1 M2 onto this milestone and
-> carved AWS out into Milestone 03 — see [`prd.md` § Milestones](../../prd.md).
+> carved AWS out into Milestone 03 — see [`prd.md` § Milestones](../../../../prd.md).
 
 ## Goal
 
