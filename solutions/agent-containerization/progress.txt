@@ -1,0 +1,20 @@
+# Progress: Sandboxed Agent Containerization
+# Created: 2026-09-03
+# Project-ID: sandboxed-agent-containerization
+# Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
+
+## Gates
+
+[-] Gate 0: Codebase Alignment  Skipped (greenfield)
+[-] Gate WB: Working Backwards  Skipped
+[x] Gate 1: Scope Review  Approved: 2026-09-03  prd.md
+[ ] Gate 2: Design Review
+[ ] Gate 3: Milestone Review
+
+## Milestones
+
+(none yet)
+
+## Spikes
+
+(none yet)

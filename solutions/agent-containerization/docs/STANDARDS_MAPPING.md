@@ -161,7 +161,9 @@ One caution on that corroboration. Brokering satisfies "replace static, long-liv
 
 ## Gaps
 
-Places where published guidance asks for something `REQUIREMENTS.md` does not yet cover. Each carries a proposed requirement, not yet merged.
+Places where published guidance asks for something `REQUIREMENTS.md` did not cover.
+
+> **Merged 2026-09-03 at Gate 1.** All nine gaps are now in the register. The "Proposed R…" blocks below are kept as the rationale trail; the requirements themselves live in [`REQUIREMENTS.md`](../REQUIREMENTS.md) and are authoritative there. G1 → R9.7, R9.8 · G2 → R12.7 · G3 → R8.8 (**promoted to MUST**, because Gate 1 selected R6.5 Model B, which R8.8 gates) · G4 → R7.14–R7.17 (all four problems, not only inventory) · G5 → R4.16 · G6 → R13.1–R13.3 · G7 → R12.8 · G8 → R14.1–R14.2 (plus R14.3, ToS-change monitoring) · G9 → R15.1 as a Non-Goal and R15.2 as a requirement.
 
 G1–G5 predate the 2026-09-03 red-team run and are sharpened below with what the primary texts actually say. G6–G9 are new, and come from the three CIS guides whose Safeguards were not extracted when this document was first written.
 
@@ -209,7 +211,9 @@ R7.13 carries a prose note that MCP servers are subject to the same egress polic
 
 R4 requires that agent authentication survive container restart, which in practice means persisting long-lived OAuth refresh tokens on a volume. The guidance prefers short-lived credentials over persistent secrets. R4.7 already treats these volumes as secret material, but the trade-off is not written down as a decision.
 
-> **Proposed R4.12 (MUST):** The persistence of long-lived agent refresh tokens is recorded as an accepted risk, with its compensating controls named (R4.3 per-agent volumes, R4.7 secret handling, R8.5 revocation, R8.7 backup exclusion) and a stated review trigger should brokered agent credentials become available.
+**Renumbered 2026-09-03.** This proposal was written as R4.12; R4.12–R4.15 are now taken by the authentication-mode requirements added when scope expanded to cover both API-key and OAuth configurations. The next free sub-ID is R4.16.
+
+> **Proposed R4.16 (MUST):** The persistence of long-lived agent refresh tokens is recorded as an accepted risk, with its compensating controls named (R4.3 per-agent volumes, R4.7 secret handling, R8.5 revocation, R8.7 backup exclusion) and a stated review trigger should brokered agent credentials become available.
 
 Note that G5 applies to the model-provider credentials only. The AWS path already resolves this correctly under R6.5 Model B.
 

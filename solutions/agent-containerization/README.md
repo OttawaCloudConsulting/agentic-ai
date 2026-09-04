@@ -1,8 +1,8 @@
-# Sandboxed Agent Containerization — Options Analysis
+# Sandboxed Agent Containerization
 
 Research and design options for running agentic coding agents (Claude Code, OpenAI Codex, Google Antigravity) inside a fully sandboxed container with a minimal blast radius.
 
-**Status:** Research complete, no option selected. This directory contains analysis only — no implementation.
+**Status:** Gate 1 (Scope Review) in flight. Research complete; no architecture option ratified — that is Gate 2. See [`progress.txt`](progress.txt) for gate state and [`prd.md`](prd.md) for settled scope. No implementation yet.
 
 **Date of research:** 2026-09-02. Agent tooling in this space moves fast; re-verify version-specific claims before building.
 

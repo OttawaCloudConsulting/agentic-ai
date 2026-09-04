@@ -24,6 +24,9 @@ Requirements for a containerized, sandboxed environment running agentic coding a
 - [R10 — Build, Supply Chain and Reproducibility](#r10--build-supply-chain-and-reproducibility)
 - [R11 — Host Platform and Portability](#r11--host-platform-and-portability)
 - [R12 — Operability](#r12--operability)
+- [R13 — Containment and Response](#r13--containment-and-response)
+- [R14 — Third-Party and Provider Governance](#r14--third-party-and-provider-governance)
+- [R15 — Application-Layer Controls](#r15--application-layer-controls)
 - [Non-Goals](#non-goals)
 - [Assumptions](#assumptions)
 - [Open Questions](#open-questions)
@@ -102,6 +105,9 @@ Priority uses RFC 2119 keywords: **MUST**, **SHOULD**, **MAY**.
 | R2.5 | MUST | S | Agent state volumes (R4) are separate from project mounts, so project write access does not imply credential write access |
 | R2.6 | SHOULD | S | Symlinks in mounted project directories cannot escape the mount root |
 | R2.7 | SHOULD | R | Where an agent only reviews code, the project mount is read-only and output is written to a separate writable path |
+| R2.8 | MUST | U | Mounts beyond the project directory and the per-agent state volumes are **optional and disabled by default**. Each is declared per use-case profile and enabled explicitly. Only mounts enumerated in this section are available to enable — this covers forwarded sockets as well as directories |
+| R2.9 | MUST | S | Where the host git configuration is mounted, it is mounted `:ro` and any `credential.helper` entry is removed first. An unfiltered gitconfig is a pointer into host credential storage and would defeat R4.8 |
+| R2.10 | MUST | S | Where a build cache is mounted, it is per-agent. A single cache shared across agents is a cross-agent write channel and contradicts R4.3. If a shared cache is chosen anyway, the channel is recorded as an accepted risk with its blast radius stated |
 
 ## R3 — Agent Toolchain
 
@@ -128,10 +134,16 @@ Priority uses RFC 2119 keywords: **MUST**, **SHOULD**, **MAY**.
 | R4.5 | MUST | R | Codex: `CODEX_HOME` is set to the mounted volume, and `cli_auth_credentials_store = "file"` is set explicitly. The `keyring` mode hard-fails with no D-Bus |
 | R4.6 | MUST | R | Antigravity: `~/.gemini` is mounted. Keyring-dependent auth is avoided in favour of a documented headless path |
 | R4.7 | MUST | S | All state volumes are treated as secret material. They hold long-lived refresh tokens |
-| R4.8 | MUST NOT | R | Host credential stores are copied into the container. Claude Code credentials on this host live in the macOS Keychain and are not portable to a Linux container |
+| R4.8 | MUST NOT | R | Host credential stores are copied or bind-mounted into the container, **except under a recorded per-agent decision** naming the file, the mount mode (read-only, per R4.13), the revocation path, and the blast radius on compromise. Claude Code credentials on this host live in the macOS Keychain and are not portable to a Linux container regardless |
 | R4.9 | MUST | R | Every agent supports a fully headless authentication path requiring no browser inside the container: paste-back code, device code, or a pre-minted token |
 | R4.10 | SHOULD | S | Session transcripts, which contain full plaintext conversation history, are covered by a retention policy and are not committed to version control |
 | R4.11 | SHOULD | R | Bulk host state is not bind-mounted. The operator's `~/.codex` on this host is 1.5 GB of session history; a fresh volume is used instead |
+| R4.12 | MUST | U | Each agent accepts either an API-key configuration or an OAuth configuration, selected by a per-agent `AUTH_MODE` (`apikey`, `oauth-interactive`, `oauth-token`, `oauth-mount`). The default is the safest mode that agent supports, as stated per agent in `docs/OPTIONS_ANALYSIS.md` § Authentication modes — not the most convenient |
+| R4.13 | MUST NOT | R | A host credential is bind-mounted read-write. OAuth refresh rewrites the credential, so a writable mount lets a compromised container overwrite host credential material. Docker Desktop's VirtioFS fakes file ownership, so host file modes are not a control inside the container — `:ro` is |
+| R4.14 | MUST | R | Where a host credential is mounted, a dedicated directory is mounted, never the credential file itself. CLIs write-temp-then-rename; a single-file bind leaves the container holding a stale inode indefinitely |
+| R4.15 | SHOULD | R | Where a host credential is the chosen source, it is mounted read-only for bootstrap only and copied into the agent's state volume, so that refresh writes land on the volume rather than the host |
+| R4.17 | MUST | U | `AUTH_MODE=oauth-mount` may source a credential from a second config directory on the operator's **own** provider account. This is recorded as an accepted risk: per-session refresh-token revocation is unverified for all three providers, so the blast radius on container compromise is the entire account and revocation is all-or-nothing. R4.13, R4.14 and R4.15 still apply in full — read-only bootstrap, dedicated directory, copy to volume. **Noted asymmetry:** R6.5.1 prohibits the structurally identical Model C for AWS. The two postures differ by deliberate decision, not oversight |
+| R4.16 | MUST | S | The persistence of long-lived agent refresh tokens is recorded as an accepted risk, with its compensating controls named (R4.3 per-agent volumes, R4.7 secret handling, R8.5 revocation, R8.7 backup exclusion) and a stated review trigger should brokered agent credentials become available |
 
 ## R5 — Network Egress Policy
 
@@ -151,6 +163,7 @@ Priority uses RFC 2119 keywords: **MUST**, **SHOULD**, **MAY**.
 | R5.12 | SHOULD | R | Where TLS interception is used, the CA is distributed through each agent's documented mechanism: `NODE_EXTRA_CA_CERTS` for Claude Code, `CODEX_CA_CERTIFICATE` for Codex, `AWS_CA_BUNDLE` for the AWS CLI |
 | R5.13 | MUST NOT | S | Antigravity OAuth traffic is TLS-intercepted. See the Terms of Service warning in [`docs/OPTIONS_ANALYSIS.md`](docs/OPTIONS_ANALYSIS.md); use SNI/CONNECT splice for that agent, or authenticate by API key to avoid the OAuth relationship entirely |
 | R5.14 | SHOULD | S | Policy changes are version-controlled and reviewed. An allowlist entry is a boundary change |
+| R5.15 | MUST | U | TLS is spliced, not terminated, for all three agents at first release — the destination is validated at CONNECT via SNI and the connection is passed through undecrypted. No content-level DLP exists in the architecture as a result. The mediator is positioned so that termination can be added later without redesign (R15.2); R5.12's CA distribution mechanisms are recorded against that later phase, and R5.13 remains a permanent bar for Antigravity |
 
 ## R6 — AWS Access
 
@@ -242,6 +255,12 @@ The mechanism by which the environment adapts per use case without widening the 
 | R7.11 | SHOULD | S | Each pack states its blast-radius contribution — what a compromised agent gains when the pack is loaded. The AWS pack's entry is R6.3 |
 | R7.12 | SHOULD | S | Packs granting credentials to external systems (AWS, Kubernetes, GitHub) are individually reviewable and independently revocable |
 | R7.13 | MAY | U | Packs may carry agent configuration (skills, MCP servers, rules) alongside binaries, provided MCP servers are subject to the same egress policy |
+| R7.14 | MUST | S | MCP servers, agent plugins and skills loaded into the sandbox are inventoried in the use-case profile, pinned to a version, and reviewed on the same basis as any other tool pack under R7.3. The inventory records a risk tier and a capability baseline, and detects capability drift — not only newly added servers |
+| R7.15 | MUST | S | For every MCP server in the inventory, the transport is recorded. A stdio server is a subprocess of the agent and its tool calls reach no network enforcement point under any option, so the inventory states which enforcement point covers it — or states that none does |
+| R7.16 | MUST | S | MCP servers are installed only from a declared registry pinned in the use-case profile. A wholesale package-registry egress entry that permits arbitrary `npx <server>` invocation does not satisfy R7.14 and is not a substitute for it |
+| R7.17 | MUST | S | Capability declarations — the files in each state volume that record which MCP servers an agent loads — are enumerated per agent and treated as configuration changes requiring review. They are agent-writable by construction under R4, which makes them an attacker-persistence path |
+| R7.18 | MUST | U | A pack may declare OS packages (`apt`, `yum`) to install. Each is pinned to a version and sourced from a repository declared in the profile. Packages are installed when the image is built, never at container runtime. The profile therefore drives the build as well as the run, so that SC-8's identical rebuild covers installed packages |
+| R7.19 | MUST NOT | U | The agent process is able to install packages at runtime. The package manager is not invocable by the agent — no privilege to run it, and no write access to the paths it would modify. This is what keeps R7.7, R7.16 and SC-8 satisfiable once R7.18 exists |
 
 **Note on MCP servers.** An MCP server is executable code with network access running inside the sandbox. It is covered by every requirement in this document that applies to the agent itself. Claude Code's built-in Bash sandbox does **not** constrain MCP servers — only `srt` or the container boundary does.
 
@@ -256,6 +275,7 @@ The mechanism by which the environment adapts per use case without widening the 
 | R8.5 | MUST | S | Credential rotation and revocation are possible without rebuilding the environment |
 | R8.6 | SHOULD | S | Agent session transcripts are checked to confirm they do not capture credential values from command output |
 | R8.7 | MUST | S | State volumes holding refresh tokens are excluded from backups that leave the trust boundary, and from version control |
+| R8.8 | MUST | S | Each agent instance is issued a distinct workload identity with a defined lifecycle, used for authentication to the enforcement point and recorded in the audit log, so actions are attributable to an agent rather than only to a container. **Precondition:** credential brokering under R8.3 and R6.5 Model B is not enabled until this is satisfied — brokering without caller identity at the mediator hands every agent on a shared network every brokered credential |
 
 ## R9 — Observability and Audit
 
@@ -267,6 +287,9 @@ The mechanism by which the environment adapts per use case without widening the 
 | R9.4 | SHOULD | S | Egress rules REJECT rather than DROP where practical, so misconfiguration fails fast and visibly instead of hanging |
 | R9.5 | SHOULD | R | The environment self-verifies its policy at startup: a known-denied destination must fail and a known-allowed destination must succeed, or startup aborts. Both vendor reference firewalls do this and it is worth retaining |
 | R9.6 | MAY | S | Egress logs are shipped to a SIEM or alerting pipeline |
+| R9.9 | MUST | U | The four exported artifacts — egress log, agent action log, resolved egress policy, image digest and SBOM — are produced by default and exported for outside consumption. A profile may disable an **export**; it may not disable the underlying **recording**, which R9.1 and R9.7 make mandatory. Any disabled export is explicit and recorded |
+| R9.7 | MUST | S | Agent tool invocations, file modifications and privilege changes are recorded outside the agent's blast radius, in a form sufficient to reconstruct the sequence of actions taken during a session. R9.1–R9.6 cover network egress only, which is not the same thing |
+| R9.8 | SHOULD | S | Agent session transcripts are retained and correlatable with the egress log by session identifier and timestamp. Attribution to a specific agent depends on R8.8; until that is satisfied, the log records what happened but not who did it |
 
 ## R10 — Build, Supply Chain and Reproducibility
 
@@ -300,6 +323,39 @@ The mechanism by which the environment adapts per use case without widening the 
 | R12.4 | SHOULD | S | A discovery mode exists to observe and record what a workload actually needs, for turning into a policy — run in a disposable environment, never against production credentials |
 | R12.5 | SHOULD | S | Tearing down a session destroys ephemeral state but preserves the declared persistent volumes |
 | R12.6 | SHOULD | S | Onboarding documentation covers first-run authentication for all three agents plus AWS SSO |
+| R12.7 | SHOULD | S | Actions classified as irreversible or high-impact require human authorization even in otherwise unattended operation. The classification is declared per use-case profile. Where a profile waives this, the waiver is explicit and recorded. This is in tension with assumption A2 by design — the tension is recorded rather than resolved by default |
+| R12.9 | MUST | U | The entry point is `docker compose` with a profile-selected override file. No wrapper CLI is built. The operator sees exactly what runs; documentation under R12.6 covers the compose invocation directly |
+| R12.8 | MUST | S | Before the sandbox is used for real work, the enforcement boundary is tested adversarially against at least: DNS exfiltration, network-isolation routability, post-resolution CIDR deny under CDN rotation, policy modification from inside a container, agent-to-agent reachability, and a repository seeded with injected instructions. Each test records whether the attempt was blocked, whether it appeared in the log, and whether it was attributable |
+
+## R13 — Containment and Response
+
+Every requirement above this section is preventive or detective. These describe what happens after a detection.
+
+| ID | Pri | Src | Requirement |
+|---|---|---|---|
+| R13.1 | MUST | S | For each credential type the design persists, a revocation procedure is documented and tested, with a stated maximum time from detection to revocation |
+| R13.2 | MUST | S | A single agent can be isolated, and a single MCP server or tool disabled, without stopping the other agents |
+| R13.3 | SHOULD | S | A documented path returns a contaminated environment to a known-good state, naming what happens to the persistent state volumes |
+
+## R14 — Third-Party and Provider Governance
+
+Two provider relationships sit on the agent traffic path: the tooling vendor and the three model providers. Both were previously treated only as network destinations.
+
+| ID | Pri | Src | Requirement |
+|---|---|---|---|
+| R14.1 | MUST | S | Before any third party is placed on the agent traffic path, record what it can observe, its stated retention period for that data, and its breach-notification path. Where the assessment cannot be completed, the resulting constraint on use is recorded |
+| R14.2 | SHOULD | S | For each model provider, record the model version pinning capability (or its absence), the history-retention and training-opt-out setting in use, and the data classification permitted to leave |
+| R14.3 | SHOULD | U | Provider terms of service are monitored for change, and a change triggers re-review of the affected access route. This exists because the Antigravity position depends on a ToS reading that Google declined to confirm — see R5.13 and the warning in [`docs/OPTIONS_ANALYSIS.md`](docs/OPTIONS_ANALYSIS.md) |
+
+## R15 — Application-Layer Controls
+
+The design has no control that acts on hostile input, and none that mediates an agent *action* as opposed to a network packet. The absence is deliberate and recorded in Non-Goals; what survives as a requirement is the architectural option to add one later.
+
+| ID | Pri | Src | Requirement |
+|---|---|---|---|
+| R15.2 | SHOULD | S | Where an enforcement point capable of mediating tool calls is available, prefer the option that can host one later over one that cannot |
+
+> R15.1 is deliberately absent from this table. It is recorded in [Non-Goals](#non-goals) instead — a requirement that records an absence belongs with the other recorded absences.
 
 ## Non-Goals
 
@@ -313,6 +369,7 @@ Explicitly out of scope. Listed so they are not silently assumed.
 | Preventing exfiltration through legitimately allowlisted destinations | Structurally impossible. An agent allowed to reach GitHub can push to GitHub. Mitigated by narrowing the allowlist and by audit, not eliminated |
 | Multi-tenancy or hosting the sandbox as a shared service | Single-operator scope; revisit if this changes, since it raises the isolation requirement |
 | Replacing code review of agent output | The sandbox bounds damage; it does not certify correctness |
+| **R15.1** — Inspecting or constraining agent inputs (ingress filtering) | No component inspects what enters an agent's context. The architecture bounds the consequences of a successful prompt injection rather than preventing one. Building a deterministic guardrail layer in front of three third-party agent harnesses whose input pipelines are not ours to instrument is a larger undertaking than the sandbox itself. R15.2 keeps the option open |
 
 ## Assumptions
 
@@ -326,19 +383,19 @@ Explicitly out of scope. Listed so they are not silently assumed.
 
 ## Open Questions
 
-Answers change the design; none blocks drafting requirements.
+**Seven of nine were answered at Gate 1 (2026-09-03).** Q1 and Q9 remain open; neither blocks the design.
 
-| # | Question | Why it matters |
+| # | Question | Status |
 |---|---|---|
-| Q1 | Which AWS accounts and services must the agent actually reach? | Determines whether R6.4.3's bucket-level allowlisting is practical or whether the surface is too broad |
-| Q2 | Is this for one workstation or a team/CI artifact? | Team use raises R10 and R11.2 from SHOULD to MUST |
-| Q3 | Will agents operate on untrusted third-party repositories? | Invalidates A3, and pushes the recommendation toward the microVM option |
-| Q4 | Which agent auth mode per agent — subscription OAuth or API key? | Changes the required allowlist and whether credential brokering (R8.3) is possible |
-| Q5 | Is there an existing organisational egress proxy or data perimeter to integrate with? | May replace part of the enforcement point |
-| Q6 | Acceptable session-duration and re-authentication frequency? | Trades operator friction against R6.3.5 |
-| Q7 | Are Kubernetes or Terraform packs needed at first release, or later? | Terraform state and `kubeconfig` each add their own blast radius |
-| Q8 | Which credential delivery model — A (dedicated agent SSO identity) or B (brokered short-lived credentials)? | Determines whether an SSO token exists in the container at all, and whether `oidc.*` / `portal.sso.*` appear in the allowlist |
-| Q9 | Can a dedicated Identity Center user or group be created for agent use? | If not, Model A is unavailable and Model B becomes mandatory, since Model C is prohibited |
+| Q1 | Which AWS accounts and services must the agent actually reach? | **Open.** Determines whether R6.4.3's bucket-level allowlisting is practical or whether the surface is too broad |
+| Q2 | Is this for one workstation or a team/CI artifact? | **Answered — one workstation.** A1 holds; R10 and R11.2 stay SHOULD |
+| Q3 | Will agents operate on untrusted third-party repositories? | **Answered — no, trusted-ish only.** A3 holds; Option 3 is not forced |
+| Q4 | Which agent auth mode per agent — subscription OAuth or API key? | **Answered — both.** `AUTH_MODE` per agent (R4.12). Defaults: Claude Code and Codex `oauth-interactive`, `agy` `apikey` |
+| Q5 | Is there an existing organisational egress proxy or data perimeter to integrate with? | **Answered — no.** The mediator is the sole enforcement point |
+| Q6 | Acceptable session-duration and re-authentication frequency? | **Answered — split.** AWS short-lived via Model B brokering; model-provider credentials long-lived on state volumes per R4.16 |
+| Q7 | Are Kubernetes or Terraform packs needed at first release, or later? | **Answered — all four packs at first release**, plus pinned OS packages (R7.18/R7.19). Staging across milestones is a Gate 3 question |
+| Q8 | Which credential delivery model — A or B? | **Answered — Model B (brokered).** Gated on R8.8, now MUST |
+| Q9 | Can a dedicated Identity Center user or group be created for agent use? | **Open.** Model B still requires a principal to broker from; A5 assumes the estate can be modified |
 
 ## Acceptance Test Matrix
 

@@ -316,6 +316,96 @@ The same class of defect has been CVE'd twice against repository-carried config 
 
 Partial mitigation, Claude Code only: `srt` hard-denies writes to `.mcp.json`, `.claude/commands` and `.claude/agents` at the project root. Options 1 and 3 have no equivalent, and no equivalent exists for Codex or `agy`. Record which paths inside each state volume are capability declarations, and treat changes to them as configuration changes requiring review.
 
+### Authentication modes (requirement 4)
+
+Requirement 4 is mechanism-agnostic. R4.9 asks only that every agent have *some* fully headless path — "paste-back code, device code, or a pre-minted token" — and does not prefer API keys to OAuth. The first version of this document nevertheless arrived at a different mechanism per agent by expedience rather than by decision, and gave the operator no way to choose.
+
+Scope now covers **both**: the container accepts an API-key configuration or an OAuth configuration for every agent that can take one. That is a container contract rather than a per-agent workaround — one `AUTH_MODE` variable per agent, defaulting to the safest mode that agent supports.
+
+This expansion changes a requirement. R4.8 previously read as an unqualified MUST NOT on host credential stores entering the container; it is amended in [`REQUIREMENTS.md`](../REQUIREMENTS.md) to permit a bind-mount only under a recorded per-agent decision. Modes D and E below exist because that amendment was requested deliberately, not because the prohibition was wrong.
+
+#### The axis that matters: who holds the refresh token, and who can write it back
+
+Every option sorts on this one question, and the trade-offs fall out of it.
+
+| # | Mode | Token minted | Token lives | Blast radius on container compromise | Revocable alone? |
+|---|---|---|---|---|---|
+| A | In-container interactive bootstrap | in container | volume | container | yes |
+| B | Pre-minted token via environment | on host | env + process | container | yes |
+| C | OAuth callback port-forward | in container | volume | container | yes |
+| D-shared | Bind-mount the **live** host credential | on host | host file | **entire host account** | no — all-or-nothing |
+| D-dedicated | Bind-mount a credential minted under a **separate provider account** | on host | host file | that account only | yes |
+| E | Seed-copy at entrypoint, then detach | on host | volume | container | depends on source |
+| F | Broker outside the container | outside | never in container | none | yes |
+
+**D-dedicated means a separate provider account**, not a second session of the operator's own. The distinction is the whole value of the row. A second `codex login` under a different `CODEX_HOME` on the same ChatGPT account yields a second refresh token, but the blast radius stays the account and per-session revocation is **UNVERIFIED** — nothing establishes that any of the three providers can invalidate one refresh token without invalidating the account's others. Same-account separation therefore buys convenience, not containment, and should be treated as D-shared until the revocation question is answered. A genuinely separate account costs a second seat and buys real independence.
+
+#### The modes
+
+**A — In-container interactive bootstrap.** A human runs the login inside the container once and pastes the code back. The credential is minted in the blast radius but never existed on the host. Claude Code needs `claude.ai` and `platform.claude.com` allowlisted, neither of which Anthropic's own reference firewall permits. Codex uses `codex login --device-auth`. `agy` detects a remote session and prints a copy-paste URL and code. This is the cleanest option; its cost is one human interaction per container rebuild, mitigated by the state volume surviving rebuilds.
+
+**B — Pre-minted token via environment variable.** Claude Code only: `claude setup-token` mints a one-year `CLAUDE_CODE_OAUTH_TOKEN`. Codex has no OAuth environment-variable equivalent. `agy` explicitly does not support one — issue #632 is open and container runs fail with `authentication required. Run 'agy' to log in, then retry`. The twelve-month replay window is recorded as an accepted risk under *Credential lifecycle* below.
+
+**C — OAuth callback port-forward.** The browser runs on the host; the callback lands inside the container, so the token is minted in the container and never touches host storage. Codex documents port 1455 with 1457 as fallback and redirect `http://localhost:1455/auth/callback`; publish it as `-p 127.0.0.1:1455:1455`, or `ssh -L 1455:localhost:1455` for a remote host. Best ergonomics-to-risk ratio of the OAuth modes.
+
+**D — Bind-mount the host credential.** Requested explicitly, and it has real advantages: no re-authentication at all, it works today for Codex, and it matches how a single-operator workstation is actually used — one identity, one login, everywhere.
+
+| Agent | Host artifact (measured 2026-09-03) | Mountable? |
+|---|---|---|
+| OpenAI Codex | `~/.codex/auth.json` — 4.0 KB, `-rw-------` | **Yes.** Plain JSON, no OS binding. Requires `cli_auth_credentials_store = "file"`. Mount a dedicated directory, never the 1.5 GB `~/.codex` |
+| Antigravity `agy` | `~/.gemini/oauth_creds.json` — 4.0 KB, `-rw-------` | **Unverified** — see below |
+| Claude Code | macOS **Keychain**; no `~/.claude/.credentials.json` present | **No.** Not portable to a Linux container |
+
+Claude Code cannot take mode D here without first degrading host posture, because the credential would have to be forced out of the Keychain into a file. Separately, `~/.claude.json` is 224 KB holding the OAuth account, every project's trust decision, and personal MCP servers — and setting `CLAUDE_CONFIG_DIR` deliberately pulls it *inside* the mounted directory. Mounting it surrenders the trust and MCP configuration, not merely a token. Use A or B for Claude Code.
+
+`agy` mode D has two unresolved problems that compound. `RESEARCH_FINDINGS.md` previously recorded the token as landing at `~/.gemini/antigravity-cli/antigravity-oauth-token`; that file does not exist on this host and the claim is now corrected. The candidate artifact is `~/.gemini/oauth_creds.json`, whose mtime is five weeks older than `agy`'s own `settings.json` — consistent with macOS `agy` using the Keychain and this file being a `gemini-cli` remnant, though it postdates the 2026-06-18 `gemini-cli` shutdown and so is not clearly dead either. Whether Linux `agy` reads it with no Secret Service present is exactly what a test must establish. Until then, treat `agy` mode D as **UNVERIFIED**.
+
+The second `agy` problem is not technical. Antigravity Additional Terms Section 6 prohibits "using third party software, tools, or services to access the Service", and Google has suspended paid subscribers without warning for it. Mounting an Antigravity OAuth credential into a container to be driven by a wrapper is the closest pattern in this list to the one actually enforced against, and the blast radius is the whole Google account rather than the container. See [Security Warning — Antigravity Terms of Service](#security-warning--antigravity-terms-of-service).
+
+**E — Seed-copy at entrypoint, then detach.** Mount the host credential read-only for bootstrap only; the entrypoint copies it into the persistent volume; steady-state runs with no host mount at all. Refresh writes land on the volume. This reduces host exposure from continuous to a bootstrap window while keeping most of mode D's ergonomics, and it is the honest middle ground if mode D is what you want.
+
+**F — Broker outside the container.** Codex ships a ready-made primitive: `codex-responses-api-proxy` forwards **only** `POST /v1/responses` to `api.openai.com`, injects `Authorization` from a key read on stdin, 403s everything else, and runs as a privileged user so the agent process never sees the key. Strongest available control, and it fits the Option 2 mediator directly. It is API-key-shaped, however — it does not carry an OAuth flow the CLI drives itself — so it does not generalise to the other two agents today.
+
+#### Traps
+
+These decide the choice more than the threat model does.
+
+1. **OAuth refreshes, so `:ro` breaks.** The access token expires and the CLI writes a new one back. A read-only mount works until the first expiry and then fails, possibly mid-run and hours in. A read-write mount lets a compromised agent **overwrite** the host credential — corruption and operator lockout, a second-order effect that the threat model's exfiltration-and-lateral-reach framing does not name. Mode E resolves this: refresh lands on the volume, not the host.
+2. **Never bind-mount a single credential file.** CLIs commonly write to a temporary file and rename. The container retains the old inode and silently keeps a stale credential indefinitely. Mount a dedicated directory.
+3. **Refresh-token rotation race.** If a provider issues single-use refresh tokens, a host and a container sharing one file invalidate each other and log the operator out of both. **UNVERIFIED per provider**, and the failure most likely to make D-shared unworkable in daily use irrespective of security posture. It belongs in the test plan.
+4. **`0600` means nothing inside the container.** Docker Desktop on macOS uses VirtioFS and fakes file ownership, so reads and writes succeed regardless of the container UID. Host file modes are not a control here; `:ro` is the only real one.
+5. **Revocation granularity.** D-shared revokes as a single unit — suspecting the container forces re-authentication on every machine the operator owns. Only a **separate provider account** changes that. A second login under a different `CODEX_HOME` on the same account looks like separation and is not, because revocation granularity is a property of the provider, not of the file layout, and no provider here is known to revoke one refresh token in isolation.
+
+#### The precedent already set in this repository
+
+R6.5 answers the same question for AWS and rejects Model C — the operator's own identity with a trimmed configuration — in these words: "Provides the appearance of scoping without the substance." Mounting the operator's live OAuth credential is Model C applied to model providers. The asymmetry is worth stating plainly: R6.2.2 forbids long-lived IAM access keys for AWS, while this document recommends a one-year OAuth token for Claude Code. Both may be defensible, but they are opposite postures in one repository and the difference has not been argued anywhere. See [`STANDARDS_MAPPING.md`](STANDARDS_MAPPING.md) G5.
+
+#### What each agent can actually accept
+
+| Mode | Claude Code | OpenAI Codex | Antigravity `agy` |
+|---|---|---|---|
+| API key | Yes — `ANTHROPIC_API_KEY` | Yes — `codex login --with-api-key`, reads stdin | Yes — `GEMINI_API_KEY` **and** `"modelProvider": "gemini"`; the variable alone is a documented no-op |
+| A — in-container login | Yes — needs `claude.ai` + `platform.claude.com` | Yes — `--device-auth` | Yes — SSH paste-back |
+| B — pre-minted OAuth env | Yes — one-year `CLAUDE_CODE_OAUTH_TOKEN` | No equivalent | No — issue #632 |
+| C — callback port-forward | **Unverified** — whether the container login is a localhost callback or a browser paste-back code is an open item in [`RESEARCH_FINDINGS.md`](RESEARCH_FINDINGS.md). If paste-back, there is no port to forward and C collapses into A | Yes — 1455 / 1457 | Unverified |
+| D — mount host credential | No — Keychain-bound | Yes — `auth.json` | Unverified, and ToS-exposed |
+| E — seed-copy | Nothing to copy | Yes | Same caveats as D |
+| F — broker | No primitive | Yes — `codex-responses-api-proxy` | No |
+
+#### Position
+
+Implement the mode switch, since that is the actual scope change: `AUTH_MODE=apikey | oauth-interactive | oauth-token | oauth-mount` per agent, defaulting to the safest mode the agent supports rather than to whichever mode is most convenient.
+
+The lettered modes above do not map one-to-one onto that enum, and the mapping needs stating or an implementer cannot select what this section recommends. **A and C are both `oauth-interactive`** — C is A with the OAuth callback port published (`-p 127.0.0.1:1455:1455`) so the browser can run on the host. **B is `oauth-token`. D and E are both `oauth-mount`**, and R4.15 makes E the required shape of it: read-only bootstrap mount, copied to the volume. **F is not an agent auth mode at all** — it is a mediator concern under Option 2, and it is listed here only because it is the strongest answer to the same problem.
+
+- **Claude Code** — mode A, falling back to B where no human is available.
+- **Codex** — A or C first. E where the host credential's ergonomics are wanted, and only from a separate provider account; a second config directory on the operator's own account is D-shared wearing a different name. Not D-shared.
+- **Antigravity `agy`** — API key. Mode D is unverified *and* ToS-exposed, and the two problems compound rather than trading off.
+
+**Overridden at Gate 1.** The Codex recommendation above was not adopted. R4.17 permits `oauth-mount` from a second config directory on the operator's own provider account — which this section defines as functionally D-shared — recorded as an accepted risk with the blast radius stated. The E shape (R4.15) still applies.
+
+One rule holds across every mode: **no read-write bind-mount of a host credential.** A read-only bootstrap plus a copy to the volume delivers the same ergonomics without granting a compromised container write access to host credential material.
+
 ### Credential lifecycle (requirements 4 and 6)
 
 The design persists long-lived refresh tokens and, for headless Claude Code, may mint a one-year `CLAUDE_CODE_OAUTH_TOKEN`. That token sits on a volume this document concedes a malicious project can read — a twelve-month replay window. The first version offered it as guidance with no invalidation path attached.
@@ -415,13 +505,14 @@ Splice-only for the Antigravity container remains the position if the OAuth rout
 
 ## Open Decisions
 
-Three decisions are proposed above but not settled. Each needs an owner before build starts. They are listed here so they are not lost in the prose.
+**Three of four were settled at Gate 1 (2026-09-03).** Their resolutions are recorded in [`prd.md`](../prd.md) and in the requirement register; this table is kept so the reasoning above stays traceable to an outcome. Open Decision 3 remains open and is now governed by R14.1.
 
 | # | Decision | Proposed position | Blocking? |
 |---|---|---|---|
-| 1 | TLS interception posture | Splice-only for all three agents; content-level DLP accepted as out of scope | No — but it changes the effort estimate if reversed |
-| 2 | Antigravity access route | `GEMINI_API_KEY` / Vertex ADC, sidestepping the ToS clause | No — affects Antigravity only |
+| 1 | TLS interception posture | **Settled — splice now, termination possible later.** R5.15. No content-level DLP at first release; the mediator keeps the seam (R15.2) | Closed |
+| 2 | Antigravity access route | **Settled — `GEMINI_API_KEY` only**, with a ToS-change review trigger (R14.3). No Antigravity account credential enters a container. R5.13 remains a permanent bar | Closed |
 | 3 | Docker Sandboxes provider assessment | Not done. Step 1 is constrained to a synthetic repository and throwaway credentials until it is | No — the constraint *is* the mitigation. Would block only a run against a representative repository |
+| 4 | Host-credential mount posture for Codex | **Settled against the proposed position.** R4.17 permits `oauth-mount` from a second config directory on the operator's *own* account, recorded as an accepted risk: blast radius is the whole account, revocation all-or-nothing. R4.13–R4.15 still bound the shape | Closed |
 
 ## Recommendation
 

@@ -32,7 +32,7 @@ Measured on the development machine, 2026-09-02:
 | Claude Code credentials | macOS **Keychain** — no `~/.claude/.credentials.json` | Host credentials are not portable into a Linux container |
 | Codex credentials | `~/.codex/auth.json` present (4 KB) | Mountable, but see the size note below |
 | `~/.codex` size | 1.5 GB | Do not bind-mount the host directory; use a fresh volume |
-| Antigravity state | No `~/.antigravity` or `~/.config/Antigravity` | Not installed on this host |
+| Antigravity state | `agy` **1.1.23** installed at `~/.local/bin/agy`. `~/.gemini` is 141 MB; `~/.gemini/antigravity-cli` is 42 MB | Mount a fresh volume, not the host directory. **Corrected 2026-09-03** — the previous entry read "not installed on this host" because it checked `~/.antigravity` and `~/.config/Antigravity`, paths this document itself identifies as wrong |
 
 Docker Desktop on macOS uses VirtioFS and fakes file ownership so reads and writes succeed regardless of the container UID. `chown` from inside a bind mount is a no-op on the host. Read-only (`:ro`) mounts are enforced correctly.
 
@@ -266,7 +266,7 @@ Install: `curl -fsSL https://antigravity.google/cli/install.sh | bash` → binar
 ### State and auth
 
 - Credentials go to the OS keyring via Secret Service / libsecret (GNOME Keyring, KWallet). **This is the main headless blocker in containers.** Official troubleshooting advises ensuring the keyring daemon runs and `export $(dbus-launch)`.
-- The OAuth token also lands as a plain file at `~/.gemini/antigravity-cli/antigravity-oauth-token`. Several early write-ups claim `~/.config/agy/credentials.json` — that is wrong.
+- **Where the OAuth credential actually lands is not established.** An earlier revision of this document stated it lands as a plain file at `~/.gemini/antigravity-cli/antigravity-oauth-token`; **that file does not exist on this host** (checked 2026-09-03, `agy` 1.1.23). The candidate artifact is `~/.gemini/oauth_creds.json` — 4.0 KB, mode `-rw-------`, mtime 2026-07-28, which is five weeks older than `~/.gemini/antigravity-cli/settings.json`. That gap is consistent with macOS `agy` using the Keychain as its live store and this file being a `gemini-cli` remnant, though it postdates the 2026-06-18 `gemini-cli` shutdown and so is not clearly stale either. Contents were not inspected. Several early write-ups claim `~/.config/agy/credentials.json`; that path is also absent here.
 - Settings at `~/.gemini/antigravity-cli/settings.json`. MCP config, saved conversations and workflows also live under `~/.gemini`. **`~/.gemini` is the high-value path to mount.**
 
 Auth options, ranked for containers:
@@ -364,6 +364,9 @@ Added 2026-09-03:
 - **The exact Compose/driver key for disabling inter-container connectivity.** `com.docker.network.bridge.enable_icc` is the expected name and the `driver_opts` mechanism is confirmed, but two documentation queries returned the option only as a described capability ("managing inter-container connectivity") without the literal key. Confirm against the Docker version in use before relying on it. Per-agent networks achieve the same isolation and need no such confirmation.
 - **The default MCP transport for each of the three agents** — stdio versus Streamable HTTP, per agent and per configured server. This determines whether MCP traffic crosses a network enforcement point at all, and the answer drives whether any egress audit trail covers the MCP vector. Not established for any of the three.
 - **Docker Sandboxes' retention and data-handling terms for intercepted traffic.** Its proxy terminates HTTP/HTTPS, so it processes decrypted prompts, source and credential-bearing headers. What it retains, for how long, with what tenant isolation and what deletion guarantee, is not documented at the level needed to assess it as a service provider.
+- **Which file, if any, Linux `agy` reads for its OAuth credential with no Secret Service present.** The macOS host offers `~/.gemini/oauth_creds.json` as the only candidate, and its mtime does not suggest it is the live store. This is the question that decides whether the `oauth-mount` auth mode is available for `agy` at all.
+- **Per-session refresh-token revocation.** Whether any of the three providers can invalidate one refresh token without invalidating the account's others. If none can, then a second login under a separate config directory offers no containment over sharing the operator's live credential, and only a separate provider account does. This decides whether the D-dedicated auth mode is meaningful.
+- **Refresh-token rotation semantics per provider.** If any of the three issues single-use refresh tokens, a host and a container sharing one credential file will invalidate each other and log the operator out of both. Not established for Anthropic, OpenAI or Google. This is the failure most likely to make a shared host-credential mount unworkable in daily use irrespective of security posture.
 
 ## Sources
 
