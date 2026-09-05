@@ -218,7 +218,7 @@ container that does not match its declaration.
   cheapest early signal on the D14 question (`RESEARCH_FINDINGS.md:76`). The result is recorded
   whether it passes or fails. Depends on SF-1 only for the build-context shape.
 
-- [ ] **SF-3: Per-agent images, pins and native-sandbox disposition** — `images/claude/`,
+- [x] **SF-3: Per-agent images, pins and native-sandbox disposition** — `images/claude/`,
   `images/codex/`, `images/agy/` plus `images/agy/agy-run.sh`. Thin layers on SF-2's base: pinned
   agent installation via `ARG` with no `curl | bash`, auto-update disabled, the non-interactive
   entry points, and the `agy` JSON `status` gating wrapper. **Records the per-agent native-sandbox

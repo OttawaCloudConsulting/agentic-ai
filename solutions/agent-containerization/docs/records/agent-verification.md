@@ -266,3 +266,32 @@ image next month with the same `pins.env` fetches the identical, hash-verified a
 of what the live manifest serves by then — unlike the manifest URL itself, which always resolves to
 "latest." `linux_arm64_musl` returns 404 from this manifest endpoint, confirming the base image
 must be glibc-based (`node:22-slim`, not an Alpine variant) for `agy` specifically.
+
+---
+
+## Per-agent native-sandbox verdicts — 01.2 SF-3 (criterion 7)
+
+Per the base-posture result above (unprivileged user-namespace creation is blocked by Docker's
+default seccomp profile, independent of which process requests it), all three agents' native
+sandboxes are **disabled by default**, matching Deviation 2 (D14 amendment).
+
+| Agent | Mechanism | Verdict | Basis |
+|---|---|---|---|
+| claude | `srt` (`@anthropic-ai/sandbox-runtime`) | **Disabled** | Depends on the same bwrap/user-namespace primitive the base-posture probe found blocked. Not independently re-probed — the blocking mechanism (seccomp on `unshare(CLONE_NEWUSER)`) is process-agnostic. |
+| codex | `features.network_proxy` (bubblewrap-based) | **Disabled** | Same basis. Also pre-existing R3.8 finding independent of this probe. |
+| agy | `--sandbox` ("terminal restrictions") | **Disabled** | Same basis. Mechanism not independently confirmed to use bubblewrap (agy's binary is closed-source), but no combination of D15's flags permits any unprivileged-namespace-based sandbox regardless of implementation, so the verdict is unaffected by that uncertainty. |
+
+**Auto-update, per agent (R3.5, R10.3):**
+
+| Agent | Mechanism | Disabled how |
+|---|---|---|
+| claude | Background auto-updater | `DISABLE_AUTOUPDATER=1` (documented env var, set in the `claude` image stage) |
+| codex | `codex update` subcommand | Not automatic — confirmed via `codex --help`: `update` is a subcommand the pod never invokes. No separate disable flag exists or is needed. |
+| agy | `agy update` subcommand, **plus** a documented background self-update check "during regular runs" (the install script's own text; corroborated by `docs/records/egress-discovery.md:180`, which shows the auto-updater host contacted on every invocation in the wider discovery run, not just at install) | The explicit `update` subcommand is never invoked. The background self-update check cannot be independently disabled — no env var or flag for it was found in `agy --help` or in the binary's strings. Not exercised here: 01.2 has no egress, so the check simply fails/times out silently, which is what the offline `--version` checks above already confirm doesn't affect `agy`'s own exit behavior. This is a residual, not-fully-closed R10.3 item for 01.3 to account for in the allowlist (the host is already seeded in `docs/records/egress-discovery.md`). |
+
+**`agy-run.sh` JSON status-field gating (R3.6, Interface Contract 5): UNVERIFIED.** The wrapper at
+`images/agy/agy-run.sh` parses `.status` from `agy`'s `--output-format json` output and fails
+closed (non-zero exit) on anything other than `success`/`ok`/`completed`. The exact field name and
+the values `agy` actually emits for a genuine tool denial have not been observed — 01.2 has no
+egress and no credentials wired (01.4). Confirm against a live, authenticated run before relying on
+this in production.
