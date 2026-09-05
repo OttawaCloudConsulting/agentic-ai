@@ -2,7 +2,23 @@
 
 Research and design options for running agentic coding agents (Claude Code, OpenAI Codex, Google Antigravity) inside a fully sandboxed container with a minimal blast radius.
 
-**Status:** Gate 1 (Scope Review) in flight. Research complete; no architecture option ratified — that is Gate 2. See [`progress.txt`](progress.txt) for gate state and [`prd.md`](prd.md) for settled scope. No implementation yet.
+**Status:** Gate 3 (Milestone Review) in progress. Gates 1 (Scope) and 2 (Design) are ratified — see
+[`prd.md`](prd.md) and [`.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md`](.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md).
+Milestone 01 (Sandboxed Pod) is building; Feature 01.2 (pod topology, hardened runtime, minimal
+profile) has produced a runnable pod. **This pod is not for real work yet** — it has no egress
+(Feature 01.3), no authentication (Feature 01.4), and no adversarial acceptance testing (Milestone
+02) until those land. See [`progress.txt`](progress.txt) for current gate/feature state.
+
+**Entry point** (requires Docker Desktop; builds the pod cold on first run):
+
+```
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up
+```
+
+This is the only entry point — no wrapper script. `--env-file` is required: Compose interpolates
+version pins from it into the image builds, and without it the build fails. The pod starts with no
+default route and no route to the internet (Feature 01.3 adds the egress mediator).
 
 **Date of research:** 2026-09-02. Agent tooling in this space moves fast; re-verify version-specific claims before building.
 
@@ -44,12 +60,17 @@ A denylist alone cannot deliver a minimal blast radius. An agent that is comprom
 
 The recommendation is therefore: **default-deny allowlist as the primary control, with the denylist layered on top** as an independent second control for known-bad indicators, RFC1918 and link-local ranges, and the cloud metadata endpoint. All three options support both, with deny taking precedence over allow. Requirement 5 is met — it is just not the only control.
 
-## Out of Scope for This Directory
+## What Now Exists, and What's Still Out of Scope
 
-Deliberately not produced, because no option has been selected:
+`prd.md` and `progress.txt` exist at this directory's root. The architecture document exists at
+`.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md` — **not** at
+`docs/ARCHITECTURE_AND_DESIGN.md` as an earlier version of this note (and the architecture
+document's own file tree) stated; the path discrepancy itself is recorded as a finding for
+`/project`, not fixed here. Dockerfiles (`images/`) and Compose files (`compose/`) exist as of
+Feature 01.2. Still not produced:
 
-- `prd.md` / `progress.txt` — generate with `/create-prd` once an option is chosen
-- `docs/ARCHITECTURE_AND_DESIGN.md` — there is no chosen architecture to document yet
-- Dockerfiles, Compose files, firewall scripts, policy files, tool-pack manifests
+- Firewall/egress-mediator scripts and the compiled egress policy — Feature 01.3
+- Tool-pack manifests and the policy compiler — Feature 01.5
+- AWS access (R6) — Milestone 03
 
 Note that requirements R6 (AWS access) and R7 (loadable tool packs) were added after the options analysis was written. The three options remain valid — both requirements are orthogonal to the choice of enforcement architecture — but the options analysis does not yet evaluate them per option.

@@ -235,7 +235,7 @@ container that does not match its declaration.
   mount-enumeration, route, pin-agreement, record-presence and offline-version assertions plus the
   volume-upgrade check, T1 and T2. Depends on SF-1, SF-2 and SF-3.
 
-- [ ] **SF-5: CIS applicability table and README drift correction** —
+- [x] **SF-5: CIS applicability table and README drift correction** —
   `docs/cis-docker-runtime-applicability.md` mapping the benchmark's Container Runtime
   recommendations to R1 with an applicability disposition each, plus the `README.md` corrections at
   `:5` and `:47-53`, the documented entry point, the no-egress prerequisite, and the **not for real
