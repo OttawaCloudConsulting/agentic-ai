@@ -1,0 +1,15 @@
+# Post-resolution CIDR deny list. Deny always wins over allow (R5.3, R5.7); enforced by the
+# 01.3 mediator, not by this repository. Link-local (incl. the cloud metadata endpoint),
+# loopback and RFC1918 — the ranges no agent traffic should ever legitimately reach (R5.6).
+#
+# No deny_fqdns field: R5.3/R5.7 and D5 specify post-resolution CIDR deny only. Nothing in the
+# requirements register asks for FQDN-level deny.
+#
+# Per-agent rate and concurrency limits (D5's third control) are deliberately absent here — that
+# is mediator configuration owned by 01.3, not base policy. The omission is a decision, not a gap.
+deny_cidrs:
+  - 169.254.0.0/16      # link-local, incl. 169.254.169.254 metadata endpoint (R5.6)
+  - 127.0.0.0/8         # loopback
+  - 10.0.0.0/8          # RFC1918
+  - 172.16.0.0/12       # RFC1918
+  - 192.168.0.0/16      # RFC1918

@@ -1,0 +1,102 @@
+# Seed egress allowlist. Built from a real discovery capture (SF-3), not a vendor reference list
+# (R5.8, D17). Keyed per agent — never a union; three separate discovery runs share this one
+# seeding pass and one cross-validation pass (see the plan's Approach section for why).
+#
+# provisional: true until every entry has agreement between two independent sources. Several do
+# not yet -- see each entry's `source` list and docs/records/egress-discovery.md for the full
+# discussion of why. Consumers of this file MUST NOT treat "provisional" as "safe to promote"
+# without reading that record first.
+#
+# Blind spot (sbx, and by extension this capture method): sbx's proxy fully intercepts only
+# HTTP/HTTPS. UDP and ICMP are blocked outright and invisible to the capture -- a legitimate UDP
+# dependency in any of these three agents would not appear here and would surface later as a
+# novel failure. This is why cross-validation is mandatory and why the file stays provisional.
+provisional: true
+pins: agent-verification.md            # the SF-2 pins this capture was taken against (R10.6)
+sources: [sbx-discovery-capture, agent-verbose-log]
+
+agents:
+  # claude 2.1.260 (SF-2 pin). Discovery caveat: sbx's own `claude-code-docker` kit bakes in a
+  # non-removable ("editable": false) global-bypassing allow rule for six Anthropic-family hosts
+  # (api.anthropic.com, platform.claude.com, downloads.claude.ai, claude.com,
+  # mcp-proxy.anthropic.com, bridge.claudeusercontent.com) regardless of the deny-all policy this
+  # capture ran under. Only api.anthropic.com showed real traffic (33 requests) during the task;
+  # the other five are NOT included below because this run observed no actual use of them --
+  # including them on the kit's say-so alone would be exactly the "vendor reference allowlist
+  # copied verbatim" R5.8/D17 forbid. See docs/records/egress-discovery.md for the full finding.
+  claude:
+    allow_fqdns:
+      - fqdn: api.anthropic.com
+        port: 443
+        upgrade: false     # R5.9 -- Upgrade permitted on TCP/443 where an agent requires it
+        source: [sbx-discovery-capture]   # kit-bypassed traffic, not a deny-then-observe result; NOT cross-validated against a second source in this run
+    allow_cidrs: []        # R7.3/R7.4 -- shape must compose with CIDR-bearing packs
+
+  # codex 0.152.1 (SF-2 pin). Genuine deny-all discovery -- no kit bypass observed for this
+  # template, unlike claude's. api.openai.com is cross-validated (policy log + codex's own
+  # verbose stderr, which named the exact same host and the same 403 rejections). chatgpt.com,
+  # api.github.com and github.com are single-source (policy log only, one run) -- consistent
+  # with SF-2's earlier incidental sighting of the same three hosts, but still not independently
+  # cross-validated per D17's bar.
+  codex:
+    allow_fqdns:
+      - fqdn: api.openai.com
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture, agent-verbose-log]
+      - fqdn: chatgpt.com
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture]   # single-source; matches SF-2's incidental observation
+      - fqdn: api.github.com
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture]   # single-source; matches SF-2's incidental observation
+      - fqdn: github.com
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture]   # single-source; matches SF-2's incidental observation
+    allow_cidrs: []
+
+  # agy -- no real pin (SF-2: installer always fetches the live manifest); this run observed
+  # 1.1.26. sbx has no first-class agy template (edge case anticipated by the plan) -- this
+  # capture used sbx's generic "shell" template with agy installed live inside it, which DID
+  # execute successfully (resolves the plan's open question: agy is not structurally barred from
+  # running under sbx, it simply lacks a first-class template). All five entries below are
+  # cross-validated: present in both the sbx policy log and agy's own --log-file output for the
+  # same task run. antigravity-cli-auto-updater is additionally confirmed by static review of the
+  # installer script, which hard-codes it as DOWNLOAD_BASE_URL, and by its recurrence on every
+  # invocation (not just install) -- it is a live runtime dependency, not one-time install noise.
+  #
+  # Excluded from this seed: antigravity.google and storage.googleapis.com, seen only during the
+  # install step (before the task ran) with no repeat during the task itself -- install-time-only
+  # on current evidence, not confirmed as an ongoing runtime dependency. Relevant to 01.2's choice
+  # between vendoring a pinned binary at build time vs. installing live at container start
+  # (docs/records/agent-verification.md, "Consequence for 01.2 and R10.6").
+  agy:
+    allow_fqdns:
+      - fqdn: generativelanguage.googleapis.com
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture, agent-verbose-log]
+      - fqdn: antigravity-unleash.goog
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture, agent-verbose-log]
+      - fqdn: playwright.azureedge.net
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture, agent-verbose-log]
+      - fqdn: playwright-akamai.azureedge.net
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture, agent-verbose-log]
+      - fqdn: playwright-verizon.azureedge.net
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture, agent-verbose-log]
+      - fqdn: antigravity-cli-auto-updater-974169037036.us-central1.run.app
+        port: 443
+        upgrade: false
+        source: [sbx-discovery-capture, install-script-source-review]
+    allow_cidrs: []

@@ -305,7 +305,7 @@ This is actively enforced — Google has suspended paid subscribers, including A
 
 | Tool | Model | Notes |
 |---|---|---|
-| **Docker Sandboxes (`sbx`)** | Managed proxy + microVM | Domains, wildcards, IPs, CIDRs, ports. Deny beats allow. UDP/ICMP blocked at the network layer and not unblockable by policy. Presets `open` / `balanced` / `locked-down`. Closed-source CLI. |
+| **Docker Sandboxes (`sbx`)** | Managed proxy + microVM | Domains, wildcards, IPs, CIDRs, ports. Deny beats allow. UDP/ICMP blocked at the network layer and not unblockable by policy. Presets `allow-all` / `balanced` / `deny-all` **(corrected 2026-09-04, 01.1 SF-3 — the installed CLI, v0.39.0, does not expose `open`/`locked-down`; `deny-all` is the operative equivalent of "locked-down" used for discovery)**. Closed-source CLI. Also observed (SF-3): first-party agent kits (e.g. `claude-code-docker`) can bake in non-removable, policy-bypassing allow rules for their own vendor's hosts — `deny-all` is not a uniform guarantee across all of `sbx`'s own templates. |
 | **iron-proxy** (Go, Apache-2.0) | MITM egress proxy with built-in DNS | Default-deny; glob domain allowlist plus CIDR; **upstream IP denylist applied after resolution** — refuses even an allowlisted domain if the resolved IP is in a blocked range. Metadata and loopback blocked by default. Three wiring modes: DNS-based, DNS + nftables, TPROXY. |
 | **Squid (CONNECT allowlist)** | SNI peek-and-splice | Validates the destination at CONNECT before the TLS handshake — no decryption, so no CA distribution. Domain granularity only. Well-understood; `ssl::server_name` ACL. |
 | **`iptables` + `ipset`** (vendor reference) | IP allowlist inside the container | Requires `NET_ADMIN`/`NET_RAW` **inside the blast radius**. IP-snapshot semantics break on CDN rotation. Does not filter DNS. Use REJECT not DROP so failures surface. |
@@ -352,7 +352,7 @@ Carried forward deliberately — do not treat these as established:
 - ~~Whether `agy` honours `HTTPS_PROXY`, and its CA-trust mechanism.~~ **Resolved 2026-09-04** — see `docs/records/agent-verification.md` (01.1 SF-2). Yes for both proxy URL schemes; CA-trust via `SSL_CERT_FILE`.
 - ~~Whether `agy` currently accepts `GEMINI_API_KEY` — official docs and a June 2026 maintainer statement conflict.~~ **Resolved 2026-09-04** — see `docs/records/agent-verification.md` (01.1 SF-2). Confirmed working on `agy` 1.1.26 with `modelProvider: "gemini"` set; the June 2026 maintainer statement is superseded.
 - Any Antigravity environment variable other than `GEMINI_API_KEY` (`AV_API_KEY`, `ANTIGRAVITY_API_KEY`, `AGY_API_KEY` all appear in blogs, none in official docs).
-- The complete Antigravity egress allowlist — not published by Google.
+- The complete Antigravity egress allowlist — not published by Google. **Partially substituted 2026-09-04** (`docs/records/egress-discovery.md`, 01.1 SF-3): a discovery-based seed for one task's egress (`generativelanguage.googleapis.com`, `antigravity-unleash.goog`, three `playwright*.azureedge.net` CDN mirrors, the auto-updater host) exists, cross-validated against `agy`'s own verbose log — but this is what one synthetic task exercised, not Google's complete allowlist, which remains unpublished.
 - Whether Claude Code's container login is a true RFC 8628 device-code grant or a browser paste-back code.
 - `IS_SANDBOX` and `CLAUDE_CODE_DONT_INHERIT_ENV` — absent from the current environment-variable reference; do not rely on them.
 - Whether `api.openai.com` is contacted at all in Codex ChatGPT-subscription mode.

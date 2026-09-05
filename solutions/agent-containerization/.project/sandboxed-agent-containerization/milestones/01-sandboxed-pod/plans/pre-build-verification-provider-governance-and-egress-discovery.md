@@ -114,7 +114,7 @@ enforces the split so 01.5's policy compiler inherits a per-agent policy rather 
   transport per agent and per configured server. Includes the throwaway TLS listener and
   `internal: true` fixture. Every result is recorded whether it passes or fails.
 
-- [ ] **SF-3: Egress discovery, seed allowlist and denylist** — Runs only after SF-1 and SF-2. The
+- [x] **SF-3: Egress discovery, seed allowlist and denylist** — Runs only after SF-1 and SF-2. The
   constrained `locked-down` discovery run against a synthetic repository, **at the SF-2 pins**, one
   agent at a time; seed `allowlist.base.yaml` from
   the capture; cross-validate against agent verbose logging; write `denylist.base.yaml`. Kept whole
