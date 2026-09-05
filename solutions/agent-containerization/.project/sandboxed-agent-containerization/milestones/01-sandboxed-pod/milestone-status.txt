@@ -8,9 +8,13 @@
     Sub-features: 3/3 complete
     Notes: Completed 2026-09-04.
 
-[~] Feature 01.2: Pod topology, hardened runtime and minimal profile
+[x] Feature 01.2: Pod topology, hardened runtime and minimal profile
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pod-topology-hardened-runtime-and-minimal-profile.md
     Sub-features: 5/5 complete
+    Notes: Completed 2026-09-04. 3 architectural deviations recorded (Deviation 1: single
+    multi-stage images/Dockerfile with target: selection; Deviation 2: native agent sandboxes
+    disabled by default, D14 amendment needed; Deviation 3: egress-net not a live Docker
+    resource until 01.3 attaches a service to it). Consider /design refresh to consolidate.
 
 [~] Feature 01.3: Egress mediator
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/egress-mediator.md
