@@ -3,9 +3,10 @@
 
 ## Features
 
-[~] Feature 01.1: Pre-build verification, provider governance and egress discovery
+[x] Feature 01.1: Pre-build verification, provider governance and egress discovery
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pre-build-verification-provider-governance-and-egress-discovery.md
-    Sub-features: 2/3 complete
+    Sub-features: 3/3 complete
+    Notes: Completed 2026-09-04.
 
 [~] Feature 01.2: Pod topology, hardened runtime and minimal profile
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pod-topology-hardened-runtime-and-minimal-profile.md
