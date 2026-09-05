@@ -209,7 +209,7 @@ container that does not match its declaration.
   explicitly so none joins Compose's implicit default. Depends on nothing inside this feature;
   depends on 01.1 SF-2 only for the pins it interpolates.
 
-- [ ] **SF-2: Hardened base image and the home-skeleton mechanism** — `images/agent-base/Dockerfile`
+- [x] **SF-2: Hardened base image and the home-skeleton mechanism** — `images/agent-base/Dockerfile`
   and `images/agent-base/entrypoint.sh`, plus `images/.dockerignore` and `compose/pins.env` derived
   from the 01.1 record. Establishes the non-root `agent` user, the read-only-rootfs writable-path
   layout, the `/opt/agent-home-skel` skeleton and the idempotent seeding entrypoint. **Carries the
@@ -602,3 +602,25 @@ invoked as `bash script.sh`.
   sub-feature boundaries are unaffected (the base-posture probe and per-agent installs remain
   separable within their respective stages of the same file). No consumer outside 01.2 references
   the per-Dockerfile paths, so 01.3–01.5 are unaffected.
+
+### Deviation 2: Native agent sandboxes disabled by default, not enabled — D14 amendment needed
+- **What changed:** SF-2's base-posture probe (`docs/records/agent-verification.md`, "Base-posture
+  bubblewrap nesting probe") shows bubblewrap cannot create or use a nested namespace under D15's
+  hardened posture on this host, for a reason none of D15's own flags can fix (Docker's default
+  seccomp profile blocks `unshare(CLONE_NEWUSER)` outright; relaxing seccomp alone reproduces the
+  exact `/proc`-mount failure `RESEARCH_FINDINGS.md:76` documents). All three agents' native
+  sandboxes (`srt` for Claude Code, Codex's `features.network_proxy`, and `agy --sandbox` if it
+  shares the primitive) are disabled by default in SF-3, pending a `/milestone` revision of D14.
+- **Originally planned:** D14 (architecture doc) enables native agent sandboxes by default; only
+  Codex's bubblewrap nesting was pre-identified as a disable-on-sight case (existing R3.8 finding).
+  The plan's Edge Case 1 named Claude Code's case as an "open design question this feature is the
+  first to hit" and left `agy` unexamined at the base-posture level.
+- **Why necessary:** Verified empirically (see the record) rather than inferred: enabling any
+  hardening exception broad enough to permit nesting (`seccomp=unconfined` or a custom allowlist)
+  is itself an R1.4 violation without individual justification, which does not exist for this
+  milestone. Disabling nesting is the only option that keeps D15's posture intact.
+- **Impact:** D14 needs a `/milestone` revision to state the actual default (disabled, not enabled)
+  and record this as the reason. SF-3 configures all three agents with native sandboxing off.
+  02.2's adversarial acceptance testing (owner of R12.8's "unbreakable" claim) is unaffected in
+  scope but should not assume any inner sandbox is present when reasoning about defense in depth
+  for this milestone.

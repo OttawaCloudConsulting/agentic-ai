@@ -3,5 +3,10 @@ references/.env_keys
 *.env
 *.env.*
 
+# Not a credential: version pins interpolated into build.args (01.2 SF-2).
+# Committed intentionally so the smoke check can assert it agrees with
+# docs/records/agent-verification.md.
+!compose/pins.env
+
 # SF-2 fixture scratch (throwaway PKI, proxy logs, agent workspaces)
 .build-scratch/

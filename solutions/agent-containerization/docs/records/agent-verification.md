@@ -197,3 +197,72 @@ http: TLS handshake error from 127.0.0.1:50039: tls: client didn't provide a cer
 This confirms the three outcomes the record above distinguishes between (proxy honoured with a
 cert, proxy honoured without a cert being available, proxy not reached at all) are actually
 distinguishable by this fixture, not an artifact of how a given agent happens to fail.
+
+---
+
+## Base-posture bubblewrap nesting probe — 01.2 SF-2
+
+**Feature:** 01.2 Pod topology, hardened runtime and minimal profile, SF-2
+**Date:** 2026-09-04
+**Question:** can bubblewrap create and use a fresh mount/user namespace (the primitive `srt` and
+Codex's `features.network_proxy` nesting both depend on) inside a container running D15's hardened
+posture — `cap_drop: ALL`, `no-new-privileges`, non-root, read-only rootfs?
+
+**Method:** built the `agent-base` stage (`images/Dockerfile`, `node:22-slim` + `bubblewrap`
+package) and ran `bwrap --ro-bind / / --proc /proc --dev /dev --unshare-all --die-with-parent
+/bin/echo ok` inside `docker run` with progressively relaxed flags, isolating which restriction is
+responsible.
+
+**Result: fails under D15's posture, and fails for a reason D15's flags cannot fix.**
+
+| Flags | Result |
+|---|---|
+| `--user 1000:1000` only | `bwrap: No permissions to create new namespace, likely because the kernel does not allow non-privileged user namespaces.` |
+| `--user 1000:1000` + `--security-opt no-new-privileges` | Same error |
+| `--user 1000:1000` + `--cap-drop=ALL` | Same error |
+| `--cap-drop=ALL` + `--security-opt no-new-privileges`, **root** | Same error |
+| `--security-opt seccomp=unconfined` **+ full D15 posture** (`cap_drop: ALL`, `no-new-privileges`, non-root) | `bwrap: Can't mount proc on /newroot/proc: Operation not permitted` — the exact failure `RESEARCH_FINDINGS.md:76` documents |
+
+`/proc/sys/kernel/unprivileged_userns_clone` does not exist in the Docker Desktop VM kernel (that
+sysctl is a Debian-only patch; upstream kernels allow unprivileged user namespaces by default), so
+the first-row failure is **Docker's default seccomp profile** blocking `unshare(CLONE_NEWUSER)`
+outright — not a kernel restriction and not anything D15's own flags (`cap_drop`,
+`no-new-privileges`, non-root user) contribute to or could relax. Relaxing seccomp *specifically*
+(and only that) reproduces the documented `/proc`-mount failure one layer in, confirming this is
+the same failure mode Anthropic's own documentation names, not a Docker Desktop artifact.
+
+**Consequence:** no combination of D15's hardening flags permits bubblewrap-based nesting
+(`srt`, Codex's `features.network_proxy`, `agy --sandbox` if it uses the same primitive) on this
+host. The only way to enable it would be an *additional* hardening exception — `security_opt:
+seccomp=unconfined` or a custom seccomp profile allowlisting the relevant syscalls — which R1.4
+requires to be individually justified, and none is currently justified for this milestone. Recorded
+as a D14 amendment; see 01.2's feature plan, Architectural Deviations, Deviation 2. All three
+agents' native sandboxes are disabled by default per R3.8 pending `/milestone` revision of D14.
+
+---
+
+## `agy` version pin — resolved (01.2 SF-2)
+
+The pin-capability gap recorded above (**"No... build-blocking open item for 01.2"**) is resolved
+via option (a): a direct, checksum-verified download, no installer script executed.
+
+`agy`'s installer (`https://antigravity.google/cli/install.sh`, fetched and read, never piped to a
+shell — R7.7) queries `https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/<platform>.json`,
+which returns a **version-suffixed URL** plus a `sha512`:
+
+```json
+{
+  "version": "1.1.26",
+  "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.1.26-5550154686791680/linux-arm/cli_linux_arm64.tar.gz",
+  "sha512": "332dddb06ab4d901a44cfd4b9b358848230e64a64515a8e79b03822348adac9ce92d54cb4fc5119ef075edfba922820c926dfddf82d3a49f4ecdb6e6704dfc75"
+}
+```
+
+The URL's path embeds the version (`1.1.26-5550154686791680`), so it is content-addressed in
+practice: the same URL always serves the same bytes, verified against the manifest's own `sha512`
+at build time. `compose/pins.env` records `AGY_VERSION`, `AGY_URL` and `AGY_SHA512` for the
+`linux_arm64` platform (Docker Desktop on Apple silicon, A1). This is a real pin — rebuilding the
+image next month with the same `pins.env` fetches the identical, hash-verified artifact regardless
+of what the live manifest serves by then — unlike the manifest URL itself, which always resolves to
+"latest." `linux_arm64_musl` returns 404 from this manifest endpoint, confirming the base image
+must be glibc-based (`node:22-slim`, not an Alpine variant) for `agy` specifically.
