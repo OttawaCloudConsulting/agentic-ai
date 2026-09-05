@@ -10,7 +10,7 @@
 
 [~] Feature 01.2: Pod topology, hardened runtime and minimal profile
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pod-topology-hardened-runtime-and-minimal-profile.md
-    Sub-features: 0/5 complete
+    Sub-features: 1/5 complete
 
 [~] Feature 01.3: Egress mediator
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/egress-mediator.md

@@ -201,7 +201,7 @@ container that does not match its declaration.
 
 ## Sub-Features
 
-- [ ] **SF-1: Compose topology and hardened service declarations** — `compose/compose.yaml` with the
+- [x] **SF-1: Compose topology and hardened service declarations** — `compose/compose.yaml` with the
   three `internal: true` per-agent networks, `egress-net` as a Compose-managed bridge
   (`internal: false`, not Compose `external:`), the three agent services carrying the full D15
   hardening set, the three named state volumes, the project bind mount, and the shared `./images`
