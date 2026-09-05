@@ -1,0 +1,81 @@
+name: sandboxed-agent-pod
+
+# Topology and hardening are invariant (D2, D15) and never profile-selectable.
+# Profile-controlled fields (resource limits, the workspace bind mount) live in
+# compose/overrides/<profile>.yaml, layered on with -f at invocation time.
+
+networks:
+  claude-net:
+    internal: true
+  codex-net:
+    internal: true
+  agy-net:
+    internal: true
+  # Compose-managed bridge, internal:false (NOT Compose `external:`). No agent
+  # container attaches to this network in 01.2 -- the mediator (01.3) is the
+  # first and only member besides itself.
+  egress-net:
+    internal: false
+
+volumes:
+  claude-state:
+  codex-state:
+  agy-state:
+
+x-hardened: &hardened
+  user: "1000:1000"
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+
+services:
+  claude:
+    <<: *hardened
+    build:
+      context: ../images
+      dockerfile: Dockerfile
+      target: claude
+      args:
+        CLAUDE_VERSION: ${CLAUDE_VERSION}
+        CLAUDE_SOURCE: ${CLAUDE_SOURCE}
+    image: sandboxed-agent/claude:local
+    networks:
+      - claude-net
+    volumes:
+      - claude-state:/home/agent
+
+  codex:
+    <<: *hardened
+    build:
+      context: ../images
+      dockerfile: Dockerfile
+      target: codex
+      args:
+        CODEX_VERSION: ${CODEX_VERSION}
+        CODEX_SOURCE: ${CODEX_SOURCE}
+    image: sandboxed-agent/codex:local
+    networks:
+      - codex-net
+    volumes:
+      - codex-state:/home/agent
+
+  agy:
+    <<: *hardened
+    build:
+      context: ../images
+      dockerfile: Dockerfile
+      target: agy
+      args:
+        AGY_VERSION: ${AGY_VERSION}
+        AGY_URL: ${AGY_URL}
+        AGY_SHA512: ${AGY_SHA512}
+    image: sandboxed-agent/agy:local
+    networks:
+      - agy-net
+    volumes:
+      - agy-state:/home/agent

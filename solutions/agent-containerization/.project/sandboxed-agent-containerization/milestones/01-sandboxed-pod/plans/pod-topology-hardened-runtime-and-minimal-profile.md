@@ -572,4 +572,33 @@ invoked as `bash script.sh`.
 
 ## Architectural Deviations
 
-(none)
+### Deviation 1: Single multi-stage `images/Dockerfile` instead of four separate Dockerfiles
+- **What changed:** The image build is one multi-stage `images/Dockerfile` with a shared
+  `agent-base` stage plus three final stages (`claude`, `codex`, `agy`), each layering its agent
+  onto `agent-base`. Each compose service builds with `context: ../images`, `dockerfile:
+  Dockerfile`, and a distinct `target:`. Non-Dockerfile per-agent assets (e.g. `agy-run.sh`) still
+  live in per-agent subdirectories (`images/agy/agy-run.sh`) and are `COPY`'d in by path relative
+  to the shared context.
+- **Originally planned:** Four separate files — `images/agent-base/Dockerfile`,
+  `images/claude/Dockerfile`, `images/codex/Dockerfile`, `images/agy/Dockerfile` — with each
+  per-agent Dockerfile doing `FROM agent-base:local` (or equivalent tag) to layer onto a
+  separately-built base image, all built by one `docker compose up` (plan Approach section and
+  Files to Create/Modify table).
+- **Why necessary:** Empirically verified (minimal repro, Docker Compose v2.38.2, with and without
+  `COMPOSE_BAKE=true`): when one service's Dockerfile has `FROM <another-service's-image-tag>`,
+  `docker compose build` / `up --build` does **not** build the referenced service first. On a cold
+  cache (no prior local image), it instead tries to pull the tag from a registry and fails
+  (`pull access denied, repository does not exist`), regardless of `depends_on` (including
+  `condition: service_completed_successfully`). This is not a race condition — the whole solve is
+  submitted as one BuildKit bake plan with no cross-target dependency wiring between services'
+  `build:` stanzas. A single multi-stage Dockerfile with `target:` selection does not have this
+  problem: BuildKit resolves in-Dockerfile stage dependencies natively within one solve, verified
+  cold-cache-safe by the same repro methodology. This preserves criterion 4's single documented
+  `docker compose up` entry point on a fresh, greenfield checkout (no prior local images) without a
+  wrapper script or a required pre-build step.
+- **Impact:** `images/agent-base/Dockerfile` does not exist as a standalone file; the shared base
+  logic is the `agent-base` stage in `images/Dockerfile`. Per-agent directories
+  (`images/claude/`, `images/codex/`, `images/agy/`) hold only non-Dockerfile assets. SF-2 and SF-3
+  sub-feature boundaries are unaffected (the base-posture probe and per-agent installs remain
+  separable within their respective stages of the same file). No consumer outside 01.2 references
+  the per-Dockerfile paths, so 01.3–01.5 are unaffected.
