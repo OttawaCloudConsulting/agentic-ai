@@ -1,0 +1,36 @@
+# The minimal profile contract (R12.9, D10). Populates only what the
+# default profile requires; remaining keys are declared with empty/false
+# values so the schema is complete rather than grown ad hoc later (01.5's
+# policy compiler consumes this shape).
+#
+# This is a schema/contract file, not itself interpreted by `docker compose`
+# -- compose/overrides/default.yaml is its hand-authored Compose counterpart.
+
+name: default
+
+packs: []                      # 01.5 composes egress from these. Empty at this profile
+
+auth_mode:                     # R4.12 defaults, consumed by 01.4
+  claude: oauth-interactive
+  codex: oauth-interactive
+  agy: apikey
+
+mounts:
+  project:
+    path: <host path>          # operator-supplied; this profile's Compose override binds `..`
+    mode: rw                   # :ro where the agent only reviews (R2.7). Default is rw;
+                                # T2's read-only fixture comes from a test-only override,
+                                # not from changing this
+  build_cache: false            # R2.10, per-agent where enabled
+  host_git_config: false        # R2.9, :ro with credential.helper stripped
+
+limits:                         # R1.10, applied per agent container
+  cpus: "2.0"
+  memory: 4g
+  pids: 512
+
+exports:                        # R9.9 -- export toggles only; recording is not disableable
+  egress_audit_log: true
+  agent_action_log: true
+  resolved_policy: true
+  image_digest_sbom: true

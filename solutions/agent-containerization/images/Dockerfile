@@ -29,6 +29,17 @@ ENV HOME=/home/agent
 # on every start, idempotently.
 RUN mkdir -p /opt/agent-home-skel && chown -R agent:agent /opt/agent-home-skel
 
+# Test-only hook for the volume-upgrade smoke check (Edge Case 8): empty by
+# default, so it changes nothing about a normal build. When set, adds one
+# file to the skeleton so the test can rebuild with a "changed default" and
+# assert it appears in an existing volume without disturbing agent-owned
+# files already there.
+ARG SKEL_MARKER=""
+RUN if [ -n "$SKEL_MARKER" ]; then \
+      echo "$SKEL_MARKER" > /opt/agent-home-skel/.upgrade-marker \
+      && chown agent:agent /opt/agent-home-skel/.upgrade-marker; \
+    fi
+
 COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 

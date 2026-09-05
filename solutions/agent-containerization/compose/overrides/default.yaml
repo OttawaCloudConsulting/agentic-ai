@@ -1,0 +1,32 @@
+# Hand-authored Compose counterpart of profiles/default.yaml (R12.9). Carries
+# the profile-controlled fields -- resource limits and the workspace bind
+# mount -- that a different profile could plausibly set differently. D2/D15's
+# invariant topology and hardening live in compose/compose.yaml itself and
+# are never profile-selectable.
+#
+# mounts.project.path in profiles/default.yaml is a placeholder for the
+# operator's own project directory. This minimal/demo profile (not for real
+# work -- see README.md) binds the solution's own checkout (`..`, the parent
+# of this compose/ directory) as a stand-in; a real profile would parameterize
+# this via 01.5's policy compiler.
+
+x-limits: &limits
+  cpus: "2.0"
+  mem_limit: 4g
+  pids_limit: 512
+
+services:
+  claude:
+    <<: *limits
+    volumes:
+      - ../:/workspace:rw
+
+  codex:
+    <<: *limits
+    volumes:
+      - ../:/workspace:rw
+
+  agy:
+    <<: *limits
+    volumes:
+      - ../:/workspace:rw

@@ -227,7 +227,7 @@ container that does not match its declaration.
   `agy`, each enabled only if it nests without a capability R1.4 forbids. Codex's bubblewrap
   nesting is disabled from the outset on the existing R3.8 finding. Depends on SF-2.
 
-- [ ] **SF-4: Minimal profile contract, entry point and smoke checks** — `profiles/default.yaml`
+- [x] **SF-4: Minimal profile contract, entry point and smoke checks** — `profiles/default.yaml`
   (the schema 01.5's compiler consumes), `compose/overrides/default.yaml` as its hand-authored
   Compose counterpart, `compose/overrides/test-readonly.yaml` supplying T2's read-only fixture
   mount, the documented `docker compose` invocation, and
@@ -624,3 +624,25 @@ invoked as `bash script.sh`.
   02.2's adversarial acceptance testing (owner of R12.8's "unbreakable" claim) is unaffected in
   scope but should not assume any inner sandbox is present when reasoning about defense in depth
   for this milestone.
+
+### Deviation 3: `egress-net` is not a live Docker resource in 01.2
+- **What changed:** SF-4's acceptance test asserts `egress-net`'s `internal: false` declaration
+  statically against `compose/compose.yaml`'s source YAML, not as a live Docker network resource.
+  `compose/compose.yaml` itself is unchanged — the declaration already there is correct and is
+  exactly what 01.3 will reference when it attaches the mediator service.
+- **Originally planned:** Criterion 1 and the Approach section state `egress-net` is "declared here
+  but carries no service until 01.3... a Compose network with no attached service is valid and
+  inert, which is what makes the 01.2/01.3 seam clean" — implying it exists as a real, inert Docker
+  resource in 01.2. The Test Strategy table lists "Egress network exists... internal:false" as a
+  criterion-1 assertion.
+- **Why necessary:** Verified empirically: `docker compose --env-file compose/pins.env -f
+  compose/compose.yaml config` (with or without `overrides/default.yaml` layered on) silently
+  drops `egress-net` from the resolved output entirely, because no service in 01.2 references it.
+  Docker Compose does not create top-level `networks:` resources that no service uses — this is
+  normal Compose resource scoping, not a defect in `compose.yaml`. There is no way to force a
+  network into existence within pure Compose semantics without a service referencing it.
+- **Impact:** None on 01.3: the moment it adds a service (the mediator) attached to `egress-net`,
+  Compose creates it for real, with the same `internal: false` declaration already in place. The
+  "01.2/01.3 seam is clean" claim still holds in spirit — the YAML contract doesn't change between
+  the two features — just not via a pre-existing runtime resource. No other consumer assumes
+  `egress-net` exists as a running resource before 01.3.
