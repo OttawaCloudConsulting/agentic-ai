@@ -102,7 +102,10 @@ into the template/kit itself, not something this discovery run, or any operator 
 - The **`claude-code-docker` template** unconditionally allows six hosts: `api.anthropic.com`,
   `platform.claude.com`, `downloads.claude.ai`, `claude.com`, `mcp-proxy.anthropic.com`,
   `bridge.claudeusercontent.com`. Only `api.anthropic.com` showed real traffic during the capture
-  task (33 requests over ~5 minutes); the other five were not exercised.
+  task (11 requests in the corrected run at 2.1.260, 33 at 2.1.246 pre-correction); the other five
+  were not exercised by the task — though `downloads.claude.ai` was hit once by the `claude install
+  2.1.260` re-pin step itself (see Correction, above), which is exactly the kind of traffic the kit
+  bypass exists to allow and is unrelated to the task's own egress.
 - The **`codex-docker` template carries no equivalent kit rule** — `sbx policy ls sf3-codex-capture
   --wide --json` returned no sandbox-scoped rules at all. codex's capture is therefore a genuine
   deny-all discovery (real 403 rejections observed, see below), while claude's is not — the
