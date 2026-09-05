@@ -97,8 +97,10 @@ resolves the UNVERIFIED items the architecture names as build blockers.
 
 ### Feature 01.3: Egress mediator
 
-The single enforcement point. Four of the mediator's five roles land here; the fifth — upstream
-credential brokering — is Milestone 03.
+The single enforcement point. Three of the mediator's five roles land here — L7 policy evaluation,
+pod DNS authority and the audit writer — on network-derived per-agent identity. The fourth role,
+client authentication and identity issuance, was split out as **Feature 01.6** at the 2026-09-04
+revision. The fifth, upstream credential brokering, is Milestone 03.
 
 **Acceptance Criteria:**
 
@@ -117,9 +119,14 @@ credential brokering — is Milestone 03.
   (R5.9). Protocols other than TCP/443 and the resolver path are denied, including ICMP and
   arbitrary UDP (R5.10). Optional telemetry endpoints are excluded from the allowlist and disabled
   at the agent (R5.11).
-- Each agent is issued a **distinct mTLS workload identity** with a defined lifecycle, used to
-  authenticate to the mediator and recorded on every audit line; a credential bound to one identity
-  is refused when presented by another (R8.8, D6) — **T34**.
+- **Per-listener transport, per agent, and the policy selection that rests on it.** The three
+  agent-facing listeners are not identical, because the agents' HTTP clients are not: `claude` and
+  `agy` reach an `https://` listener, `codex` rejects an `https://` proxy URL **at parse time** and
+  must be given plain HTTP CONNECT (01.1 SF-2). Each listener selects that agent's allowlist and rate
+  bucket from the network it arrived on — **network-derived identity**, structural and always
+  available, since each `internal: true` network carries exactly one agent container. Client
+  authentication on top of this is **Feature 01.6**; what 01.3 owns is the listener surface, the CA
+  and listener certificates the TLS hops need, and per-agent policy selection working without it.
 - Every outbound attempt is logged with destination, verdict and timestamp — **blocked attempts
   included** — to a sink no agent container can reach or alter (R9.1, R9.2, D12). Denials are
   surfaced with a clear, actionable message naming the blocked destination, and rules REJECT rather
@@ -199,12 +206,60 @@ Terraform, Kubernetes and GitHub CLI arrive in 02.3, AWS CLI in 03.3.
   are consumed by testing only (D21, R10.2, R10.7). Provenance verification (**T45**) and the
   clean-rebuild proof (**T18**) belong to 02.4.
 
+### Feature 01.6: Per-agent workload identity
+
+Split out of 01.3 at the 2026-09-04 revision. 01.3 ships the mediator working on network-derived
+identity; this feature adds the client-authentication layer on top of it and closes R8.8.
+
+**Acceptance Criteria:**
+
+- **The mechanism is verified per agent before it is built on, not assumed uniform.** 01.1 SF-2
+  established that `claude` presents a client certificate, `codex` cannot reach a TLS listener at all,
+  and `agy` reaches the handshake with nothing to present. This feature establishes the one remaining
+  unknown: whether `codex` and `agy` accept a **proxy credential** (`Proxy-Authorization`, or userinfo
+  in the proxy URL). The acceptance criterion is that each result is **recorded**, not that each
+  passes — the same disposition 01.1 gives its verification results.
+- Each agent is issued a **distinct workload identity** with a defined lifecycle, used to authenticate
+  to the mediator and recorded on every audit line (R8.8). The form is the strongest that agent's
+  client supports: mTLS client certificate for `claude`; proxy credential for `codex`/`agy` where the
+  verification above finds one; otherwise **network-derived** — exactly one agent container per
+  `internal: true` network, which no other agent holds an interface on.
+- **The audit line states the strength of its own attribution.** Every line records which form
+  produced the identity, so a network-derived attribution is never read as a cryptographic one. This
+  is the residual this milestone carries against R9.8, recorded per line rather than in a footnote.
+- A credential bound to one identity is refused when presented by another — **T34**. For the mTLS
+  agent this runs literally at the listener (subject CN must equal the listener's agent). For an agent
+  with no client credential the cross-binding case is **structural**: no route to another agent's
+  network exists to present anything over, and the harness asserts network disjointness by enumeration
+  rather than by a presentation attempt.
+- **T34's register method is amended, not reinterpreted locally.** T34 reads "present agent A's client
+  certificate", which is unexecutable for an agent that has none. `/plan-feature` carries the
+  amendment to `REQUIREMENTS.md` alongside the T28 amendment 01.3's plan already holds — `/milestone`
+  has no authority to edit the register, and an interpretation living only in a milestone README is
+  drift by construction.
+- Identity lifecycle is defined and documented (R8.8's "defined lifecycle"): subject naming, validity
+  bound, renewal path and revocation path. The CA private key stays on the operator host and never
+  enters the mediator.
+- **D6's precondition is enforced, not relaxed.** Credential brokering (Milestone 03, D13) is enabled
+  **only** for an agent whose identity is cryptographically bound at the mediator — which on today's
+  evidence may mean `claude` alone. The confused-deputy failure D6 names cannot occur for an agent
+  that is never brokered to. Whichever agents qualify is recorded here as Milestone 03's inherited
+  input.
+
 ## Dependencies
 
 - **01.1 gates 01.2–01.5.** The `agy` `HTTPS_PROXY` result is go/no-go: on an `internal: true`
   network a client that ignores proxy configuration has no route at all and simply fails. A negative
   is a design change under D1 affecting one agent, and must be resolved before the pod is built, not
-  during it.
+  during it. **Result: positive** — `agy` honours `HTTPS_PROXY` for both `http://` and `https://`
+  proxy URL schemes (01.1 SF-2). No agent loses its network on this account.
+- **01.1 SF-2's client-certificate result shapes 01.3's listener surface** (revision of 2026-09-04).
+  `codex` rejects an `https://`-scheme proxy URL at parse time, so its proxy hop must be plain HTTP
+  CONNECT — destination TLS is unaffected, since the mediator splices rather than terminates it
+  (D4, R5.15), and the hop runs on a two-member `internal: true` network. The consequence is that the
+  mediator's three agent-facing listeners are not identical, and the proxy implementation 01.3 selects
+  must support all three modes with per-listener policy selection. This is a resolved dependency, not
+  an open question — but it was resolved *after* 01.3 was planned, which is why 01.3 is re-planned.
 - **Repository-root `.github/workflows/`** (01.5) is a cross-cutting change outside
   `solutions/agent-containerization/`. This repository has no `.github/` directory today; D21
   introduces its first workflow, and CI becomes a build-time dependency the repo did not previously
@@ -226,14 +281,39 @@ adversarial validation, is Milestone 02 and is what makes the environment usable
 01.3 must precede 01.4 in practice: an agent on an `internal: true` network cannot complete an
 OAuth flow until the mediator resolves and permits the provider's auth endpoints.
 
+**01.6 is numbered last and ordered after 01.3, not last** (2026-09-04 revision). It may land any
+time after 01.3 — before, between or after 01.4 and 01.5 — because nothing else in the milestone
+depends on it: 01.3 leaves a mediator whose per-agent policy selection already works on
+network-derived identity, and 01.4's agents authenticate to their providers through that mediator
+without a client credential of their own. It is numbered 01.6 rather than inserted as a new 01.4 to
+avoid renumbering two features whose Gate 4 plans reference their own numbers throughout; the number
+records insertion order, and this section records execution order. The milestone does not close until
+it lands — R8.8 is a MUST.
+
 ## Sizing
 
-Five features — the DD-1 ceiling, and a deliberate consequence of the pod being unusable until all
-five land.
+**Six features — one over DD-1's 2–5 ceiling. This is a recorded deviation, not an oversight.**
+At the 2026-09-04 revision 01.3 was split into 01.3 (mediator controls, DNS, audit) and 01.6
+(per-agent workload identity). The alternative was to keep a single feature that had already been
+the milestone's largest at eight sub-features and then grew a verification step and a non-uniform
+listener surface. The trade taken: exceed a sizing ceiling that governs review load, rather than
+carry a feature that exceeds a session budget and lands a half-built enforcement point at its own
+boundary. The ceiling is exceeded by one, on a milestone whose feature count was already deliberate.
 
-- **01.3 is the largest.** It maps 1:1 to the `egress-mediator` component and carries four of its
-  five roles. Expect one sub-feature per role at `/plan` time: L7 policy engine, DNS resolver, audit
-  writer, mTLS identity issuance. The fifth role, credential brokering, is Milestone 03.
+- **01.3 remains the largest.** It maps to the `egress-mediator` component and carries three of its
+  five roles: L7 policy engine, DNS resolver, audit writer — plus the listener surface those rest on.
+  The fourth role, client authentication and identity issuance, is 01.6. The fifth, credential
+  brokering, is Milestone 03.
+- **01.6 is small but not trivial.** A verification step (does `codex` or `agy` accept a proxy
+  credential?), an offline CA and issuance path, client verification on the listeners that support
+  it, the subject↔listener binding refusal, and the audit line's attribution-strength field. It is
+  the feature most likely to return a result that changes what is possible in Milestone 03, which is
+  the same shape as 01.1 and the reason it is separable at all.
+- **The listener surface is the tightest constraint on the proxy implementation** and it is 01.3's,
+  not 01.6's: one TLS listener able to require a client certificate, one TLS listener without one,
+  and one plain-HTTP CONNECT listener, each selecting its own per-agent policy. That is a wider
+  selection question than "does it verify client certificates", and it must be settled before either
+  feature is built on the choice.
 - **01.5 splits cleanly** at compiler versus CI pipeline if it runs long.
 - **01.1 is discovery-shaped.** Its output is records, verification results and two policy files —
   not code. It is sized by external dependencies (a vendor assessment, a named ToS owner) more than
@@ -248,6 +328,8 @@ five land.
 | `AUTH_MODE` | Per agent, per R4.12 defaults: Claude Code `oauth-interactive` (fallback `oauth-token`), Codex `oauth-interactive`, `agy` `apikey` |
 | Tool packs | Language runtimes only, as the reference pack exercising the compiler |
 | `policy/allowlist.base.yaml` | Marked **provisional** until the capture and its cross-validation source agree (D17) |
+| Agent → mediator proxy hop | Per agent, per 01.1 SF-2: `claude` `https://` with client certificate; `agy` `https://` without one; `codex` `http://` (rejects `https://` at parse time) |
+| Workload identity (R8.8) | Strongest each client supports: mTLS for `claude`; proxy credential for `codex`/`agy` if 01.3's verification finds one, otherwise network-derived. Brokering (M03) is gated on the cryptographic form |
 
 ## Definition of Done
 
@@ -255,10 +337,13 @@ five land.
 - [ ] All acceptance criteria verified
 - [ ] `gate-3-review.md` checklist fully resolved
 - [ ] `milestone-status.txt` updated with final counts
-- [ ] `progress.txt` milestone summary shows 5/5 features complete
+- [ ] `progress.txt` milestone summary shows 6/6 features complete
 - [ ] SC-4 demonstrated end to end: restart the pod, all three agents still authenticated with state
       intact (T9)
 - [ ] The provisional status of `policy/allowlist.base.yaml` is recorded in the file itself
+- [ ] R8.8's per-agent identity form is recorded — which agents carry a cryptographic identity and
+      which carry network-derived identity — together with the resulting Milestone 03 brokering
+      restriction, so the gate is inherited explicitly rather than rediscovered there
 - [ ] `README.md` drift corrected (Gate 2 open item, due at this milestone's start)
 - [ ] The environment carries a stated **not for real work** notice until Milestone 02 completes
       (R12.8)

@@ -86,7 +86,13 @@ feature breakdown in
 1. **Sandboxed pod** — `milestones/01-sandboxed-pod/`. All three agents run authenticated inside the
    pod with state surviving restart (SC-4), behind a seeded default-deny egress policy, on a
    hardened runtime with the mediator as the only path out. The sandbox works; it is not yet
-   proven, and R12.8 bars real work until Milestone 02.
+   proven, and R12.8 bars real work until Milestone 02. **Revised 2026-09-04:** R8.8's per-agent
+   workload identity is delivered in the strongest form each agent's HTTP client actually supports
+   (mTLS for Claude Code; a proxy credential or network-derived identity for Codex and Antigravity,
+   whose clients cannot present a certificate), and D6's precondition is enforced by restricting
+   Milestone 03's credential brokering to cryptographically bound identities only. That identity work
+   is now its own feature (01.6), taking the milestone to **six features — one over DD-1's ceiling,
+   recorded as a deliberate deviation** in the milestone README's Sizing section.
 2. **Proven and composable** — `milestones/02-proven-and-composable/`. Adversarial validation passes
    (SC-1, SC-2, SC-3), the remaining tool packs compose without hand-editing policy (SC-6), and
    audit and reproducibility land (SC-7, SC-8). **Unlocks real work without AWS** — SC-5 is not in

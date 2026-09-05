@@ -1,5 +1,5 @@
 # Milestone 01: Sandboxed Pod
-# Status: [ ] pending  5 features, 0 complete
+# Status: [~] in progress  6 features, 2 complete
 
 ## Features
 
@@ -16,9 +16,14 @@
     disabled by default, D14 amendment needed; Deviation 3: egress-net not a live Docker
     resource until 01.3 attaches a service to it). Consider /design refresh to consolidate.
 
-[~] Feature 01.3: Egress mediator
-    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/egress-mediator.md
-    Sub-features: 0/8 complete
+[ ] Feature 01.3: Egress mediator
+    Plan: (not yet planned)
+    Notes: Reset 2026-09-04 by /milestone revision. R8.8's identity mechanism is no longer
+    uniform mTLS -- 01.1 SF-2 found codex cannot reach a TLS proxy listener at all and agy has
+    no client certificate to present. Client authentication split out to Feature 01.6; 01.3
+    keeps controls, DNS, audit and the per-agent listener surface on network-derived identity.
+    Prior Gate 4 plan remains on disk at plans/egress-mediator.md; /plan-feature enters re-plan
+    mode against it. See docs/records/r8-8-identity-mechanism-gap-escalation.md.
 
 [~] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
@@ -27,3 +32,9 @@
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
     Sub-features: 0/7 complete
+
+[ ] Feature 01.6: Per-agent workload identity
+    Plan: (not yet planned)
+    Notes: Created 2026-09-04 by /milestone revision -- split out of 01.3. Closes R8.8 with the
+    strongest identity form each agent's client supports; carries T34 and the Milestone 03
+    brokering gate. Ordered after 01.3; may land before or after 01.4 and 01.5.
