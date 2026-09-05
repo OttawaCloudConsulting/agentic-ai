@@ -9,6 +9,40 @@ throwaway operator-supplied credentials (`references/.env_keys`, git-ignored). E
 was cross-validated against a second, independent source per D17 (agent verbose logging, or static
 review of installer source for `agy`'s update-check host).
 
+## Correction — first-pass capture was not at the SF-2 pins
+
+The first capture pass used `sbx run claude`/`sbx run codex` unmodified. Both of `sbx`'s first-party
+templates (`docker/sandbox-templates:claude-code-docker`, `codex-docker`) bundle their **own**
+agent version, independent of whatever version the operator's own host or Dockerfiles pin —
+`claude --version` reported `2.1.246` and `codex --version` reported `0.149.1` inside the unmodified
+sandboxes, against SF-2's pins of `2.1.260` and `0.152.1`. This was caught (not by this record's
+first draft) before being reported as complete, and fixed by re-pinning **in place** before
+re-running the capture:
+
+- **claude**: the template's native installer supports exact-version pinning directly —
+  `claude install 2.1.260` (downloads via `downloads.claude.ai`, already one of the six hosts the
+  template's own kit bypasses regardless of policy — see below — so no temporary policy change was
+  needed for this step).
+- **codex**: no in-template pinning mechanism; reinstalled via `npm install -g
+  @openai/codex@0.152.1`, which required a temporary per-sandbox allow for `registry.npmjs.org`
+  (added, used, then removed before the discovery task ran, so it does not appear in the task-time
+  capture below).
+
+**The re-capture at the correct pins reproduced the first pass's results exactly** — identical
+hosts, identical or near-identical request counts, for both agents. This is genuine signal: the
+observed egress surface is stable across these two nearby versions, not an artifact of running the
+wrong one. It also means the version mismatch does **not** explain claude's non-reproduction of
+SF-2's incidental `datadoghq.com` sighting (see below) — that discrepancy remains open under the
+"event-triggered, not every invocation" theory, now with the version-drift alternative ruled out
+rather than merely unconsidered.
+
+This is flagged here as a correction, not as an Architectural Deviation under D-11/D-12 — the
+implementation did not choose a different approach than the plan specified; it executed the
+specified approach against the wrong artifact (a template's bundled version) and corrected the
+mistake before the sub-feature was reported complete, per this project's own "reality is the
+arbiter" verification discipline. All data in this record and in `policy/allowlist.base.yaml`
+reflects the corrected, pin-accurate captures.
+
 ## Method note — `sbx` was not installed; naming and access notes
 
 `sbx` was not present on the host at SF-3 start (no binary, no `docker sandbox`/`docker sandboxes`
@@ -96,23 +130,26 @@ and none of the three completed it (each is blocked from reaching its model API 
 degrees) — consistent with SF-2's framing that the criterion is that each result is recorded, not
 that each passes.
 
-### claude 2.1.260 (SF-2 pin)
+### claude 2.1.260 (SF-2 pin, verified via `claude install 2.1.260` before this capture — see Correction above)
 
 | Host | Port | Requests | Sources | Notes |
 |---|---|---|---|---|
-| `api.anthropic.com` | 443 | 33 | sbx policy log only | Kit-bypassed (see above); real, repeated traffic confirms use, not sufficiency |
+| `api.anthropic.com` | 443 | 11 (33 in the pre-correction run at 2.1.246) | sbx policy log only | Kit-bypassed (see above); real, repeated traffic confirms use, not sufficiency |
 
-No other host reached the proxy. Notably, **no telemetry/analytics host was observed** in this run
-— SF-2's earlier probe incidentally saw an attempt at `http-intake.logs.us5.datadoghq.com` during a
-single authenticated prompt. This run did not reproduce that. Left as an open discrepancy: possibly
-event-triggered (session-start only, not every `-p` invocation) rather than absent. Not included in
-the allowlist on the strength of one non-reproduction; flagged for the next validation pass.
+No other host reached the proxy, in either the 2.1.246 or the corrected 2.1.260 run. Notably, **no
+telemetry/analytics host was observed** in either run — SF-2's earlier probe incidentally saw an
+attempt at `http-intake.logs.us5.datadoghq.com` during a single authenticated prompt. Reproducing
+this discrepancy at the exact SF-2 pin rules out version drift as the explanation: it is not that
+2.1.246 lacked telemetry that 2.1.260 has. Left as an open discrepancy, now narrowed to
+event-triggered behaviour (session-start only, not every `-p` invocation) or an environmental
+difference between SF-2's Go-fixture probe and this run's `sbx` sandbox. Not included in the
+allowlist on the strength of a non-reproduction; flagged for the next validation pass.
 
-The task did not complete in this run (repeated internal retries with no error surfaced after ~5
-minutes; killed rather than diagnosed further, since the egress signal — the only thing SF-3 owns
-— had already stopped changing after the first ~30 seconds).
+The task did not complete in either run (repeated internal retries with no error surfaced after
+~30-45 seconds; killed rather than diagnosed further, since the egress signal — the only thing SF-3
+owns — had already stopped changing well before that).
 
-### codex 0.152.1 (SF-2 pin)
+### codex 0.152.1 (SF-2 pin, verified via `npm install -g @openai/codex@0.152.1` before this capture — see Correction above)
 
 | Host | Port | Requests | Sources | Notes |
 |---|---|---|---|---|
@@ -187,6 +224,18 @@ this capture method entirely and would surface later as a novel failure.
 
 - `.build-scratch/sf3/synthetic-repo/` — the synthetic repository (git-ignored via
   `.build-scratch/`)
-- Three `sbx` sandboxes (`sf3-agy-probe`, `sf3-claude-capture`, `sf3-codex-capture`) and their
+- Five `sbx` sandboxes across the two capture passes (`sf3-agy-probe`, `sf3-claude-capture`,
+  `sf3-codex-capture`, then `sf3-claude-repin`, `sf3-codex-repin` for the corrected pass) and their
   scoped secrets — created, captured, then removed (`sbx rm --force`, `sbx secret rm -f`) at the
-  end of this discovery run, per D17's synthetic-repo/throwaway-credential constraint
+  end of each pass, per D17's synthetic-repo/throwaway-credential constraint
+- Two local Docker images (`sf3-claude-pinned:local`, `sf3-codex-pinned:local`) built as a first
+  attempt at a custom `sbx --template` for exact-pin capture; abandoned (`sbx` pulls templates from
+  a registry, not the local Docker image store — `403 Forbidden`) in favour of reinstalling the
+  pinned version inside the first-party template instead. Removed (`docker rmi`)
+
+## Operator note — host state left changed by this discovery run
+
+`sbx policy init deny-all` was set as the **global** default and left in place — it is the safer
+default for a host that will keep running sandbox discovery work, but it is a persistent change to
+`sbx`'s behavior for *any* future sandbox on this host, not scoped to this discovery run. Reset with
+`sbx policy init balanced` (or `allow-all`) if that is not the desired steady state.
