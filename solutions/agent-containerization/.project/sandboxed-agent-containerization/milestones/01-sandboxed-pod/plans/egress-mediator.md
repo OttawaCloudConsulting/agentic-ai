@@ -458,7 +458,7 @@ revision — so this is a renumber, not a migration.
   client certificate, `codex` reaches no TLS listener at all, `agy` reaches the handshake with
   nothing to present.
 
-- [ ] **SF-2: Resolved-policy contract and degenerate compiler** — The resolved-policy schema
+- [x] **SF-2: Resolved-policy contract and degenerate compiler** — The resolved-policy schema
   (Interface Contract 1), `scripts/compile-policy.sh` in its zero-pack form, the committed
   `policy/resolved/default.yaml`, the schema validator the mediator's stage-1 self-check calls, and
   the `deny_fqdns` addition to `policy/denylist.base.yaml` closing the R5.1 gap. Also adds the
