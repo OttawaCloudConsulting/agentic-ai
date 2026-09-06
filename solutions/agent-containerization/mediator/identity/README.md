@@ -81,6 +81,10 @@ first; **01.6 inherits it, does not define a second one, and does not create a s
 **Validity.** CA 730 days. Listener certificates 365 days. Bounded, and short enough that renewal
 is a routine the operator has performed before it is needed.
 
+**Bring-up order.** Issuance comes before `docker compose up`: the Compose `secrets:` entries have
+`file:` sources pointing into this directory, so the project fails to start if the certificates do
+not exist yet.
+
 **Issuance.**
 
 ```bash

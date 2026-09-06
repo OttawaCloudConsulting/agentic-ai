@@ -185,11 +185,34 @@ verify_listener() {
   openssl verify -CAfile "$CA_CRT" "$crt" >/dev/null 2>&1 \
     || fail "$crt does not verify against $CA_CRT"
 
-  openssl x509 -in "$crt" -noout -text | grep -q "IP Address:${ip}\b" \
-    || fail "$crt carries no iPAddress SAN for $ip -- the agent's proxy URL is an IP literal and would fail verification"
+  # The SAN and EKU checks read `x509 -text` rather than `x509 -ext`: LibreSSL (which is
+  # /usr/bin/openssl on macOS) has no -ext, and it fails silently enough that the check would
+  # report a missing extension that is in fact present.
+  local san eku
+  san="$(cert_extension_value "$crt" "X509v3 Subject Alternative Name")"
+  eku="$(cert_extension_value "$crt" "X509v3 Extended Key Usage")"
 
-  openssl x509 -in "$crt" -noout -ext extendedKeyUsage 2>/dev/null | grep -q "TLS Web Server Authentication" \
+  printf '%s' "$san" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -qxF "IP Address:$ip" \
+    || fail "$crt carries no iPAddress SAN for $ip (SAN: ${san:-none}) -- the agent's proxy URL is an IP literal and would fail verification"
+
+  printf '%s' "$eku" | grep -qF "TLS Web Server Authentication" \
     || fail "$crt is missing serverAuth extended key usage"
+
+  # Strongest available form of the same assertion: the TLS stack's own IP matcher. Present in
+  # OpenSSL >= 1.1.0, absent in LibreSSL, so it is a bonus check and not the one relied on.
+  if openssl verify -help 2>&1 | grep -qF -- "-verify_ip"; then
+    openssl verify -CAfile "$CA_CRT" -verify_ip "$ip" "$crt" >/dev/null 2>&1 \
+      || fail "$crt does not satisfy the TLS stack's IP match for $ip"
+  fi
+}
+
+# Print one X.509 extension's value, portably. `openssl x509 -ext` does not exist in LibreSSL.
+cert_extension_value() {
+  local crt="$1" name="$2"
+  openssl x509 -in "$crt" -noout -text | awk -v want="$name" '
+    index($0, want) && index($0, ":") { found = 1; next }
+    found { sub(/^ +/, ""); sub(/ +$/, ""); print; exit }
+  '
 }
 
 renew_listener() {
@@ -225,9 +248,17 @@ status() {
     if [[ -f "$crt" ]]; then
       echo "listener $agent: $crt"
       echo "     subject: $(openssl x509 -in "$crt" -noout -subject | sed 's/^subject= *//')"
-      echo "     SAN:     $(openssl x509 -in "$crt" -noout -ext subjectAltName 2>/dev/null | tail -n1 | sed 's/^ *//')"
+      echo "     SAN:     $(cert_extension_value "$crt" "X509v3 Subject Alternative Name")"
       echo "     expires: $(openssl x509 -in "$crt" -noout -enddate | sed 's/^notAfter=//')"
       [[ -f "$ipfile" ]] && echo "     issued against: $(cat "$ipfile")"
+      # A certificate left over from a previous CA still looks well-formed. Mounting one gives the
+      # mediator a certificate the agents' trust anchor cannot chain, which presents as a handshake
+      # failure at the agent rather than as anything naming the real cause.
+      if openssl verify -CAfile "$CA_CRT" "$crt" >/dev/null 2>&1; then
+        echo "     chains to the current CA: yes"
+      else
+        echo "     chains to the current CA: NO -- re-issue it: bash scripts/issue-identity.sh $agent"
+      fi
     else
       echo "listener $agent: none"
     fi
