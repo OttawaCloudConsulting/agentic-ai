@@ -60,6 +60,47 @@ A denylist alone cannot deliver a minimal blast radius. An agent that is comprom
 
 The recommendation is therefore: **default-deny allowlist as the primary control, with the denylist layered on top** as an independent second control for known-bad indicators, RFC1918 and link-local ranges, and the cloud metadata endpoint. All three options support both, with deny taking precedence over allow. Requirement 5 is met — it is just not the only control.
 
+## Bring-Up
+
+Two things must happen before `docker compose up`, and both are ordering, not preference.
+
+**1. Issue the proxy-hop trust material.** The Compose `secrets:` have `file:` sources pointing
+into `mediator/identity/`, which is generated and git-ignored — the project fails to start if the
+certificates do not exist. The listener certificates carry an `iPAddress` SAN for the mediator's
+static address on that agent's network, so the addresses below must match `compose/compose.yaml`'s
+`ipam` blocks. See `mediator/identity/README.md` for the lifecycle, renewal and revocation paths.
+
+```bash
+bash scripts/issue-identity.sh ca
+bash scripts/issue-identity.sh listener claude --ip 172.31.10.2
+bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2
+bash scripts/issue-identity.sh status
+```
+
+`codex` gets no certificate: it rejects an `https://`-scheme proxy URL at parse time and its hop is
+plain HTTP CONNECT (`docs/records/agent-verification.md`).
+
+**2. Bring the pod up with the profile override layered on.**
+
+```bash
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up -d
+```
+
+### The project mount must not be this solution tree
+
+**This is a security property, not a style note.** The default profile binds a dedicated,
+git-ignored `workspace/` directory at `/workspace`, and a real profile should bind the operator's
+own project directory. It must not bind this checkout.
+
+This tree holds the control plane — `policy/`, `mediator/config/`, `mediator/identity/` — and the
+project mount is read-write. An agent that could write to it could rewrite `allowlist.base.yaml` or
+the mediator's configuration templates, and the next `docker compose build` would compile
+agent-authored policy into the enforcement point. The running mediator is not exposed to this: it
+reads its policy from its own image layer and its Compose secrets, never from a path any agent can
+write. The exposure is the *next build*, which is why the fix is the default binding rather than a
+warning, and why the acceptance harness asserts no agent's mount set contains a control-plane path.
+
 ## What Now Exists, and What's Still Out of Scope
 
 `prd.md` and `progress.txt` exist at this directory's root. The architecture document exists at
@@ -69,7 +110,10 @@ document's own file tree) stated; the path discrepancy itself is recorded as a f
 `/project`, not fixed here. Dockerfiles (`images/`) and Compose files (`compose/`) exist as of
 Feature 01.2. Still not produced:
 
-- Firewall/egress-mediator scripts and the compiled egress policy — Feature 01.3
+- The egress mediator's policy engine, pod resolver and audit writer — Feature 01.3, in progress.
+  The mediator image, its place in the Compose topology and the per-agent proxy environment exist
+  (SF-4); the three agent-facing listeners, the closed DNS forwarder and the audit sink's contents
+  do not yet — the container comes up on a holding configuration that refuses everything.
 - Tool-pack manifests and the policy compiler — Feature 01.5
 - AWS access (R6) — Milestone 03
 

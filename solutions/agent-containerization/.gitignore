@@ -10,3 +10,18 @@ references/.env_keys
 
 # SF-2 fixture scratch (throwaway PKI, proxy logs, agent workspaces)
 .build-scratch/
+
+# Generated trust material (01.3 SF-3). mediator/identity/ carries its own
+# deny-all .gitignore; this is the second line of defence, so a private key
+# cannot be committed by someone working from the repository root who has not
+# read that file.
+mediator/identity/ca/
+mediator/identity/listeners/
+*.key
+*.pem
+
+# The default profile's project mount (01.3 SF-4). The directory is committed
+# via its .gitkeep so Docker does not auto-create it root-owned; its contents
+# are the operator's scratch work and are never this repository's.
+workspace/*
+!workspace/.gitkeep

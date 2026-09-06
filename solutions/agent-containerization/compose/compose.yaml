@@ -5,15 +5,32 @@ name: sandboxed-agent-pod
 # compose/overrides/<profile>.yaml, layered on with -f at invocation time.
 
 networks:
+  # `ipam` with an explicit subnet, and a static mediator address on each agent
+  # network, are load-bearing rather than tidy (01.3 criterion 4): Compose `dns:`
+  # takes an ADDRESS, not a service name, and each TLS listener certificate carries
+  # an iPAddress SAN for exactly the address below. Change one of these and the
+  # matching certificate must be re-issued against the new address
+  # (`bash scripts/issue-identity.sh listener <agent> --ip <addr>`).
   claude-net:
     internal: true
+    ipam:
+      config:
+        - subnet: 172.31.10.0/24
   codex-net:
     internal: true
+    ipam:
+      config:
+        - subnet: 172.31.20.0/24
   agy-net:
     internal: true
+    ipam:
+      config:
+        - subnet: 172.31.30.0/24
   # Compose-managed bridge, internal:false (NOT Compose `external:`). No agent
-  # container attaches to this network in 01.2 -- the mediator (01.3) is the
-  # first and only member besides itself.
+  # container attaches to this network -- the mediator is its only member, which
+  # is what makes the mediator the pod's single route out (R1.2, D1). 01.2 recorded
+  # this network as declared-but-not-live (Deviation 3); attaching the mediator here
+  # is what makes it a real Docker resource, and closes that deviation.
   egress-net:
     internal: false
 
@@ -21,6 +38,37 @@ volumes:
   claude-state:
   codex-state:
   agy-state:
+  # The audit sink (R9.2, D12). Mounted into the mediator alone -- no agent service
+  # references it, which the acceptance harness asserts by enumeration rather than
+  # by inspection of this file.
+  audit:
+
+# Proxy-hop trust material (01.3 SF-3, Interface Contract 3). `file:` sources are
+# the runtime-injection mechanism available on Docker Desktop; nothing here is baked
+# into an image layer (R8.1, criterion 9).
+#
+# The CA PRIVATE key is deliberately absent and must stay absent: issuance is an
+# offline operator script and the key never leaves the operator host, so a mediator
+# compromise cannot mint agent identities. See mediator/identity/README.md.
+#
+# These files do not exist in a fresh checkout -- they are generated, and git-ignored.
+# `docker compose up` fails on a missing `file:` source, which is the bring-up order
+# surfacing rather than a fault:
+#
+#   bash scripts/issue-identity.sh ca
+#   bash scripts/issue-identity.sh listener claude --ip 172.31.10.2
+#   bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2
+secrets:
+  mediator-ca.crt:
+    file: ../mediator/identity/ca/mediator-ca.crt
+  claude-listener.crt:
+    file: ../mediator/identity/listeners/claude-listener.crt
+  claude-listener.key:
+    file: ../mediator/identity/listeners/claude-listener.key
+  agy-listener.crt:
+    file: ../mediator/identity/listeners/agy-listener.crt
+  agy-listener.key:
+    file: ../mediator/identity/listeners/agy-listener.key
 
 x-hardened: &hardened
   user: "1000:1000"
@@ -34,6 +82,67 @@ x-hardened: &hardened
     - /run:rw,noexec,nosuid,size=16m
 
 services:
+  # The single enforcement point (R1.2, D1): the only container on more than one
+  # network and the only one with a route off the host. Same D15 baseline as the
+  # agents, at a different uid -- 13:13 is the `proxy` user the Squid package ships
+  # and the owner of its packaged paths.
+  egress-mediator:
+    build:
+      # Solution root, not ../images: the image carries policy/resolved/ and (from
+      # SF-5/SF-6) mediator/config/. `.dockerignore` at that root is deny-all plus
+      # an allowlist, so references/.env_keys and the CA private key under
+      # mediator/identity/ never reach the daemon.
+      context: ..
+      dockerfile: images/mediator/Dockerfile
+      args:
+        MEDIATOR_BASE_DIGEST: ${MEDIATOR_BASE_DIGEST}
+        SQUID_VERSION: ${SQUID_VERSION}
+        UNBOUND_VERSION: ${UNBOUND_VERSION}
+    image: sandboxed-agent/mediator:local
+    user: "13:13"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    # `uid`/`gid` on the /run tmpfs, and they are not decoration: a tmpfs mount
+    # arrives root-owned mode 0755, so a container running as uid 13 with
+    # `cap_drop: ALL` cannot create the runtime directories it needs there.
+    # Owning the mount is narrower than making it world-writable.
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=13,gid=13,mode=0700
+      - /run:rw,nosuid,size=16m,uid=13,gid=13,mode=0750
+    # Binding :53 with no capabilities requires the unprivileged-port floor to be
+    # lowered. This is the namespaced sysctl, preferred over `cap_add:
+    # NET_BIND_SERVICE` precisely so `cap_drop: ALL` survives intact -- the recorded
+    # fallback if Docker Desktop's VM refuses it is that single capability, which is
+    # still narrower than running the resolver as root. Verified, not assumed:
+    # docs/records/mediator-runtime-verification.md.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+      # Criterion 3 asserts the mediator is not a router. Verified, and the default
+      # is NOT what the plan assumed: a fresh container on this Docker Desktop
+      # inherits `ip_forward=1`, so the container that holds an interface on both an
+      # agent network and the external one was one routing table entry away from
+      # being a bypass. Set explicitly rather than asserted from the namespace default.
+      net.ipv4.ip_forward: "0"
+    networks:
+      claude-net:
+        ipv4_address: 172.31.10.2
+      codex-net:
+        ipv4_address: 172.31.20.2
+      agy-net:
+        ipv4_address: 172.31.30.2
+      egress-net:
+    volumes:
+      - audit:/var/log/mediator
+    secrets:
+      - mediator-ca.crt
+      - claude-listener.crt
+      - claude-listener.key
+      - agy-listener.crt
+      - agy-listener.key
+
   claude:
     <<: *hardened
     build:
@@ -46,6 +155,28 @@ services:
     image: sandboxed-agent/claude:local
     networks:
       - claude-net
+    # Replaces Docker's embedded resolver upstreams with the mediator (R5.4, D3).
+    # `internal: true` withholds the default route but leaves 127.0.0.11 forwarding
+    # to the daemon's own upstreams -- a path out that does not traverse the
+    # container's routing table, and therefore a DNS exfiltration channel the
+    # network mode does not close.
+    dns:
+      - 172.31.10.2
+    environment:
+      # https:// -- claude reaches a TLS proxy hop (Interface Contract 2). Both
+      # cases are set: the three agents' HTTP clients do not agree on which they read.
+      HTTPS_PROXY: https://172.31.10.2:3128
+      https_proxy: https://172.31.10.2:3128
+      HTTP_PROXY: https://172.31.10.2:3128
+      http_proxy: https://172.31.10.2:3128
+      NO_PROXY: localhost,127.0.0.1
+      no_proxy: localhost,127.0.0.1
+      # Anchors the PROXY HOP only (R5.12). No mediator CA appears in any
+      # destination chain -- destination TLS is spliced, never terminated
+      # (REQUIREMENTS.md T28 as amended by SF-3).
+      NODE_EXTRA_CA_CERTS: /run/secrets/mediator-ca.crt
+    secrets:
+      - mediator-ca.crt
     volumes:
       - claude-state:/home/agent
 
@@ -61,6 +192,21 @@ services:
     image: sandboxed-agent/codex:local
     networks:
       - codex-net
+    dns:
+      - 172.31.20.2
+    environment:
+      # http:// -- and this asymmetry is a finding, not a preference: 01.1 SF-2
+      # established that codex rejects an `https://`-scheme proxy URL at URL-parse
+      # time, before any handshake. Its hop is plain HTTP CONNECT.
+      HTTPS_PROXY: http://172.31.20.2:3128
+      https_proxy: http://172.31.20.2:3128
+      HTTP_PROXY: http://172.31.20.2:3128
+      http_proxy: http://172.31.20.2:3128
+      NO_PROXY: localhost,127.0.0.1
+      no_proxy: localhost,127.0.0.1
+    # No CA secret and no trust variable: codex opens no TLS to the mediator, so
+    # there is no mediator certificate for it to validate. Its DESTINATION TLS is
+    # unaffected and uses its own trust store.
     volumes:
       - codex-state:/home/agent
 
@@ -77,5 +223,18 @@ services:
     image: sandboxed-agent/agy:local
     networks:
       - agy-net
+    dns:
+      - 172.31.30.2
+    environment:
+      HTTPS_PROXY: https://172.31.30.2:3128
+      https_proxy: https://172.31.30.2:3128
+      HTTP_PROXY: https://172.31.30.2:3128
+      http_proxy: https://172.31.30.2:3128
+      NO_PROXY: localhost,127.0.0.1
+      no_proxy: localhost,127.0.0.1
+      # agy's mechanism is SSL_CERT_FILE, not NODE_EXTRA_CA_CERTS (01.1 SF-2).
+      SSL_CERT_FILE: /run/secrets/mediator-ca.crt
+    secrets:
+      - mediator-ca.crt
     volumes:
       - agy-state:/home/agent

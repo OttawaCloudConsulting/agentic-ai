@@ -646,3 +646,9 @@ invoked as `bash script.sh`.
   "01.2/01.3 seam is clean" claim still holds in spirit — the YAML contract doesn't change between
   the two features — just not via a pre-existing runtime resource. No other consumer assumes
   `egress-net` exists as a running resource before 01.3.
+- **Closed 2026-09-06 by 01.3 SF-4.** The `egress-mediator` service now attaches to `egress-net`,
+  so Compose creates it: observed at `172.18.0.2` on a live bring-up, with the mediator on all four
+  networks and no agent on this one. `tests/acceptance/verify-pod-topology.sh` keeps the static
+  `internal: false` assertion and adds a resolved-config assertion that the mediator's network set
+  is exactly the four, so the deviation cannot silently reopen. The prediction in **Impact** held:
+  `compose.yaml`'s `egress-net` declaration was not changed by 01.3.

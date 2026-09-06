@@ -52,9 +52,52 @@ check_sandbox_record() {
                   || fail "sandbox record carries a verdict for all three agents"
 }
 
+# The Compose project's secrets have `file:` sources pointing into
+# mediator/identity/, which is generated and git-ignored (01.3 SF-3). Every
+# compose invocation below fails on a missing source, and the daemon's error names
+# a path rather than the step that was skipped -- so check it here and say so.
+check_trust_material() {
+  local missing=()
+  for f in mediator/identity/ca/mediator-ca.crt \
+           mediator/identity/listeners/claude-listener.crt \
+           mediator/identity/listeners/claude-listener.key \
+           mediator/identity/listeners/agy-listener.crt \
+           mediator/identity/listeners/agy-listener.key; do
+    [ -f "$f" ] || missing+=("$f")
+  done
+  if [ "${#missing[@]}" -eq 0 ]; then
+    pass "proxy-hop trust material present"
+    return 0
+  fi
+  echo "FAIL: proxy-hop trust material is missing:"
+  printf '  %s\n' "${missing[@]}"
+  echo "  Issue it first (see mediator/identity/README.md):"
+  echo "    bash scripts/issue-identity.sh ca"
+  echo "    bash scripts/issue-identity.sh listener claude --ip 172.31.10.2"
+  echo "    bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2"
+  exit 1
+}
+
+# The mediator's pins are asserted against docs/records/mediator-selection.md the
+# same way the agents' are asserted against agent-verification.md: SF-1 verified
+# P1-P8 against exactly this Squid build and this base image, and both supersede in
+# place upstream. UNBOUND_VERSION is deliberately not asserted -- SF-1's properties
+# are the proxy's, and the record makes no claim about the resolver.
+check_mediator_pin_agreement() {
+  local record="docs/records/mediator-selection.md"
+  local ok=1
+  for v in "$SQUID_VERSION" "$MEDIATOR_BASE_DIGEST"; do
+    grep -qF -- "$v" "$record" || { echo "  missing from $record: $v"; ok=0; }
+  done
+  [ "$ok" -eq 1 ] && pass "mediator pin agreement (pins.env vs $record)" \
+                  || fail "mediator pin agreement (pins.env vs $record)"
+}
+
 # shellcheck disable=SC1091
 set -a; source compose/pins.env; set +a
+check_trust_material
 check_pin_agreement
+check_mediator_pin_agreement
 check_sandbox_record
 
 # ---------------------------------------------------------------------------
@@ -162,12 +205,66 @@ for agent in "${AGENTS[@]}"; do
     pass "$agent: no NET_ADMIN/NET_RAW granted"
   fi
 
-  # Check 4 (criterion 4): mount set equals exactly {state volume, workspace bind}
+  # Check 4 (criterion 4): mount set equals exactly the set this agent should have.
+  # No longer one shared constant -- 01.3 SF-4 mounts the mediator CA into `claude`
+  # and `agy` as a Compose secret, and deliberately NOT into `codex`, which opens no
+  # TLS to the mediator and has nothing to validate. A single expected set would now
+  # fail on all three: on two for missing the secret, on codex for having it.
+  # 01.6 extends this again when per-agent client certificates land.
+  case "$agent" in
+    claude|agy) expected_mounts="/home/agent,/run/secrets/mediator-ca.crt,/workspace" ;;
+    codex)      expected_mounts="/home/agent,/workspace" ;;
+  esac
   mount_set="$(echo "$inspect" | jq -r '[.[0].Mounts[] | .Destination] | sort | join(",")')"
-  if [ "$mount_set" = "/home/agent,/workspace" ]; then
-    pass "$agent: mount set equals exactly {/home/agent, /workspace}"
+  if [ "$mount_set" = "$expected_mounts" ]; then
+    pass "$agent: mount set equals exactly {$expected_mounts}"
   else
-    fail "$agent: mount set is {$mount_set}, expected {/home/agent,/workspace}"
+    fail "$agent: mount set is {$mount_set}, expected {$expected_mounts}"
+  fi
+
+  # Check 4b (01.3 Interface Contract 2): the proxy hop's scheme is per agent, and
+  # the asymmetry is a finding rather than a preference -- 01.1 SF-2 established
+  # that codex rejects an `https://`-scheme proxy URL at URL-parse time. A uniform
+  # scheme here would take codex's route away silently, so it is asserted.
+  case "$agent" in
+    claude) expected_proxy="https://172.31.10.2:3128"; expected_dns="172.31.10.2"; expected_trust="NODE_EXTRA_CA_CERTS=/run/secrets/mediator-ca.crt" ;;
+    codex)  expected_proxy="http://172.31.20.2:3128";  expected_dns="172.31.20.2"; expected_trust="" ;;
+    agy)    expected_proxy="https://172.31.30.2:3128"; expected_dns="172.31.30.2"; expected_trust="SSL_CERT_FILE=/run/secrets/mediator-ca.crt" ;;
+  esac
+  env_ok=1
+  for var in HTTPS_PROXY https_proxy HTTP_PROXY http_proxy; do
+    got="$(docker exec "$cid" printenv "$var" 2>/dev/null || true)"
+    [ "$got" = "$expected_proxy" ] || { echo "  $var=$got, expected $expected_proxy"; env_ok=0; }
+  done
+  for var in NO_PROXY no_proxy; do
+    got="$(docker exec "$cid" printenv "$var" 2>/dev/null || true)"
+    [ "$got" = "localhost,127.0.0.1" ] || { echo "  $var=$got, expected localhost,127.0.0.1"; env_ok=0; }
+  done
+  if [ -n "$expected_trust" ]; then
+    var="${expected_trust%%=*}"; want="${expected_trust#*=}"
+    got="$(docker exec "$cid" printenv "$var" 2>/dev/null || true)"
+    [ "$got" = "$want" ] || { echo "  $var=$got, expected $want"; env_ok=0; }
+  else
+    # codex must have NEITHER trust variable: it has no TLS hop to anchor, and a
+    # CA it cannot use is a mount it should not have.
+    for var in NODE_EXTRA_CA_CERTS SSL_CERT_FILE CODEX_CA_CERTIFICATE; do
+      got="$(docker exec "$cid" printenv "$var" 2>/dev/null || true)"
+      [ -z "$got" ] || { echo "  codex carries $var=$got; it has no TLS hop to the mediator"; env_ok=0; }
+    done
+  fi
+  [ "$env_ok" -eq 1 ] && pass "$agent: proxy env matches Interface Contract 2 ($expected_proxy)" \
+                      || fail "$agent: proxy env does not match Interface Contract 2"
+
+  # Check 4c (R5.4, D3): the embedded resolver's upstream is the mediator, not the
+  # daemon's. `internal: true` withholds the default route but leaves 127.0.0.11
+  # forwarding to the host's upstreams -- a path out that does not traverse the
+  # container's routing table. Docker records the override in resolv.conf's
+  # ExtServers comment; the live capture that the redirect actually carries the
+  # query is docs/records/mediator-runtime-verification.md, and SF-8 re-runs it.
+  if docker exec "$cid" grep -qF "ExtServers: [$expected_dns]" /etc/resolv.conf; then
+    pass "$agent: embedded resolver forwards to the mediator ($expected_dns)"
+  else
+    fail "$agent: resolv.conf ExtServers is not [$expected_dns]"
   fi
 
   # Check 14/15: agent starts, reports its pinned version, offline, non-root, read-only
@@ -202,16 +299,22 @@ done
 [ "$DOCKER_SOCK_FOUND" -eq 0 ] && pass "no agent mounts the host Docker socket (all services)"
 
 # Check 3: egress-net is declared with internal:false, Compose-managed.
-# Not a live Docker resource in 01.2 -- Compose does not create a top-level
-# network no service references yet (verified: it is silently absent from
-# `docker compose config`'s resolved output, even without any override
-# layered on). It becomes real the moment 01.3 attaches the mediator
-# service to it. This is a static check on the source YAML, not a runtime
-# resource check. See Deviation 3.
+# 01.2 could only check this statically -- Compose does not create a top-level
+# network no service references, so egress-net was declared but never a live Docker
+# resource (01.2 Deviation 3). 01.3 SF-4 attaches the mediator to it, which closes
+# that deviation, so the static check is joined by the resolved-config check that
+# the mediator is on all four networks and no agent is on egress-net.
 if awk '/^  egress-net:/{f=1} f && /internal: false/{print; exit}' compose/compose.yaml | grep -q "internal: false"; then
   pass "egress-net declared in compose.yaml with internal:false"
 else
   fail "egress-net not declared with internal:false in compose.yaml"
+fi
+
+mediator_nets="$("${COMPOSE_A[@]}" config --format json | jq -r '.services["egress-mediator"].networks | keys | sort | join(",")')"
+if [ "$mediator_nets" = "agy-net,claude-net,codex-net,egress-net" ]; then
+  pass "egress-mediator attaches to all four networks (Deviation 3 closed)"
+else
+  fail "egress-mediator networks are {$mediator_nets}, expected all four"
 fi
 
 # ---------------------------------------------------------------------------

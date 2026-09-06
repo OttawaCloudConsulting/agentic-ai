@@ -1,0 +1,25 @@
+# Build context guard for the mediator image (01.3 SF-4).
+#
+# The mediator's build context is this solution root, not `images/`, because the
+# image must carry two things that live outside `images/`: the resolved policy
+# artifact (`policy/resolved/`, read from the image layer and never from a path an
+# agent can write) and the mediator's configuration templates (`mediator/config/`,
+# added by SF-5 and SF-6). A root context sends everything here to the daemon by
+# default -- including `references/.env_keys` (live credentials) and
+# `mediator/identity/ca/mediator-ca.key` (the CA private key that criterion 9 says
+# never enters an image layer or the mediator).
+#
+# So this is deny-all plus an explicit allowlist. A new path the image needs must be
+# added here deliberately; the failure mode is a build error, not a leaked secret.
+#
+# Note: `images/.dockerignore` governs the AGENT builds, whose context is `images/`.
+# A .dockerignore applies to the context root it sits in, so both files are needed.
+*
+
+!images/mediator
+!policy/resolved
+!mediator/config
+
+# Never, under any allowlist entry above.
+**/.DS_Store
+mediator/identity

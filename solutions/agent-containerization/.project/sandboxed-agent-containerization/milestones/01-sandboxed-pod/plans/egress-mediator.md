@@ -491,7 +491,7 @@ revision — so this is a renumber, not a migration.
   boundary is a sub-feature boundary and not a paragraph. Depends on SF-1 (P1 determines the listener
   certificate's required shape for 01.6's sake).
 
-- [ ] **SF-4: Mediator image, compose seam and hardened runtime** — `images/mediator/Dockerfile` and
+- [x] **SF-4: Mediator image, compose seam and hardened runtime** — `images/mediator/Dockerfile` and
   its entrypoint, the `egress-mediator` service on four networks, `ipam` subnets with a static
   mediator address per agent network, the `dns:` and **per-agent** `HTTPS_PROXY`/`HTTP_PROXY`/
   `NO_PROXY` additions to the three agent services (`https://` for `claude` and `agy`, `http://` for
