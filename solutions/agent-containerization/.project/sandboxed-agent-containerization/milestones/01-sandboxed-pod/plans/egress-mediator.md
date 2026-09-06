@@ -467,7 +467,7 @@ revision — so this is a renumber, not a migration.
   the resolved allowlist and records the exclusion and its reason in the artifact** (criterion 12,
   R10.3). Depends on 01.1 SF-3 for the base policy files and on 01.2 for the profile schema.
 
-- [ ] **SF-3: Proxy-hop trust anchors** — The offline CA and `scripts/issue-identity.sh` in its
+- [x] **SF-3: Proxy-hop trust anchors** — The offline CA and `scripts/issue-identity.sh` in its
   **CA-and-listener-certificate form**: create the CA on the operator host, issue one listener
   certificate for `claude-net` and one for `agy-net` (`codex-net` is plain HTTP and gets none), and
   document the lifecycle R8.8 will inherit — subject naming, validity bound, renewal path, revocation

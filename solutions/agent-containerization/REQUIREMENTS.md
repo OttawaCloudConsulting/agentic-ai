@@ -401,6 +401,17 @@ Explicitly out of scope. Listed so they are not silently assumed.
 
 Minimum verification set. Each test maps to a success criterion.
 
+**Amendment, 2026-09-06 (Feature 01.3 SF-3, Gate 4 criterion 5).** T28's pass criterion previously
+read *"No mediator CA is presented to any agent"*. Two of the three proxy hops are themselves TLS
+(`claude` and `agy` reach an `https://` listener; `codex` reaches a plain HTTP CONNECT listener),
+and a TLS hop requires those two agents to trust the listener's server certificate. The literal
+text and a TLS proxy hop are mutually exclusive, so the register carried a pass criterion no
+implementation could ever meet. T28 is now stated as the property it exists to protect — **no
+mediator CA in any destination TLS chain** — with the single proxy-hop trust anchor recorded as an
+explicit exception. The mediator still splices and holds no destination plaintext (D4, R5.15), and
+R5.13's bar on intercepting Antigravity traffic is untouched. **R8.8 is unchanged.** See
+`mediator/identity/README.md` for the anchor's scope and lifecycle.
+
 | Test | Method | Passes when | SC |
 |---|---|---|---|
 | T1 Host filesystem containment | Attempt to read paths outside declared mounts | All attempts fail | SC-1 |
@@ -444,7 +455,7 @@ these tests verify requirements that no success criterion reaches directly.
 | T25 Credential mount shape | Under `oauth-mount`: inspect the mount, then force an OAuth refresh | Mount is `:ro`, is a directory not a file, and the refreshed credential lands on the state volume with the host file unchanged | R4.13, R4.14, R4.15 |
 | T26 Long-lived token inventory and revocation | Enumerate persisted refresh tokens; execute the documented revocation for each type and time it | Every persisted token is inventoried with its compensating controls named; revocation succeeds within the stated maximum time | R4.16, R13.1 |
 | T27 `oauth-mount` risk recording | Enable `oauth-mount` in a profile that does not record the accepted-risk decision | The build or startup refuses until the decision is recorded with file, mount mode, revocation path and blast radius | R4.17 |
-| T28 TLS splice verification | Inspect the connection from inside each agent container; attempt to read plaintext at the mediator | No mediator CA is presented to any agent; the mediator holds no plaintext. Antigravity traffic is never intercepted | R5.15, R5.13 |
+| T28 TLS splice verification | Inspect the destination certificate chain from inside each agent container; attempt to read plaintext at the mediator; confirm no mediator CA appears in any destination chain | No mediator CA appears in any **destination** TLS chain; the mediator holds no plaintext; Antigravity traffic is never intercepted. **Recorded exception:** the single proxy-hop trust anchor -- `claude` and `agy` trust the mediator CA for the agent->mediator hop only (`NODE_EXTRA_CA_CERTS` / `SSL_CERT_FILE`); `codex` trusts no mediator CA at all | R5.15, R5.13 |
 | T29 MCP inventory and drift | Add an uninventoried MCP server; then change an inventoried server's capabilities | The uninventoried server is refused; the capability change is reported as drift, not silently accepted | R7.14 |
 | T30 MCP transport declaration | Inspect the inventory for every configured server | Each records its transport and names the enforcement point covering it — or explicitly states that none does | R7.15 |
 | T31 MCP install channel | Attempt `npx <server>` for a server not in the pinned registry | Refused. No wholesale package-registry egress entry permits arbitrary server installation | R7.16 |
