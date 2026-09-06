@@ -134,22 +134,39 @@ SQUID_PID=$!
 # is a pod whose DNS authority has silently gone, and a live resolver with a dead
 # proxy is an enforcement point that is no longer enforcing. Either exit takes the
 # container down so the restart policy and the operator both see it.
+SHUTTING_DOWN=0
 shutdown() {
   trap - TERM INT
   kill "$SQUID_PID" "$UNBOUND_PID" 2>/dev/null || true
   wait "$SQUID_PID" "$UNBOUND_PID" 2>/dev/null || true
   kill "$TAIL_AUDIT" "$TAIL_CACHE" 2>/dev/null || true
 }
-trap shutdown TERM INT
+# An asked-for stop (`docker stop`, `compose down`) is not an incident and must
+# exit 0. A daemon leaving on its own always is -- including when it leaves
+# cleanly, which is the case that would otherwise be invisible: unbound exits 0 on
+# SIGTERM, so a resolver killed inside the container would take the pod's DNS
+# authority away and report success to anything reading the container's exit code.
+on_signal() { SHUTTING_DOWN=1; shutdown; exit 0; }
+trap on_signal TERM INT
 
 note "up: squid $(squid -v 2>/dev/null | head -1 | sed 's/^Squid Cache: //'), unbound $(unbound -V 2>/dev/null | head -1) -- HOLDING configuration (SF-4)"
 
-wait -n "$SQUID_PID" "$UNBOUND_PID"
-STATUS=$?
+# `|| STATUS=$?` is load-bearing, not defensive: under `set -e` a bare `wait -n`
+# that returns non-zero exits the shell AT THIS LINE, skipping the diagnostic
+# below, the cleanup, and the controlled exit. The container would still go down
+# with the right status -- but silently, and the message naming WHICH daemon died
+# is the whole reason this supervisor exists. A dead resolver and a dead proxy are
+# different incidents and the operator has to be able to tell them apart.
+STATUS=0
+wait -n "$SQUID_PID" "$UNBOUND_PID" || STATUS=$?
 if ! kill -0 "$SQUID_PID" 2>/dev/null; then
-  note "squid exited (status $STATUS) -- taking the mediator down"
+  note "squid exited (status $STATUS) -- taking the mediator down; the pod has no enforcement point"
 else
   note "unbound exited (status $STATUS) -- taking the mediator down; the pod has no resolver"
 fi
 shutdown
+# Never 0 on this path. Neither daemon exiting is ever a normal outcome while the
+# mediator is up, and reporting success would hide the incident from the restart
+# policy and from anyone reading the exit code.
+[ "$STATUS" -eq 0 ] && STATUS=1
 exit "$STATUS"
