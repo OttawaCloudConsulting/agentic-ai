@@ -16,14 +16,17 @@
     disabled by default, D14 amendment needed; Deviation 3: egress-net not a live Docker
     resource until 01.3 attaches a service to it). Consider /design refresh to consolidate.
 
-[ ] Feature 01.3: Egress mediator
-    Plan: (not yet planned)
-    Notes: Reset 2026-09-04 by /milestone revision. R8.8's identity mechanism is no longer
-    uniform mTLS -- 01.1 SF-2 found codex cannot reach a TLS proxy listener at all and agy has
-    no client certificate to present. Client authentication split out to Feature 01.6; 01.3
-    keeps controls, DNS, audit and the per-agent listener surface on network-derived identity.
-    Prior Gate 4 plan remains on disk at plans/egress-mediator.md; /plan-feature enters re-plan
-    mode against it. See docs/records/r8-8-identity-mechanism-gap-escalation.md.
+[~] Feature 01.3: Egress mediator
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/egress-mediator.md
+    Sub-features: 0/8 complete
+    Notes: Re-planned 2026-09-05, Gate 4 re-approved (supersedes the 2026-09-04 approval, which the
+    /milestone revision invalidated). Identity, R8.8 and T34 moved to Feature 01.6; 01.3 keeps L7
+    controls, DNS, audit, the non-uniform listener surface (claude/agy https, codex plain http
+    CONNECT) and the proxy-hop trust anchors, on network-derived identity. T28 amendment stays 01.3's
+    and re-homed to SF-3. Codex adversarial pass: 8 findings, 6 fixed, 2 downgraded from blocking with
+    operator ratification. Two re-plans queued behind this: 01.1 (deny_fqdns contradiction, carried
+    from the prior gate) and 01.4 (stale against Interface Contract 2 -- CODEX_CA_CERTIFICATE, mTLS
+    client keys, SF-7a). See docs/records/r8-8-identity-mechanism-gap-escalation.md.
 
 [~] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md

@@ -1,0 +1,780 @@
+# Feature Plan: Pack composition, policy compiler and build pipeline
+
+**Milestone:** 01 - Sandboxed Pod
+**Feature:** 01.5: Pack composition, policy compiler and build pipeline
+**Status:** Planned
+**Date:** 2026-09-04
+
+## Summary
+
+This feature is the composition mechanism SC-6 and SC-8 are measured against. It defines the pack
+manifest schema (R7.3, R7.11), extends 01.3's degenerate zero-pack `scripts/compile-policy.sh` into
+a pack-composing compiler, relocates that compiler into a build stage of the mediator image so it
+is never an operator step (R7.4, D10), installs pack-declared OS packages at image build only with
+the package manager left uninvocable at runtime (R7.18, R7.19), adds the profile-side build-refusal
+gates (R4.17/T27, R2.8/T21, R2.10/T23, R12.7), and introduces this repository's first CI workflow —
+`.github/workflows/agent-sandbox-image.yml` at the repository root — which publishes the base image
+to GHCR with an SBOM for consumption by digest (D21, R10.2, R10.7). It is exercised with the
+`language-runtimes` reference pack, which by deliberate decision declares **no runtime egress**.
+
+## Acceptance Criteria
+
+Restated from the milestone README with implementation detail. The README wins where they differ.
+
+1. **Pack manifest schema.** `packs/<name>/pack.yaml` declares, at minimum: packages with pinned
+   versions and checksums; required egress FQDNs and CIDRs; required mounts and their modes;
+   required environment variables; required credentials; whether the pack needs write access; and
+   the pack's blast-radius contribution (R7.3, R7.11). A manifest missing any mandatory field fails
+   validation with the file and the failing field named.
+
+2. **The compiler composes and runs as a build stage.** `scripts/compile-policy.sh` composes the
+   resolved egress policy from `policy/allowlist.base.yaml` + `policy/denylist.base.yaml` +
+   `profiles/<profile>.yaml` + the profile's selected packs, and continues to emit exactly the
+   schema 01.3 Interface Contract 1 fixed — now with `compiled_from.packs` populated. It runs as a
+   build stage of the mediator image, not as an operator step (R7.4, D10). The output is a
+   committed, reviewable artifact under `policy/resolved/` (see Interface Contract 4 for how both
+   halves of R7.4 are satisfied at once).
+
+3. **No residue on pack removal.** Removing a pack from a profile removes its egress entries,
+   mounts, environment variables and credentials from the recomposed policy and from the rebuilt
+   images, with no residue (R7.5) — **T14**, exercised by loading and unloading `language-runtimes`.
+
+4. **The reference pack declares no runtime egress.** `language-runtimes` is build-time-only under
+   R7.18 and adds no package-registry entry to the resolved policy. A pack granting runtime registry
+   egress (`registry.npmjs.org`, PyPI, the Go proxy) would enable arbitrary `npx <server>` and break
+   **T31** on every profile loading it; R7.6 keeps runtime-install egress off by default and
+   explicitly declared where used. **Accepted consequence:** T14 here exercises OS-package and mount
+   composition only, and the *egress* half of the composition delta is re-exercised in 02.3 by
+   Terraform, the first pack carrying unique entries and needing no credential.
+
+5. **Packages are build-time only — every kind of package.** Pack OS packages are version-pinned,
+   checksummed, sourced from the snapshot repository the profile declares, and installed at image
+   build only. The agent process cannot invoke a package manager at runtime (R7.18, R7.19, D10) —
+   **T33** and **T15**. R7.19 says *packages*, not *OS packages*: the reference pack ships Node,
+   Python and Go, so the language-level installers are covered too, and the plan states which layer
+   refuses which attempt rather than claiming the filesystem controls cover all of them.
+
+6. **The profile carries R12.7's classification.** The profile schema carries the classification of
+   irreversible or high-impact actions, or an explicit recorded waiver. Shape is validated here;
+   verification of the gate itself (**T37**) belongs to 02.5.
+
+7. **`oauth-mount` without a recorded decision refuses to build.** A profile enabling `oauth-mount`
+   without an `accepted_risk` record naming the file, mount mode, revocation path and blast radius
+   refuses to build or start (R4.17) — **T27**. 01.4 enforces the same constraint at bootstrap
+   (`bootstrap-auth.sh` exit 3); this feature moves the refusal to build time where T27 requires it.
+
+8. **Optional mounts are default-off and enumerable.** Mounts beyond the project directory and the
+   per-agent state volumes are optional, disabled by default, and only those enumerated in R2 are
+   available to enable — forwarded sockets including `SSH_AUTH_SOCK` are not among them (R2.8) —
+   **T21**. A build cache, where enabled, is per-agent (R2.10) — **T23**.
+
+9. **CI builds and publishes the base image.** A GitHub Actions workflow at the repository root
+   builds the base image and publishes it to GHCR with its digest and SBOM; compose consumes it
+   **by digest, never by tag**; branch-built images are consumed by testing only (D21, R10.2,
+   R10.7). Provenance verification (**T45**) and the clean-rebuild proof (**T18**) belong to 02.4.
+
+## Approach
+
+### The composition model
+
+The compiler is a pure function of committed inputs:
+
+```text
+policy/allowlist.base.yaml  ─┐
+policy/denylist.base.yaml   ─┤
+profiles/<profile>.yaml     ─┼─→ compile-policy.sh ─→ policy/resolved/<profile>.yaml
+packs/<selected>/pack.yaml  ─┘                        (schema fixed by 01.3 IC1)
+```
+
+Three properties make it a *composition* rather than a merge, and each is enforced rather than
+assumed:
+
+- **Per-agent keying is preserved end to end.** 01.1 SF-3 keys the capture per agent precisely so
+  the compiler inherits a per-agent policy rather than a union (`01.1:98-100`). Pack entries are
+  applied to every agent the profile enables the pack for, and never flattened across agents.
+- **Deny wins, post-resolution.** `deny_cidrs` and `deny_fqdns` are copied to the resolved artifact
+  unmodified. No pack may remove or narrow a deny entry; a pack manifest containing a `deny_*` key
+  is a validation failure, not a merge.
+- **A pack cannot widen policy at runtime** (R7.4). Every pack-derived entry enters the artifact at
+  compile time and is baked into the mediator image layer. The running mediator reads policy only
+  from its own image layer and its Compose secrets (`01.3:581-582`).
+
+### Validation the compiler inherits from 01.3
+
+01.3 SF-2 already mandates three checks and states that they are enforced "where the composition
+happens" because this feature composes pack-supplied entries into the same fields
+(`01.3:606-612`, `:77-78`). They are extended, not reimplemented:
+
+- **Wildcard allowlist entries are rejected.** `*.anthropic.com` from a pack fails the build. The
+  allowlist schema is exact-`fqdn`; a pack is the only realistic way a wildcard could appear.
+- **Any allowlist entry whose port is not 443 is flagged.** One is a design question, not a config
+  detail — and a pack introducing one is exactly the case worth surfacing.
+- **`provisional:` propagates** from `allowlist.base.yaml` into the resolved artifact. A pack cannot
+  clear it.
+
+### The refusal gates
+
+Three build-time refusals, all in the compiler because that is the single point every profile
+passes through before an image exists:
+
+| Gate | Trigger | Requirement |
+|---|---|---|
+| `oauth-mount` accepted-risk | any agent at `AUTH_MODE=oauth-mount` without a complete `accepted_risk` record | R4.17, **T27** |
+| Mount-key allowlist | any `mounts.*` key not in the enumerated R2 set — fail closed, never ignore | R2.8, **T21** |
+| Runtime-install egress | a pack declaring `egress.runtime` without `runtime_install: true` and a recorded reason | R7.6, **T31** |
+| Project-mount containment | `mounts.project.path` resolving to the solution root, an ancestor of it, or any descendant exposing `policy/`, `packs/`, `profiles/`, `compose/`, `images/`, `mediator/`, `scripts/` or `.dockerignore` | SC-3, R5.14 |
+
+The first three gates run inside the compiler, which executes in the mediator build stage. The
+project-mount gate cannot: it resolves a host path and runs host-side before the build, in
+`scripts/lint-policy.sh` — see Edge Case 18.
+
+The project-mount gate is this feature's debt to 01.3, not a new idea. 01.3's Phase A asserts that no
+agent's *runtime mount set* contains a control-plane path, and its stated threat is a read-write
+project mount aimed at the solution tree: an agent that can rewrite `allowlist.base.yaml`,
+`mediator/config/*.tmpl` or `scripts/compile-policy.sh` widens its own policy at the next build. This
+feature makes that threat sharper by turning those same files into build inputs, so the gate that
+refuses the mount belongs here.
+
+The mount-key gate must **fail closed**. Silently ignoring an unrecognised key is how R2.8 gets
+defeated in practice: a profile that asks for `ssh_auth_sock: true` and is quietly ignored looks
+identical to one that was correctly refused, right up to the day the key is implemented.
+
+### Where pack OS packages land, and why not in the base image
+
+D21's "base image" is singular: `images/agent-base` is what CI builds and publishes. D10 says a
+profile drives the build and "each profile pins to a distinct image digest, so 'the image' is
+per-profile rather than universal." These are only compatible one way:
+
+- **`images/agent-base`** — profile-independent, CI-built, GHCR-published, consumed by digest.
+- **`images/{claude,codex,agy}`** — built locally `FROM ghcr.io/...@sha256:<base digest>`, and the
+  layer where the profile's pack OS packages are installed. This is the per-profile digest D10
+  names.
+- **`images/mediator`** — built locally, retains its `build:`, and hosts the policy compile stage.
+  Its content is profile-dependent by construction, so it cannot be a CI-published universal image.
+
+Reading `01.3:534-535` ("01.5 replaces the mediator's local `build:` with a digest-pinned GHCR
+image") as *the mediator's `FROM` becomes digest-pinned* rather than *the mediator becomes a
+CI-published image* is the only reading consistent with D10, with the compile stage, and with
+ARCH:243-244 ("the CI-published base image and its pinned digest, with `build.sh` retained for local
+per-profile layering"). **This is an interpretation and is flagged for the gate**, not asserted.
+
+### R7.19: two classes of package manager, and only one the filesystem can stop
+
+R7.19 is a MUST NOT and it says *packages*, not *OS packages*. The reference pack installs Node,
+Python and Go — three language-level installers that touch no path `apt` uses. Treating R7.19 as an
+`apt` problem is the failure this feature is most likely to ship. Treating it as fully solvable is
+the second.
+
+**The system-level manager — stopped by the runtime.** Three conditions, the first two inherited
+from 01.2's hardened runtime:
+
+1. **No privilege** — `cap_drop: ALL`, `no-new-privileges`, non-root `agent` (uid 1000). `apt` needs
+   `CAP_DAC_OVERRIDE`/root to write `/var/lib/dpkg`.
+2. **No write access** — read-only root filesystem. `/var/lib/dpkg`, `/var/cache/apt` and `/usr/lib`
+   are on the image layer, not on a writable mount.
+3. **No binary** — `apt`, `apt-get` and `dpkg` are removed in the final stage of each agent image
+   after the build-time install completes.
+
+T33's wording — "fails for want of both privilege and write access" — is OS-manager-shaped, and
+conditions 1-3 satisfy it.
+
+**The language-level managers — not stopped by the filesystem, and the plan says so.** 01.2 makes
+`/home/agent` and `/workspace` writable, with `/tmp` and `/run` as `tmpfs`. `pip install --user`, a
+venv install, `npm install` into a project `node_modules`, and `go install` into `GOPATH` write only
+to paths the agent already owns. R7.19's filesystem clause — no write access to the paths the
+manager would modify — is **structurally unsatisfiable** for these while `/home/agent` is writable,
+and SC-4 requires it writable, because that is where session state and credentials live. The two
+requirements pull against each other; this plan records the tension rather than papering over it.
+
+4. **Installer packages removed, best-effort.** `pip` and `ensurepip` are removed from the Python
+   installation and the bundled `npm` tree from the Node installation — the packages, not only the
+   `bin` symlinks, so `python3 -m pip` and a direct `npm-cli.js` invocation fail too. This raises the
+   cost. It does not close the class: an agent that vendors or writes an installer still has a
+   writable target.
+5. **No registry egress — the control that actually holds.** The reference pack declares none, so
+   every install attempt surviving condition 4 fails at the mediator with an audited denial.
+
+**What is claimed and what is not.** **T15** ("blocked and logged") is claimed for the
+language-level managers, and condition 5 is what makes the *logged* half true — the filesystem
+controls fail an install silently as far as the audit log is concerned, because nothing reaches the
+enforcement point. **T33 is claimed for the OS manager only.** Recording R7.19 as fully met for
+language-level installers would be an assertion this design cannot support, and 02.2 is where that
+would surface expensively.
+
+An earlier draft of this plan added a `go` wrapper refusing install-shaped subcommands and a set of
+installer-hostile environment variables. Both are dropped: the real `go` binary must remain for
+`go build` so the wrapper is bypassed by calling it directly, and the plan's own text conceded the
+agent can unset any of the variables. Neither changed what an attacker can do.
+
+## Sub-Features
+
+Seven, dependency-ordered. Each is a single reviewable unit judged against DD-1's ~120k-token
+session guideline; DD-1's 2-5 ceiling governs features per milestone, not sub-features per feature.
+The milestone README's own split point — "01.5 splits cleanly at compiler versus CI pipeline" — is
+the SF-1..SF-5 / SF-6 boundary.
+
+- [ ] **SF-1: Pack manifest schema and the `language-runtimes` reference pack** -- Define
+  `packs/<name>/pack.yaml` covering all seven R7.3 fields plus R7.11's blast-radius contribution.
+  Write `packs/language-runtimes/pack.yaml` declaring Node, Python and Go toolchains as build-time
+  only with an empty runtime egress set, and `packs/README.md` recording why the reference pack
+  grants no registry egress and what that costs an operator at runtime. Ships the manifest validator
+  as a function of `scripts/lint-policy.sh` (01.1's Test Command), which is where policy-file
+  well-formedness already lives.
+
+- [ ] **SF-2: Profile schema extension and the build-refusal gates** -- Extend 01.2 Interface
+  Contract 3 additively: `packs:` becomes a populated list, `authorization:` carries R12.7's
+  classification or its recorded waiver, and `mounts.build_cache` gains its per-agent shape. Implement
+  the three refusal gates in the compiler's validation pass (T27, T21's mount-key allowlist, R7.6's
+  runtime-install declaration). No composition logic here — this sub-feature is the input contract
+  and the gates that reject bad input.
+
+- [ ] **SF-3: Pack composition in the compiler** -- Extend `scripts/compile-policy.sh` from its
+  degenerate zero-pack form to compose pack-supplied FQDNs, CIDRs, mounts, environment variables and
+  credentials into 01.3's fixed resolved schema, populating `compiled_from.packs`. Preserve
+  per-agent keying, deny-wins precedence and `provisional:` propagation; extend the wildcard
+  rejection and the port≠443 flag to pack-supplied entries. Make the output **deterministic** —
+  stable key order, sorted entry lists — because the drift check in SF-4 is meaningless otherwise.
+
+- [ ] **SF-4: Build-stage relocation, build context and the drift check** -- Move the compiler
+  invocation into a stage of `images/mediator/Dockerfile` so it is never an operator step (D10,
+  R7.4). Change the build context for the four locally built images from the `images/` tree to the
+  solution root so the compiler's inputs are reachable, and add a solution-root `.dockerignore` that
+  allowlists rather than denylists. Implement the committed-artifact drift check per Interface
+  Contract 4. Extend `images/mediator/entrypoint.sh` only where the policy path changes.
+  *Split condition:* if the context change runs long across four Dockerfiles, SF-4a is the context
+  and `.dockerignore` work and SF-4b is the compile stage and drift check.
+
+- [ ] **SF-5: Build-time OS packages, package-manager removal, and the per-agent build cache** --
+  Install the profile's composed pack package set in `images/{claude,codex,agy}/Dockerfile` at build
+  time only, from the snapshot repository the profile declares, version-pinned and
+  checksum-verified. Remove `apt`/`apt-get`/`dpkg`; remove the `pip`, `ensurepip` and bundled `npm`
+  *packages* rather than their `bin` symlinks, so R7.19 is addressed for language-level installers
+  as far as the filesystem can reach it, with the residual recorded rather than claimed away
+  (Approach, conditions 3-5). Add
+  `compose/overrides/build-cache.yaml` as a layerable per-agent fragment `profiles/default.yaml`
+  never selects (R2.10). Extend `tests/acceptance/verify-pod-topology.sh`'s mount-set equality
+  assertion — this is its **fourth** extension, after 01.3's `/run/secrets` and 01.4's
+  `/run/oauth-src` and `/run/gitconfig`.
+
+- [ ] **SF-6: GitHub Actions base-image publish, per-profile build artifacts, and the CI drift job**
+  -- Create `.github/workflows/agent-sandbox-image.yml` at the **repository root** — this
+  repository's first workflow. Build `images/agent-base`, publish to GHCR with an SBOM via buildx
+  attestation, and tag branch builds so nothing consumes them by default. Pin the three agent
+  Dockerfiles to the published digest via `AGENT_BASE_DIGEST` in `compose/pins.env`. Ship
+  `scripts/build.sh` — the per-profile image build the ratified file tree names — recording each
+  profile image's digest and emitting its SBOM (R9.9, Edge Case 19). Add the CI job that fails on
+  resolved-policy drift. Document the first-publish bootstrap (Edge Case 11).
+
+- [ ] **SF-7: Acceptance harness** -- `tests/acceptance/verify-pack-composition.sh`, phases A-G
+  covering T14, T15, T21, T23, T27, T31 and T33, following the harness conventions all four siblings
+  share: test-scoped Compose project name, `down -v` teardown, assertions against `docker inspect`
+  on running containers rather than against the Compose YAML, and no third-party service as a test
+  target.
+
+No sub-feature carries the `[OVERSIZED]` flag. SF-4 and SF-5 are the closest calls; SF-4 carries a
+stated split condition and SF-5 is kept whole because the package install, the binary removal and
+the T33 assertion that ties them together are one change to one file per agent.
+
+## Interface Contracts
+
+### Contract 1: Pack manifest — `packs/<name>/pack.yaml` (produced here, consumed by the compiler)
+
+New in this feature. No sibling fixes any part of this shape.
+
+```yaml
+name: language-runtimes
+description: Node, Python and Go toolchains, build-time only
+schema: 1
+
+blast_radius: |                  # R7.11 — what a compromised agent gains when this pack loads
+  Language interpreters and compilers inside the container. No new egress, no new credential,
+  no new mount. The gain is local execution capability, not reach.
+
+needs_write_access: false        # R7.3 — whether the pack needs write access
+
+packages:                        # R7.3, R7.18 — pinned versions WITH checksums, both kinds
+  apt:
+    repository: profile          # resolves to profiles.<p>.package_repository (R7.18)
+    items:                       # sha256 is the .deb hash from the signed Packages index
+      - {name: python3, version: "3.11.2-6+deb12u5", sha256: <64 hex>}
+      - {name: python3-venv, version: "3.11.2-6+deb12u5", sha256: <64 hex>}
+  archives:                      # direct downloads, where apt has no acceptable pin
+    - {name: node, version: "20.18.1", url: <url>, sha256: <64 hex>}
+    - {name: go, version: "1.23.4", url: <url>, sha256: <64 hex>}
+
+egress:                          # R7.3 — required FQDNs and CIDRs
+  runtime:
+    allow_fqdns: []              # EMPTY BY DECISION — see Acceptance Criterion 4 and T31
+    allow_cidrs: []
+  build:                         # consumed by the image build only; never enters resolved policy
+    allow_fqdns:                 # every build-time destination, R10.4
+      - {fqdn: snapshot.debian.org, port: 443}
+      - {fqdn: nodejs.org, port: 443}
+      - {fqdn: go.dev, port: 443}
+      - {fqdn: dl.google.com, port: 443}
+
+runtime_install: false           # R7.6 — true requires a recorded reason and registry egress above
+
+mounts: []                       # R7.3 — required mounts and their modes. Keys must be in the R2 set
+env: []                          # R7.3 — required environment variables
+credentials: []                  # R7.3 — required credentials
+```
+
+Two fields need their reasoning stated because neither is obvious:
+
+- **`egress.build` is not `egress.runtime`.** Build-time egress is consumed by the image build,
+  which runs on the host build network, and never enters `policy/resolved/`. Conflating them is how
+  a pack would silently acquire runtime registry reach.
+- **Every package carries a checksum, because R7.3 is a MUST and says so without qualification.**
+  Direct downloads carry a SHA-256 of the archive. `apt` items carry the `.deb` SHA-256 taken from
+  the signed `Packages` index and re-verified at build. An earlier draft of this plan argued the
+  signed `Release` made a per-package hash redundant; that is an argument for `apt` being *safe*,
+  not for the manifest being *pinned*, and it does not survive the reproducibility half of R7.18.
+- **The repository must be a snapshot, not a suite.** `suite: bookworm` plus `name=version` is not
+  reproducible over time: Debian rotates the archive and drops superseded versions, so a clean
+  rebuild months later fails to resolve the pin — and SC-8 measures exactly that rebuild. The
+  profile therefore declares a `snapshot.debian.org` URL carrying a timestamp, plus the keyring
+  fingerprint that signs it.
+
+### Contract 2: Profile schema extension (extends 01.2 IC3 and 01.4 IC3, additively)
+
+Every key 01.2 and 01.4 defined is unchanged. Three additions:
+
+```yaml
+packs:                           # 01.2 shipped this as `packs: []`. Now populated
+  - language-runtimes
+
+package_repository:              # R7.18 — the repository pack apt items are sourced from
+  apt:
+    url: https://snapshot.debian.org/archive/debian/<timestamp>/   # pinned in time, not a suite
+    suite: bookworm
+    signed_by: images/agent-base/keyrings/debian-archive.gpg   # version-controlled, in the build context
+    fingerprint: <full 40-hex key fingerprint>     # asserted at build; a key swap fails the build
+
+authorization:                   # R12.7. Exactly one of `classify` or `waiver` is required
+  classify:                      # actions requiring human authorization when unattended
+    - git-push
+    - infrastructure-apply
+  # waiver: <recorded reason this profile waives R12.7>
+
+mounts:
+  build_cache: false             # 01.2 already declares this key. Per-agent where enabled (R2.10)
+```
+
+`authorization` is validated for shape here and enforced nowhere in this milestone — **T37 is
+02.5's**. Requiring `waiver` as the explicit alternative to `classify` is what stops the field from
+being quietly omitted for a year.
+
+### Contract 3: Resolved policy — unchanged schema, populated `packs`
+
+01.3 Interface Contract 1 is the target and it does not change. This feature populates two things
+that were empty:
+
+```yaml
+compiled_from:
+  allowlist: policy/allowlist.base.yaml
+  denylist: policy/denylist.base.yaml
+  profile: profiles/default.yaml
+  packs:                         # was `[]`. Now the selected pack manifests, with their content hash
+    - {name: language-runtimes, path: packs/language-runtimes/pack.yaml, sha256: <64 hex>}
+
+agents:
+  claude:
+    allow_fqdns: [...]           # base entries + pack `egress.runtime.allow_fqdns`, per agent
+    allow_cidrs: [...]           # base entries + pack `egress.runtime.allow_cidrs`, per agent
+```
+
+For the `default` profile with `language-runtimes` loaded, `allow_fqdns` and `allow_cidrs` are
+**byte-identical to the zero-pack output** — that is the point of Acceptance Criterion 4, and
+asserting the zero is what T14 checks here.
+
+`schema: 1` is unchanged: adding entries to `compiled_from.packs` is what the field was declared
+for. The per-pack `sha256` is what makes `compiled_from` a provenance record rather than a list of
+names — it is what tells a reviewer that a resolved artifact was compiled from *this* manifest and
+not a later edit of it.
+
+### Contract 4: How both halves of R7.4 hold at once
+
+R7.4 and D10 require the compiler to run **as a build stage, not as an operator step**. The
+milestone README requires the resolved policy to be **a committed, reviewable artifact under
+`policy/resolved/`**. A Docker build stage cannot write to the repository, so these are only
+compatible with an explicit resolution:
+
+| Where | Behaviour |
+|---|---|
+| Mediator image build stage | **Compiles authoritatively.** Emits to the image layer. This is the policy the mediator runs |
+| Local build and CI alike | **Fail on drift.** The compiled output must equal the committed `policy/resolved/<profile>.yaml`, comparing every field except `compiled_at` |
+| Operator, when policy inputs change | `bash scripts/compile-policy.sh --write <profile>`, then reviews the diff and commits it — a version-controlled, reviewed policy change |
+
+**The build fails on drift rather than warning.** R5.14 requires policy changes to be
+version-controlled and reviewed, and a warning printed into a build log is neither. A local build
+that merely warns produces a mediator running a resolved policy no reviewer has seen, which is the
+property SC-3 exists to prevent — and it makes the committed artifact decorative, since nothing
+would ever force it to be true.
+
+This does not cost SC-6. SC-6 is measured as "switch use-case profile; confirm egress policy
+**recomposes** automatically", and it does: the operator never hand-edits a policy file, the
+compiler composes it from the profile and its packs. "Automatically" qualifies *recomposes*, not
+*is committed*. The one deliberate manual act is reviewing and committing the recomposed artifact —
+which is what R5.14 asks for, not the step D10 forbids. The prohibition on the *compilation* being
+an operator step is D10's and the milestone README's, not R7.4's — R7.4 verbatim requires only that
+the effective policy be composed from base plus selected packs and that a pack cannot widen it at
+runtime. Compilation happens in the build stage, unattended, every time.
+
+**`compiled_at` is excluded from the drift comparison.** It is in 01.3's schema and it changes on
+every compile, so a byte-diff would always fail. The comparison is over every field except
+`compiled_at`; `compiled_at` in the committed copy records when it was last refreshed.
+
+**The documented entry point must rebuild, or none of this runs.** 01.2 fixes the single documented
+start command as `docker compose --env-file compose/pins.env -f compose/compose.yaml -f
+compose/overrides/default.yaml up` — with no `--build`. Once the compiler lives in a build stage,
+that command reuses whatever image is cached and the policy never recomposes: SC-6 fails while
+appearing to pass, because switching profiles changes the Compose files and nothing else. This
+feature therefore amends the documented command to `up --build`, keeping R12.1's single documented
+start command and D10's "a profile change that touches packages is a rebuild, not a restart" both
+true. `PACK_SET_HASH` (Edge Case 4) is what makes the rebuild cheap when nothing has changed and
+mandatory when it has. The amendment lands in `README.md` and in 01.2's entry-point text, and SF-7
+Phase C proves it: change a pack, run **only** the documented command, and assert both the mediator
+and the agent images were rebuilt.
+
+### Contract 5: Build context (modifies 01.2's Compose seam — the fourth extension)
+
+01.2 fixes a single shared build context at the `images/` tree with per-service `dockerfile:` and
+`build.args`. That context cannot satisfy D10: the compiler's inputs (`policy/`, `profiles/`,
+`packs/`) and `mediator/config/*.tmpl` all sit **outside** `images/`, and a build stage can only
+read what is in its context.
+
+```yaml
+services:
+  egress-mediator:
+    build:
+      context: ..                # the solution root, relative to compose/compose.yaml
+      dockerfile: images/mediator/Dockerfile
+  claude:
+    build:
+      context: ..
+      dockerfile: images/claude/Dockerfile
+      args: [...]                # 01.2's pins.env args, unchanged
+  # codex, agy identical
+```
+
+Consequences, each handled rather than noted:
+
+- **`images/.dockerignore` no longer applies.** Docker resolves `.dockerignore` at the context root.
+  Its rules are folded into a new solution-root `.dockerignore` written as an **allowlist** —
+  `*` followed by `!` re-includes for `images/`, `policy/`, `profiles/`, `packs/`, `mediator/config/`,
+  `images/agent-base/keyrings/` and `scripts/compile-policy.sh`. A denylist would ship `docs/artifacts/` —
+  several large PDFs — and `.project/` into the daemon on every build. The keyring is in the list
+  because Contract 2's `signed_by` resolves against the build context; omitting it makes every
+  `apt` step in every agent image fail.
+- **The allowlist is a security boundary, not a size optimisation.** It must never re-include
+  `mediator/identity/`, `compose/generated/` or `compose/pins.env`. The CA private key is never
+  committed (01.3), but a build context is the **working tree**, and 01.3 places that key under
+  `mediator/identity/` on the operator's disk — a `!mediator/` re-include instead of
+  `!mediator/config/` would ship it to the daemon on every build. Re-including `mediator/config/`
+  rather than `mediator/` is therefore a property to assert, not a path that happens to be right:
+  SF-7 Phase A enumerates the context's contents and fails if any of those three paths appears.
+- **In the context is not in the image**, and the rule is checkable rather than promised. No
+  Dockerfile uses `COPY . .`. The mediator image copies `policy/`, `profiles/`, `packs/` and
+  `mediator/config/`. The agent images copy `packs/` and `profiles/` — which they need to resolve
+  their own package set — and **never `policy/`, `mediator/` or any identity path**. SF-7 Phase A
+  asserts that against the built images, not against the Dockerfiles. 01.3's Phase A assertion — no
+  agent's *runtime mount set* contains a control-plane path — is about mounts and is unaffected; the
+  same argument now covers `packs/`, and the assertion set is extended to name it.
+- **Two consumers read the pack manifests, and only one of them is the policy compiler.** The
+  mediator's build stage composes the resolved *egress policy*; each agent image separately resolves
+  its *package set* from the same manifests. The second is a selection, not a composition, and it
+  has to live in the agent image because that is where the packages install — the compiler's output
+  is baked into the mediator layer and is not reachable from another image's build. The consequence
+  for `/build`: a change to the manifest schema in Contract 1 touches both readers, and SF-1 owns
+  the schema for both.
+- **This is a departure from the ratified file organisation's implied single context** and is
+  recorded in `docs/ARCHITECTURE_AND_DESIGN.md`, following the precedent 01.4 set when it relocated
+  `bootstrap-auth.sh` into `images/agent-base/` and recorded the departure rather than letting the
+  tree drift silently.
+
+**Alternative considered and rejected:** BuildKit named additional build contexts
+(`additional_contexts:`), leaving 01.2's context untouched. Rejected on a stronger ground than
+novelty. `additional_contexts:` is a **Compose** key, and two of this feature's own deliverables —
+`scripts/build.sh` and the CI drift job — invoke `docker build`/buildx directly, where the
+equivalent is hand-mirrored `--build-context name=path` flags. That is a second implementation of
+the compiler's input surface maintained in parallel, and Contract 4's drift check is only meaningful
+while there is exactly one. It also buys less isolation than it appears to: a named context is a
+whole directory the build may `COPY --from`, so the agent images would still see `packs/` and
+`profiles/` and the mediator would still see `policy/`. The control-plane threat is the runtime
+project mount, which the project-mount gate handles independently and which this option does not
+touch. Its behaviour on the pinned Docker Desktop is additionally UNVERIFIED — 01.1 SF-2 could
+establish that cheaply if the option is ever wanted, but nothing here needs it.
+
+### Contract 6: `scripts/compile-policy.sh` CLI (fixes what 01.3 left unstated)
+
+01.3 states the script's behaviour but no signature, no flags and no exit codes. This feature fixes
+them, following the shape `bootstrap-auth.sh` already established in 01.4:
+
+```
+bash scripts/compile-policy.sh [--write] [--check] <profile>
+
+  <profile>   profile name, resolving to profiles/<profile>.yaml
+  --write     write the result to policy/resolved/<profile>.yaml
+  --check     compare against the committed copy and exit non-zero on drift
+  (neither)   write the result to stdout
+
+Exit codes
+  0  success, or --check with no drift
+  2  input validation failure (malformed profile, pack manifest or policy file)
+  3  refusal gate tripped (T27 accepted_risk, R2.8 mount key, R7.6 runtime egress,
+     SC-3 project-mount containment)
+  4  --check found drift
+```
+
+Exit 3 is distinct from exit 2 because a refusal is a *recorded policy decision the operator must
+make*, not a syntax error, and the acceptance harness distinguishes them.
+
+## Edge Cases
+
+1. **The build context change ships the repository into the daemon.** `docs/artifacts/` holds
+   several large PDFs and `.project/` holds the full planning tree. A denylist `.dockerignore` will
+   miss one of them. Handled by writing the solution-root `.dockerignore` as `*` plus explicit
+   `!` re-includes, and by asserting the context size in SF-7.
+
+2. **Drift check defeated by non-determinism.** Unordered map emission or unsorted entry lists make
+   the compiled output differ from the committed copy on every run. Handled by fixing key order and
+   sorting every list in SF-3, and by asserting in SF-7 that two consecutive compiles are
+   byte-identical.
+
+3. **`compiled_at` always differs.** In 01.3's schema, changes every compile. Excluded from the
+   drift comparison (Contract 4). Stated because a naive `diff` would make the CI job permanently
+   red and the obvious fix — removing the field — would break 01.3's schema.
+
+4. **Pack removal leaves image residue.** Recomposing the policy is not enough: a previously built
+   agent image still carries the removed pack's OS packages, and Compose will reuse it. R7.5 says
+   "no residue" and T14 tests load *and unload*. Handled by making the composed pack set a build
+   argument — `PACK_SET_HASH` — so a changed pack set produces a different image, and by asserting
+   in SF-7 that the unloaded pack's binaries are absent from the rebuilt container rather than only
+   absent from the policy.
+
+5. **T14's egress delta is zero.** Because the reference pack declares no runtime egress, "gains and
+   loses exactly that pack's entries" is satisfied by an empty set. The test asserts the zero
+   explicitly — the allowlist section byte-identical across load and unload — while packages and
+   mounts do change. This is the honest exercise the milestone README accepts, and it doubles as
+   T31's negative proof: there is no registry entry for `npx <server>` to use.
+
+6. **Two different things are called `limits`.** The profile's `limits` is `{cpus, memory, pids}`
+   (01.2, container ceilings); the resolved artifact's per-agent `limits` is
+   `{max_concurrent, connections_per_minute, bytes_per_second}` (01.3, egress ceilings), whose
+   profile-side name is `rate_limits`. The compiler reads both and must not cross them. Named here
+   because the collision sits exactly on the compiler's input/output boundary.
+
+7. **`accepted_risk` has five keys in 01.4 and four in T27.** 01.4 IC3 adds `rotation` — SF-3's
+   measured per-provider result — to T27's `file`, `mount_mode`, `revocation_path`, `blast_radius`.
+   All five are required, and `rotation` must carry 01.4 SF-3's **measured** value. An earlier draft
+   allowed it to record "unverified" in case 01.4's measurement was outstanding; the milestone's
+   ordering puts 01.4 before 01.5, so that case does not arise, and permitting it would let a
+   profile record an accepted risk whose central unknown is still unknown — which is the opposite of
+   what R4.17 makes the operator accept. If 01.4 SF-3 has genuinely not run, the gate refuses the
+   `oauth-mount` profile rather than accepting a hollow record.
+
+8. **A suite pin is not reproducible; a snapshot pin is.** `suite: bookworm` plus `name=version`
+   resolves today and fails in six months, because Debian rotates the archive and drops superseded
+   versions — and SC-8 measures precisely the rebuild that happens later. Handled by pinning
+   `snapshot.debian.org` with a timestamp and asserting the signing key's full fingerprint, so the
+   pin is stable in time and a key substitution fails the build. Every package carries a SHA-256,
+   `apt` items included; R7.3 is a MUST and says "checksums" without qualification.
+
+9. **The language-runtimes pack is deliberately half-useful, and fails at two different layers.**
+   Node, Python and Go interpreters are installed; the `pip`, `ensurepip` and bundled `npm` packages
+   are removed, so an install attempt usually fails at the filesystem with no audit line. Where an
+   installer survives — a vendored copy, a script the agent writes itself, `go install` from the
+   toolchain the pack must keep for `go build` — it fails at the mediator instead, with the audited
+   denial T15 requires. An operator will read either as a bug. Handled in `packs/README.md`, which
+   states which layer refuses what, and by 01.3's denial surface naming the blocked destination.
+
+10. **The mount-key allowlist must fail closed.** A profile asking for `ssh_auth_sock: true` that is
+    silently ignored is indistinguishable from one correctly refused — until the key is implemented.
+    Unknown `mounts.*` keys are exit 3, not a warning.
+
+11. **First publish is a chicken-and-egg.** The three agent Dockerfiles pin
+    `FROM ghcr.io/...@sha256:<digest>`, but no digest exists until the workflow has run once.
+    Handled by documenting the bootstrap in SF-6: the first CI run builds and publishes from the
+    working branch, and its digest is committed to `compose/pins.env` as a deliberate edit.
+    `AGENT_BASE_DIGEST` has no default, so an unset value fails the build rather than resolving to
+    `latest` — the same discipline 01.2 applies to the agent pins.
+
+12. **Branch-built images must not leak into use.** D21 restricts branch builds to testing. Handled
+    by tagging branch builds distinctly and by consuming only the committed digest — nothing
+    resolves a tag at build time, so a branch image can only be used by explicitly pinning it.
+    T45 verifies this properly in 02.4.
+
+13. **SBOM tooling is not established anywhere in the repository.** Handled by using buildx's own
+    SBOM attestation rather than adding a scanner to the toolchain — adding a third-party binary to
+    satisfy a MAY would be more supply chain, not less. **Attestation on *local* Compose builds is
+    UNVERIFIED** on the pinned Docker Desktop, unlike the CI path where it is routine. If it does
+    not hold, `scripts/build.sh` records digests only and R10.7's SBOM half stays with CI-published
+    `agent-base`. Recorded the way 01.1 SF-2 records an unverified capability: established before it
+    is built on, not during.
+
+14. **The per-agent build cache may already be satisfied.** 01.2 places `/home/agent/.cache` on the
+    per-agent state volume, so caching is already per-agent and T23 would pass trivially. The
+    `build_cache` option therefore means a *separate, larger* dedicated per-agent volume. SF-5
+    states which of the two T23 is asserted against so the test proves the property rather than
+    restating 01.2's volume layout.
+
+15. **The schema validator is not chosen here.** 01.3 SF-2 promises "the schema validator the
+    mediator's stage-1 self-check calls" but names no tool or library. This feature's manifest and
+    profile validation reuses whatever 01.3 selects. If 01.3 has not yet built when this feature
+    starts, the constraint recorded for `/build` is: it must run inside the mediator image at
+    stage 1, and it must not add a language runtime the images do not already carry. Naming a tool
+    here would pre-empt a decision that belongs to 01.3.
+
+16. **R12.7's classification is declared and enforced by nothing.** T37 is 02.5's. A field validated
+    for shape but never exercised drifts. Recorded as a residual with its landing point named,
+    rather than presented as satisfying R12.7.
+
+17. **`--write` and the build stage must produce byte-identical output.** The authoritative compile
+    runs inside the mediator image; `--write` runs on the host. The drift check compares the two, so
+    any difference in validator version, YAML emitter or key ordering makes the check fire on
+    identical policy. Two resolutions and `/build` picks one: pin the compiler's toolchain
+    identically on both sides, or make `--write` run *through* the build stage
+    (`docker build --target compile` and extract the artifact) so there is only one implementation.
+    The second is more robust and slower; naming the choice here rather than discovering it as a
+    permanently red CI job.
+
+18. **The project-mount containment gate cannot run in the build stage.** It resolves
+    `mounts.project.path`, a host path, through `realpath` — which a Docker build stage cannot see.
+    It therefore runs host-side in `scripts/lint-policy.sh` before the build, and is asserted again
+    at test time against `docker inspect` on the running container. Stated because the Approach
+    lists it beside three gates that *do* run in the compiler, and an implementer would otherwise
+    put it where it cannot work. Its D19 consequence is worth recording: the copied sandbox tree
+    must be a **sibling** of the project directory, never inside it.
+
+19. **The per-profile digest and SBOM are a second artifact, not a by-product of CI.** CI publishes
+    `agent-base` and attests it. But R9.9 and the PRD's Outputs table make "image digest + SBOM" a
+    default-produced artifact, and the ratified file tree names `scripts/build.sh` as the
+    per-profile image build that emits them. Locally built per-profile images have digests that no
+    CI run ever sees. Handled by shipping `scripts/build.sh` in SF-6 to build each profile's images,
+    record their digests and emit an SBOM per image. T18 and T45 verify the property properly in
+    02.4; this feature produces the artifact they will verify.
+
+20. **This plan contradicts 01.3's Interface Contract 5 and must say so.** 01.3 states that 01.5
+    "replaces the mediator's local `build:` with a digest-pinned GHCR image". This plan keeps the
+    mediator's local `build:` and pins its `FROM` instead, because the compile stage makes the
+    mediator image profile-dependent. That is a contract change, not a reading difference. Recorded
+    as **decided and scheduled** with a single landing point: **01.3 is re-planned in revision mode
+    before 01.3 builds**, batched with the 01.1 re-plan its own gate already scheduled. The ordering
+    is load-bearing — 01.3 builds before 01.5, so leaving IC5 as written means `/build` implements
+    the contract this plan contradicts. Following the precedent 01.3's gate set for its T28 register
+    amendment. `Architectural Deviations` stays `(none)`: that section is populated by `/build`, not
+    by `/plan-feature`.
+
+## Test Command
+
+```
+bash tests/acceptance/verify-pack-composition.sh
+```
+
+## Test Strategy
+
+Eight phases, following the harness conventions all four siblings share: a test-scoped Compose
+project name, teardown with `down -v` so operator state volumes are never touched, assertions
+against `docker inspect` on **running containers** rather than against the Compose YAML, and no
+third-party service as a test target.
+
+| Phase | Covers | Asserts |
+|---|---|---|
+| A — Manifest and profile validation | R7.3, R7.11 | A manifest missing each mandatory field in turn fails with exit 2 naming the field. Every package entry, `apt` included, carries a SHA-256. A well-formed manifest passes |
+| B — Refusal gates | R4.17/**T27**, R2.8, R7.6, SC-3 | `oauth-mount` without a complete five-field `accepted_risk` exits 3; an unknown `mounts.*` key exits 3; a pack with `egress.runtime` entries and `runtime_install: false` exits 3; `mounts.project.path` set to the solution root, an ancestor, and a control-plane-exposing descendant each exit 3 |
+| C — Composition and determinism | R7.4 | Two consecutive compiles are byte-identical. Per-agent keying preserved. A pack-supplied wildcard is rejected; a pack-supplied non-443 port is flagged. `--check` exits 4 on drift, and a drifted committed artifact fails the **local** build, not only CI |
+| D — Rebuild on the documented command | SC-6, R12.1, D10 | Change the profile's pack set, refresh with `--write`, review and commit the recomposed artifact, then run **only** the documented start command (`up --build`). Both the mediator and the agent images rebuild — `PACK_SET_HASH` having changed — and the resolved policy in the running mediator reflects the change. Asserted separately: omitting the `--write` refresh fails the build rather than silently running stale policy |
+| E — Load/unload | R7.5/**T14** | With `language-runtimes` loaded then unloaded: package set and mounts change; the resolved `allow_fqdns`/`allow_cidrs` sections are **byte-identical in both states**. Rebuilt container has no residue of the unloaded pack's binaries. Each state needs its own committed artifact under the fail-on-drift rule, so the phase uses 01.3's `policy/resolved/test-fixtures.yaml` for the loaded state rather than mutating the operator's committed `default.yaml` |
+| F — Build-time only, both manager classes | R7.18, R7.19/**T33**, **T15** | Installed versions match the profile pins and the snapshot repository. **T33 (OS manager):** as the `agent` user, `apt`/`apt-get`/`dpkg` are absent and an install attempt fails for want of privilege and write access. **T15 (language managers):** `pip`, `ensurepip` and the bundled `npm` tree are absent, and `python3 -m pip` and a direct `npm-cli.js` path both fail; then a *deliberately vendored* installer is run to prove the residual — it reaches the network, is denied at the mediator, and the denial appears in the audit log |
+| G — Mounts | R2.8/**T21**, R2.10/**T23** | On `default`: only the project directory and that agent's state volume; no socket forwarded. With the build cache enabled for two agents: distinct paths, neither writable by the other |
+| H — Registry reach | **T31** | `npx <server>` from inside an agent fails, and the resolved policy contains no package-registry entry for any agent |
+
+**Not covered here, by design:** T37 (02.5), T45 provenance verification and T18 clean rebuild
+(02.4), and the egress half of the composition delta, which 02.3 re-exercises with Terraform.
+
+## Documentation
+
+- `packs/README.md` — **create.** The manifest schema field by field, and why the reference pack
+  grants no runtime egress, including what fails at runtime as a result (Edge Case 9).
+- `policy/resolved/README.md` — **extend** 01.3's generated-output notice with the drift-check
+  contract and the `--write` refresh procedure.
+- `README.md` — **extend.** Adding and removing a pack, the profile fields this feature adds, the
+  CI workflow, the first-publish bootstrap for `AGENT_BASE_DIGEST`, the amended `up --build` entry
+  point, and the `--write` refresh procedure an operator runs when policy inputs change.
+- `docs/ARCHITECTURE_AND_DESIGN.md` — **extend.** Record the build-context departure from the
+  ratified file organisation (Contract 5), the D21 reading that CI publishes `agent-base` only while
+  the mediator retains a local `build:` (Approach), and the amended entry point. Following 01.4's
+  precedent, a departure is recorded in the design document rather than left as tree drift.
+
+## Files to Create/Modify
+
+| File | Action | Changes |
+|------|--------|---------|
+| `packs/language-runtimes/pack.yaml` | Create | The reference pack. Node, Python, Go; build-time only; empty runtime egress |
+| `packs/README.md` | Create | Manifest schema and the no-runtime-egress decision |
+| `.dockerignore` (solution root) | Create | Allowlist-form context filter for the new build context |
+| `.github/workflows/agent-sandbox-image.yml` | Create | **Repository root.** Builds `images/agent-base`, publishes to GHCR with SBOM; policy-drift job |
+| `tests/acceptance/verify-pack-composition.sh` | Create | Phases A-H |
+| `scripts/build.sh` | Create | Per-profile image build; records digests, emits SBOM per image (R9.9) |
+| `images/agent-base/keyrings/debian-archive.gpg` | Create | Committed signing key for the snapshot repository; fingerprint asserted at build |
+| `policy/resolved/default.yaml` | Modify | Recomposed with `compiled_from.packs` populated; runtime egress sections byte-identical |
+| `scripts/compile-policy.sh` | Modify | Pack composition, refusal gates, CLI and exit codes, deterministic output, `--write`/`--check` |
+| `scripts/lint-policy.sh` | Modify | Pack manifest well-formedness (01.1's Test Command host) |
+| `profiles/default.yaml` | Modify | `packs`, `package_repository`, `authorization`; `mounts.build_cache` shape |
+| `images/mediator/Dockerfile` | Modify | Policy compile stage; copies compiler inputs from the new context |
+| `images/mediator/entrypoint.sh` | Modify | Policy path only, where the build stage changes it |
+| `images/claude/Dockerfile` | Modify | `FROM ...@sha256:`; pack OS package install; package-manager removal |
+| `images/codex/Dockerfile` | Modify | As above |
+| `images/agy/Dockerfile` | Modify | As above |
+| `images/agent-base/Dockerfile` | Modify | CI-publish surface; nothing profile-dependent added |
+| `images/.dockerignore` | Modify | Rules folded into the solution-root file; retained or removed per SF-4 |
+| `compose/compose.yaml` | Modify | Per-service `context: ..` and `dockerfile:`; `PACK_SET_HASH` and `AGENT_BASE_DIGEST` build args |
+| `compose/overrides/default.yaml` | Modify | Keeps the Compose counterpart aligned with the extended profile |
+| `compose/overrides/build-cache.yaml` | Create | Per-agent build cache fragment, never selected by `default` |
+| `compose/pins.env` | Modify | `AGENT_BASE_DIGEST`, no default |
+| `policy/resolved/README.md` | Modify | Drift-check contract and `--write` refresh |
+| `tests/acceptance/verify-pod-topology.sh` | Modify | Mount-set equality extended for the build cache — the fourth extension |
+| `tests/acceptance/verify-egress-mediator.sh` | Modify | Control-plane assertion set extended to name `packs/` |
+| `README.md` | Modify | Pack add/remove, new profile fields, CI, bootstrap, and the `up --build` entry-point amendment |
+| `docs/ARCHITECTURE_AND_DESIGN.md` | Modify | Build-context departure; D21 reading |
+
+## Dependencies
+
+**Blocking, in-milestone.** All four siblings are `[~] planned, awaiting build`; none has been
+built. Every dependency below is on a plan, not on code:
+
+- **01.1** — `policy/allowlist.base.yaml` and `policy/denylist.base.yaml` are the compiler's base
+  inputs; `docs/records/agent-verification.md` carries the pins. Note the allowlist is **not frozen
+  at 01.1's version**: 01.4 adds provider OAuth endpoints to it. 01.1's approved plan also denies
+  `deny_fqdns`, which 01.3 records as a defect against R5.1 and schedules a re-plan for; the
+  compiler must handle `deny_fqdns` present-and-empty.
+- **01.2** — the profile schema this feature extends additively; the Compose seam; the `images/`
+  tree; `pins.env`; `verify-pod-topology.sh`.
+- **01.3** — `scripts/compile-policy.sh` in its zero-pack form, the resolved-policy schema this
+  feature must continue to emit, `images/mediator/Dockerfile` and `entrypoint.sh`, and the schema
+  validator whose selection this feature inherits (Edge Case 15). **01.3's Interface Contract 5 is
+  contradicted by this plan** and the amendment is decided and scheduled, not executed — see Edge
+  Case 20.
+- **01.2's entry point is amended by this feature.** The documented start command gains `--build`
+  (Contract 4). The amendment lands in `README.md`, which is listed in Files to Create/Modify;
+  01.2's plan text carries the old form and is **superseded, not edited** — recorded as decided and
+  scheduled in the same manner as Edge Case 20, because this feature does not edit sibling plans.
+- **01.4** — the `oauth_mount.<agent>.accepted_risk` shape T27's gate validates.
+
+**Ordering.** SF-1 → SF-2 → SF-3 → SF-4 → SF-5 → SF-7 is strict. SF-6 depends only on SF-5 for the
+agent Dockerfiles' `FROM` lines and is the clean split point if the feature runs long.
+
+**Cross-cutting, outside the solution directory.** `.github/workflows/` is at the **repository
+root**. This repository has no `.github/` directory today; D21 introduces its first workflow, and CI
+becomes a build-time dependency the repository did not previously have.
+
+**External.** GitHub Actions availability and a GHCR namespace under `OCC-github/agentic-ai`, with
+`packages: write` granted to the workflow. Docker Desktop on macOS 26, Apple silicon (R11.1, A1).
+
+**Not a dependency.** Nothing here depends on Milestone 02 or 03. The AWS, Terraform, Kubernetes and
+GitHub CLI packs are 02.3 and 03.3; this feature ships the mechanism and one reference pack.
+
+## Architectural Deviations
+
+(none)
