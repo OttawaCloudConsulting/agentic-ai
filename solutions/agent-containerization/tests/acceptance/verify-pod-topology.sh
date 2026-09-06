@@ -310,6 +310,32 @@ else
   fail "egress-net not declared with internal:false in compose.yaml"
 fi
 
+# The ipam addresses, the agents' proxy/dns literals and the listener certificates'
+# iPAddress SANs are three copies of one fact, and Compose enforces no coupling
+# between them. A renumber that updates two of the three fails at runtime as a
+# proxy-hop TLS verification error at the agent -- and the tempting repair for that
+# is disabling verification, which gives up the server authentication the TLS hop
+# exists for. Asserted here so drift is caught before bring-up, not diagnosed from
+# a handshake failure. codex has no certificate by design and is skipped.
+san_ok=1
+for a in claude agy; do
+  crt="mediator/identity/listeners/${a}-listener.crt"
+  want="$("${COMPOSE_A[@]}" config --format json \
+    | jq -r --arg a "${a}-net" '.services["egress-mediator"].networks[$a].ipv4_address')"
+  got="$(openssl x509 -in "$crt" -noout -text \
+    | awk '/X509v3 Subject Alternative Name/{getline; gsub(/^ +| +$/,""); print}' \
+    | tr ',' '\n' | sed 's/^ *//' | grep '^IP Address:' | sed 's/^IP Address://')"
+  if [ "$got" = "$want" ]; then
+    echo "  $a: cert SAN $got matches ipam $want"
+  else
+    echo "  $a: cert SAN is '$got' but compose puts the mediator at '$want'"
+    echo "     re-issue: bash scripts/issue-identity.sh listener $a --ip $want"
+    san_ok=0
+  fi
+done
+[ "$san_ok" -eq 1 ] && pass "listener certificate SANs match the mediator's ipam addresses" \
+                    || fail "listener certificate SANs do not match the mediator's ipam addresses"
+
 mediator_nets="$("${COMPOSE_A[@]}" config --format json | jq -r '.services["egress-mediator"].networks | keys | sort | join(",")')"
 if [ "$mediator_nets" = "agy-net,claude-net,codex-net,egress-net" ]; then
   pass "egress-mediator attaches to all four networks (Deviation 3 closed)"

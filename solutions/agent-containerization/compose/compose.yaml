@@ -111,7 +111,7 @@ services:
     # Owning the mount is narrower than making it world-writable.
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m,uid=13,gid=13,mode=0700
-      - /run:rw,nosuid,size=16m,uid=13,gid=13,mode=0750
+      - /run:rw,noexec,nosuid,size=16m,uid=13,gid=13,mode=0750
     # Binding :53 with no capabilities requires the unprivileged-port floor to be
     # lowered. This is the namespaced sysctl, preferred over `cap_add:
     # NET_BIND_SERVICE` precisely so `cap_drop: ALL` survives intact -- the recorded

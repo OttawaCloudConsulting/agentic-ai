@@ -20,6 +20,18 @@
 !policy/resolved
 !mediator/config
 
-# Never, under any allowlist entry above.
+# Trailing denies. Docker's rules are order-sensitive -- the LAST matching line
+# decides -- so these sit below every `!` above and re-exclude regardless of what
+# an allowlist entry admitted. That is the whole point of their position: today
+# the deny-all already covers them and these lines are redundant, but the moment
+# someone adds `!mediator/**` or `!references/**` above, they are the difference
+# between a redundant line and a leaked private key.
+#
+# They are not an absolute guard. A future `!` placed BELOW this block would
+# re-admit the path silently. Add new allowlist entries above this comment, never
+# under it.
 **/.DS_Store
 mediator/identity
+mediator/identity/**
+references
+references/**

@@ -137,6 +137,37 @@ making them world-writable. The agent services are unaffected: their entrypoint 
 - Anything about the three agent-facing listeners. The holding Squid configuration binds loopback
   only; SF-6 opens them. Criterion 1's per-network listener enumeration is therefore SF-8's, not
   this record's.
+- **The audit sink's durability properties.** An external review of SF-4 raised six that this
+  sub-feature does not close and SF-7 (audit writer) inherits. Recorded here so they are designed
+  against rather than rediscovered:
+  - **The audit volume is unbounded and agent-triggerable.** `touch` at start proves the files open;
+    it proves nothing about capacity. An agent can generate outbound attempts until the volume
+    fills. Squid may then fail on a log write, but the attempt that trips `ENOSPC` is not guaranteed
+    recorded, and `cache_log` shares the same volume. R9.1 says every attempt is logged; that holds
+    only while there is somewhere to log it.
+  - **Rotation is undefined.** `tail -F` follows a pathname; Squid writes through an open descriptor
+    until told to reopen. External rename or copytruncate rotation can split, lose or mis-relay
+    records unless coordinated with Squid's own rotation path.
+  - **Buffering is not pinned as an audit property.** Nothing currently establishes "connection
+    accepted implies durable audit line" -- Squid, the file layer and the OS all buffer, there is no
+    fsync, and the relay adds another buffered hop. A crash can lose records for attempts that
+    already happened.
+  - **`tail -n 0` favours loss over duplication across a restart.** Lines written to the volume but
+    not yet relayed are skipped when the relay restarts. The durable file still holds them, so this
+    is a stdout-sink gap rather than a data-loss bug -- but it means the two sinks are not
+    interchangeable, and which one is canonical has to be stated.
+  - **Cross-stream ordering is approximate.** The access and cache logs are relayed by separate
+    processes to separate streams. Millisecond timestamps help; concurrent attempts can still
+    collide and there is no sequence number.
+  - **The `error_directory` copy into a 16MB `/run` tmpfs is an unmeasured startup assumption.**
+    Sound for the pinned package today. If the packaged set or SF-7's overlay outgrows the headroom,
+    `cp` fails under `set -e` and the mediator does not start -- fail-closed, and not an audit
+    integrity problem, but it should be measured rather than assumed.
+
+  Two of that review's findings were SF-4's own and are fixed rather than handed on: the relays are
+  now supervised alongside the daemons (an unwatched relay stops the stdout sink silently), and the
+  supervisor's failure path is reachable at all (see the fix commit).
+
 - The proxy-hop TLS handshake. The listener certificates are mounted and re-issued against the
   `ipam` addresses (`172.31.10.2`, `172.31.30.2`), but nothing terminates TLS until SF-6, so
   SF-8 Phase B remains the assertion that the hop verifies with no insecure-TLS bypass.

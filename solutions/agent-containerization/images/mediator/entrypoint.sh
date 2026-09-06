@@ -157,12 +157,22 @@ note "up: squid $(squid -v 2>/dev/null | head -1 | sed 's/^Squid Cache: //'), un
 # with the right status -- but silently, and the message naming WHICH daemon died
 # is the whole reason this supervisor exists. A dead resolver and a dead proxy are
 # different incidents and the operator has to be able to tell them apart.
+# The tail relays are watched alongside the daemons, not left to run unsupervised.
+# A dead relay is silent by construction: squid keeps writing to the volume, the
+# mediator keeps enforcing, and the container's stdout -- one of D12's two sinks --
+# simply stops carrying audit lines with nothing to say so. R9.1 makes the audit
+# trail a property of the enforcement point rather than a convenience, so losing a
+# sink is treated the same as losing a daemon: fail closed, loudly. SF-7 owns the
+# audit writer and may soften this to a relay restart; it must not soften it to
+# silence.
 STATUS=0
-wait -n "$SQUID_PID" "$UNBOUND_PID" || STATUS=$?
+wait -n "$SQUID_PID" "$UNBOUND_PID" "$TAIL_AUDIT" "$TAIL_CACHE" || STATUS=$?
 if ! kill -0 "$SQUID_PID" 2>/dev/null; then
   note "squid exited (status $STATUS) -- taking the mediator down; the pod has no enforcement point"
-else
+elif ! kill -0 "$UNBOUND_PID" 2>/dev/null; then
   note "unbound exited (status $STATUS) -- taking the mediator down; the pod has no resolver"
+else
+  note "an audit relay exited (status $STATUS) -- taking the mediator down; stdout is no longer carrying the audit trail"
 fi
 shutdown
 # Never 0 on this path. Neither daemon exiting is ever a normal outcome while the
