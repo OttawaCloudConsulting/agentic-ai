@@ -187,8 +187,24 @@ resolution.
    can reach or alter. The sink is a named volume mounted into the mediator only, plus the
    container's stdout; no agent mounts it, asserted by enumeration. Denials are surfaced with a
    clear, actionable message naming the blocked destination (R9.3, R12.2) and rules REJECT rather
-   than DROP (R9.4) — for a CONNECT proxy that means an immediate HTTP 403 whose body names the
-   destination and the control that refused it, never a silent hang or a dropped packet.
+   than DROP (R9.4) — a refusal is always immediate, never a silent hang or a dropped packet.
+
+   **Amended 2026-09-06 after SF-1 (Deviation 2).** The pre-SF-1 text read "an immediate HTTP 403
+   whose body names the destination and the control that refused it". SF-1 established that a
+   verifying HTTPS client cannot receive that body for any verdict decided after the CONNECT is
+   accepted, and that accepting the CONNECT is a precondition of observing the SNI at all
+   (`docs/records/mediator-selection.md`, P5). Split by decision point:
+   - **Refusal decided before the CONNECT is accepted** — the CONNECT host is not on the agent's
+     allowlist, is in `deny_fqdns`, or resolves into `deny_cidrs`: the proxy returns **HTTP 403 with
+     the plain-text body** of Interface Contract 6. This path is real and is taken wherever the
+     verdict does not need the ClientHello.
+   - **Refusal decided after the ClientHello** — an SNI that disagrees with the CONNECT host, or any
+     other post-peek verdict: the proxy terminates without minting a destination certificate, and a
+     verifying client sees a prompt TLS/proxy failure and **no body**. Minting one is the MITM
+     capability D4 and criterion 5 forbid.
+   In both cases the destination-naming, actionable denial surface R9.3 and R12.2 require is the
+   **audit record and the operator-facing message rendered from it** — not guaranteed in-band agent
+   output.
 
    **R9.1 is satisfied for attempts that reach the mediator, and not for attempts that do not.**
    An agent that unsets its proxy variables and opens a raw socket fails with `ENETUNREACH` inside
@@ -385,8 +401,12 @@ agent process
   → egress-net → destination
 ```
 
-A refusal at any control writes `verdict=deny` with the refusing control named, and returns HTTP
-403 with a body naming the destination. The agent sees an error it can act on rather than a hang.
+A refusal at any control writes `verdict=deny` with the refusing control named. Where the verdict is
+reached before the CONNECT is accepted, the mediator returns HTTP 403 with a body naming the
+destination; where it depends on the ClientHello, the connection is terminated and a verifying agent
+sees a prompt TLS/proxy failure with no body (SF-1, Deviation 2). Either way the agent gets an
+immediate, distinguishable failure rather than a hang, and the destination and refusing control are
+named on the audit line.
 
 ### DNS path
 
@@ -515,7 +535,9 @@ revision — so this is a renumber, not a migration.
 - [ ] **SF-7: Audit writer, denial surface and startup self-checks** — The audit line schema
   (Interface Contract 4) and the writer behind it, including `identity_source` emitting `listener`
   for all three agents at this feature and the field being present so 01.6 extends its enumeration
-  rather than the schema. The 403-with-destination denial surface (Interface Contract 6), both stages
+  rather than the schema. The two-path denial surface of Interface Contract 6 — a 403-with-destination
+  body on pre-CONNECT verdicts, terminate-without-body plus the operator record on post-ClientHello
+  verdicts — both stages
   of the startup self-check, and the loopback self-check listener stage 2 probes through. Product
   code, and the last piece of the mediator itself. Depends on SF-6.
 
@@ -732,8 +754,16 @@ compilation into its build stage.
 
 ### 6. Denial surface — produced by 01.3 SF-7, consumed by the operator (R12.2)
 
-A refused CONNECT returns HTTP 403 immediately, with a plain-text body naming the destination, the
-control that refused it, and the policy file to edit:
+**Amended 2026-09-06 after SF-1 (Deviation 2).** The contract was written against a single
+client-visible 403 for every refusal. SF-1 established that is unreachable for post-ClientHello
+verdicts without terminating destination TLS, so the contract now has an authoritative operator half
+and a best-effort client half.
+
+**The authoritative surface is the structured denial record.** Every refused egress attempt that
+reaches the mediator emits one, naming `agent`, `identity_source`, destination host and port,
+resolved IP where known, `verdict=deny`, the refusing control, the reason, and the policy source and
+remediation path. The operator-facing message rendered from that record is the R12.2 denial surface,
+and it is what SF-7 must get right:
 
 ```
 403 egress denied
@@ -742,8 +772,18 @@ control:     allowlist (default-deny; host not present for agent "claude")
 policy:      policy/resolved/default.yaml  (edit policy/allowlist.base.yaml, then recompile)
 ```
 
-Immediate refusal, never a drop (R9.4), and the same body reaches the agent's own error output so a
-legitimate gap is distinguishable from an attack (R9.3).
+**The client half is conditional on when the verdict is reached.**
+
+- **Before the CONNECT is accepted** — CONNECT host off the agent's allowlist, in `deny_fqdns`, or
+  resolving into `deny_cidrs`: the proxy returns HTTP 403 with the body above, and it reaches the
+  agent's own error output. A legitimate gap is distinguishable from an attack in-band (R9.3).
+- **After the ClientHello** — SNI disagreeing with the CONNECT host, or any other post-peek verdict:
+  the proxy terminates the connection **without minting a destination certificate**, because minting
+  one is the MITM capability D4 and criterion 5 forbid. A verifying agent sees a prompt TLS/proxy
+  failure naming the mediator's certificate, not the destination. Diagnosis of *which* destination
+  was refused requires the operator record.
+
+Immediate refusal or termination in both cases, never a drop and never a hang (R9.4).
 
 ## Edge Cases
 
@@ -837,6 +877,23 @@ control 3 bounds a runaway loop that opens connections and blunts one that does 
 bound request count, and it cannot while TLS is spliced. Recorded as a residual against D5's stated
 rationale rather than presented as satisfying it. Adding request-level limits would require
 terminating TLS, which R5.15 forbids and R5.13 permanently bars for one agent.
+
+**And `connections_per_minute` has no native mechanism in the selected implementation.** SF-1
+verified two of control 3's three ceilings and found the third absent: `maxconn` bounds concurrency
+and `delay_pools` bounds bytes — and, better than assumed, `delay_pools` does shape spliced CONNECT
+tunnels — but Squid 6.13 has no per-client connection-rate directive at all
+(`docs/records/mediator-selection.md`, P3). The schema field at Interface Contract 1 must not remain
+an unimplemented promise. **SF-6 owns the choice and must make it explicitly:** implement the ceiling
+with an `external_acl_type` token-bucket helper (this build carries
+`--enable-external-acl-helpers`), or drop `connections_per_minute` from the resolved-policy schema
+and record the gap here with its mitigation. Shipping the field while enforcing nothing is the one
+option ruled out — a policy key that silently does nothing is worse than an absent one, and it is
+the same failure shape as the SNI fallback SF-1 found.
+
+**One further SF-1 result lands on control 3's concurrency half:** under peek, a single client
+transaction accounts for more than one connection, so the effective ceiling is not the literal number
+in the directive. SF-6 must calibrate the threshold empirically and SF-8 must assert the calibrated
+value, not the nominal one.
 
 **Wildcard allowlist entries would reopen DNS exfiltration.** The closed forwarder is safe only
 because matching is exact. A wildcard entry such as `*.anthropic.com` would make
@@ -957,8 +1014,13 @@ Phases:
   the origin's own CA, not the mediator's; the mediator's process holds no destination plaintext.
   **T34 is not exercised here** — no client certificate exists to cross-present. It is 01.6's, and
   01.6 extends this phase rather than adding a second harness.
-- **Phase C — controls (T3, T5, T6, T7).** A non-allowlisted collector is refused with 403 and
-  logged. A raw TCP socket to a non-allowlisted host and port fails. An allowlisted domain and a
+- **Phase C — controls (T3, T5, T6, T7).** Denials are asserted by decision point, per Interface
+  Contract 6 as amended. A non-allowlisted collector — a pre-CONNECT verdict — is refused with an
+  HTTP 403 **whose body names the destination**, and logged. A post-ClientHello verdict (SNI
+  disagreeing with the CONNECT host) is asserted to fail **promptly, with certificate verification
+  enabled at the client, with no HTTP body expected**, and to produce a matching `verdict=deny`
+  record naming the destination and the refusing control. No assertion anywhere in this phase
+  requires a 403 body for a post-peek denial, and none uses an insecure-TLS bypass to obtain one. A raw TCP socket to a non-allowlisted host and port fails. An allowlisted domain and a
   denied domain sharing one address: the allowed one succeeds, the denied one is refused —
   demonstrating per-connection L7 evaluation rather than an IP snapshot. `169.254.169.254` is
   refused. Rate and concurrency ceilings refuse past their thresholds with `control=ratelimit`.
@@ -1008,8 +1070,10 @@ Codex's WebSocket transport (criterion 3) is checked behaviourally in phase C ag
   to 01.6, network-derived identity accepted for 01.3, `agy` keeps its TLS hop, `codex` hop is plain
   HTTP) so the record does not outlive the block it describes.
 - `README.md` — the mediator's role in bring-up, the certificate-issuance step before first start,
-  the R12.2 troubleshooting path for a blocked destination (read the 403 body, edit
-  `policy/allowlist.base.yaml`, recompile, restart), and the D3 note that a mediator outage presents
+  the R12.2 troubleshooting path for a blocked destination (read the mediator's denial record — the
+  403 body carries it only for pre-CONNECT verdicts, and a post-ClientHello denial reaches the agent
+  as a bare TLS failure; then edit `policy/allowlist.base.yaml`, recompile, restart), and the D3 note
+  that a mediator outage presents
   as DNS failure first.
 - `docs/ARCHITECTURE_AND_DESIGN.md` — update the Open Items Carried Into Build table with the
   resolved `agy` proxy and MCP-transport rows this feature consumes, and record the four decisions
