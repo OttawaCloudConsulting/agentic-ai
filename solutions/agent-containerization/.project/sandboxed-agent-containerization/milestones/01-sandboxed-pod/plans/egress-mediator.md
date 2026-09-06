@@ -423,7 +423,7 @@ revision — so this is a renumber, not a migration.
 
 ## Sub-Features
 
-- [ ] **SF-1: Mediator implementation selection, verified** — Verify the selected proxy against
+- [x] **SF-1: Mediator implementation selection, verified** — Verify the selected proxy against
   P1–P8 above on a throwaway fixture, and record each result in
   `docs/records/mediator-selection.md` whether it passes or fails. Produces a record and a decision,
   not shipped code. Gates SF-2 to SF-8. Discovery-shaped and small by design; it exists because a
@@ -1138,4 +1138,63 @@ anywhere in the repository. Shell scripts follow `#!/usr/bin/env bash`, `set -eu
 
 ## Architectural Deviations
 
-(none)
+### Deviation 1: self-cascade listener topology for the TLS-fronted agents
+- **What changed:** The `claude` and `agy` proxy hops are served by **two** listeners each, not one.
+  An agent-facing `https_port` terminates the proxy-hop TLS and forwards the CONNECT, via
+  `cache_peer` + `never_direct`, to a **loopback-bound** `http_port ... ssl-bump` listener dedicated
+  to that agent, where peek+splice runs and the per-agent policy is evaluated. `codex` is unchanged:
+  one plain `http_port ... ssl-bump` listener does both jobs. Per-agent identity survives the hop
+  because each fronted agent has its own inner port name, and `myportname` is what selects policy.
+- **Originally planned:** The Approach section's request-path diagram routes each agent to a single
+  "mediator listener for THAT network" which both accepts the hop and peeks the SNI ("control 1:
+  CONNECT host on allowlist? and SNI == CONNECT host?"). SF-6 is written as "the three listeners of
+  criterion 6 (two TLS, one plain HTTP CONNECT) in one instance", one per agent.
+- **Why necessary:** Squid 6.13 cannot do both on one listener, verified in SF-1. `https_port`
+  refuses the `ssl-bump` flag outright (`FATAL: ssl-bump on https_port requires tproxy/intercept
+  which is missing`), and `http_port ... tls-cert=` does not terminate client TLS at all — that
+  `tls-cert=` is the bumping certificate, and a raw TLS probe against such a port fails with
+  `wrong version number`. Proxy-hop TLS therefore requires `https_port`, SNI peek requires
+  `ssl-bump`, and the two cannot be the same listener. See `docs/records/mediator-selection.md`,
+  P6 and P7.
+- **Impact:** SF-6 renders five listeners, not three. Criterion 1's enumeration is **unaffected** —
+  the inner listeners bind loopback inside the mediator, which criterion 1 already permits
+  ("any management, metrics, admin or health endpoint binds the loopback interface inside the
+  mediator, never an agent network"), and the permitted set on each agent network remains exactly
+  {proxy, resolver}. SF-8 Phase A's listener enumeration must assert that the inner listeners are
+  **not** reachable from any agent network. SF-7 is affected: the front listener logs the tunnel and
+  the inner listener logs the verdict, so a denied connection produces a front line reading
+  `status=200 squid=TCP_TUNNEL` alongside the inner `status=403 squid=TCP_DENIED`. The audit writer
+  must take the verdict from the inner listener or the log will misreport denials for two of three
+  agents. SF-7's stage-2 self-check should also warm the cascade — the first request through a cold
+  `cache_peer` returned 500 while the peer was still being probed.
+
+### Deviation 2: no client-visible 403 body; the denial surface is operator-facing only
+- **What changed:** A refused connection reaches the agent as a **TLS failure**, not as an HTTP 403
+  with a body naming the destination. The destination, verdict and refusing control are recorded on
+  the audit line and exposed through the mediator's own denial surface; they are not delivered to
+  the agent.
+- **Originally planned:** Acceptance criterion 5 and the Approach section: "A refusal at any control
+  writes `verdict=deny` with the refusing control named, and returns HTTP 403 with a body naming the
+  destination. The agent sees an error it can act on rather than a hang." Interface Contract 6
+  (Denial surface) is written against that response. SF-1's P5 tests it as a selection property:
+  "An immediate, body-bearing refusal naming the destination (R9.3, R9.4, R12.2)".
+- **Why necessary:** Structural, and no configuration setting reaches it. A listener that peeks must
+  accept the CONNECT before it can see the ClientHello — verified: a raw `CONNECT` to a
+  non-allowlisted host returns `HTTP/1.1 200 Connection established`, and the refusal is then
+  delivered inside the TLS session the client starts. With `generate-host-certificates=off` — which
+  is mandatory, since minting a per-destination certificate is exactly the MITM capability D4 and
+  criterion 5 rule out — Squid presents its static listener certificate, whose SAN cannot match the
+  destination. Every verifying client aborts there: `SSL: no alternative certificate subject name
+  matches target hostname 'agy-only.test'`. The body is unreachable whether or not the agent trusts
+  the mediator CA. This follows from splicing rather than from Squid: any proxy that declines to
+  decrypt cannot deliver an application-layer error inside a session it declines to terminate, so
+  `iron-proxy` inherits the identical failure. See `docs/records/mediator-selection.md`, P5.
+- **Impact:** Criterion 5's client-visible half and Interface Contract 6 need rewriting before SF-7
+  builds against them; R9.3, R9.4 and R12.2 must be satisfied by the audit log and the operator
+  denial surface instead. SF-8's Phase C assertions change shape — a refusal is asserted as a TLS
+  failure plus a matching `verdict=deny` audit line, not as a 403 body. The Approach section's claim
+  that the agent "sees an error it can act on rather than a hang" survives in weakened form: the
+  agent gets a prompt, distinguishable failure, but one that names the mediator's certificate rather
+  than the blocked destination, so agent-side diagnosis of *which* destination was refused is not
+  possible without the operator reading the audit log. **Direction on the criterion-5 amendment was
+  referred to an external review at the operator's instruction; it is not resolved by this record.**

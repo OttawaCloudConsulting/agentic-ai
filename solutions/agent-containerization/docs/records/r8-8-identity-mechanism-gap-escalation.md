@@ -2,7 +2,12 @@
 
 **Raised during:** `/build` pre-flight for Feature 01.3 Egress mediator, before SF-1 (no code written)
 **Date:** 2026-09-04
-**Status:** Open — blocks 01.3 build until resolved by `/milestone` revision
+**Status:** **Resolved by the 2026-09-04 `/milestone` revision.** The revision split per-agent
+workload identity out of 01.3 into **Feature 01.6**, so the block this record describes no longer
+exists and 01.3 builds on network-derived identity. The underlying R8.8 gap is *not* closed — it is
+re-homed. 01.6 must either close R8.8 with a real credential for every agent or amend R8.8 in
+`REQUIREMENTS.md`; see the 01.3 plan's Dependencies section, "On later features".
+Status flipped 2026-09-06 at 01.3 SF-1.
 
 ## Finding
 
