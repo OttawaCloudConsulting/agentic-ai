@@ -38,19 +38,39 @@ options ndots:0
 `nameserver` is still the embedded resolver — that is expected and is what keeps container-name
 resolution working locally. The substituted upstream is in `ExtServers`.
 
-**What actually arrived.** A resolution from the agent, and the mediator's resolver log:
+**What actually arrived — and the first version of this evidence was overstated.** The original
+capture was a *refusal*: `getent hosts example.com` in the agent returned exit 2 while the mediator
+logged the query. An external review was right that this proves less than it claimed. A refusal
+plus a log line does not establish the path — the same mediator-side log could come from a direct
+query to `172.31.10.2:53` from that namespace rather than from the embedded resolver forwarding it,
+and `getent` exit 2 does not distinguish REFUSED from unreachable or timed out. Re-done as a
+**positive** answer with a nonce and a negative control, which is what the claim needed:
+
+The resolver was given one nonce name it answers with a unique address
+(`n17887428704549.sf4probe.test → 203.0.113.77`), through a throwaway override. Then, on the same
+network, two containers differing only in `--dns`:
 
 ```
-claude$ getent hosts example.com     # exit 2 -- REFUSED by the mediator's resolver
+A)  --dns 172.31.10.2   (the mediator)
+    203.0.113.77    n17887428704549.sf4probe.test
+    exit=0
+    mediator log: 172.31.10.3 n17887428704549.sf4probe.test. A IN   (and AAAA)
 
-mediator$ unbound[17:0] info: 172.31.10.3 example.com. A IN
-          unbound[17:0] info: 172.31.10.3 example.com. AAAA IN
+B)  --dns 172.31.10.9   (nothing listens there; same subnet)
+    exit=2
+    mediator log: nothing
 ```
 
-`172.31.10.3` is the `claude` container's address on `claude-net`. The query left the agent, was
-re-originated by the embedded resolver to `172.31.10.2` — the mediator's static address on that
-network — and was refused there. The redirect carries real queries across an `internal: true`
-bridge to a container address, and the agent's resolution fails when the mediator refuses it.
+The address returned in (A) exists nowhere but that resolver's configuration, so the answer can only
+have come from it, and it arrived through the agent's normal NSS path rather than a hand-aimed
+query. (B) is the control: change only the `dns:` target and the resolution fails and the mediator
+sees nothing. Together these establish that the redirect carries real queries across an
+`internal: true` bridge — which the refusal-based evidence did not.
+
+Note for whoever repeats this: layering a `dns:` override in a second Compose file **appends**
+rather than replaces (`ExtServers: [172.31.10.2 172.31.10.9]`), so a negative control written that
+way silently still reaches the mediator and passes for the wrong reason. The controls above use
+`docker run --dns` for that reason.
 
 This is the assertion SF-8 Phase A re-runs. The topology test asserts the `ExtServers` half on all
 three agents; the capture half needs a mediator with a resolver, so it belongs to the egress
@@ -74,6 +94,13 @@ mediator$ awk '$4=="07"' /proc/net/udp      # 00000000:0035  -> 0.0.0.0:53
 $ docker inspect --format '{{.HostConfig.CapDrop}} {{.HostConfig.CapAdd}}' <mediator>
 [ALL] []
 ```
+
+**What this does not establish.** The same review noted the bind evidence is sound but not
+audit-grade: it reads the container's configuration and the listening sockets, not the live
+process's capability set. Stronger evidence would be `CapEff`/`CapPrm` zero in
+`/proc/<unbound-pid>/status`, the socket inode mapped back to that pid, `getcap` on the binary, and
+a negative control showing the same container fails to bind `:53` with the sysctl removed. Recorded
+as a known limit of this record rather than claimed.
 
 **The recorded fallback was not needed and is not taken.** `cap_add: NET_BIND_SERVICE` stays
 unused, which matters beyond tidiness: `cap_add` combined with a non-root `user:` does not reliably
