@@ -43,9 +43,9 @@ AUDIT_DIR=/var/log/mediator
 AUDIT_LOG="$AUDIT_DIR/egress-audit.log"
 # The intermediate trail Squid writes and the audit writer reads. A FIFO on the /run
 # tmpfs rather than a file: an intermediate log would grow without bound inside the
-# enforcement point, and rotating it would be a second failure mode. It also makes
-# the writer's death loud -- Squid takes SIGPIPE and exits, and the supervisor takes
-# the mediator down.
+# enforcement point, and rotating it would be a second failure mode. The writer is a
+# supervised child like the daemons, so its death takes the mediator down -- verified
+# by killing it on the running pod (exit 143, and the supervisor named it).
 AUDIT_RAW="$RUN_DIR/audit.fifo"
 CACHE_LOG="$AUDIT_DIR/squid-cache.log"
 DNS_AUDIT_LOG="$AUDIT_DIR/dns-audit.log"
@@ -106,7 +106,8 @@ note() { echo "mediator: $*" >&2; }
 # and nothing else's.
 audit_event() { # <json body, no braces>
   printf '{"ts":"%s","event":"startup_check",%s}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)" "$1" >> "$AUDIT_LOG" 2>/dev/null || true
+    "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)" "$1" >> "$AUDIT_LOG" \
+    || note "WARNING: could not write a startup_check event to $AUDIT_LOG -- the audit sink is not accepting writes"
 }
 
 # --------------------------------------------------------------- writable paths

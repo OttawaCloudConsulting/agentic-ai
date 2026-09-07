@@ -24,9 +24,14 @@
 #
 # WHY A FIFO AND NOT A FILE. An intermediate log on the /run tmpfs would grow without
 # bound inside the enforcement point, and rotating it would be a second failure mode.
-# The FIFO also makes this writer's death loud: Squid takes SIGPIPE and exits, and
-# the entrypoint's supervisor takes the mediator down. R9.1 makes the audit trail a
-# property of the enforcement point, so a mediator that has stopped recording stops.
+#
+# This writer's death is fail-closed, and the mechanism is the entrypoint's supervisor
+# rather than anything about the FIFO. Measured at the SF-7 build by killing this
+# process on the running pod: `wait -n` returned it, the supervisor reported "the
+# audit writer exited -- taking the mediator down; verdicts are no longer being
+# recorded", and the container left with 143. Squid was still running and was reaped
+# with the rest; it never reached a write. R9.1 makes the audit trail a property of
+# the enforcement point, so a mediator that has stopped recording stops.
 #
 # Field order is fixed by `logformat mediator_raw` in mediator/config/proxy.conf.tmpl.
 # The two files are ONE contract, and a short line is reported rather than dropped.
@@ -76,6 +81,26 @@ while IFS=' ' read -r ts agent layer control reason authority status squid bout 
       continue ;;
   esac
 
+  # A bumping listener logs TWICE per attempt, and the first entry is not an outcome.
+  # Squid records the client-side CONNECT as soon as it answers it -- `NONE_NONE`,
+  # status 200, `bytes_out` the size of the CONNECT line itself and `bytes_in` zero --
+  # because on a peeking port the CONNECT must be accepted before the ClientHello that
+  # decides the verdict can arrive. The real outcome follows as `TCP_TUNNEL` or
+  # `TCP_DENIED`. Measured at the SF-7 build: an SNI-mismatch refusal produced
+  # `NONE_NONE/200` and then `TCP_DENIED/403` at the same millisecond.
+  #
+  # Emitted as an EVENT, not dropped and not recorded as a verdict. Recording it as
+  # `verdict: allow` would say a refused attempt succeeded -- Deviation 1's failure
+  # mode, one layer further in. Dropping it would lose the only trace of an agent that
+  # opens CONNECTs and never sends a ClientHello, which is exactly the destination
+  # probing R9.1 wants visible. It carries no `verdict` key, so nothing can misparse it.
+  if [ "$squid" = "NONE_NONE" ] && [ "$status" = "200" ]; then
+    printf '{"ts":%s,"event":"connect_accepted","agent":%s,"layer":%s,"dest_host":%s,"dest_port":%s,"sni":%s}\n' \
+      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$layer")" "$(jnull "${authority%:*}")" \
+      "$(jnum "${authority##*:}")" "$(jnull "$sni")"
+    continue
+  fi
+
   # The verdict. A refusing rule always annotates its control (proxy.conf.tmpl), so
   # the note is the primary signal; the 403 and Squid's own DENIED result are kept as
   # corroboration, so a deny reached by a path that forgot to annotate still reads as
@@ -116,17 +141,17 @@ while IFS=' ' read -r ts agent layer control reason authority status squid bout 
   if [ "$verdict" = "deny" ]; then
     # Contract 6: the record names the refusing control, the reason and the policy
     # source. `bytes_*` are omitted -- nothing was carried.
-    printf '{"ts":%s,"agent":%s,"identity_source":"listener","dest_host":%s,"dest_port":%s,"resolved_ip":%s,"verdict":"deny","control":%s,"reason":%s,"policy":%s,"sni":%s,"method":%s,"http_status":%s}\n' \
-      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$host")" "$port" "$(jnull "$server")" \
+    printf '{"ts":%s,"agent":%s,"layer":%s,"identity_source":"listener","dest_host":%s,"dest_port":%s,"resolved_ip":%s,"verdict":"deny","control":%s,"reason":%s,"policy":%s,"sni":%s,"method":%s,"http_status":%s,"squid":%s}\n' \
+      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$layer")" "$(jnull "$host")" "$port" "$(jnull "$server")" \
       "$(jnull "$control")" "$(jnull "$reason")" "$(jstr "$POLICY")" "$(jnull "$sni")" \
-      "$(jnull "$method")" "$(jnum "$status")"
+      "$(jnull "$method")" "$(jnum "$status")" "$(jnull "$squid")"
   else
     # `http_status` is on the allow line as well as the deny line. Not decoration: a
     # front whose peer was still cold answers 500, which is not a refusal by policy
     # and so is not a deny -- but a line saying only "allow" would report it as a
     # connection that worked.
-    printf '{"ts":%s,"agent":%s,"identity_source":"listener","dest_host":%s,"dest_port":%s,"resolved_ip":%s,"verdict":"allow","control":null,"bytes_out":%s,"bytes_in":%s,"sni":%s,"method":%s,"http_status":%s}\n' \
-      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$host")" "$port" "$(jnull "$server")" \
-      "$(jnum "$bout")" "$(jnum "$bin")" "$(jnull "$sni")" "$(jnull "$method")" "$(jnum "$status")"
+    printf '{"ts":%s,"agent":%s,"layer":%s,"identity_source":"listener","dest_host":%s,"dest_port":%s,"resolved_ip":%s,"verdict":"allow","control":null,"bytes_out":%s,"bytes_in":%s,"sni":%s,"method":%s,"http_status":%s,"squid":%s}\n' \
+      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$layer")" "$(jnull "$host")" "$port" "$(jnull "$server")" \
+      "$(jnum "$bout")" "$(jnum "$bin")" "$(jnull "$sni")" "$(jnull "$method")" "$(jnum "$status")" "$(jnull "$squid")"
   fi
 done

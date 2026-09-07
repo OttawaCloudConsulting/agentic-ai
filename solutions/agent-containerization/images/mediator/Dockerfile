@@ -134,7 +134,8 @@ RUN chmod -R a=rX /etc/mediator
 # The audit writer turns Squid's intermediate line into Interface Contract 4's JSON.
 # Bash, not awk, and the reason is in its own header: `mawk` -- the only awk in this
 # image -- produces NO output at all from a FIFO whose writer is still open, so an
-# awk writer would emit the whole trail at shutdown and nothing before it.
+# awk writer would emit the whole trail at shutdown and nothing before it. It runs as
+# a supervised child of the entrypoint, so the mediator stops when it does.
 COPY --chmod=0755 scripts/compile-policy.sh /usr/local/bin/mediator-compile-policy
 COPY --chmod=0755 images/mediator/audit-writer.sh /usr/local/bin/mediator-audit-writer
 

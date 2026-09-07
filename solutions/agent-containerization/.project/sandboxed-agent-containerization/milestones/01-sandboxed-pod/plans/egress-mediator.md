@@ -1385,7 +1385,10 @@ anywhere in the repository. Shell scripts follow `#!/usr/bin/env bash`, `set -eu
   `port_not_allowlisted`, `agent_has_no_allowlist`, `sni_does_not_match_connect_host`,
   `fqdn_on_denylist`, `resolved_address_on_denylist`, `concurrency_ceiling_exceeded`,
   `method_not_connect`), `policy` (the artifact path an operator edits and recompiles), `sni` and
-  `http_status`. An allow line adds `http_status`.
+  `http_status`. An allow line adds `http_status`. **Both** lines add `layer` (`front` or `inner` —
+  which listener produced the record) and `squid` (the result code: `TCP_TUNNEL`, `TCP_DENIED`,
+  `NONE_NONE`). A third line shape appears that is not a verdict at all:
+  `{"event":"connect_accepted", ...}`.
 - **Originally planned:** Contract 4's example object, which carries `ts`, `agent`,
   `identity_source`, `dest_host`, `dest_port`, `resolved_ip`, `verdict`, `control` and `bytes_*`.
 - **Why necessary:** Contract 6 requires the structured denial record to name "the reason, and the
@@ -1395,9 +1398,22 @@ anywhere in the repository. Shell scripts follow `#!/usr/bin/env bash`, `set -eu
   so the line is the only record that exists. `http_status` on the allow line exists because a
   front whose peer was still cold answers **500**: not a refusal by policy, so not a deny, but a
   line reading only `"verdict":"allow"` would report a failed connection as one that worked.
-- **Impact:** Contract 4's object is the superset above. Nothing was removed or renamed, so a
-  consumer written against the original field set still reads. The `event` lines the startup
-  self-check writes carry no `verdict` key at all, so they cannot be misparsed as verdicts.
+  `layer` and `squid` are not decoration and were added after a measurement, not before one. A
+  **bumping** listener logs an attempt TWICE: Squid records the client-side CONNECT the moment it
+  answers it (`NONE_NONE`, status 200, `bytes_out` the size of the CONNECT line, `bytes_in` zero),
+  because on a peeking port the CONNECT must be accepted before the ClientHello that decides the
+  verdict can arrive; the real outcome follows as `TCP_TUNNEL` or `TCP_DENIED`. Observed on the
+  running pod: an SNI-mismatch refusal produced `NONE_NONE/200` and `TCP_DENIED/403` at the same
+  millisecond. Without `squid` the first entry is indistinguishable from an allowed connection, and
+  the trail would say a refused attempt succeeded — Deviation 1's failure mode, one layer further
+  in. It is emitted as `{"event":"connect_accepted"}` rather than dropped, so an agent that opens
+  CONNECTs and never sends a ClientHello still leaves a trace.
+- **Impact:** Contract 4's object is the superset above, and "one object per connection attempt"
+  holds for **verdict** lines: exactly one per attempt, from the layer that decided it. Nothing was
+  removed or renamed, so a consumer written against the original field set still reads. Every
+  non-verdict line carries an `event` key and no `verdict` key — `startup_check` (both stages),
+  `connect_accepted`, `proxy_internal` (Squid's own `cache_peer` probes) and `audit_writer_error` —
+  so a parser selecting on `verdict` sees only verdicts.
 
 ### Deviation 8: `codex` receives no client-visible 403 for any verdict, not only post-ClientHello
 - **What changed:** Interface Contract 6's client half is narrowed again. Its two-path split was
