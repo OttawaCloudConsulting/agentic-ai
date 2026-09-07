@@ -16,9 +16,9 @@
     disabled by default, D14 amendment needed; Deviation 3: egress-net not a live Docker
     resource until 01.3 attaches a service to it). Consider /design refresh to consolidate.
 
-[~] Feature 01.3: Egress mediator
+[x] Feature 01.3: Egress mediator
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/egress-mediator.md
-    Sub-features: 7/8 complete
+    Sub-features: 8/8 complete
     Notes: Re-planned 2026-09-05, Gate 4 re-approved (supersedes the 2026-09-04 approval, which the
     /milestone revision invalidated). Identity, R8.8 and T34 moved to Feature 01.6; 01.3 keeps L7
     controls, DNS, audit, the non-uniform listener surface (claude/agy https, codex plain http
@@ -27,6 +27,13 @@
     operator ratification. Two re-plans queued behind this: 01.1 (deny_fqdns contradiction, carried
     from the prior gate) and 01.4 (stale against Interface Contract 2 -- CODEX_CA_CERTIFICATE, mTLS
     client keys, SF-7a). See docs/records/r8-8-identity-mechanism-gap-escalation.md.
+    Completed 2026-09-07. Test command passes: bash tests/acceptance/verify-egress-mediator.sh,
+    77 assertions across phases A-G. 11 architectural deviations recorded on the plan (6-11 added
+    at the SF-7/SF-8 build). Two mediator defects were found by the harness and fixed rather than
+    worked around: Squid's cache_peers are DEAD at start and cost the first fronted request a 500
+    (the entrypoint now warms the cascade), and unbound answers RFC 6761 special-use TLDs itself
+    and never forwards them (docs/records/resolver-verification.md addendum -- worth a
+    compile-time warning in 01.5). Consider /design refresh to consolidate the deviations.
 
 [~] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
