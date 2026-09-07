@@ -64,9 +64,9 @@ framing is carried verbatim from the options analysis and is the honest summary 
 
 | Component | Responsibility | Interfaces |
 |-----------|---------------|------------|
-| **`claude` container** | Runs Claude Code non-interactively (R3.1). Pinned version, auto-update disabled (`DISABLE_AUTOUPDATER=1`, R3.5). `srt` native sandbox on (R3.7, D14) | Attached to `claude-net` only. Proxy listener on the mediator; mediator-served DNS. Mounts: project dir, `claude-state` volume. Env: `AUTH_MODE`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`. Client cert for mTLS (D6) |
-| **`codex` container** | Runs OpenAI Codex CLI non-interactively (`codex exec`, R3.2). Pinned, auto-update disabled. `features.network_proxy` on; bubblewrap nesting **disabled** — it needs `SYS_ADMIN` + `seccomp=unconfined`, violating R1.4 (R3.8) | Attached to `codex-net` only. Mounts: project dir, `codex-state` volume. Requires `cli_auth_credentials_store = "file"` under `oauth-mount`. **Egress needs `Upgrade` permitted on TCP/443** — Codex defaults to WebSocket transport and silently degrades otherwise (R5.9). Client cert for mTLS |
-| **`agy` container** | Runs Google Antigravity via the `agy` CLI non-interactively (R3.3). GUI explicitly not containerized (R3.4). `--sandbox` on | Attached to `agy-net` only. Mounts: project dir, `agy-state` volume. Env: `GEMINI_API_KEY` **and** `"modelProvider": "gemini"` in settings (D9 — env var alone is a documented no-op). **Exit status is read from the JSON `status` field, not the exit code** — `agy` soft-denies unapproved tools and still exits 0 (R3.6). Client cert for mTLS |
+| **`claude` container** | Runs Claude Code non-interactively (R3.1). Pinned version, auto-update disabled (`DISABLE_AUTOUPDATER=1`, R3.5). `srt` native sandbox **off by default** (R3.7, D14 as amended — it does not nest inside the container) | Attached to `claude-net` only. Proxy listener on the mediator; mediator-served DNS. Mounts: project dir, `claude-state` volume. Env: `AUTH_MODE`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`. Client cert for mTLS (D6) — **target state, Feature 01.6**; as built the identity is the arriving listener |
+| **`codex` container** | Runs OpenAI Codex CLI non-interactively (`codex exec`, R3.2). Pinned, auto-update disabled. `features.network_proxy` **off by default** (D14 as amended); bubblewrap nesting **disabled** — it needs `SYS_ADMIN` + `seccomp=unconfined`, violating R1.4 (R3.8) | Attached to `codex-net` only. Mounts: project dir, `codex-state` volume. Requires `cli_auth_credentials_store = "file"` under `oauth-mount`. **Egress needs `Upgrade` permitted on TCP/443** — Codex defaults to WebSocket transport and silently degrades otherwise (R5.9). Client cert for mTLS (D6) — **target state, Feature 01.6** |
+| **`agy` container** | Runs Google Antigravity via the `agy` CLI non-interactively (R3.3). GUI explicitly not containerized (R3.4). `--sandbox` **off by default** (D14 as amended) | Attached to `agy-net` only. Mounts: project dir, `agy-state` volume. Env: `GEMINI_API_KEY` **and** `"modelProvider": "gemini"` in settings (D9 — env var alone is a documented no-op). **Exit status is read from the JSON `status` field, not the exit code** — `agy` soft-denies unapproved tools and still exits 0 (R3.6). Client cert for mTLS (D6) — **target state, Feature 01.6** |
 | **`egress-mediator` container** | The single enforcement point and the only path to the internet (R1.2). Five roles in one process boundary: L7 CONNECT/SNI policy evaluation, authoritative DNS for the pod, audit writer, mTLS terminator for agent identity, and (gated on D6) upstream credential broker. **Implementation selected and pinned at 01.3 SF-1: Squid 6.13 (`squid-openssl`), with `dnsdist` 1.9.16 and `unbound` 1.22.0 as the two-daemon resolver (D3) and a small `bash` audit writer.** `iron-proxy` was not taken. Every property the design rests on was verified against exactly these builds, which is why the versions and the base-image digest are pinned together — see `docs/records/mediator-selection.md` | Multi-homed onto `claude-net`, `codex-net`, `agy-net` and the external network. Exposes **exactly two ports to each agent network** — the proxy listener (3128) and the resolver (53, UDP and TCP) — and no management or metrics port (see [Mediator hardening](#mediator-hardening) below). **The proxy is five listeners, not three (01.3 Deviation 1):** Squid cannot both terminate the agent-to-mediator TLS hop and peek at the client's ClientHello on one port, so each TLS-fronted agent gets a front listener on its own network plus a peeking inner listener on **loopback inside the container**, and `codex`'s single plaintext listener does both. The inner listeners are not reachable from any agent network, which is what keeps the cascade inside criterion 1's "exactly {proxy, resolver}" enumeration; the acceptance harness asserts it by port sweep from each agent network. Reads the resolved egress policy; writes the audit stream to the sink. Broker secrets and the listener certificates injected at runtime through Compose `secrets:`, never baked into the image and never on an agent-reachable volume. **The CA private key is not injected at all — 01.3 SF-3 narrows issuance to an offline operator script and keeps the key on the operator host** |
 | **`claude-net` / `codex-net` / `agy-net`** | Per-agent isolation segments, `internal: true` — no default route, no DNS path to the internet (D2, D3) | Each carries exactly one agent container plus the mediator |
 | **External network** (`egress-net`) | The mediator's only route out | Mediator only. No agent container is ever attached. **Declared but not a live Docker resource until 01.3 SF-4 attached the mediator to it** (01.2 Deviation 3, now closed): 01.2 could declare the network but nothing joined it, so its properties were unasserted for one feature |
@@ -117,19 +117,29 @@ SDKs ship with rebinding protection **off** by default (CVE-2025-66414, CVE-2025
 agent process
   → HTTPS_PROXY / native proxy config
   → agent-net (internal: true — no other route exists)
-  → mediator proxy listener
-      ├─ mTLS handshake: client cert → agent identity            (R8.8, D6)
-      ├─ DNS resolution by the mediator's own resolver           (R5.4, D3)
-      ├─ control 1: allowlist match on CONNECT/SNI hostname      (R5.2, R5.5)
-      ├─ control 2: resolved IP vs. CIDR denylist — deny wins    (R5.3, R5.7)
-      ├─ control 3: per-agent rate / concurrency check           (D5)
-      ├─ optional: inject brokered upstream credential           (D6, D13)
-      └─ audit line: {session, agent identity, destination, verdict=allow, ts}
-  → external network → destination
+  → mediator FRONT listener on that agent's network            (3128; TLS for claude/agy, plain for codex)
+      ├─ terminates the agent→mediator proxy hop (D4 amendment) — TLS-fronted listeners
+      │   cannot also peek, so the front decides on the CONNECT authority alone
+      ├─ identity = arriving listener (01.3): agent ↔ port ↔ network are 1:1
+      │   (mTLS client-cert identity — R8.8, D6 — is 01.6, not built)
+      ├─ control 1a: allowlist match on the CONNECT authority     (R5.2)
+      └─ cache_peer → mediator INNER listener on loopback         (not reachable from any agent net)
+  → inner listener (ssl-bump peek at step SslBump1, then splice)
+      ├─ DNS resolution by the mediator's own resolver            (R5.4, D3)
+      ├─ control 1b: allowlist match on the TLS SNI               (R5.5 — catches domain fronting)
+      ├─ control 2: resolved IP vs. CIDR denylist — deny wins     (R5.3, R5.7)
+      ├─ control 3: per-agent rate / concurrency check            (D5)
+      ├─ optional: inject brokered upstream credential            (D6, D13 — not built)
+      └─ raw audit line → FIFO → audit writer → JSON audit sink
+  → egress-net → destination
 ```
 
-TLS is spliced at the CONNECT boundary: the mediator validates the destination and passes the
-connection through undecrypted (R5.15, D4). It sees hostname and byte count, never payload.
+`codex` has one plaintext listener that does both jobs, so its path has no cascade hop — which is
+why a `codex` denial is refused *after* the CONNECT is accepted and carries no error body.
+
+TLS is spliced at the CONNECT boundary: the mediator peeks at the ClientHello to read the SNI,
+then passes the connection through undecrypted (R5.15, D4). It sees hostname and byte count, never
+payload. The certificate the destination presents is the origin's own, not the mediator's.
 
 ### 2. Blocked outbound attempt
 
@@ -145,6 +155,23 @@ There is no path from any agent network to port 53 on the internet. Every lookup
 the mediator's resolver, which is also the component that evaluates the allowlist — so the name
 that was resolved and the name that was authorised are the same name. DNS tunnelling is
 structurally unavailable rather than filtered (R5.4, D3).
+
+The resolver is two daemons, not one (D3 as amended at 01.3):
+
+```text
+agent stub resolver → agent-net → mediator :53 (udp/tcp)
+  → dnsdist 1.9.16 — policy: the arriving subnet names the agent, the per-agent allowlist
+      decides, and every decision (name, QTYPE, agent, verdict) is written to the audit sink
+      before anything is forwarded; a refusal is REFUSED, never NXDOMAIN
+  → unbound 1.22.0 on loopback:5353 — re-origination only: recursion, cache, and the
+      RFC 6761 special-use zones (test., invalid., localhost., example.) answered locally
+      and never forwarded
+  → egress-net → upstream
+```
+
+Splitting policy from re-origination is what lets the audit line be written by the component that
+made the decision. Note the RFC 6761 consequence recorded at 01.3 SF-8: names under `test.` cannot
+be used for fixtures, because unbound answers them locally — the acceptance harness uses `.lab`.
 
 ### 4. Audit write path
 
@@ -192,13 +219,14 @@ file ownership, so `0600` means nothing inside the container and `:ro` is the on
 
 ## File Organization
 
-Target tree. Everything below `compose/` and beyond is **not yet built** — this is the shape M1
-creates, following the packaging convention set by `solutions/well-architected-review/` (D19).
+The tree as it stands after Feature 01.3. Paths marked *(not yet built)* in the comments below
+are still target state; everything else exists and is exercised by the acceptance harnesses. It
+follows the packaging convention set by `solutions/well-architected-review/` (D19).
 
 ```text
 repository root/
 └── .github/workflows/
-    └── agent-sandbox-image.yml   # builds + publishes the base image to GHCR (D21)
+    └── agent-sandbox-image.yml   # (not yet built) builds + publishes the base image to GHCR (D21)
 
 solutions/agent-containerization/
 ├── README.md                      # install, prerequisites, first-run auth, troubleshooting (R12.6)
@@ -233,8 +261,8 @@ solutions/agent-containerization/
 │                                  #   mawk emits nothing from a FIFO whose writer is still open)
 ├── profiles/
 │   ├── default.yaml               # project mount + state volumes only; every optional mount off
-│   └── <use-case>.yaml            # packs, mounts, AUTH_MODE per agent, OS packages, export toggles
-├── packs/
+│   └── <use-case>.yaml            # (not yet built — 01.5) packs, mounts, AUTH_MODE, OS packages
+├── packs/                         # (not yet built — Feature 01.5)
 │   ├── aws-cli/pack.yaml          # egress entries, pinned OS packages, mounts
 │   ├── terraform/pack.yaml
 │   ├── kubernetes/pack.yaml
@@ -256,9 +284,9 @@ solutions/agent-containerization/
 │   └── identity/                  # CA and per-agent cert issuance (R8.8). No private key committed
 ├── scripts/                       # bash, `set -euo pipefail`, invoked as `bash script.sh`
 │   ├── compile-policy.sh          # profile + packs → policy/resolved/
-│   ├── build.sh                   # per-profile image build; emits digest + SBOM (SC-8)
-│   ├── bootstrap-auth.sh          # per-agent AUTH_MODE bootstrap, incl. :ro copy-to-volume (R4.15)
-│   ├── validate-boundary.sh       # runs the adversarial matrix (R12.8) before real use
+│   ├── build.sh                   # (not yet built — 01.5) per-profile image build; digest + SBOM (SC-8)
+│   ├── bootstrap-auth.sh          # (not yet built — 01.4) per-agent AUTH_MODE bootstrap, incl. :ro copy-to-volume (R4.15)
+│   ├── validate-boundary.sh       # (not yet built — M2) runs the adversarial matrix (R12.8)
 │   ├── lint-policy.sh             # feature test command (01.1); policy/*.yaml well-formedness only
 │   ├── issue-identity.sh          # OFFLINE CA + listener certificates (01.3 SF-3). Runs on the
 │   │                              #   operator host; the CA private key never enters the mediator
