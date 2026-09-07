@@ -18,6 +18,15 @@
 -- Only the agent networks may query at all. The mediator also holds an interface
 -- on the external network; nothing there can reach this listener, both because no
 -- address there is bound below and because the ACL refuses it.
+-- dnsdist polls for its own security status on a timer, resolving
+-- `*.security-status.dnsdist.powerdns.com` through the CONTAINER's resolver rather
+-- than through the pod resolver this file configures. That is third-party egress
+-- originating in the enforcement point itself: attributable to no agent, absent
+-- from the audit trail, and invisible even to the harness's controlled upstream
+-- because it never takes that path. Observed on the shipped mediator, not assumed.
+-- Off, for the same reason R10.3 disables the agents' auto-updaters.
+setSecurityPollSuffix("")
+
 setACL({@ACL@})
 
 -- One listener per agent network, on the mediator's static address for that
@@ -29,12 +38,14 @@ setACL({@ACL@})
 -- already permits a loopback-bound listener ("any management, metrics, admin or
 -- health endpoint binds the loopback interface inside the mediator").
 --
--- Health checks are OFF. The backend is a process in this same container, so a
--- health probe adds nothing a dead-process check does not already give -- and an
--- enabled check queries through to the real upstream on an interval, producing
--- egress traffic attributable to no agent and appearing in no audit line
--- (docs/records/resolver-verification.md, "Results carried forward").
-newServer({address="127.0.0.1:@REORIGIN_PORT@", pool="reorigin", healthCheckMode="lazy", checkInterval=0, mustResolve=false})
+-- Health checks are OFF, and `healthCheckMode="up"` is what actually achieves it.
+-- `checkInterval=0` with lazy mode does NOT: measured on the shipped mediator, it
+-- sent two `a.root-servers.net` queries to the upstream in 60 seconds of idle --
+-- egress attributable to no agent and on no audit line, which is the shape
+-- criterion 7 exists to name. "up" marks the backend permanently up and probes
+-- never run. Nothing is lost: the backend is a process in this same container, and
+-- the supervisor already takes the whole mediator down if it dies.
+newServer({address="127.0.0.1:@REORIGIN_PORT@", pool="reorigin", healthCheckMode="up"})
 
 -- ------------------------------------------------------------------ audit sink
 -- One JSON line per DNS decision, allow and deny alike -- the four fields

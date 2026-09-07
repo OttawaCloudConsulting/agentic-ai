@@ -2,6 +2,11 @@
 
 **Date:** 2026-09-07
 **Host:** Docker Desktop 28.3.2, macOS 26, Apple silicon (R11.1, A1)
+**Verified against:** `dnsdist 1.9.16-0+deb13u1`, `unbound 1.22.0-2+deb13u3`, on
+`debian:trixie-slim@sha256:d7e1218...` — the exact package strings pinned in
+`compose/pins.env`. The directives these properties rest on are version-scoped, so
+the full string is recorded rather than the marketing version, in the manner
+`mediator-selection.md` records Squid's.
 **Subject:** whether the resolver binary the mediator image already carries can express
 acceptance criterion 4 — the closed forwarder — and, where it cannot, what does.
 
@@ -298,6 +303,21 @@ build that works on one machine and not another.
   socket, or it will fail on this. Binding `outgoing-interface: 127.0.0.1` would
   remove it, and is deliberately not done — it would break the configurable upstream
   the harness depends on for T4.
+- **Two sources of mediator-originated egress were found by idling the pod against
+  the T4 fixture, and both are now off.** Neither was visible in any agent's audit
+  line, which is exactly why they were looked for.
+  - *dnsdist's security poll.* It resolves `security-status.dnsdist.powerdns.com`
+    on a timer through the **container's** resolver, not the pod resolver — so it
+    bypasses this configuration entirely and would not appear even in the harness's
+    controlled upstream. `setSecurityPollSuffix("")` turns it off, for the same
+    reason R10.3 disables the agents' auto-updaters. Confirmed by the log line
+    disappearing.
+  - *Backend health checks.* `healthCheckMode="lazy"` with `checkInterval=0` does
+    **not** disable them: two `a.root-servers.net` queries reached the upstream in
+    60 seconds of idle. `healthCheckMode="up"` does. Re-measured after the change:
+    **zero** unprompted queries in 60 seconds. The comment claiming checks were off
+    was wrong before it was true, which is the argument for measuring rather than
+    reading the documentation.
 - **Squid's own resolution path is SF-6's, and it collides with this design.** If SF-6 points
   `dns_nameservers` at the pod resolver, Squid's queries arrive from `127.0.0.1` — no agent
   subnet, so no view, so REFUSED by default-deny. SF-1's verified configuration used
@@ -306,9 +326,7 @@ build that works on one machine and not another.
 
 ## Not established here
 
-- Behaviour under the shipped resolved-policy artifact. The fixture used hand-written
-  allowlists mirroring `policy/resolved/default.yaml`; rendering the configuration from the
-  artifact is the build, and SF-8 Phase D is the assertion.
-- Anything about the upstream's identity. Which address the mediator forwards to is a
-  configuration decision recorded with the build, not a property tested here.
-- Load, cache and failure behaviour of the two-stage cascade under concurrency.
+- Load, ordering and cache behaviour of the two-stage cascade under concurrency.
+- The audit sink's durability properties, which SF-7 inherits from SF-4's record. The
+  DNS trail is written and flushed per line, but "decision made implies decision
+  durably recorded" is not established here any more than it was for the egress trail.
