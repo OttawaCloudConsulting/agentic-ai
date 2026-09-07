@@ -135,13 +135,28 @@ esac
 # A refused CONNECT returns Squid's ERR_MEDIATOR_ALLOWLIST page (HTTP 403). The audit line is
 # the authoritative denial record and names the control; this only needs to know it was refused.
 probe_endpoint() {
-  local fqdn="$1" out
-  # --max-time bounds a hang; -o /dev/null discards the body. A 000/exit-nonzero from a
-  # transport failure is NOT treated as a policy gap -- only an explicit proxy refusal is.
-  out="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://$fqdn/" 2>&1)" || true
+  local fqdn="$1" out ca ca_args=()
+
+  # The TLS proxy hop must be ANCHORED or this check silently inverts. claude and agy reach an
+  # `https://` listener; without the mediator CA, curl fails the PROXY handshake and never issues
+  # CONNECT at all -- the mediator logs nothing and the probe cannot tell "refused by policy" from
+  # "could not talk to the proxy". Observed: every claude candidate returned 000 with no audit
+  # line until --proxy-cacert was supplied. codex's hop is plain HTTP CONNECT and needs no anchor,
+  # which is why the CA variables are read rather than a path being hardcoded.
+  for ca in "${NODE_EXTRA_CA_CERTS-}" "${SSL_CERT_FILE-}"; do
+    if [ -n "$ca" ] && [ -r "$ca" ]; then ca_args=(--proxy-cacert "$ca"); break; fi
+  done
+
+  # A refused CONNECT is reported on STDERR, not in %{http_code} -- curl exits 56 and the code is
+  # 000, the same 000 a transport failure produces. Matching on the message is what distinguishes
+  # a policy denial from an unreachable proxy; matching on the code would treat both as failures
+  # and exit 4 on a broken pod. Both curl phrasings are accepted across versions.
+  out="$(curl -sS -o /dev/null ${ca_args[@]+"${ca_args[@]}"} --max-time 20 "https://$fqdn/" 2>&1)" || true
   case "$out" in
-    *403*) return 1 ;;   # refused by the mediator
-    *)     return 0 ;;
+    *"CONNECT tunnel failed, response 403"*)   return 1 ;;
+    *"received HTTP code 403 from proxy"*)     return 1 ;;
+    *"Received HTTP code 403 from proxy"*)     return 1 ;;
+    *) return 0 ;;
   esac
 }
 
