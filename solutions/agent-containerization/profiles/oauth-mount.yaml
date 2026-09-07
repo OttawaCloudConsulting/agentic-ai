@@ -1,0 +1,122 @@
+# The `oauth-mount` profile (01.4 SF-4, Interface Contract 3). Identical to
+# profiles/default.yaml in every respect except the two this mode turns on:
+# `auth_mode.codex` and the `oauth_mount` block that default.yaml documents as
+# deliberately absent.
+#
+# It is a full profile rather than a fragment because `scripts/compile-policy.sh`
+# resolves one named profile at a time -- `--profile oauth-mount` must produce a
+# complete artifact, not a partial one. Where a value below is unchanged from
+# default.yaml, the comment is trimmed rather than repeated; read default.yaml for
+# the reasoning.
+#
+# USING IT (the whole sequence -- each step is load-bearing):
+#
+#   bash scripts/stage-oauth-mount.sh --profile oauth-mount   # host-side. Stages the
+#                                                             # credential and this file's
+#                                                             # accepted_risk record
+#   docker compose --env-file compose/pins.env \
+#     -f compose/compose.yaml -f compose/overrides/default.yaml \
+#     -f compose/overrides/oauth-mount.bootstrap.yaml \
+#     run --rm codex bash /usr/local/bin/bootstrap-auth codex
+#
+# The second command is ONE-SHOT. Steady state never layers the bootstrap fragment, so the
+# host credential source is absent from the running pod entirely (R4.15) -- see README.md.
+
+name: oauth-mount
+
+packs: []
+
+auth_mode:
+  claude: oauth-interactive    # unchanged from default
+  codex: oauth-mount           # THE CHANGE. Its other supported cells are apikey and
+                               # oauth-interactive; oauth-token has no env equivalent
+  agy: apikey                  # unchanged from default (D9)
+
+mounts:
+  project:
+    path: <host path>
+    mode: rw
+  build_cache: false
+  host_git_config: false
+
+# R4.17's accepted risk, in the shape Interface Contract 3 fixes. Two consumers, and they
+# are at different times:
+#
+#   BUILD time   01.5's policy compiler refuses the build when this block is absent (T27).
+#                Not yet built -- 01.4 defines the shape, 01.5 enforces it there.
+#   BOOTSTRAP    scripts/stage-oauth-mount.sh reads these five fields, validates them and
+#                writes them into the staged directory as accepted-risk.yaml.
+#                bootstrap-auth.sh refuses to copy a credential from a source that does not
+#                carry the record (exit 3). So the risk is acknowledged in a file the
+#                operator wrote, at the moment the credential crosses the boundary.
+oauth_mount:
+  codex:
+    # A DEDICATED DIRECTORY, never the credential file itself (R4.14), and never ~/.codex --
+    # that is a 54-entry directory of sessions, archived sessions and global state, none of
+    # which has any business crossing the boundary. The staging script writes exactly two
+    # files here. Path is relative to the solution root; compose/generated/ is git-ignored.
+    host_dir: compose/generated/oauth-src
+    accepted_risk:
+      file: auth.json -- the Codex OAuth credential set (refresh token, 10-day access token,
+        1 h id_token), staged from the operator's host ~/.codex/auth.json with OPENAI_API_KEY
+        removed
+      mount_mode: ro            # the only permitted value (R4.13)
+      revocation_path: >-
+        In-container, `codex logout` removes the stored credentials (verified present in
+        0.152.1). That is local removal, not revocation -- also revoke the session at the
+        OpenAI account, since a copy of the volume keeps a valid refresh token. On the host,
+        re-run `codex login` to re-establish the operator's own session. See
+        docs/records/credential-inventory.md row V3.
+      blast_radius: >-
+        A container compromise yields the operator's ChatGPT OAuth session: a refresh token
+        with NO stated provider expiry (unlike claude's ~28 days, nothing bounds it) plus a
+        10-day access token, both readable from the state volume by the agent that owns it.
+        The staged copy strips OPENAI_API_KEY, so E2's API-key blast radius is not silently
+        added to this one.
+      rotation: >-
+        MEASURED, 01.4 SF-3 (docs/records/agent-verification.md): codex ROLLS its refresh
+        token on refresh. The container's first refresh mints a new token onto the state
+        volume and leaves the host ~/.codex/auth.json holding the previous one. What was
+        measured is that the host copy is SUPERSEDED; what was NOT measured is whether the
+        provider REJECTS it when the host CLI next presents it. The conservative reading is
+        the one accepted here: treat oauth-mount as a ONE-SHOT BOOTSTRAP THAT COSTS THE
+        OPERATOR THEIR HOST CODEX LOGIN. Being wrong in this direction costs a documented
+        re-login that was not strictly necessary; being wrong the other way breaks the host
+        CLI without warning. The cost is deferred, not immediate -- the refresh trigger is
+        the access token's own 10-day expiry, so a pod that is bootstrapped and then left
+        alone may never pay it.
+
+limits:
+  cpus: "2.0"
+  memory: 4g
+  pids: 512
+
+listeners:
+  claude: {scheme: https, tls: true,  port: 3128}
+  codex:  {scheme: http,  tls: false, port: 3128}
+  agy:    {scheme: https, tls: true,  port: 3128}
+
+rate_limits:
+  claude: {max_concurrent: 16, bytes_per_second: 2000000}
+  codex:  {max_concurrent: 16, bytes_per_second: 2000000}
+  agy:    {max_concurrent: 16, bytes_per_second: 2000000}
+
+# Unchanged from default.yaml -- see there for the R10.3 reasoning.
+egress_exclusions:
+  - agent: agy
+    fqdn: antigravity-cli-auto-updater-974169037036.us-central1.run.app
+    reason: >-
+      R10.3 is a MUST: agent auto-updaters are disabled so a pinned build stays pinned.
+      agy has no flag or env var that disables the check, so default-deny is the only
+      mechanism left and the entry is not copied through.
+
+startup_check:
+  allowed: {agent: claude, fqdn: api.anthropic.com, port: 443}
+  denied:  {ip: 169.254.169.254, port: 443}
+  offline: false
+
+exports:
+  egress_audit_log: true
+  agent_action_log: true
+  resolved_policy: true
+  image_digest_sbom: true

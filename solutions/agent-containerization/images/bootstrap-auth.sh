@@ -290,17 +290,101 @@ when it is no longer needed."
 }
 
 do_oauth_mount() {
-  # SF-4 supplies the copy-from-/run/oauth-src step and its shape constraints (R4.13-R4.15,
-  # R4.17). Until then this cell is declared-but-not-built: it is a SUPPORTED cell per Interface
-  # Contract 1, so it must not exit 2 as if unsupported.
+  # codex only -- the matrix has no other supported cell (claude's host credential is
+  # macOS-Keychain-resident and not portable to a Linux container, R4.8; agy offers no OAuth
+  # cell at all, D9).
+  #
+  # THE BOOTSTRAP BOUNDARY IS THE MOUNT, NOT A FLAG (R4.15, criterion 5). $SRC exists only while
+  # compose/overrides/oauth-mount.bootstrap.yaml is layered, which is the one-shot `run --rm`
+  # and nothing else. So at steady state there is no source to copy from, and two failures stop
+  # being possible rather than being guarded against: a re-copy on every start clobbering the
+  # token the container just refreshed (edge case 1), and an agent DELETING its own credential
+  # to force a re-copy (edge case 2), where the guard's condition would be exactly what the
+  # agent controls. An emptied volume exits 3 here and -- because entrypoint.sh runs under
+  # `set -e` -- FAILS THE CONTAINER START.
+  #
+  # This branch does NOT relax at --at-start. `missing_credential` is deliberately not used
+  # below: every exit here is die 3.
+  local src="${OAUTH_MOUNT_SRC:-/run/oauth-src}"
+
   if already_authenticated; then
     echo "bootstrap-auth: (codex, oauth-mount) already authenticated -- no-op"
     return 0
   fi
-  die 3 "(codex, oauth-mount) has no credential on the state volume and the bootstrap copy step \
-is not built yet (01.4 SF-4). Bootstrap it with the one-shot invocation once SF-4 lands: \
-docker compose -f compose/compose.yaml -f compose/overrides/default.yaml \
--f compose/overrides/oauth-mount.bootstrap.yaml run --rm codex bash /usr/local/bin/bootstrap-auth codex"
+
+  local bootstrap_cmd="bash scripts/stage-oauth-mount.sh --profile oauth-mount && \
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+-f compose/overrides/default.yaml -f compose/overrides/oauth-mount.bootstrap.yaml \
+run --rm codex bash /usr/local/bin/bootstrap-auth codex"
+
+  [ -d "$src" ] || die 3 "(codex, oauth-mount) has no credential on the state volume and no \
+credential source at $src -- this is steady state, where R4.15 requires the host mount to be \
+ABSENT. Re-bootstrap deliberately: $bootstrap_cmd"
+
+  # :ro is the ONLY real control here (R4.13). Docker Desktop's VirtioFS fakes file ownership,
+  # so a 0600 on the host means nothing inside the container -- the mount mode is what is
+  # asserted, and it is read from the kernel's own view rather than trusted from the fragment.
+  # Field 6 of a mountinfo line is the per-mount option list; field 5 is the mount point.
+  local opts
+  opts="$(awk -v mp="$src" '$5 == mp {print $6}' /proc/self/mountinfo | tail -n1)"
+  [ -n "$opts" ] || die 3 "$src is not a mount point. R4.14 requires a dedicated :ro DIRECTORY \
+mounted from the host, not a directory the container created for itself."
+  case ",$opts," in
+    *,ro,*) ;;
+    *) die 3 "$src is mounted '$opts', not read-only. R4.13 permits :ro and nothing else -- a \
+writable credential source lets a compromised agent write back to the host." ;;
+  esac
+
+  # R4.17: the risk record travels WITH the material it is about. scripts/stage-oauth-mount.sh
+  # writes it from the profile's oauth_mount.codex.accepted_risk block, so a credential can only
+  # be staged by an operator who recorded what staging it costs. 01.5 moves the same refusal to
+  # build time (T27); this is the bootstrap-time half Interface Contract 3 assigns to 01.4.
+  local risk="$src/accepted-risk.yaml"
+  [ -s "$risk" ] || die 3 "$src carries no accepted-risk.yaml. R4.17 requires the accepted risk \
+to be recorded before a host credential crosses the boundary. Stage the directory with \
+scripts/stage-oauth-mount.sh rather than by hand -- it writes the record from the profile."
+  local field
+  for field in file mount_mode revocation_path blast_radius rotation; do
+    grep -Eq "^[[:space:]]*${field}:" "$risk" \
+      || die 3 "$risk is missing the '$field' field (R4.17). Re-run scripts/stage-oauth-mount.sh."
+  done
+
+  local staged="$src/auth.json"
+  [ -s "$staged" ] || die 3 "$src is mounted but holds no auth.json. Run \
+'bash scripts/stage-oauth-mount.sh' on the HOST first -- it stages the credential from \
+~/.codex/auth.json with OPENAI_API_KEY removed."
+
+  # Shape, never content (edge case 11): a bootstrap interrupted mid-copy, or a directory holding
+  # a config but no token, must not read as authenticated. grep rather than jq -- only the agy
+  # image carries jq, and claiming a JSON parse this container cannot do would be worse than an
+  # honest string check.
+  grep -q '"refresh_token"' "$staged" \
+    || die 3 "$staged carries no refresh_token -- it is not an OAuth credential set. A file \
+holding only OPENAI_API_KEY is an API key, which is AUTH_MODE=apikey, not oauth-mount."
+
+  # The staged copy must NOT carry OPENAI_API_KEY, and this is a TEST-VALIDITY control before it
+  # is a security one: codex would authenticate off the API key and this cell would pass green
+  # while the OAuth path it exists to prove was broken. The staging script strips it; this
+  # refuses a hand-built directory that did not.
+  ! grep -q '"OPENAI_API_KEY"' "$staged" \
+    || die 3 "$staged still carries OPENAI_API_KEY. Stage with scripts/stage-oauth-mount.sh, \
+which removes it -- mounted as-is, codex could authenticate off the API key and this cell would \
+pass while the OAuth path was broken."
+
+  # ONE FILE, never the directory. R4.14's dedicated directory is about what leaves the host;
+  # copying only the credential is about what lands on the volume -- accepted-risk.yaml is the
+  # operator's record and has no business persisting into the agent's home.
+  mkdir -p "$CODEX_HOME"
+  cp "$staged" "$CODEX_HOME/auth.json"
+  chmod 600 "$CODEX_HOME/auth.json"
+
+  already_authenticated \
+    || die 3 "(codex, oauth-mount) copy from $src did not produce $CODEX_HOME/auth.json"
+
+  echo "bootstrap-auth: (codex, oauth-mount) bootstrapped from $src onto the state volume"
+  echo "bootstrap-auth: ONE-SHOT. codex ROLLS its refresh token (01.4 SF-3), so this container's"
+  echo "bootstrap-auth: first refresh supersedes the host copy -- expect to run 'codex login' on"
+  echo "bootstrap-auth: the host again. Steady state must NOT layer the bootstrap fragment."
 }
 
 # --------------------------------------------------------------------------- dispatch

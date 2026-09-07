@@ -166,6 +166,83 @@ docker compose --env-file compose/pins.env -f compose/compose.yaml build egress-
 obtain, its lifetime and its documented revocation path. The `oauth-token` cell mints a **one-year**
 token — record it there and revoke it when it is no longer needed.
 
+### Codex `oauth-mount` (optional, one-shot)
+
+`oauth-mount` copies your **host** Codex OAuth credential into the pod's state volume, once. It
+is codex's only host-credential mode and no other agent has one: claude's credential is
+macOS-Keychain-resident and not portable to a Linux container, and `agy` is API-key-only by
+decision.
+
+**Read this before you use it.** Codex **rolls** its refresh token — measured, not assumed
+(`docs/records/agent-verification.md`, 01.4 SF-3). The container's first refresh mints a new token
+onto the volume and leaves your host `~/.codex/auth.json` holding the previous one. Treat it as a
+**one-shot bootstrap that costs you your host codex login**: expect to run `codex login` on the
+host again. The cost is deferred, not immediate — the refresh trigger is the access token's own
+10-day expiry, so a pod you bootstrap and then leave alone may never pay it.
+
+```bash
+# 1. Stage. HOST-SIDE, and required first -- like the git-config scrub, the filtering happens
+#    before the material crosses the boundary.
+bash scripts/stage-oauth-mount.sh --profile oauth-mount
+
+# 2. Bootstrap. ONE-SHOT: `run --rm`, never `up`.
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml \
+  -f compose/overrides/default.yaml \
+  -f compose/overrides/oauth-mount.bootstrap.yaml \
+  run --rm codex bash /usr/local/bin/bootstrap-auth codex
+
+# 3. Steady state. The bootstrap fragment is NOT layered -- the credential source is absent
+#    from the running pod entirely.
+CODEX_AUTH_MODE=oauth-mount docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up -d
+```
+
+What is mounted is `compose/generated/oauth-src/` — a **dedicated directory** holding exactly two
+staged files — and never your `~/.codex`, which is a 54-entry directory of sessions, archived
+sessions and global state. The staging script strips `OPENAI_API_KEY` from the credential on the
+way through. That is a **test-validity control before it is a security one**: your host
+`auth.json` carries both an OAuth token set and a raw API key, and mounted as-is codex could
+authenticate off the key while the OAuth path was broken. `bootstrap-auth` refuses a source that
+still carries it.
+
+The mount is `:ro`, which is the only real control — Docker Desktop's VirtioFS fakes file
+ownership, so `0600` means nothing inside the container. `bootstrap-auth` reads the actual mount
+options from `/proc/self/mountinfo` and refuses anything but read-only.
+
+**The risk record is not paperwork.** `profiles/oauth-mount.yaml` carries
+`oauth_mount.codex.accepted_risk` with five fields — `file`, `mount_mode`, `revocation_path`,
+`blast_radius`, `rotation` (R4.17). The staging script validates them and writes them into the
+staged directory as `accepted-risk.yaml`; `bootstrap-auth` **exits 3 if that record is absent or
+incomplete**. So a host credential can only cross the boundary from a directory whose operator
+recorded what crossing costs. Feature 01.5 moves the same refusal to build time.
+
+**Why "one-shot" is structural, not advice.** Steady state never layers the bootstrap fragment, so
+there is no source to copy from. Two failures stop being possible rather than being guarded
+against: a re-copy on every start clobbering the token the container just refreshed, and an agent
+**deleting its own credential** to force a re-copy — where the guard's condition would be exactly
+what the agent controls. On an emptied volume at steady state, `bootstrap-auth` exits `3` naming
+the bootstrap command, and because the entrypoint runs under `set -e` that **fails the container
+start**. Re-bootstrapping is a deliberate act.
+
+Skipping step 1 is fail-closed rather than silent: Compose creates the missing source directory
+empty, and `bootstrap-auth` exits `3` saying the directory holds no `auth.json`.
+
+**The browser-redirect alternative.** If you want plain `codex login` (callback on `localhost:1455`)
+instead of device code, layer `compose/overrides/codex-callback.yaml` and invoke the CLI directly —
+`bootstrap-auth` hard-codes `--device-auth` on purpose:
+
+```bash
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml \
+  -f compose/overrides/codex-callback.yaml \
+  run --rm --service-ports codex codex login
+```
+
+That publishes `127.0.0.1:1455:1455` — a host-side publish so your browser can reach *into* the
+container. It gives the container no route *out*: `internal: true` is untouched and egress still
+goes through the mediator or nowhere.
+
 ### Host git configuration (optional, default off)
 
 `profiles/default.yaml` sets `mounts.host_git_config: false`, so nothing below happens unless you

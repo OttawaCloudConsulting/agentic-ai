@@ -57,6 +57,11 @@ mounts:
 #
 # The directory is mounted only by compose/overrides/oauth-mount.bootstrap.yaml, for a one-shot
 # `run --rm`, and never at steady state (R4.15).
+#
+# profiles/oauth-mount.yaml is that profile, built at 01.4 SF-4: this file with auth_mode.codex
+# set to oauth-mount and the block above populated. scripts/stage-oauth-mount.sh reads its
+# accepted_risk record and stages it alongside the credential, and bootstrap-auth.sh refuses to
+# copy a credential from a source that does not carry it. See README.md, "Codex oauth-mount".
 
 limits:                         # R1.10, applied per agent container
   cpus: "2.0"

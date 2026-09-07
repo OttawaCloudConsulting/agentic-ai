@@ -254,7 +254,7 @@ per agent, not both.
   persisted one (R4.16). **Gates SF-4** — its result decides whether `oauth-mount` is a durable mode
   or a one-shot bootstrap that costs the operator their host login. Depends on SF-2.
 
-- [ ] **SF-4: `oauth-mount` bootstrap invocation and its shape constraints** — the fourth dispatcher
+- [x] **SF-4: `oauth-mount` bootstrap invocation and its shape constraints** — the fourth dispatcher
   branch plus `compose/overrides/oauth-mount.bootstrap.yaml`: dedicated `:ro` directory (R4.14,
   R4.13), copy-to-volume during a one-shot invocation only, steady state with no host mount at all
   (R4.15), the exit-`3` behaviour on an emptied volume, and the R4.17 accepted-risk record carrying
@@ -891,3 +891,57 @@ mode 644, invoked as `bash script.sh`.
   moves: no exit code, mount, matrix cell or allowlist entry changed, and both SF-3 deliverables
   ship complete. If the question is wanted later, the cheap way to buy it is a throwaway provider
   account, which is a `/milestone` scope item and not a re-plan of 01.4.
+
+### Deviation 4: the callback publish ships as its own fragment, not inside the bootstrap fragment
+
+- **What changed:** `compose/overrides/oauth-mount.bootstrap.yaml` carries the `:ro` credential
+  mount and the `AUTH_MODE: oauth-mount` override, and **publishes no port**. The
+  `127.0.0.1:1455:1455` callback forward ships as a separate layerable fragment,
+  `compose/overrides/codex-callback.yaml`, invoked with `run --rm --service-ports codex codex login`
+  — the CLI directly, because `bootstrap-auth` hard-codes `--device-auth`.
+- **Originally planned:** Files to Create/Modify makes one file of both: "the dedicated `:ro`
+  credential-source directory, **plus the optional `127.0.0.1:1455:1455` callback publish**."
+- **Why necessary:** "optional" is not expressible inside a Compose fragment — a fragment is layered
+  whole or not at all, so a publish carried there would open a host port on every bootstrap
+  invocation, which is the one invocation that is *not* an interactive login. The two also belong to
+  different modes: the callback is an `oauth-interactive` concern, and `oauth-mount` performs no
+  login at all. Under R2.8's default-off posture, publishing a port the device-code path never uses
+  is the wrong default. Operator decision at the SF-4 build (2026-09-07), choosing the separate
+  fragment over both omitting it and folding it in.
+- **Impact:** the callback forward is now reachable without editing a file, which the "documented
+  only" reading of SF-2 did not give. It is honest but currently inert through `bootstrap-auth`:
+  using it means invoking `codex login` directly, and the fragment says so. SF-5's T25 assertions
+  read the bootstrap fragment's mount set, which is unchanged and now free of a published port that
+  would have had to be asserted absent at steady state. If a future feature gives the dispatcher a
+  callback branch, this fragment is where its port already lives.
+
+### Deviation 5: the `accepted_risk` record reaches the container through a staged file, produced by two files the plan does not list
+
+- **What changed:** two files not in Files to Create/Modify. `profiles/oauth-mount.yaml` — a
+  complete profile (it compiles: `bash scripts/compile-policy.sh --profile oauth-mount`) carrying
+  `auth_mode.codex: oauth-mount` and Interface Contract 3's `oauth_mount.codex.accepted_risk` block
+  with the five fields populated, `rotation` quoting SF-3's conservative reading. And
+  `scripts/stage-oauth-mount.sh` — host-side, the counterpart of `scrub-gitconfig.sh`: it validates
+  those five fields, refuses a Keychain-backed host install, strips `OPENAI_API_KEY` from
+  `~/.codex/auth.json`, and writes `auth.json` plus `accepted-risk.yaml` into
+  `compose/generated/oauth-src/`. `bootstrap-auth.sh` then refuses to copy a credential from a
+  source lacking that record or any of its five fields (exit 3).
+- **Originally planned:** Interface Contract 3 assigns the bootstrap-time half of T27 to 01.4 —
+  "`bootstrap-auth.sh` exits `3` if the source is mounted without the record" — and Files to
+  Create/Modify lists neither a staging script nor a profile that enables the mode. The plan states
+  the requirement and not the mechanism.
+- **Why necessary:** the profile does not exist inside the container, so the record has to travel
+  with the material to be checkable at bootstrap time at all. Staging it from the profile is what
+  connects Contract 3's schema to the runtime check instead of leaving two disconnected shapes — and
+  it is the same schema 01.5's compiler will validate for T27. The staging script was needed
+  independently: the `OPENAI_API_KEY` strip that SF-4's own sub-feature text requires is a
+  test-validity control, and leaving it a manual step would put the cell's validity in the
+  operator's hands. `.gitignore` already reserved `compose/generated/oauth-src/` at SF-1, so the
+  staged directory's location was anticipated even though its producer was not. Operator decision at
+  the SF-4 build (2026-09-07).
+- **Impact:** SF-5 gains a named profile to iterate the `oauth-mount` cell against and a scriptable
+  staging step, rather than hand-built fixtures; it should also assert `OPENAI_API_KEY` absent from
+  the mounted source, which the staging script's own self-check now makes a second line of defence
+  rather than the only one. 01.5's T27 has a real profile to refuse the build against, and the
+  `accepted_risk` shape is now exercised by a producer rather than only documented. Two new files
+  join the repository's host-side script surface, and `README.md` documents the three-step sequence.

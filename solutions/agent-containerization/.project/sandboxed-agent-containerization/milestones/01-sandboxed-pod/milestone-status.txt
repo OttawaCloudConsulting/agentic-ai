@@ -42,7 +42,7 @@
 
 [~] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
-    Sub-features: 3/5 complete
+    Sub-features: 4/5 complete
     Build started 2026-09-07. SF-1 complete (commit fbe5e06): R4.5 config seed + merge, host-side
     scrub-gitconfig.sh, host-gitconfig override, .gitignore/tmutil, and the pod-topology harness
     extensions (parameterized mount-set, volume exclusivity, auth-surface assertions).
@@ -79,6 +79,20 @@
     test is replaying a superseded refresh token against the operator's live account. R4.17 is
     narrowed, not closed, and SF-4 must write accepted_risk.rotation against the conservative
     reading).
+    SF-4 complete 2026-09-07. oauth-mount built and its shape constraints VERIFIED by running
+    them, not by reasoning: steady state with no source exits 3 and FAILS THE CONTAINER START
+    (criterion 5, confirmed -- `codex --version` never ran); a rw-mounted source is refused from
+    /proc/self/mountinfo (R4.13); a source without accepted-risk.yaml, or missing any of its five
+    fields, is refused (R4.17); a staged copy still carrying OPENAI_API_KEY is refused (the
+    test-validity control); a credential with no refresh_token is refused (edge case 11); a
+    populated volume is an idempotent no-op. Smoked with a SYNTHETIC credential and scratch
+    volumes -- the operator's live host codex login was never spent and codex itself was never
+    run against a copy (that is SF-5's call). All smoke volumes removed. 2 architectural
+    deviations recorded, both operator-ratified before building (4: the callback publish ships as
+    its own compose/overrides/codex-callback.yaml rather than inside the bootstrap fragment, since
+    a fragment cannot be layered by halves; 5: the accepted_risk record reaches the container via
+    scripts/stage-oauth-mount.sh from a new profiles/oauth-mount.yaml -- the plan required the
+    exit-3 check but named no mechanism, and the profile does not exist inside the container).
     VOLUME HAZARD, kept by operator decision. Live credentials are in sf3_claude-state and
     sf3_codex-state ONLY. Four volumes hold SUPERSEDED refresh tokens -- sf2bd_claude-state,
     sf2bd_codex-state, sf3-claude-pristine, sf3-codex-pristine -- and were kept as authenticated

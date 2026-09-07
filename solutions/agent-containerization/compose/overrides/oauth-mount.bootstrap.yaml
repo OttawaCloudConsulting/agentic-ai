@@ -1,0 +1,55 @@
+# The one-shot `oauth-mount` bootstrap (01.4 SF-4, R4.13-R4.15, R4.17, criterion 5).
+#
+# LAYERED FOR ONE INVOCATION AND FOR NOTHING ELSE:
+#
+#   bash scripts/stage-oauth-mount.sh --profile oauth-mount     # REQUIRED FIRST
+#   docker compose --env-file compose/pins.env \
+#     -f compose/compose.yaml \
+#     -f compose/overrides/default.yaml \
+#     -f compose/overrides/oauth-mount.bootstrap.yaml \
+#     run --rm codex bash /usr/local/bin/bootstrap-auth codex
+#
+# Steady-state `up` NEVER layers this file. That is what makes "bootstrap only" (R4.15)
+# structural rather than conventional: at steady state the credential source is not mounted,
+# so there is nothing to re-copy from. Two failure modes stop being possible rather than being
+# guarded against --
+#
+#   * a re-copy on every start clobbering the token the container just refreshed (edge case 1);
+#   * an agent DELETING its own credential to force a re-copy from the host (edge case 2), where
+#     the guard's condition would be exactly what the agent controls.
+#
+# At steady state with an emptied volume, bootstrap-auth exits 3 and names this command. Because
+# the entrypoint runs under `set -e`, that exit FAILS THE CONTAINER START -- re-bootstrapping is
+# a deliberate operator act, never a silent recovery.
+#
+# WHAT IS MOUNTED is compose/generated/oauth-src/ -- the STAGED artifact -- and never the
+# operator's ~/.codex, which is a 54-entry directory of sessions, archived sessions and global
+# state. R4.14 requires a dedicated DIRECTORY rather than the credential file itself; the staging
+# script writes exactly two files into it, and strips OPENAI_API_KEY from the credential on the
+# way through (see that script for why that is a test-validity control before it is a security
+# one).
+#
+# `:ro` is the only permitted mode (R4.13) and it is the only real control here: Docker Desktop's
+# VirtioFS fakes file ownership, so a 0600 on the host means nothing inside the container. The
+# harness asserts the MOUNT mode, not the file mode.
+#
+# The target is /run/oauth-src, under 01.2's `/run` tmpfs -- the precedent 01.3 set with
+# /run/secrets. Host-derived credential material that must not persist onto the state volume
+# belongs somewhere that vanishes with the container.
+#
+# NO PORT IS PUBLISHED HERE. The callback forward lives in its own fragment
+# (compose/overrides/codex-callback.yaml) because it belongs to oauth-interactive, not to this
+# mode, and because a Compose fragment cannot be layered by halves -- carrying it here would
+# publish a host port on the one invocation that is not an interactive login (R2.8 default-off).
+
+services:
+  codex:
+    # compose.yaml reads AUTH_MODE as ${CODEX_AUTH_MODE:-oauth-interactive}. Without this line
+    # the bootstrap invocation runs the oauth-interactive branch and the copy never fires, which
+    # is a silent wrong-mode success rather than an error. Set here so the mount and the mode
+    # that consumes it appear together, exactly as host-gitconfig.yaml pairs GIT_CONFIG_GLOBAL
+    # with its target.
+    environment:
+      AUTH_MODE: oauth-mount
+    volumes:
+      - ../compose/generated/oauth-src:/run/oauth-src:ro

@@ -1,0 +1,36 @@
+# The codex callback forward (01.4, R4.9's browser-redirect path) -- OPTIONAL, NOT THE DEFAULT.
+#
+# `bootstrap-auth` runs `codex login --device-auth`, which needs no port at all and is one of the
+# three paths R4.9 counts as headless. This fragment exists for an operator who wants the
+# browser-redirect flow instead, and it is layered explicitly or not at all:
+#
+#   docker compose --env-file compose/pins.env \
+#     -f compose/compose.yaml \
+#     -f compose/overrides/default.yaml \
+#     -f compose/overrides/codex-callback.yaml \
+#     run --rm --service-ports codex codex login
+#
+# `codex login` is invoked DIRECTLY, not through bootstrap-auth: the dispatcher hard-codes
+# --device-auth, deliberately, because that is the path that works with no published port.
+# `--service-ports` is required -- `run` does not publish a service's ports without it.
+#
+# WHY PLAIN `codex login` NEEDS THIS. It starts a callback server on localhost:1455 INSIDE the
+# container and hands the browser redirect_uri=http://localhost:1455/auth/callback. The browser
+# runs on the HOST, where nothing is listening: the pod publishes no ports (R2.8) and the agent
+# networks are `internal: true`. Observed at the SF-2 build -- the provider side authorized and
+# the browser then reported "Unable to connect to localhost:1455".
+#
+# THIS IS A HOST-SIDE PUBLISH, NOT CONTAINER EGRESS (edge case 9). 127.0.0.1:1455:1455 lets the
+# host's browser reach INTO the container. It gives the container no route OUT: `internal: true`
+# is untouched, and every byte the agent sends still leaves through the mediator or not at all.
+# The bind address is explicit -- 127.0.0.1, never 0.0.0.0 -- so the port is not offered to the
+# operator's network.
+#
+# 1457 is codex's own documented fallback when 1455 is occupied. It is commented out rather than
+# published alongside 1455: publishing both opens a port the flow will not use.
+
+services:
+  codex:
+    ports:
+      - "127.0.0.1:1455:1455"
+    # - "127.0.0.1:1457:1457"
