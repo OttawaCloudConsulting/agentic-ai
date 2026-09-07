@@ -107,6 +107,54 @@ reads its policy from its own image layer and its Compose secrets, never from a 
 write. The exposure is the *next build*, which is why the fix is the default binding rather than a
 warning, and why the acceptance harness asserts no agent's mount set contains a control-plane path.
 
+### First-run authentication
+
+`AUTH_MODE` is set per agent from the profile's `auth_mode` block. It has **no default in the
+image** — an unset value is an error, not a fallback, because a default would pick an
+authentication mode on your behalf and could pick a less safe one than R4.12 mandates.
+
+**Headless means no browser inside the container**, not "no terminal". R4.9 defines the headless
+path by enumeration — paste-back code, device code, or a pre-minted token — and two of those three
+need a terminal by construction. See the T24 amendment in `REQUIREMENTS.md`.
+
+Seven cells are supported, and the agents are **not** symmetric:
+
+| Agent | `apikey` | `oauth-interactive` | `oauth-token` | `oauth-mount` |
+|---|---|---|---|---|
+| `claude` | `ANTHROPIC_API_KEY` | **default** — paste-back | `CLAUDE_CODE_OAUTH_TOKEN` (one-year) | unsupported (Keychain-resident) |
+| `codex` | `OPENAI_API_KEY` | **default** — paste-back | unsupported (no env equivalent) | `auth.json` copy-in |
+| `agy` | **default** — `GEMINI_API_KEY` | not offered (D9) | unsupported | not offered (D9) |
+
+An unsupported cell **exits 2 and names the supported set**. It never quietly falls back to a
+different mode — that would defeat "the default is the safest mode that agent supports".
+
+Containers **start unauthenticated** rather than failing: the start-time pass warns and continues.
+Authenticate with an explicit one-shot invocation, which is where the strict exit codes apply:
+
+```bash
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml \
+  run --rm claude bash /usr/local/bin/bootstrap-auth claude
+```
+
+Open the printed URL **on the host** and paste the code back. Exit codes: `0` authenticated (or
+already was — re-running is a no-op), `2` unsupported cell or unset `AUTH_MODE`, `3` credential
+absent, `4` a provider endpoint the mediator refuses — the message names the FQDN.
+
+**On exit 4:** the OAuth endpoints must be in the allowlist, and an allowlist edit is **inert until
+the policy is recompiled and the mediator image rebuilt** — the mediator reads its policy from its
+own image layer, not from a bind mount:
+
+```bash
+# add the FQDN to policy/allowlist.base.yaml, then BOTH of:
+bash scripts/compile-policy.sh
+docker compose --env-file compose/pins.env -f compose/compose.yaml build egress-mediator
+```
+
+**Revocation (R12.6).** `docs/records/credential-inventory.md` carries every credential an agent can
+obtain, its lifetime and its documented revocation path. The `oauth-token` cell mints a **one-year**
+token — record it there and revoke it when it is no longer needed.
+
 ### Host git configuration (optional, default off)
 
 `profiles/default.yaml` sets `mounts.host_git_config: false`, so nothing below happens unless you

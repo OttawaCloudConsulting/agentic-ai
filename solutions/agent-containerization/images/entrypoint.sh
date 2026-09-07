@@ -63,6 +63,21 @@ ensure_codex_credentials_store() {
   rm -f "$tmp"
 }
 
+# The AUTH_MODE dispatcher (01.4 SF-2, Interface Contract 2). Invoked AFTER the skeleton seed
+# and after the R4.5 merge -- the ordering is load-bearing in both directions: the seed must not
+# overwrite a credential, and the dispatcher must see the config.toml the merge just fixed.
+#
+# --at-start marks this as the every-start pass, in which an absent credential WARNS rather than
+# failing the container (operator decision, 2026-09-07; see the feature plan, Deviation 2). An
+# unset or unsupported AUTH_MODE still exits 2 here, and oauth-mount still exits 3 on an emptied
+# volume per criterion 5 -- so the fail-closed properties that matter are unchanged.
+bootstrap_auth() {
+  [ -n "${AGENT_NAME:-}" ] || return 0
+  [ -x /usr/local/bin/bootstrap-auth ] || return 0
+  bash /usr/local/bin/bootstrap-auth "$AGENT_NAME" --at-start
+}
+
 seed_home
 ensure_codex_credentials_store
+bootstrap_auth
 exec "$@"

@@ -1,0 +1,277 @@
+#!/usr/bin/env bash
+# AUTH_MODE dispatcher (01.4 SF-2, Interface Contract 2). Runs INSIDE the agent container,
+# invoked by entrypoint.sh after the home-skeleton seed. That ordering is load-bearing: the
+# skeleton seed must not overwrite a credential.
+#
+#   bash bootstrap-auth.sh <agent>        # agent in claude | codex | agy
+#
+# Ships at images/bootstrap-auth.sh, not the plan's images/agent-base/bootstrap-auth.sh --
+# 01.2's Deviation 1 collapsed the per-agent image directories into one multi-stage
+# images/Dockerfile. See this feature plan, Deviation 1. The REASON Interface Contract 2 gives
+# for the location is unchanged: the build context is ./images, so a file under scripts/ cannot
+# be COPY'd in, and the copy-to-volume must run where both the :ro source and the state volume
+# are mounted.
+#
+# EXIT CODES (Interface Contract 2) -- every one of them fails CLOSED and names its destination:
+#
+#   0  authenticated, or already was (idempotent re-run)
+#   2  unsupported (agent, AUTH_MODE) cell, or AUTH_MODE unset. Names the cell and that
+#      agent's supported set. An unsupported cell must NEVER degrade to a working-but-
+#      different mode -- that would silently defeat "the default is the safest mode that
+#      agent supports" (R4.12).
+#   3  required credential material absent. Names what to supply; under oauth-mount at
+#      steady state it names the bootstrap command to run.
+#   4  precondition failed -- a required provider endpoint is refused by the mediator.
+#      Names the FQDN. Mirrors R9.3/R12.2's posture at the mediator: a legitimate policy
+#      gap must be distinguishable from an attack.
+#
+# THIS SCRIPT NEVER PRINTS CREDENTIAL MATERIAL. It asserts presence, shape and exit status.
+# Every diagnostic below names a variable or a path, never a value.
+set -euo pipefail
+
+AGENT="${1-}"
+MODE="${AUTH_MODE-}"
+
+# --at-start marks the pass entrypoint.sh makes on EVERY container start, as opposed to the
+# operator's explicit one-shot invocation. The two differ in one way only: what an ABSENT
+# CREDENTIAL means (operator decision, 2026-09-07 -- see this feature plan, Deviation 2).
+#
+#   at start   a missing credential WARNS and the container starts. It is not yet a failure:
+#              oauth-interactive obtains its credential from a later interactive invocation,
+#              and blocking here would stop the pod coming up at all on a fresh volume --
+#              including under the default profile, whose claude and codex cells are
+#              oauth-interactive and whose agy cell is apikey with no key wired by Compose.
+#   explicit   a missing credential is exit 3, and oauth-interactive actually runs the login.
+#
+# What does NOT relax at start: an unset or unsupported AUTH_MODE is exit 2 in both passes.
+# That is a misconfiguration rather than a not-yet-done step, and it fails closed either way.
+# oauth-mount also does not relax -- criterion 5 requires that an agent which deletes its own
+# credential FAILS ITS NEXT START rather than triggering a silent re-copy.
+AT_START=0
+[ "${2-}" = "--at-start" ] && AT_START=1
+
+die() { echo "bootstrap-auth: $2" >&2; exit "$1"; }
+
+# Absent credential: fatal on an explicit invocation, a warning during the start-time pass.
+missing_credential() {
+  if [ "$AT_START" -eq 1 ]; then
+    echo "bootstrap-auth: WARNING -- $1" >&2
+    echo "bootstrap-auth: ($AGENT, $MODE) is NOT authenticated; the container is starting anyway." >&2
+    exit 0
+  fi
+  die 3 "$1"
+}
+
+# --------------------------------------------------------------------------- matrix
+# Interface Contract 1, the authoritative support matrix. SEVEN supported cells.
+# `agy` is apikey-only BY DECISION (D9), not by omission: an agy OAuth relationship reopens
+# the Antigravity ToS question the PRD carries as unresolved and R5.13 permanently bars
+# interception for. R4.12 requires an API-key OR an OAuth configuration per agent, not both.
+supported_modes_for() {
+  case "$1" in
+    claude) echo "apikey oauth-interactive oauth-token" ;;
+    codex)  echo "apikey oauth-interactive oauth-mount" ;;
+    agy)    echo "apikey" ;;
+    *)      echo "" ;;
+  esac
+}
+
+# Provider authentication endpoints, per agent, probed before an OAuth flow starts.
+#
+# These are OBSERVATION-DERIVED and provisional on the same terms as policy/allowlist.base.yaml
+# (R5.8, D17): running the flow IS the observation of the minimal destination set, and the
+# mediator's own audit line for a blocked attempt is the independent second source D17 requires.
+# Do not extend this list from a vendor reference page -- that is precisely what R5.8 forbids.
+# Update it, and allowlist.base.yaml, from what a real flow was seen to need.
+auth_endpoints_for() {
+  case "$1" in
+    claude) echo "claude.ai console.anthropic.com api.anthropic.com" ;;
+    codex)  echo "auth.openai.com chatgpt.com api.openai.com" ;;
+    *)      echo "" ;;
+  esac
+}
+
+# --------------------------------------------------------------------------- argument gate
+case "$AGENT" in
+  claude|codex|agy) ;;
+  "") die 2 "no agent given. usage: bash bootstrap-auth.sh <claude|codex|agy>" ;;
+  *)  die 2 "unknown agent '$AGENT'. usage: bash bootstrap-auth.sh <claude|codex|agy>" ;;
+esac
+
+# AUTH_MODE has NO default in the image (Interface Contract 2). An unset value is an error,
+# not a fallback -- a default here would pick a mode on the operator's behalf and could pick a
+# less safe one than R4.12 mandates.
+[ -n "$MODE" ] || die 2 "AUTH_MODE is unset for '$AGENT'. Supported: $(supported_modes_for "$AGENT"). \
+Compose sets it per agent from the profile's auth_mode block."
+
+if ! echo " $(supported_modes_for "$AGENT") " | grep -q " $MODE "; then
+  die 2 "unsupported cell ($AGENT, $MODE). '$AGENT' supports: $(supported_modes_for "$AGENT"). \
+Refusing to fall back to another mode -- see Interface Contract 1."
+fi
+
+# --------------------------------------------------------------------------- 01.2 contract
+# ASSERTED, never set (Interface Contract 5). 01.2 owns these; 01.4 sits on top of them. If
+# they are wrong, the credential this script is about to write lands somewhere that does not
+# survive a restart, and that failure is far cheaper to catch here than at T9.
+[ "${HOME-}" = "/home/agent" ] || die 3 "HOME is '${HOME-<unset>}', expected /home/agent (01.2 Interface Contract 2)"
+case "$AGENT" in
+  claude) [ "${CLAUDE_CONFIG_DIR-}" = "/home/agent/.claude" ] \
+            || die 3 "CLAUDE_CONFIG_DIR is '${CLAUDE_CONFIG_DIR-<unset>}', expected /home/agent/.claude" ;;
+  codex)  [ "${CODEX_HOME-}" = "/home/agent/.codex" ] \
+            || die 3 "CODEX_HOME is '${CODEX_HOME-<unset>}', expected /home/agent/.codex" ;;
+esac
+
+# --------------------------------------------------------------------------- precondition
+# An agent on an `internal: true` network reaches nothing except through the mediator, so an
+# OAuth flow against an endpoint the mediator does not allow HANGS OR FAILS OPAQUELY (Edge
+# Case 5). This turns that into a named exit before the operator is asked to open a browser.
+#
+# The agent container has no copy of policy/resolved/default.yaml -- the mediator reads it from
+# its own image layer, and the ./images build context cannot reach policy/. So the check is a
+# PROBE THROUGH THE MEDIATOR rather than a file read, which is also the stronger check: it tests
+# what the enforcement point actually does, not what an artifact says it should do. The probe is
+# additionally the D17 observation itself -- each refusal writes the audit line SF-2 harvests.
+#
+# A refused CONNECT returns Squid's ERR_MEDIATOR_ALLOWLIST page (HTTP 403). The audit line is
+# the authoritative denial record and names the control; this only needs to know it was refused.
+probe_endpoint() {
+  local fqdn="$1" out
+  # --max-time bounds a hang; -o /dev/null discards the body. A 000/exit-nonzero from a
+  # transport failure is NOT treated as a policy gap -- only an explicit proxy refusal is.
+  out="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://$fqdn/" 2>&1)" || true
+  case "$out" in
+    *403*) return 1 ;;   # refused by the mediator
+    *)     return 0 ;;
+  esac
+}
+
+check_auth_endpoints() {
+  local fqdn
+  for fqdn in $(auth_endpoints_for "$AGENT"); do
+    if ! probe_endpoint "$fqdn"; then
+      die 4 "provider endpoint '$fqdn' is refused by the mediator, so ($AGENT, $MODE) cannot \
+complete. Add it to policy/allowlist.base.yaml, then: bash scripts/compile-policy.sh && \
+docker compose build egress-mediator. NOTE: an allowlist edit is inert until BOTH run -- the \
+mediator reads its policy from its own image layer. The audit line for this attempt is the \
+authoritative denial record."
+    fi
+  done
+}
+
+# --------------------------------------------------------------------------- idempotency
+# "Authenticated, or already was" (exit 0). Presence and shape only -- never content.
+already_authenticated() {
+  case "$AGENT" in
+    claude)
+      [ -s "$CLAUDE_CONFIG_DIR/.credentials.json" ] || [ -s "$HOME/.claude.json" ]
+      ;;
+    codex)
+      [ -s "$CODEX_HOME/auth.json" ]
+      ;;
+    agy)
+      # agy's apikey cell is env-delivered: the credential is not persisted, so "already
+      # authenticated" is only ever about the settings half (see the agy branch).
+      return 1
+      ;;
+  esac
+}
+
+# --------------------------------------------------------------------------- mode branches
+do_apikey() {
+  local var
+  case "$AGENT" in
+    claude) var=ANTHROPIC_API_KEY ;;
+    codex)  var=OPENAI_API_KEY ;;
+    agy)    var=GEMINI_API_KEY ;;
+  esac
+  [ -n "${!var-}" ] || missing_credential "AUTH_MODE=apikey requires $var in the environment for \
+'$AGENT'. Supply it via the Compose environment (references/.env_keys is git-ignored and holds \
+the keys)."
+
+  if [ "$AGENT" = "agy" ]; then
+    # D9 / Interface Contract 1: the env var ALONE is a documented no-op for agy. The settings
+    # file must also select the provider, so this branch writes that and nothing else -- the
+    # key itself stays in the environment and is never persisted to the volume.
+    local settings="$HOME/.gemini/settings.json"
+    mkdir -p "$HOME/.gemini"
+    if [ -s "$settings" ] && grep -q '"modelProvider"[[:space:]]*:[[:space:]]*"gemini"' "$settings"; then
+      echo "bootstrap-auth: agy already selects modelProvider=gemini"
+    elif [ -s "$settings" ]; then
+      missing_credential "$settings exists but does not set \"modelProvider\": \"gemini\". \
+Refusing to rewrite an existing settings file -- edit it, or remove it and re-run."
+    else
+      printf '%s\n' '{' '  "modelProvider": "gemini"' '}' > "$settings"
+      echo "bootstrap-auth: wrote modelProvider=gemini to \$HOME/.gemini/settings.json"
+    fi
+  fi
+
+  echo "bootstrap-auth: ($AGENT, apikey) ready -- credential supplied by environment ($var set)"
+}
+
+do_oauth_interactive() {
+  if already_authenticated; then
+    echo "bootstrap-auth: ($AGENT, oauth-interactive) already authenticated -- no-op"
+    return 0
+  fi
+
+  # At start there is no TTY and no operator watching, so this pass reports the state and stops.
+  # The login below is reached only by an explicit invocation.
+  if [ "$AT_START" -eq 1 ]; then
+    echo "bootstrap-auth: WARNING -- (claude|codex, oauth-interactive) has no credential yet." >&2
+    echo "bootstrap-auth: authenticate with:  docker compose ... run --rm $AGENT bash /usr/local/bin/bootstrap-auth $AGENT" >&2
+    exit 0
+  fi
+
+  check_auth_endpoints
+
+  # R4.9's headless definition is "paste-back, device code, or a pre-minted token", and requires
+  # only that NO BROWSER EXIST INSIDE THE CONTAINER. This path is paste-back: the agent's own CLI
+  # prints a URL, the operator opens it on the HOST and pastes the code back. An interactive
+  # terminal is permitted -- see criterion 4 and the T24 amendment.
+  echo "bootstrap-auth: ($AGENT, oauth-interactive) starting paste-back login."
+  echo "bootstrap-auth: open the printed URL on the HOST; no browser exists in this container."
+
+  case "$AGENT" in
+    claude) claude /login ;;
+    codex)  codex login ;;
+  esac
+
+  already_authenticated \
+    || die 3 "($AGENT, oauth-interactive) did not produce a credential on the state volume. \
+Re-run the login; if it keeps failing, check the mediator audit log for a refused endpoint."
+  echo "bootstrap-auth: ($AGENT, oauth-interactive) authenticated"
+}
+
+do_oauth_token() {
+  # claude only. `claude setup-token` mints a ONE-YEAR CLAUDE_CODE_OAUTH_TOKEN -- the R4.16 risk
+  # this feature records in docs/records/credential-inventory.md, and the reason SF-5 revokes the
+  # test credential at feature close rather than leaving a year-long token outstanding.
+  [ -n "${CLAUDE_CODE_OAUTH_TOKEN-}" ] || missing_credential "AUTH_MODE=oauth-token requires \
+CLAUDE_CODE_OAUTH_TOKEN in the environment. Mint one on the HOST with 'claude setup-token' -- it \
+is valid for ONE YEAR (R4.16); record it in docs/records/credential-inventory.md and revoke it \
+when it is no longer needed."
+  echo "bootstrap-auth: (claude, oauth-token) ready -- pre-minted token supplied by environment"
+}
+
+do_oauth_mount() {
+  # SF-4 supplies the copy-from-/run/oauth-src step and its shape constraints (R4.13-R4.15,
+  # R4.17). Until then this cell is declared-but-not-built: it is a SUPPORTED cell per Interface
+  # Contract 1, so it must not exit 2 as if unsupported.
+  if already_authenticated; then
+    echo "bootstrap-auth: (codex, oauth-mount) already authenticated -- no-op"
+    return 0
+  fi
+  die 3 "(codex, oauth-mount) has no credential on the state volume and the bootstrap copy step \
+is not built yet (01.4 SF-4). Bootstrap it with the one-shot invocation once SF-4 lands: \
+docker compose -f compose/compose.yaml -f compose/overrides/default.yaml \
+-f compose/overrides/oauth-mount.bootstrap.yaml run --rm codex bash /usr/local/bin/bootstrap-auth codex"
+}
+
+# --------------------------------------------------------------------------- dispatch
+case "$MODE" in
+  apikey)            do_apikey ;;
+  oauth-interactive) do_oauth_interactive ;;
+  oauth-token)       do_oauth_token ;;
+  oauth-mount)       do_oauth_mount ;;
+  *)                 die 2 "unhandled AUTH_MODE '$MODE' for '$AGENT' (matrix and dispatch disagree)" ;;
+esac

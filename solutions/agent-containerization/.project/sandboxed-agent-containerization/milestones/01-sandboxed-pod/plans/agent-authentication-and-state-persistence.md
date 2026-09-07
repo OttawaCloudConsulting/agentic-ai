@@ -294,6 +294,14 @@ per agent, not both.
     diagnostic echoing an environment value or a credential file is a leak into CI logs and terminal
     scrollback. Assert on presence, shape and exit status, never on value.
 
+  - **Owed by SF-1: the R4.5 check in EVERY Codex mode.** Criterion 2 requires the effective
+    `cli_auth_credentials_store` value to be read inside the container "in every Codex mode, not by
+    reading the Dockerfile". SF-1 added that read to `verify-pod-topology.sh` check 4d, but that
+    harness only ever brings the pod up on the **default** profile, so it proves the property for
+    one mode. SF-5 iterates the modes and must re-assert it per Codex cell — otherwise the
+    criterion is met for `oauth-interactive` alone and the `apikey` and `oauth-mount` cells are
+    unverified against the register's unconditional reading.
+
   Depends on SF-1 to SF-4.
 
 Sizing note: five sub-features, each judged a single reviewable unit against DD-1's ~120k-token
@@ -826,3 +834,34 @@ mode 644, invoked as `bash script.sh`.
   allowlist `images/bootstrap-auth.sh` under the `./images` context. `scripts/scrub-gitconfig.sh`
   is unaffected — it runs on the host and stays in `scripts/` exactly as the plan and the
   architecture file tree state.
+
+### Deviation 2: an absent credential warns at container start, and is fatal only on explicit invocation
+- **What changed:** `bootstrap-auth.sh` takes an `--at-start` flag, which `entrypoint.sh` passes on
+  the every-start pass. In that pass an **absent credential warns on stderr and exits `0`**, so the
+  container starts unauthenticated. Exit `3` is reserved for the operator's explicit invocation.
+  Three properties do **not** relax: an unset or unsupported `AUTH_MODE` is exit `2` in both passes;
+  `oauth-mount` on an emptied volume is exit `3` in both, so criterion 5's "an agent that deletes
+  its own credential fails its next start" holds literally; and `oauth-interactive` never launches a
+  login at start, where there is no TTY.
+- **Originally planned:** Interface Contract 2 states exit `3` as "required credential material
+  absent", unconditionally, with `bootstrap-auth.sh` "invoked by `entrypoint.sh` after 01.2's
+  home-skeleton seed" — i.e. one behaviour on every start.
+- **Why necessary:** The flat reading makes `docker compose up` fail on a fresh volume under **the
+  default profile**, which is the profile every existing harness uses. `profiles/default.yaml` sets
+  `claude` and `codex` to `oauth-interactive` — unauthenticated by definition before the first
+  interactive login — and `agy` to `apikey`, while Interface Contract 4 restricts 01.4 to adding
+  *only* `AUTH_MODE` to `compose.yaml`, so no API key is wired in by Compose at all. All three
+  agent containers would therefore exit non-zero at start, and
+  `tests/acceptance/verify-pod-topology.sh` — a **pre-existing 01.2 harness that this feature's own
+  composite test command requires to still pass** — asserts against running containers. The
+  alternative was editing that harness to supply credentials or override `AUTH_MODE`, which changes
+  an 01.2 acceptance artifact to accommodate 01.4. Operator decision, 2026-09-07: warn, do not
+  block. Verified after the change: `verify-pod-topology.sh` reports ALL CHECKS PASSED with the
+  dispatcher wired into the entrypoint.
+- **Impact:** A container can now run unauthenticated, and the agent inside it fails at first use
+  rather than at start. That is the intended first-run shape for `oauth-interactive`, whose
+  credential is obtained by a later `run --rm` invocation. Consequences for later work: SF-5's
+  harness must assert the **explicit** invocation's exit codes, not the start-time pass's, or it
+  will read every missing-credential case as a pass; and the `--at-start` contract is a second
+  entry point that 01.5's compiler and any future caller must not confuse with the strict one.
+  No exit code, mount, or matrix cell changed.

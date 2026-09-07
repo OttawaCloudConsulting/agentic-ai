@@ -251,6 +251,12 @@ solutions/agent-containerization/
 │   │                              #   one because the three agent stages share the base layer and
 │   │                              #   Compose selects the stage per service
 │   ├── .dockerignore              # agent build context guard
+│   ├── entrypoint.sh              # idempotent home seed from /opt/agent-home-skel, the R4.5
+│   │                              #   config.toml merge, then the start-time bootstrap-auth pass
+│   ├── bootstrap-auth.sh          # per-agent AUTH_MODE dispatcher (01.4 SF-2), incl. the :ro
+│   │                              #   copy-to-volume (R4.15). HERE, not scripts/ -- see the note
+│   │                              #   below the tree and Feature 01.4 Deviation 1
+│   ├── agy/agy-run.sh             # agy's JSON status-field gating (R3.6)
 │   └── mediator/
 │       ├── Dockerfile             # Squid 6.13 + dnsdist + unbound + yq, all pinned; context is
 │       │                          #   the SOLUTION ROOT (it carries policy/resolved/ and
@@ -282,10 +288,21 @@ solutions/agent-containerization/
 │   │                              #   resolver-reorigin.conf.tmpl (unbound), errors/ERR_MEDIATOR_*
 │   │                              #   (the operator-facing denial pages, one per control)
 │   └── identity/                  # CA and per-agent cert issuance (R8.8). No private key committed
+│
+│   # NOTE (01.4 SF-2): `bootstrap-auth.sh` was listed here in an earlier revision of this tree.
+│   # It ships at `images/bootstrap-auth.sh` instead. The build context for the agent images is
+│   # ./images, so a file under scripts/ cannot be COPY'd into the image, and the copy-to-volume
+│   # it performs must run inside the container where both the :ro source and the state volume
+│   # are mounted. 01.2 set the same precedent with `images/entrypoint.sh`. See the Feature 01.4
+│   # plan, Deviation 1 — which also records that the per-agent image directories this tree once
+│   # implied (`images/agent-base/`, `images/codex/`) do not exist: 01.2 collapsed them into one
+│   # multi-stage `images/Dockerfile` with `target:` selection.
 ├── scripts/                       # bash, `set -euo pipefail`, invoked as `bash script.sh`
 │   ├── compile-policy.sh          # profile + packs → policy/resolved/
 │   ├── build.sh                   # (not yet built — 01.5) per-profile image build; digest + SBOM (SC-8)
-│   ├── bootstrap-auth.sh          # (not yet built — 01.4) per-agent AUTH_MODE bootstrap, incl. :ro copy-to-volume (R4.15)
+│   ├── scrub-gitconfig.sh         # HOST-side pre-mount git-config scrub (01.4 SF-1, R2.9/T22).
+│   │                              #   Writes compose/generated/gitconfig.d/; the operator's own
+│   │                              #   ~/.gitconfig is never mounted into any container
 │   ├── validate-boundary.sh       # (not yet built — M2) runs the adversarial matrix (R12.8)
 │   ├── lint-policy.sh             # feature test command (01.1); policy/*.yaml well-formedness only
 │   ├── issue-identity.sh          # OFFLINE CA + listener certificates (01.3 SF-3). Runs on the
@@ -542,7 +559,7 @@ acceptance test. Numbering continues from the existing matrix.
 | **T21** Optional mounts default-off | Start the default profile; enumerate mounts inside each agent container | Only the project directory and that agent's state volume are present. No socket is forwarded | R2.8 | Profile, compose |
 | **T22** Git config scrubbing | Enable the host gitconfig mount; inspect it inside the container | Mounted `:ro`; no `credential.helper` entry present | R2.9 | `bootstrap-auth.sh` |
 | **T23** Per-agent build cache | Enable the build cache for two agents; write from one | Caches are distinct paths; neither agent can write the other's | R2.10 | Profile, volumes |
-| **T24** `AUTH_MODE` matrix | For each agent, run each mode it supports, headless | Each authenticates with no interactive terminal, and the default is the safest mode that agent supports | R4.12 | Entrypoint |
+| **T24** `AUTH_MODE` matrix | For each agent, run each mode it supports, headless. Seven supported cells — see the Feature 01.4 plan, Interface Contract 1 | Each authenticates with **no browser inside the container** (an interactive terminal is permitted; amended 2026-09-07, Feature 01.4 SF-2 — see `REQUIREMENTS.md`), and the default is the safest mode that agent supports | R4.12 | Entrypoint |
 | **T25** Credential mount shape | Under `oauth-mount`: inspect the mount, then force an OAuth refresh | Mount is `:ro`, is a directory not a file, and the refreshed credential lands on the state volume with the host file unchanged | R4.13, R4.14, R4.15 | `bootstrap-auth.sh` |
 | **T26** Long-lived token inventory and revocation | Enumerate persisted refresh tokens; execute the documented revocation for each type and time it | Every persisted token is inventoried with its compensating controls named; revocation succeeds within the stated maximum time | R4.16, R13.1 | State volumes, runbook |
 | **T27** `oauth-mount` risk recording | Enable `oauth-mount` in a profile that does not record the accepted-risk decision | The build or startup refuses until the decision is recorded with file, mount mode, revocation path and blast radius | R4.17 | Profile, policy compiler |

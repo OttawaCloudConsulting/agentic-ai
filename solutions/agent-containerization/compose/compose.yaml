@@ -214,6 +214,12 @@ services:
       # destination chain -- destination TLS is spliced, never terminated
       # (REQUIREMENTS.md T28 as amended by SF-3).
       NODE_EXTRA_CA_CERTS: /run/secrets/mediator-ca.crt
+      # 01.4 Interface Contract 4 -- the ONLY thing 01.4 adds to this file. No service,
+      # no network, no volume, no default mount, no published port, no GIT_CONFIG_GLOBAL.
+      # Sourced from the profile's auth_mode block (profiles/default.yaml). R4.12 makes
+      # oauth-interactive the safest mode claude supports; bootstrap-auth exits 2 if this
+      # is unset, so an empty value fails rather than falling back.
+      AUTH_MODE: ${CLAUDE_AUTH_MODE:-oauth-interactive}
     secrets:
       - mediator-ca.crt
     volumes:
@@ -243,6 +249,9 @@ services:
       http_proxy: http://172.31.20.2:3128
       NO_PROXY: localhost,127.0.0.1
       no_proxy: localhost,127.0.0.1
+      # 01.4 Interface Contract 4. R4.12 default for codex is oauth-interactive;
+      # oauth-mount is its other supported OAuth cell and is selected per profile.
+      AUTH_MODE: ${CODEX_AUTH_MODE:-oauth-interactive}
     # No CA secret and no trust variable: codex opens no TLS to the mediator, so
     # there is no mediator certificate for it to validate. Its DESTINATION TLS is
     # unaffected and uses its own trust store.
@@ -273,6 +282,9 @@ services:
       no_proxy: localhost,127.0.0.1
       # agy's mechanism is SSL_CERT_FILE, not NODE_EXTRA_CA_CERTS (01.1 SF-2).
       SSL_CERT_FILE: /run/secrets/mediator-ca.crt
+      # 01.4 Interface Contract 4. agy is apikey-only BY DECISION (D9) -- see
+      # Interface Contract 1 for why no OAuth cell is offered.
+      AUTH_MODE: ${AGY_AUTH_MODE:-apikey}
     secrets:
       - mediator-ca.crt
     volumes:

@@ -412,6 +412,19 @@ explicit exception. The mediator still splices and holds no destination plaintex
 R5.13's bar on intercepting Antigravity traffic is untouched. **R8.8 is unchanged.** See
 `mediator/identity/README.md` for the anchor's scope and lifecycle.
 
+**Amendment, 2026-09-07 (Feature 01.4 SF-2, Gate 4 criterion 4).** T24's pass criterion previously
+read *"Each authenticates with **no interactive terminal**, and the default is the safest mode that
+agent supports"*. R4.9 defines the headless path by enumeration — "paste-back code, device code, or
+a pre-minted token" — and two of those three require an interactive terminal by construction. R4.12
+and the PRD Configuration table make `oauth-interactive` (paste-back) the default for both Claude
+Code and Codex. Read literally, T24 therefore failed the two cells the register itself mandates as
+defaults: the pass criterion and the required defaults were mutually exclusive, the same defect
+shape as T28 above. T24 is now stated as the property it exists to protect — **each authenticates
+with no browser inside the container, and the default is the safest mode that agent supports** —
+which is R4.9's own definition of headless. **R4.9 and R4.12 are unchanged and no supported cell is
+removed**; the seven-cell support matrix is Interface Contract 1 of the Feature 01.4 plan. An
+interactive terminal is permitted; a browser inside the container is not.
+
 | Test | Method | Passes when | SC |
 |---|---|---|---|
 | T1 Host filesystem containment | Attempt to read paths outside declared mounts | All attempts fail | SC-1 |
@@ -451,7 +464,7 @@ these tests verify requirements that no success criterion reaches directly.
 | T21 Optional mounts default-off | Start the default profile; enumerate mounts inside each agent container | Only the project directory and that agent's state volume are present. No socket is forwarded | R2.8 |
 | T22 Git config scrubbing | Enable the host gitconfig mount; inspect it inside the container | Mounted `:ro`; no `credential.helper` entry present | R2.9 |
 | T23 Per-agent build cache | Enable the build cache for two agents; write from one | Caches are distinct paths; neither agent can write the other's | R2.10 |
-| T24 `AUTH_MODE` matrix | For each agent, run each mode it supports, headless | Each authenticates with no interactive terminal, and the default is the safest mode that agent supports | R4.12 |
+| T24 `AUTH_MODE` matrix | For each agent, run each mode it supports, headless. The supported set is the seven-cell matrix in Interface Contract 1 of the Feature 01.4 plan | Each authenticates with **no browser inside the container** (an interactive terminal is permitted — see the 2026-09-07 amendment above), and the default is the safest mode that agent supports | R4.12 |
 | T25 Credential mount shape | Under `oauth-mount`: inspect the mount, then force an OAuth refresh | Mount is `:ro`, is a directory not a file, and the refreshed credential lands on the state volume with the host file unchanged | R4.13, R4.14, R4.15 |
 | T26 Long-lived token inventory and revocation | Enumerate persisted refresh tokens; execute the documented revocation for each type and time it | Every persisted token is inventoried with its compensating controls named; revocation succeeds within the stated maximum time | R4.16, R13.1 |
 | T27 `oauth-mount` risk recording | Enable `oauth-mount` in a profile that does not record the accepted-risk decision | The build or startup refuses until the decision is recorded with file, mount mode, revocation path and blast radius | R4.17 |

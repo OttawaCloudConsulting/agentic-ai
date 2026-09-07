@@ -10,10 +10,20 @@ name: default
 
 packs: []                      # 01.5 composes egress from these. Empty at this profile
 
-auth_mode:                     # R4.12 defaults, consumed by 01.4
-  claude: oauth-interactive
-  codex: oauth-interactive
-  agy: apikey
+# R4.12 defaults -- "the safest mode that agent supports". The enum is PER AGENT and the agents
+# are asymmetric; Interface Contract 1 of the 01.4 plan is the authoritative matrix, and
+# bootstrap-auth implements exactly those seven cells and exits 2 on any other rather than
+# degrading to a working-but-different mode.
+auth_mode:
+  claude: oauth-interactive    # apikey | oauth-interactive | oauth-token
+                               # no oauth-mount: the host credential is macOS-Keychain-resident
+                               # and not portable to a Linux container (R4.8)
+  codex: oauth-interactive     # apikey | oauth-interactive | oauth-mount
+                               # no oauth-token: no OAuth env-var equivalent exists
+  agy: apikey                  # apikey ONLY, by decision (D9) -- an agy OAuth relationship
+                               # reopens the unresolved Antigravity ToS question and R5.13
+                               # permanently bars interception for it. R4.12 wants an API-key
+                               # OR an OAuth configuration per agent, not both.
 
 mounts:
   project:
@@ -26,7 +36,27 @@ mounts:
                                 # T2's read-only fixture comes from a test-only override,
                                 # not from changing this
   build_cache: false            # R2.10, per-agent where enabled
-  host_git_config: false        # R2.9, :ro with credential.helper stripped
+  host_git_config: false        # R2.9, :ro with credential.helper stripped. When true, run
+                                # `bash scripts/scrub-gitconfig.sh` BEFORE `up` and layer
+                                # compose/overrides/host-gitconfig.yaml -- the scrubbed artifact
+                                # is what is mounted, never the operator's own file
+
+# `oauth_mount` is DELIBERATELY ABSENT from this profile (01.4 Interface Contract 3), not omitted
+# by oversight: it is required only when an agent's auth_mode is oauth-mount, and this profile has
+# none. A profile that enables the mode declares it with this shape:
+#
+#   oauth_mount:
+#     codex:
+#       host_dir: <a dedicated directory, NEVER a credential file -- R4.14>
+#       accepted_risk:              # R4.17. 01.5's compiler refuses the build if absent (T27)
+#         file: <the credential this directory holds>
+#         mount_mode: ro            # the only permitted value (R4.13)
+#         revocation_path: <documented procedure>
+#         blast_radius: <stated consequence on container compromise>
+#         rotation: <SF-3's measured result for this provider>
+#
+# The directory is mounted only by compose/overrides/oauth-mount.bootstrap.yaml, for a one-shot
+# `run --rm`, and never at steady state (R4.15).
 
 limits:                         # R1.10, applied per agent container
   cpus: "2.0"

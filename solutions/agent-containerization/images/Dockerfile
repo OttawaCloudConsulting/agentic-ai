@@ -41,10 +41,25 @@ RUN if [ -n "$SKEL_MARKER" ]; then \
     fi
 
 COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# The AUTH_MODE dispatcher (01.4 SF-2, Interface Contract 2). Lives here rather than under
+# scripts/ because the build context is ./images and the copy-to-volume it performs must run
+# inside the container -- see this feature plan, Deviation 1.
+COPY --chmod=0755 bootstrap-auth.sh /usr/local/bin/bootstrap-auth
+
+# AUTH_MODE is deliberately NOT declared with a value in any stage. Interface Contract 2:
+# "No default in the image -- an unset value is an error, not a fallback." A default here would
+# pick an authentication mode on the operator's behalf, and could pick a less safe one than the
+# R4.12 default for that agent. Compose supplies it per agent from the profile's auth_mode block;
+# bootstrap-auth exits 2 when it is unset.
+
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # ---------------------------------------------------------------------------
 FROM agent-base AS claude
+
+# Which agent this stage is, for the entrypoint's bootstrap-auth invocation.
+ENV AGENT_NAME=claude
 
 ARG CLAUDE_VERSION
 ARG CLAUDE_SOURCE
@@ -64,6 +79,9 @@ CMD ["claude", "--version"]
 
 # ---------------------------------------------------------------------------
 FROM agent-base AS codex
+
+# Which agent this stage is, for the entrypoint's bootstrap-auth invocation.
+ENV AGENT_NAME=codex
 
 ARG CODEX_VERSION
 ARG CODEX_SOURCE
@@ -94,6 +112,9 @@ CMD ["codex", "--version"]
 
 # ---------------------------------------------------------------------------
 FROM agent-base AS agy
+
+# Which agent this stage is, for the entrypoint's bootstrap-auth invocation.
+ENV AGENT_NAME=agy
 
 ARG AGY_VERSION
 ARG AGY_URL
