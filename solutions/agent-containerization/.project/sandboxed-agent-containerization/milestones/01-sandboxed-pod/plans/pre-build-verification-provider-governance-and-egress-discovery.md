@@ -171,6 +171,18 @@ is mediator configuration and belongs to 01.3, not to the base policy. Recorded 
 is a decision rather than a gap. No `deny_fqdns` field: R5.3/R5.7 and D5 specify post-resolution
 **CIDR** deny, and nothing in the register asks for FQDN-level deny.
 
+> **SUPERSEDED (01.3 SF-2, 2026-09-05).** The last sentence is wrong, and it was wrong when this
+> plan was approved. R5.1 is a MUST and reads: *"The policy supports denying specific IP addresses,
+> CIDR ranges **and FQDNs**."* This contract asserted the opposite and the gate did not catch it.
+> 01.3's criterion 10 carries the correction: `policy/denylist.base.yaml` now has an empty
+> `deny_fqdns: []`, the resolved-policy schema supports the field, and the mediator enforces it with
+> deny-wins precedence ahead of the post-resolution address deny. The field is supported and
+> unpopulated in every shipped profile — which is what R5.1 asks for — and 01.3 SF-8 exercises it
+> against a fixture that is allowlisted and denied by name at the same time, so the assertion cannot
+> pass as an address deny wearing an FQDN's name. **This feature's built artifacts are correct;
+> only this paragraph was stale.** Recorded rather than re-planned: 01.1 is complete, and a
+> completed plan is a record of what was decided, not a live specification.
+
 ## Edge Cases
 
 - **`agy` cannot run under `sbx` at all.** D1 rejected Option 1 partly because "Antigravity
