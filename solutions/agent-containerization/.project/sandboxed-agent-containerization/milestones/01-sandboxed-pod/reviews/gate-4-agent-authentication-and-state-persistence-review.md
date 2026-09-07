@@ -30,7 +30,11 @@
 - [x] Are interface contracts compatible with existing code? -- This is what the re-plan fixed.
       Contract 6 now matches the running pod per agent: proxy scheme, CA-trust variable, and the
       absence of any client certificate. Cross-checked against `compose/compose.yaml` and the
-      assertions in `tests/acceptance/verify-pod-topology.sh`.
+      assertions in `tests/acceptance/verify-pod-topology.sh`. Contract 6 also now states the
+      policy-currency consequence of 01.3: SF-2's allowlist edit is inert until
+      `compile-policy.sh --write` regenerates `policy/resolved/default.yaml` and the mediator image
+      is rebuilt, because the mediator reads the policy from its image layer and stage 1 validates
+      schema, not currency.
 - [x] [Auto] Confirm interface: Contract 6's per-agent table matches what 01.3 ships -- verified
       against `compose/compose.yaml` (seven secrets, CA mounted into `claude` and `agy` only) and
       against 01.3's harness, which asserts `codex` carries none of `NODE_EXTRA_CA_CERTS`,

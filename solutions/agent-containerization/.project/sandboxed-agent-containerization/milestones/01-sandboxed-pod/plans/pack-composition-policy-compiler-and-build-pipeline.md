@@ -11,9 +11,10 @@ different, incompatible one), the mediator's build context is already the soluti
 deny-all `.dockerignore` (this plan scheduled that work), and the compiler already carries the
 validation this plan describes as inherited — plus refusals this plan does not mention. One new
 obligation arrives from the Gate 2 refresh: a compile-time warning for RFC 6761 special-use TLDs.
-The revision touches the inherited-validation section, Contracts 5 and 6, SF-4 and the acceptance
-criteria that referenced them; the composition model, the pack manifest contract and the refusal
-gates are unchanged.
+The revision touches the inherited-validation section, Contracts 5 and 6, SF-4 and the Files to
+Create/Modify table; the acceptance criteria, the composition model, the pack manifest contract and
+the refusal gates are unchanged — no criterion described the build context or the old CLI, so none
+needed editing.
 
 ## Summary
 
@@ -779,23 +780,20 @@ third-party service as a test target.
 |------|--------|---------|
 | `packs/language-runtimes/pack.yaml` | Create | The reference pack. Node, Python, Go; build-time only; empty runtime egress |
 | `packs/README.md` | Create | Manifest schema and the no-runtime-egress decision |
-| `.dockerignore` (solution root) | Create | Allowlist-form context filter for the new build context |
+| `.dockerignore` (solution root) | Modify | **Exists (01.3 SF-4)** — deny-all + allowlist. Add `profiles/`, `packs/` and the two base policy files **above** the trailing deny block |
 | `.github/workflows/agent-sandbox-image.yml` | Create | **Repository root.** Builds `images/agent-base`, publishes to GHCR with SBOM; policy-drift job |
 | `tests/acceptance/verify-pack-composition.sh` | Create | Phases A-H |
 | `scripts/build.sh` | Create | Per-profile image build; records digests, emits SBOM per image (R9.9) |
-| `images/agent-base/keyrings/debian-archive.gpg` | Create | Committed signing key for the snapshot repository; fingerprint asserted at build |
+| `images/keyrings/debian-archive.gpg` | Create | Committed signing key for the snapshot repository; fingerprint asserted at build. Under `images/` — the agent build context — since there is no `images/agent-base/` directory |
 | `policy/resolved/default.yaml` | Modify | Recomposed with `compiled_from.packs` populated; runtime egress sections byte-identical |
 | `scripts/compile-policy.sh` | Modify | Pack composition, refusal gates, CLI and exit codes, deterministic output, `--write`/`--check` |
 | `scripts/lint-policy.sh` | Modify | Pack manifest well-formedness (01.1's Test Command host) |
 | `profiles/default.yaml` | Modify | `packs`, `package_repository`, `authorization`; `mounts.build_cache` shape |
 | `images/mediator/Dockerfile` | Modify | Policy compile stage; copies compiler inputs from the new context |
 | `images/mediator/entrypoint.sh` | Modify | Policy path only, where the build stage changes it |
-| `images/claude/Dockerfile` | Modify | `FROM ...@sha256:`; pack OS package install; package-manager removal |
-| `images/codex/Dockerfile` | Modify | As above |
-| `images/agy/Dockerfile` | Modify | As above |
-| `images/agent-base/Dockerfile` | Modify | CI-publish surface; nothing profile-dependent added |
-| `images/.dockerignore` | Modify | Rules folded into the solution-root file; retained or removed per SF-4 |
-| `compose/compose.yaml` | Modify | Per-service `context: ..` and `dockerfile:`; `PACK_SET_HASH` and `AGENT_BASE_DIGEST` build args |
+| `images/Dockerfile` | Modify | **One multi-stage file, not four (01.2 Deviation 1).** `agent-base` stage: `FROM ...@sha256:` and the CI-publish surface; the `claude`/`codex`/`agy` stages: pack OS package install and package-manager removal |
+| `images/.dockerignore` | Modify | Governs the AGENT context, which does not move — extend only if a pack input must reach it |
+| `compose/compose.yaml` | Modify | `PACK_SET_HASH` and `AGENT_BASE_DIGEST` build args. The contexts are already correct — mediator `context: ..`, agents `context: ../images` + `target:` |
 | `compose/overrides/default.yaml` | Modify | Keeps the Compose counterpart aligned with the extended profile |
 | `compose/overrides/build-cache.yaml` | Create | Per-agent build cache fragment, never selected by `default` |
 | `compose/pins.env` | Modify | `AGENT_BASE_DIGEST`, no default |

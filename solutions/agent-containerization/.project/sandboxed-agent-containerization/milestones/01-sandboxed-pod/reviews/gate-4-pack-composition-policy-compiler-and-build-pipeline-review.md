@@ -22,10 +22,12 @@
       **Needs the reviewer:** SF-4 now also requires re-running 01.3's harness, because it changes
       an image that harness drives end to end. Confirm whether that is part of this feature's test
       command or a build-time obligation.
-- [x] Are the files to create/modify correct? -- Verified against disk on 2026-09-07.
-      `scripts/compile-policy.sh`, `images/mediator/Dockerfile`, `.dockerignore` and
-      `policy/resolved/` all exist and are extended rather than created. The agent images are one
-      multi-stage `images/Dockerfile` (01.2 Deviation 1), not four, which the plan now reflects.
+- [x] Are the files to create/modify correct? -- Verified path by path AND action by action against
+      disk on 2026-09-07. Five rows were stale and are corrected: `.dockerignore` is Modify, not
+      Create (01.3 SF-4 wrote it); the three per-agent Dockerfile rows and the `agent-base` row
+      collapse to one `images/Dockerfile` row (01.2 Deviation 1); the keyring moves to
+      `images/keyrings/`; `images/.dockerignore` keeps the agent context rather than being folded
+      away; and the `compose/compose.yaml` row drops the context change, which is already made.
 - [x] Are interface contracts compatible with existing code? -- This is what the re-plan fixed.
       Contract 6 extends the shipped CLI (`--profile`, `--out`, `--validate`, `--check`,
       `--allowlist`, `--denylist`) instead of replacing it with an incompatible signature.

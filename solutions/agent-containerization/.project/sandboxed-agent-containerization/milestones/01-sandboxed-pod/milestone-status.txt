@@ -38,8 +38,8 @@
 [~] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
     Sub-features: 0/5 complete
-    Notes: Re-planned 2026-09-07 against 01.3 as built; Gate 4 re-approved (supersedes the
-    2026-09-04 approval). The plan consumed per-agent client certificates that 01.3 does not issue
+    Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07, Gate 4
+    checklist OPEN on three items (supersedes the 2026-09-04 approval). The plan consumed per-agent client certificates that 01.3 does not issue
     -- they left with R8.8 for Feature 01.6 at the milestone revision -- and set
     CODEX_CA_CERTIFICATE on an agent that has no TLS hop to anchor. Interface Contract 6 now states
     what each agent actually gets. Sub-feature count unchanged. Three checklist items need the
@@ -49,8 +49,8 @@
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
     Sub-features: 0/7 complete
-    Notes: Re-planned 2026-09-07 against 01.3 as built; Gate 4 re-approved (supersedes the prior
-    approval). The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it
+    Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07, Gate 4
+    checklist OPEN on three items (supersedes the prior approval). The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it
     would have broken the README, both harnesses and the mediator's own stage-1 self-check -- and
     scheduled a build-context change 01.3 had already made. Contract 6 now extends the shipped CLI
     and keeps the exit-code contract as the real addition; SF-4 shrank accordingly. Also picks up

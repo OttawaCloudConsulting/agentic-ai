@@ -454,6 +454,16 @@ identity material here than it assumed:**
 - **`agy`'s mechanism is `SSL_CERT_FILE`,** per 01.1 SF-2's finding, not an unnamed "`agy` CA
   mechanism".
 
+**An allowlist edit is inert until the policy is recompiled AND the mediator image is rebuilt.**
+Since 01.3 the mediator reads `policy/resolved/default.yaml` **from its own image layer**, never
+from a bind mount, and startup stage 1 validates that file's *schema*, not its currency. So SF-2's
+addition of the provider OAuth endpoints to `policy/allowlist.base.yaml` takes effect only after
+`bash scripts/compile-policy.sh --write` regenerates `policy/resolved/default.yaml` **and**
+`docker compose build egress-mediator` (or `up --build`) bakes it in. Editing the base file and
+bringing the pod up produces `control=allowlist` / `reason=host_not_allowlisted` on the very
+endpoint just added, with no warning that the policy is stale — SF-2's flow must run the compile
+and the rebuild between observing the endpoints and re-testing them.
+
 **What this changes for 01.4, concretely.** Any mount 01.4 adds must extend
 `tests/acceptance/verify-pod-topology.sh`'s allowed mount set for that agent — the assertion is
 equality, and 01.3 SF-4 already had to extend it once for the CA secret. Identity-derived
