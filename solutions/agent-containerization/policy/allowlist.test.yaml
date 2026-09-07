@@ -17,35 +17,35 @@ pins: agent-verification.md
 
 agents:
   claude:
-    # allowed.fixture.test and denied.fixture.test share ONE address (172.31.40.20). That pair
+    # allowed.fixture.lab and denied.fixture.lab share ONE address (172.31.40.20). That pair
     # is the T6 assertion: per-connection L7 evaluation, not an IP snapshot -- the allowed name
     # succeeds and the denied one is refused although the destination address is identical.
     allow_fqdns:
-      - {fqdn: allowed.fixture.test, port: 443, upgrade: false}
+      - {fqdn: allowed.fixture.lab, port: 443, upgrade: false}
       # Allowlisted for claude and for NO other agent. Phase B drives it from each network to
       # show the listener serves its own agent's policy rather than a union.
-      - {fqdn: claude-only.fixture.test, port: 443, upgrade: false}
+      - {fqdn: claude-only.fixture.lab, port: 443, upgrade: false}
       # Resolves to 172.31.40.21, which the test denylist denies as a /32. Allowlisted here on
       # purpose: deny must win over allow (R5.3, R5.7), and the neighbouring address .20 must
       # keep working -- that pair is what distinguishes a real single-address deny from a
       # mis-sized mask (criterion 10).
-      - {fqdn: neighbour.fixture.test, port: 443, upgrade: false}
+      - {fqdn: neighbour.fixture.lab, port: 443, upgrade: false}
       # Allowlisted so that the FQDN deny has something to overrule. R5.1's deny_fqdns is
       # evaluated AFTER the allowlist gate, so a name absent from the allowlist would be
       # refused by default-deny and a passing assertion would prove nothing about deny_fqdns.
       # It resolves to the same address as an allowed name, so the refusal cannot be an
       # address deny wearing an FQDN's name either.
-      - {fqdn: denied-by-fqdn.fixture.test, port: 443, upgrade: false}
+      - {fqdn: denied-by-fqdn.fixture.lab, port: 443, upgrade: false}
     allow_cidrs: []
   codex:
     allow_fqdns:
-      - {fqdn: allowed.fixture.test, port: 443, upgrade: false}
+      - {fqdn: allowed.fixture.lab, port: 443, upgrade: false}
       # criterion 3's WebSocket path. Under peek+splice there is no flag to inspect, so it is
       # asserted behaviourally against an Upgrade-capable endpoint.
-      - {fqdn: upgrade.fixture.test, port: 443, upgrade: true}
-      - {fqdn: neighbour.fixture.test, port: 443, upgrade: false}
+      - {fqdn: upgrade.fixture.lab, port: 443, upgrade: true}
+      - {fqdn: neighbour.fixture.lab, port: 443, upgrade: false}
     allow_cidrs: []
   agy:
     allow_fqdns:
-      - {fqdn: allowed.fixture.test, port: 443, upgrade: false}
+      - {fqdn: allowed.fixture.lab, port: 443, upgrade: false}
     allow_cidrs: []

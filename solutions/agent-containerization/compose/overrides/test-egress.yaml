@@ -77,7 +77,7 @@ services:
       egress-net:
         ipv4_address: 172.31.40.20
 
-  # The neighbour of the /32 deny. `neighbour.fixture.test` resolves here and must be refused
+  # The neighbour of the /32 deny. `neighbour.fixture.lab` resolves here and must be refused
   # while the collector one address below keeps working -- the pair that tells a real
   # single-address deny from a mis-sized mask.
   fixture-neighbour:

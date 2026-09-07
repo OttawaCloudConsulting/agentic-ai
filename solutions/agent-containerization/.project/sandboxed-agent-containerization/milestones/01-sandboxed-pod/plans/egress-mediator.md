@@ -541,7 +541,7 @@ revision — so this is a renumber, not a migration.
   of the startup self-check, and the loopback self-check listener stage 2 probes through. Product
   code, and the last piece of the mediator itself. Depends on SF-6.
 
-- [ ] **SF-8: Acceptance harness and fixtures** — `tests/acceptance/verify-egress-mediator.sh`
+- [x] **SF-8: Acceptance harness and fixtures** — `tests/acceptance/verify-egress-mediator.sh`
   implementing phases A–G (T3–T8, T17, T28, plus the listener-set, per-agent proxy-hop transport,
   forwarding, sink-reachability, control-plane-mount and no-agent-on-`egress-net` assertions), the
   four fixtures (controlled authoritative DNS server, HTTP collector, `Upgrade`-capable endpoint, two
@@ -1456,3 +1456,52 @@ anywhere in the repository. Shell scripts follow `#!/usr/bin/env bash`, `set -eu
   and fails on policy rather than on resolution. What stage 2 proves is default-deny plus the
   denial surface. A dedicated `deny_cidrs` assertion belongs to SF-8, which can drive a name that
   resolves into a denied range.
+
+### Deviation 10: the mediator warms its own cascade at start, and pays for it on the audit trail
+- **What changed:** After Squid binds, the entrypoint sends one CONNECT through each TLS-fronted
+  agent's front listener to a host that agent's policy allows, and closes without sending a
+  ClientHello. It costs one `connect_accepted` **event** per fronted agent per start, attributed to
+  that agent, because the listener is that agent's.
+- **Originally planned:** Nothing. The plan's Deviation 1 anticipated a related symptom in one
+  clause — "SF-7's stage-2 self-check should also warm the cascade — the first request through a
+  cold `cache_peer` returned 500 while the peer was still being probed" — and left it there. Stage 2
+  is skipped on every offline profile, which is precisely when nothing else warms anything.
+- **Why necessary:** Squid marks every `cache_peer` DEAD at start on this topology, because the
+  parents are its own loopback listeners and the probe runs before they accept. It does **not**
+  revive them on a timer: the first request that needs a peer triggers the retry, the retry
+  succeeds, and that request is still answered **500**. Measured at Squid's default
+  `dead_peer_timeout`, at `1 seconds`, with `standby=1` and with `connect-fail-limit=100` — all
+  four behave the same. A passive wait therefore cannot work: something has to spend the
+  sacrificial request, and it should be the mediator at start rather than an agent's first call.
+  The warm-up contacts no destination (a peeking listener resolves and connects only after the
+  ClientHello), so it works on an offline host.
+- **Impact:** An agent's first request now succeeds. The audit trail carries two synthetic
+  `connect_accepted` events per start on the default profile — events, not verdicts, so nothing
+  reads them as egress an agent performed, but they do wear the agent's listener and there is no
+  way to warm that agent's peer without traversing it. `dead_peer_timeout` is also shortened to
+  1 second, which is the right scale for a loopback hop. 01.5 inherits both when it moves policy
+  compilation into the image build.
+
+### Deviation 11: the policy compiler takes alternate bases, and the test denylist drops a required range
+- **What changed:** `scripts/compile-policy.sh` gains `--allowlist PATH` and `--denylist PATH`.
+  SF-8's artifacts are compiled from `policy/allowlist.test.yaml` and `policy/denylist.test.yaml`,
+  and every artifact's `compiled_from` and header record which bases produced it.
+  `policy/denylist.test.yaml` deliberately **omits `172.16.0.0/12`**, which R5.6 requires and the
+  shipped denylist carries.
+- **Originally planned:** SF-2 fixed the compiler's inputs at `policy/allowlist.base.yaml` and
+  `policy/denylist.base.yaml`. The plan asked SF-8 for "a test-scoped resolved policy ... which
+  allowlists the fixture hosts" without saying how it would get them.
+- **Why necessary:** The alternative was putting fixture hostnames into
+  `policy/allowlist.base.yaml`, which is discovery-derived, carries `provisional: true` against
+  `docs/records/agent-verification.md` (D17) and is the record of what the real agents were
+  observed to reach. Test names in it would corrupt that provenance permanently, for a saving of
+  one flag. The denylist omission is forced rather than chosen: Docker's bridges are RFC 1918, the
+  harness's fixtures sit at `172.31.40.0/24`, and with that range denied post-resolution **no
+  allowed-path assertion can pass at all** — there is no arrangement in which both hold.
+- **Impact:** Interface Contract 1's producer has two more options; its schema and output are
+  unchanged, and `bash scripts/compile-policy.sh --check` on the default profile still passes
+  unmodified. The cost is stated where it is incurred, at the top of
+  `policy/denylist.test.yaml`: the shipped denylist's coverage of `172.16.0.0/12` is **not**
+  exercised by this harness. The other four required ranges are, and `169.254.0.0/16` in
+  particular is what the link-local assertions and the startup self-check rest on.
+  `bash scripts/lint-policy.sh` checks the base denylist for all five and is unaffected.

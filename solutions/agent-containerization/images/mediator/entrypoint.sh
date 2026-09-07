@@ -258,6 +258,8 @@ P_FRONT_ALLOW=""
 P_FRONTED=""          # port names of the TLS front listeners, for `never_direct`
 P_INNER_NAMES=""      # port names of every peeking listener -- where deny_cidrs runs
 P_FRONT_NAMES=""      # port names of every FRONT listener -- the layer annotation
+P_PEER_NAMES=""       # cache_peer names, for the cascade readiness gate after squid binds
+P_WARM_TARGETS=""     # "<agent>|<addr>|<port>|<fqdn>|<dport>" per FRONTED agent, for the warm-up
 P_SELFCHECK_NAMES=""  # the shadow listener's port names, attributed to `selfcheck`
 SC_RENDERED=0
 P_DELAY_N=0
@@ -344,6 +346,12 @@ for spec in "${_agent_specs[@]}"; do
       || fail "agent '${agent}' has a TLS proxy hop but $crt / $key is not readable. The listener key pair arrives as a Compose secret (compose.yaml) and is issued by scripts/issue-identity.sh with an iPAddress SAN for ${addr}."
     P_LISTENERS="${P_LISTENERS}https_port ${addr}:${lport} name=${agent} tls-cert=${crt} tls-key=${key}"$'\n'
     P_LISTENERS="${P_LISTENERS}http_port 127.0.0.1:${inner} name=${agent}in ssl-bump generate-host-certificates=off tls-cert=${crt} tls-key=${key}"$'\n'
+    # `standby=1` keeps one idle connection to the peer open. Not tuning: Squid probes its
+    # parents at start, marks them DEAD before its own inner listeners are accepting, and
+    # revives them about a second later -- so the FIRST fronted request after a start is
+    # answered 500 with no peer to forward to. Found by SF-8's harness on a profile whose
+    # startup self-check is skipped, which is exactly the case where nothing else warms the
+    # cascade. An agent's first request is not a request to lose.
     P_PEERS="${P_PEERS}cache_peer 127.0.0.1 parent ${inner} 0 no-query no-digest no-netdb-exchange name=${agent}peer"$'\n'
     # The agent's REAL front port, not `p_${agent}_front` -- that ACL also names the
     # self-check shadow, and a peer reachable from the shadow lets stage 2's probe be
@@ -356,6 +364,7 @@ for spec in "${_agent_specs[@]}"; do
     _front_names="${agent}"
     _inner_names="${agent}in"
     P_FRONTED="${P_FRONTED} ${agent}"
+    P_PEER_NAMES="${P_PEER_NAMES} ${agent}peer"
 
     if [ "$agent" = "$SC_AGENT" ]; then
       # The shadow. It MIRRORS this agent's topology -- a front and a peeking inner,
@@ -375,6 +384,7 @@ for spec in "${_agent_specs[@]}"; do
       P_PEERS="${P_PEERS}cache_peer_access selfcheckpeer allow p_selfcheck_front"$'\n'
       P_PEERS="${P_PEERS}cache_peer_access selfcheckpeer deny all"$'\n'
       P_FRONTED="${P_FRONTED} selfcheck"
+      P_PEER_NAMES="${P_PEER_NAMES} selfcheckpeer"
       _front_names="${_front_names} selfcheck"
       _inner_names="${_inner_names} selfcheckin"
       P_SELFCHECK_NAMES="selfcheck selfcheckin"
@@ -503,6 +513,14 @@ for spec in "${_agent_specs[@]}"; do
   done <<< "$names"
 
   AGENT_NAMESETS="${AGENT_NAMESETS}-- ${agent}: ${count} exact name(s) from ${RESOLVED_POLICY}"$'\n'"${set_lua}"$'\n'
+
+  # One allowlisted destination per FRONTED agent, for the cascade warm-up after squid binds.
+  # A fronted agent only: a single-listener agent has no peer and nothing to warm.
+  if [ "$ltls" = "true" ] && [ "$count" -gt 0 ]; then
+    _wh="$(set -- $agent_hosts; echo "$1")"
+    _wp="$(set -- $agent_ports; echo "$1")"
+    P_WARM_TARGETS="${P_WARM_TARGETS}${agent}|${addr}|${lport}|${_wh}|${_wp} "
+  fi
 
   # Control 1a's gate: the UNION of this agent's names and ports, matched on the
   # CONNECT line alone. It exists so that a name absent from this agent's allowlist
@@ -799,6 +817,69 @@ trap on_signal TERM INT
 
 note "up: squid $(squid -v 2>/dev/null | head -1 | sed 's/^Squid Cache: //'), dnsdist $(dnsdist --version 2>&1 | head -1), unbound $(unbound -V 2>/dev/null | head -1)"
 note "policy: profile '${MEDIATOR_PROFILE}', networks '${MEDIATOR_AGENT_NETWORKS}', upstream '${MEDIATOR_DNS_UPSTREAM}'"
+
+# --------------------------------------------------------- cascade readiness gate
+# Squid probes its `cache_peer` parents at start, and on this topology the parents are its OWN
+# loopback listeners -- which are not accepting yet when the probe runs. Every peer is therefore
+# marked DEAD at t=0, and a fronted agent's request arriving before the revival is answered 500
+# with no peer to forward to. Measured by SF-8's harness: ~19s at Squid's default
+# `dead_peer_timeout`, and still several seconds after shortening it to 1s.
+#
+# So the mediator does not report itself up -- and does not run stage 2 -- while any peer is
+# still dead. It WAITS rather than sending a warm-up request through the cascade: a request
+# would work, but it would arrive on an agent's listener and be recorded under that agent's
+# identity, and synthetic traffic attributed to an agent is exactly what the self-check's shadow
+# listener exists to avoid.
+# The gate is a WARM-UP, not a wait, and the difference is the whole finding. Squid marks every
+# `cache_peer` DEAD at start on this topology -- the parents are its own loopback listeners --
+# and it does NOT revive them on a timer: the first request that needs a peer is what triggers
+# the retry, the retry succeeds, and that request is still answered 500. Measured repeatedly at
+# the SF-8 build, at Squid's default `dead_peer_timeout`, at 1s, and with `standby=1` and
+# `connect-fail-limit=100`. So a passive wait cannot work -- something has to spend the
+# sacrificial request, and it should be the mediator at start rather than an agent's first call.
+#
+# The warm-up CONNECTs to an allowlisted host and closes WITHOUT sending a ClientHello. On a
+# peeking listener no destination is contacted before the ClientHello arrives, so this reaches
+# the peer and stops there: it works on an offline host and contacts nothing.
+#
+# It costs one `connect_accepted` EVENT per fronted agent per start, attributed to that agent
+# because the listener is that agent's. That is stated in the audit trail's own terms rather
+# than hidden: it is an event and not a verdict, so nothing reads it as egress the agent
+# performed -- but it is the mediator's traffic wearing the agent's listener, and there is no
+# way to warm that agent's peer without traversing it.
+warm_cascade() {
+  local spec agent addr port fqdn dport out ok
+  for spec in $P_WARM_TARGETS; do
+    IFS='|' read -r agent addr port fqdn dport <<< "$spec"
+    ok=0
+    # The front has to be ACCEPTING before an attempt means anything. Squid binds a few seconds
+    # after it is started, and attempts spent against a closed socket are attempts not spent on
+    # the peer.
+    for _ in $(seq 1 100); do
+      (echo > "/dev/tcp/${addr}/${port}") >/dev/null 2>&1 && break
+      sleep 0.1
+    done
+    # A SHORT per-attempt timeout, and it is load-bearing. Squid accepts the TCP connection
+    # before it will complete a TLS handshake on that port, so an early attempt does not fail --
+    # it HANGS. At a 10s timeout the whole budget went to three hung attempts inside the dead
+    # window and the warm-up reported failure on a mediator that was seconds from working.
+    for _ in $(seq 1 20); do
+      out="$(printf 'CONNECT %s:%s HTTP/1.1\r\nHost: %s:%s\r\n\r\n' "$fqdn" "$dport" "$fqdn" "$dport" \
+        | timeout 3 openssl s_client -quiet -connect "${addr}:${port}" 2>/dev/null \
+        | head -1 || true)"
+      case "$out" in *200*) ok=1; break ;; esac
+      kill -0 "$SQUID_PID" 2>/dev/null || fail "squid exited while the cascade was being warmed"
+      sleep 0.5
+    done
+    if [ "$ok" -eq 1 ]; then
+      note "cascade: ${agent}'s peer is live"
+    else
+      note "WARNING: could not warm ${agent}'s cascade -- its first request may be answered 500"
+      note "  last response from ${addr}:${port} for ${fqdn}:${dport}: ${out:-<empty>}"
+    fi
+  done
+}
+[ -z "$P_WARM_TARGETS" ] || warm_cascade
 
 # ================================================ stage 2 of the self-check (R9.5)
 # Through the rendered proxy, never around it. Checking the policy by re-reading the

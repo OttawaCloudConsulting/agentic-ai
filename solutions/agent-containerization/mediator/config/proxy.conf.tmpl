@@ -20,6 +20,13 @@
 # 127.0.0.1 on every inner listener.
 
 pid_filename none
+# The cascade's peers are this process's OWN loopback listeners, and Squid probes its parents at
+# start before those listeners are accepting -- so every peer is marked DEAD at t=0. With the
+# default 10s this leaves a window (measured at ~19s) in which a fronted agent's first request is
+# answered 500 with no peer to forward to. Shortened so the window closes in about a second.
+# The peers are in the same process; a probe interval sized for a remote cache is not the right
+# scale for a loopback hop.
+dead_peer_timeout 1 seconds
 cache deny all
 # The ICMP pinger needs a raw socket, which `cap_drop: ALL` does not grant, and it
 # FATALs on every start. The mediator has no ICMP path out by construction

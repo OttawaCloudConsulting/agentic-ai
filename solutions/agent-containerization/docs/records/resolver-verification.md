@@ -427,3 +427,29 @@ resolver at all. It is unreachable rather than unpoliced.
 - The audit sink's durability properties, which SF-7 inherits from SF-4's record. The
   DNS trail is written and flushed per line, but "decision made implies decision
   durably recorded" is not established here any more than it was for the egress trail.
+
+## Addendum (01.3 SF-8): the re-originating stage answers RFC 6761 special-use TLDs itself
+
+**Finding.** `unbound` carries built-in local zones for the special-use names of RFC 6761 —
+`test.`, `invalid.`, `localhost.`, `example.` and others. It answers them locally and **never
+forwards them**, whatever `forward-zone` says. An allowlist entry under one of those TLDs is
+therefore unreachable through the pod resolver even when the policy allows it and the resolver
+audits the query as allowed.
+
+**How it was measured.** SF-8's fixtures were first placed under `.test`. dnsdist recorded
+`verdict=allow` for `allowed.fixture.test`, the harness's authoritative server received nothing,
+and the client got NXDOMAIN. The same chain, an isolated `unbound` with the same `forward-zone`
+pointed at the same authoritative server, was then asked for one name under `.test` and one under
+`.lab`:
+
+| Query | unbound's own log | Result at the client |
+|---|---|---|
+| `a.probe.lab` | `resolving a.probe.lab. A IN` → `response for a.probe.lab. A IN` | resolved, `172.31.40.20` |
+| `allowed.fixture.test` | no resolution attempt logged at all | NXDOMAIN |
+
+**Consequence, and it is not only the harness's.** The fixtures moved to `.lab`. For an operator
+the same trap applies to any real allowlist entry under a special-use TLD: the policy will compile,
+the resolver will audit the query as allowed, and the name will still not resolve. The failure is
+silent in the sense that every surface says "allowed" — the only signal is the absent answer.
+Worth a compile-time warning in 01.5's policy compiler, where the allowlist is validated; not
+added here, because 01.3's compiler is the zero-pack form and this is not a defect in it.

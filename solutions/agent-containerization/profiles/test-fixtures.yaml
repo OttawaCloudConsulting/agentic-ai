@@ -79,7 +79,7 @@ egress_exclusions: []
 # `denied` is a link-local address so the check fails on POLICY rather than on resolution --
 # an unresolvable name would pass the check for the wrong reason.
 startup_check:
-  allowed: {agent: claude, fqdn: allowed.fixture.test, port: 443}
+  allowed: {agent: claude, fqdn: allowed.fixture.lab, port: 443}
   denied:  {ip: 169.254.169.254, port: 443}
   offline: true
 
