@@ -4,6 +4,15 @@
 **Feature:** 01.4: Agent authentication and state persistence
 **Status:** Planned
 **Date:** 2026-09-04
+**Re-planned:** 2026-09-07 — against Feature 01.3 **as built**. Four things this plan consumed do
+not exist in the form it assumed: 01.3 issues **no client certificates** (they left with R8.8 for
+Feature 01.6 at the 2026-09-04 milestone revision, and this plan was written the same day against
+the pre-revision shape); `CODEX_CA_CERTIFICATE` is not set on `codex`, which has no TLS hop to
+anchor and receives no CA at all; `agy`'s CA mechanism is `SSL_CERT_FILE`; and the mediator's audit
+sub-feature renumbered from SF-7a to SF-7. The revision is confined to Interface Contract 6,
+criterion 7, Contract 7's inventory table, the Dependencies section and the repository-state note —
+Approach, Sub-Features, Test Command and Test Strategy are unchanged, because none of them turned
+on the identity material.
 
 ## Summary
 
@@ -145,7 +154,9 @@ where the two differ.
    `docs/records/credential-inventory.md` covers all three delivery paths, not only the persisted
    ones: environment-delivered (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
    `CLAUDE_CODE_OAUTH_TOKEN`), volume-persisted (OAuth refresh tokens under every OAuth mode), and
-   the per-agent mTLS client key at `/run/secrets` that 01.3 issues. Each row states its blast-radius
+   and — **when 01.6 lands, not before** — the per-agent mTLS client key at `/run/secrets`. 01.3
+   issues no client certificates; the inventory records that path as *not yet populated* rather than
+   listing a file that does not exist. Each row states its blast-radius
    contribution (R8.4), and each persisted row additionally names its compensating controls
    individually (R4.3, R4.7, R8.5, R8.7), its documented revocation path, and R4.16's review trigger.
 
@@ -202,7 +213,7 @@ endpoint — 01.3's example shows `api.anthropic.com:443` and no token or author
 01.1's plan does not cover OAuth behaviour at all. Leaving the gap unowned would let SF-2 exit `4`
 forever with nothing scheduled to close it. SF-2 therefore closes it, and the derivation satisfies
 R5.8 and D17 rather than bypassing them: running the OAuth flow **is** an observation of the minimal
-destination set, and the mediator's own audit log of the blocked attempt (01.3 SF-7a) is the
+destination set, and the mediator's own audit log of the blocked attempt (01.3 SF-7) is the
 independent second source D17 requires for cross-validation. The entries are added to
 `policy/allowlist.base.yaml` marked provisional on the same terms as the rest of that file, with the
 observed FQDNs recorded in `docs/records/agent-verification.md`.
@@ -410,13 +421,44 @@ where 01.4 adds nothing. Extending 01.2's allowed set for the two phases that do
 explicit work in SF-1 and is listed in Files to Create/Modify, following the discipline 01.3
 established when it added `/run/secrets`.
 
-### 6. Agent-side proxy and identity — consumed from 01.3 Interface Contract 2
+### 6. Agent-side proxy and identity — consumed from 01.3 Interface Contract 2 (as built)
 
-`HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`, the pod DNS setting, `NODE_EXTRA_CA_CERTS` (claude),
-`CODEX_CA_CERTIFICATE` (codex), the `agy` CA mechanism per 01.1 SF-2's finding, and the per-agent
-client certificate and key under `/run/secrets`. 01.4 consumes all of it unchanged. 01.3 states the
-direction explicitly: "01.4 consumes this contract, not the reverse." The client **key** is
-inventoried by Contract 7 as a credential the agent can obtain (R8.4); its lifecycle stays 01.3's.
+01.4 consumes this contract unchanged. 01.3 states the direction explicitly: "01.4 consumes this
+contract, not the reverse." What 01.3 **actually** delivers, verified on the running pod by its
+acceptance harness, is not uniform across the three agents — and the asymmetry is a finding about
+the agents' own HTTP clients (01.1 SF-2), not a preference:
+
+| Agent | Proxy URL | CA trust | Client certificate |
+|---|---|---|---|
+| `claude` | `https://172.31.10.2:3128` — TLS proxy hop | `NODE_EXTRA_CA_CERTS=/run/secrets/mediator-ca.crt` | **None at 01.3** |
+| `codex` | `http://172.31.20.2:3128` — **plain** HTTP CONNECT | **None.** No CA certificate is mounted and `CODEX_CA_CERTIFICATE` is **not set** | **None at 01.3** |
+| `agy` | `https://172.31.30.2:3128` — TLS proxy hop | `SSL_CERT_FILE=/run/secrets/mediator-ca.crt` | **None at 01.3** |
+
+Plus `NO_PROXY=localhost,127.0.0.1` and `dns:` pointing at the mediator's address on that agent's
+network, on all three.
+
+**Three corrections to this plan as first written, all in the same direction — there is less
+identity material here than it assumed:**
+
+- **No per-agent client certificate or key exists under `/run/secrets`.** Client certificates,
+  client-certificate *verification* and R8.8 left 01.3 for **Feature 01.6** at the 2026-09-04
+  milestone revision. 01.3 ships the CA and the three listener certificates only, and configures
+  client-certificate verification explicitly **off** — a listener carrying `clientca=` would refuse
+  `agy`, which has no certificate to present. Anything in 01.4 that reads as depending on a client
+  key is depending on 01.6.
+- **`codex` gets no CA certificate and no `CODEX_CA_CERTIFICATE`.** Its hop is plaintext because it
+  rejects an `https://`-scheme proxy URL at URL-parse time, so there is nothing for it to anchor; a
+  CA it cannot use is a mount it should not have. 01.2's mount-set equality assertion enforces the
+  absence, and 01.3's harness asserts `codex` carries none of `NODE_EXTRA_CA_CERTS`,
+  `SSL_CERT_FILE` or `CODEX_CA_CERTIFICATE`.
+- **`agy`'s mechanism is `SSL_CERT_FILE`,** per 01.1 SF-2's finding, not an unnamed "`agy` CA
+  mechanism".
+
+**What this changes for 01.4, concretely.** Any mount 01.4 adds must extend
+`tests/acceptance/verify-pod-topology.sh`'s allowed mount set for that agent — the assertion is
+equality, and 01.3 SF-4 already had to extend it once for the CA secret. Identity-derived
+authorization (an `AUTH_MODE` that depends on the agent proving *which* agent it is) is not
+available until 01.6 and must not be planned against here.
 
 ### 7. `docs/records/credential-inventory.md` — produced by 01.4, consumed by 02.5
 
@@ -426,7 +468,7 @@ Covers **every credential the agent can obtain** (R8.4), across all three delive
 |---|---|
 | Environment-delivered | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` |
 | Volume-persisted | OAuth refresh tokens under `oauth-interactive` and `oauth-mount`, per agent |
-| Secret-mounted | The per-agent mTLS client key at `/run/secrets`, issued by 01.3 |
+| Secret-mounted | **Empty at this milestone.** The CA *certificate* mounted into `claude` and `agy` is a public key and not a credential. The per-agent mTLS client **key** arrives with Feature 01.6; the row exists so its absence is visible rather than an omission |
 
 Columns: agent; delivery path; producing `AUTH_MODE`; credential type; location; stated lifetime;
 **blast-radius contribution (R8.4)**; compensating controls named individually where persisted
@@ -650,10 +692,14 @@ Paths are relative to `solutions/agent-containerization/`.
 
 **On Feature 01.3 — the reason 01.3 precedes 01.4:**
 
-- Interface Contract 2 (proxy environment, DNS, CA trust, per-agent client certificate), consumed
-  unchanged.
-- **The mediator's audit log** (01.3 SF-7a) is the independent second source SF-2 cross-validates
-  the observed OAuth endpoints against, per D17.
+- Interface Contract 2 (proxy environment, DNS, CA trust), consumed unchanged — **and it carries no
+  per-agent client certificate**; see Contract 6 above.
+- **The mediator's audit log** (01.3 SF-7) is the independent second source SF-2 cross-validates
+  the observed OAuth endpoints against, per D17. Its shape is now fixed and can be matched on
+  directly: one JSON object per line, and a refused authentication endpoint appears as
+  `{"verdict":"deny","control":"allowlist","reason":"host_not_allowlisted","dest_host":"<fqdn>"}`
+  with the agent named by `agent` and the attribution strength by `identity_source`. SF-2 should
+  select on those fields rather than grepping text.
 - An agent on an `internal: true` network cannot complete an OAuth flow until the mediator resolves
   and permits the provider's authentication endpoints. Those entries do not exist yet in any
   approved plan; **01.4 SF-2 owns adding them**, derived per R5.8 as described in Approach. This is
@@ -682,10 +728,15 @@ Paths are relative to `solutions/agent-containerization/`.
   any container. Required by R12.4, R14.1 and this milestone's not-for-real-work notice (R12.8).
   This is the external dependency most likely to be underestimated: T24 iterates seven cells.
 
-**Repository state:** greenfield for this feature. None of `compose/`, `images/`, `profiles/`,
-`scripts/`, `policy/` or `tests/` exists on disk yet — 01.1, 01.2 and 01.3 are all planned and not
-built. Every file this plan lists as Modify is created by an earlier feature in this milestone, and
-01.4 cannot begin until those exist. Shell scripts follow `#!/usr/bin/env bash`, `set -euo pipefail`,
+**Repository state (re-checked 2026-09-07): no longer greenfield.** Features 01.1, 01.2 and 01.3
+are **complete and on disk**: `compose/`, `images/`, `profiles/`, `scripts/`, `policy/`,
+`mediator/`, `tests/acceptance/` and `tests/fixtures/` all exist, and the pod brings up and enforces.
+Every file this plan lists as Modify now exists and must be **extended**, not created — in
+particular `compose/compose.yaml` (seven secrets already declared), `profiles/default.yaml`,
+`policy/allowlist.base.yaml`, `.gitignore` and `tests/acceptance/verify-pod-topology.sh`, whose
+mount-set assertion is equality and breaks the moment a mount is added without extending it.
+Two harnesses already exist and must both keep passing: `verify-pod-topology.sh` (01.2) and
+`verify-egress-mediator.sh` (01.3, 77 assertions). Shell scripts follow `#!/usr/bin/env bash`, `set -euo pipefail`,
 mode 644, invoked as `bash script.sh`.
 
 ## Architectural Deviations

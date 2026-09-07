@@ -5,6 +5,16 @@
 **Status:** Planned
 **Date:** 2026-09-04
 
+**Re-planned:** 2026-09-07 — against Feature 01.3 **as built**. Three of this plan's assumptions
+were overtaken by what 01.3 actually shipped: the compiler now has a CLI (this plan proposed a
+different, incompatible one), the mediator's build context is already the solution root with a
+deny-all `.dockerignore` (this plan scheduled that work), and the compiler already carries the
+validation this plan describes as inherited — plus refusals this plan does not mention. One new
+obligation arrives from the Gate 2 refresh: a compile-time warning for RFC 6761 special-use TLDs.
+The revision touches the inherited-validation section, Contracts 5 and 6, SF-4 and the acceptance
+criteria that referenced them; the composition model, the pack manifest contract and the refusal
+gates are unchanged.
+
 ## Summary
 
 This feature is the composition mechanism SC-6 and SC-8 are measured against. It defines the pack
@@ -101,9 +111,8 @@ assumed:
 
 ### Validation the compiler inherits from 01.3
 
-01.3 SF-2 already mandates three checks and states that they are enforced "where the composition
-happens" because this feature composes pack-supplied entries into the same fields
-(`01.3:606-612`, `:77-78`). They are extended, not reimplemented:
+01.3 SF-2 built these and they are **on disk, not proposed**. They are extended to pack-supplied
+entries, never reimplemented — and the list is longer than this plan first assumed:
 
 - **Wildcard allowlist entries are rejected.** `*.anthropic.com` from a pack fails the build. The
   allowlist schema is exact-`fqdn`; a pack is the only realistic way a wildcard could appear.
@@ -111,6 +120,25 @@ happens" because this feature composes pack-supplied entries into the same field
   detail — and a pack introducing one is exactly the case worth surfacing.
 - **`provisional:` propagates** from `allowlist.base.yaml` into the resolved artifact. A pack cannot
   clear it.
+- **Hostnames and agent keys are shape-checked at the boundary.** Both are interpolated into the
+  mediator's *Lua* DNS policy and into `squid.conf`, so a name carrying a quote, an escape or a
+  newline would become policy **code**. The compiler enforces a hostname regex and an identifier
+  regex, and — this is the part that matters for 01.5 — **the mediator re-enforces both at render
+  time**, precisely because pack composition makes the artifact a channel from third-party content
+  into that render. Guarding only at the producer would put the check on the wrong side of the
+  boundary this feature opens.
+- **`connections_per_minute` is refused outright.** Squid 6.13 has no per-client connection-rate
+  directive; the compiler rejects an artifact that declares the key rather than emitting one that
+  enforces nothing (01.3 Deviation 4). A pack must not be able to reintroduce it.
+
+**New obligation from the Gate 2 refresh (2026-09-07): warn on RFC 6761 special-use TLDs.**
+`unbound` — the mediator's re-originating stage — carries built-in local zones for `test.`,
+`invalid.`, `localhost.` and `example.`: it answers such names itself and never forwards them,
+whatever the policy says. An allowlist entry under one of those TLDs compiles, is audited as
+`allow`, and still never resolves; every surface reports success and the only signal is the absent
+answer. The architecture document assigns the warning here, because this is where the allowlist is
+validated. A warning rather than a refusal: the operator may have a local resolver that does serve
+one. See the addendum in `docs/records/resolver-verification.md`.
 
 ### The refusal gates
 
@@ -235,14 +263,22 @@ the SF-1..SF-5 / SF-6 boundary.
   rejection and the port≠443 flag to pack-supplied entries. Make the output **deterministic** —
   stable key order, sorted entry lists — because the drift check in SF-4 is meaningless otherwise.
 
-- [ ] **SF-4: Build-stage relocation, build context and the drift check** -- Move the compiler
-  invocation into a stage of `images/mediator/Dockerfile` so it is never an operator step (D10,
-  R7.4). Change the build context for the four locally built images from the `images/` tree to the
-  solution root so the compiler's inputs are reachable, and add a solution-root `.dockerignore` that
-  allowlists rather than denylists. Implement the committed-artifact drift check per Interface
-  Contract 4. Extend `images/mediator/entrypoint.sh` only where the policy path changes.
-  *Split condition:* if the context change runs long across four Dockerfiles, SF-4a is the context
-  and `.dockerignore` work and SF-4b is the compile stage and drift check.
+- [ ] **SF-4: Build-stage relocation and the drift check** -- Move the compiler invocation into a
+  stage of `images/mediator/Dockerfile` so it is never an operator step (D10, R7.4), and implement
+  the committed-artifact drift check per Interface Contract 4. **Re-scoped 2026-09-07: the build
+  context work is already done.** 01.3 SF-4 moved the mediator's context to the solution root and
+  wrote the deny-all `.dockerignore`; what remains is extending that allowlist with the compiler's
+  inputs (`profiles/`, `packs/`, the two base policy files), added above the file's trailing deny
+  block. The agent images keep the `images/` context and are now one multi-stage Dockerfile
+  (01.2 Deviation 1), so there is no four-Dockerfile change to make.
+  Extend `images/mediator/entrypoint.sh` only where the policy path changes — note it already
+  copies `scripts/compile-policy.sh` into the image for stage-1 validation, so the compile stage
+  and the validate call must agree on one script, not two.
+  Also implement the exit-code contract of Interface Contract 6 and **re-run both existing
+  harnesses**: `verify-pod-topology.sh` and `verify-egress-mediator.sh` (77 assertions) must still
+  pass, since this sub-feature changes an image the second one drives end to end.
+  *Split condition:* if it runs long, SF-4a is the compile stage plus `.dockerignore` extension and
+  SF-4b is the drift check plus exit codes.
 
 - [ ] **SF-5: Build-time OS packages, package-manager removal, and the per-agent build cache** --
   Install the profile's composed pack package set in `images/{claude,codex,agy}/Dockerfile` at build
@@ -439,10 +475,23 @@ and the agent images were rebuilt.
 
 ### Contract 5: Build context (modifies 01.2's Compose seam — the fourth extension)
 
-01.2 fixes a single shared build context at the `images/` tree with per-service `dockerfile:` and
-`build.args`. That context cannot satisfy D10: the compiler's inputs (`policy/`, `profiles/`,
-`packs/`) and `mediator/config/*.tmpl` all sit **outside** `images/`, and a build stage can only
-read what is in its context.
+**Mostly already done by 01.3 SF-4 — this contract shrinks to one addition.** The mediator's build
+context *is* the solution root today, with `dockerfile: images/mediator/Dockerfile` and a
+solution-root `.dockerignore` that is deny-all plus an explicit allowlist (`images/mediator`,
+`policy/resolved`, `mediator/config`, `scripts/compile-policy.sh`), with trailing re-denies for
+`references/` and `mediator/identity/`. The three **agent** images still build from the `images/`
+tree, and after 01.2's Deviation 1 they are **one multi-stage Dockerfile selected by `target:`**,
+not four — so this plan's "four locally built images" and "four Dockerfiles" no longer describe the
+tree.
+
+What remains for 01.5: **extend the existing allowlist** so the compile stage can read the
+compiler's inputs — `profiles/`, `packs/`, `policy/allowlist.base.yaml` and
+`policy/denylist.base.yaml` — and add those entries **above** the trailing deny block, where that
+file's own comment says new entries go. The agent images' context does not change.
+
+The original reasoning, kept because it is why the context is what it is: 01.2 fixed a single
+shared context at `images/`, which cannot satisfy D10 — the compiler's inputs and
+`mediator/config/*.tmpl` sit **outside** `images/`, and a build stage can only read its context.
 
 ```yaml
 services:
@@ -506,19 +555,33 @@ project mount, which the project-mount gate handles independently and which this
 touch. Its behaviour on the pinned Docker Desktop is additionally UNVERIFIED — 01.1 SF-2 could
 establish that cheaply if the option is ever wanted, but nothing here needs it.
 
-### Contract 6: `scripts/compile-policy.sh` CLI (fixes what 01.3 left unstated)
+### Contract 6: `scripts/compile-policy.sh` CLI — **extended**, not defined
 
-01.3 states the script's behaviour but no signature, no flags and no exit codes. This feature fixes
-them, following the shape `bootstrap-auth.sh` already established in 01.4:
+**This plan originally proposed a CLI that 01.3 has since made incompatible.** The built signature
+uses `--profile` and writes by default; the proposed one used a positional profile and required
+`--write`. Adopting the proposal now would break every caller that exists: the README, both
+acceptance harnesses, and the mediator's own stage-1 self-check, which invokes this script inside
+the image. The built form is therefore authoritative and this feature **adds to it**:
 
 ```
-bash scripts/compile-policy.sh [--write] [--check] <profile>
+bash scripts/compile-policy.sh [--profile NAME] [--out PATH]
+                               [--allowlist PATH] [--denylist PATH]   # shipped by 01.3
+bash scripts/compile-policy.sh --validate PATH                        # shipped by 01.3
+bash scripts/compile-policy.sh --check [--profile NAME] [...]         # shipped by 01.3
 
-  <profile>   profile name, resolving to profiles/<profile>.yaml
-  --write     write the result to policy/resolved/<profile>.yaml
-  --check     compare against the committed copy and exit non-zero on drift
-  (neither)   write the result to stdout
+  (default)    compile profiles/<profile>.yaml -> policy/resolved/<profile>.yaml
+  --out        write elsewhere (used by --check's temp compile)
+  --allowlist  alternate allow base; the artifact records which base it came from
+  --denylist   alternate deny base
+  --validate   schema check only -- what the mediator calls at start (T17)
+  --check      recompile and diff against the committed artifact, ignoring compiled_at
+```
 
+**What 01.5 adds:** pack composition (the profile's `packs:` list becomes
+`compiled_from.packs`), the refusal gates below, and the exit-code contract — which is a real
+addition, because the shipped script exits 1 for everything:
+
+```
 Exit codes
   0  success, or --check with no drift
   2  input validation failure (malformed profile, pack manifest or policy file)
@@ -528,7 +591,10 @@ Exit codes
 ```
 
 Exit 3 is distinct from exit 2 because a refusal is a *recorded policy decision the operator must
-make*, not a syntax error, and the acceptance harness distinguishes them.
+make*, not a syntax error, and the acceptance harness distinguishes them. **Changing exit 1 to
+these codes is a caller-visible change**: 01.3's harness and the mediator's stage 1 currently test
+only for non-zero, so both keep working, but SF-4 must re-run
+`tests/acceptance/verify-egress-mediator.sh` to prove it rather than assume it.
 
 ## Edge Cases
 
