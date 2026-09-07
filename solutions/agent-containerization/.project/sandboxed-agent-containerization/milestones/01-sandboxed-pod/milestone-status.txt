@@ -42,7 +42,7 @@
 
 [~] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
-    Sub-features: 0/5 complete
+    Sub-features: 1/5 complete
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     2026-09-04 approval). Ready to build. The plan consumed per-agent client certificates that 01.3 does not issue

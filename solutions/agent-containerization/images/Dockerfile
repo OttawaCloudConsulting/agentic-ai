@@ -72,7 +72,22 @@ RUN npm install -g "@openai/codex@${CODEX_VERSION}"
 
 ENV CODEX_HOME=/home/agent/.codex
 
-RUN mkdir -p /opt/agent-home-skel/.codex && chown -R agent:agent /opt/agent-home-skel
+# R4.5, ALL modes -- not only oauth-mount. The `keyring` credential store
+# hard-fails with no D-Bus, and there is no D-Bus in any of these containers
+# under any mode, so the register's unconditional reading wins over the
+# architecture component table's oauth-mount-only one (criterion 2).
+#
+# Seeded into the SKELETON, never directly under /home/agent: the state volume
+# masks the image there. The entrypoint copies this in on first run and, on a
+# pre-existing volume whose config.toml predates this setting, merges the key in
+# without disturbing the operator's other keys.
+RUN mkdir -p /opt/agent-home-skel/.codex \
+    && printf '%s\n' \
+         '# Seeded by the image (R4.5). Codex must not use the `keyring` credential' \
+         '# store: it hard-fails without D-Bus, and no container here runs one.' \
+         'cli_auth_credentials_store = "file"' \
+         > /opt/agent-home-skel/.codex/config.toml \
+    && chown -R agent:agent /opt/agent-home-skel
 
 USER agent
 CMD ["codex", "--version"]

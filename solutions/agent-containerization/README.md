@@ -107,6 +107,53 @@ reads its policy from its own image layer and its Compose secrets, never from a 
 write. The exposure is the *next build*, which is why the fix is the default binding rather than a
 warning, and why the acceptance harness asserts no agent's mount set contains a control-plane path.
 
+### Host git configuration (optional, default off)
+
+`profiles/default.yaml` sets `mounts.host_git_config: false`, so nothing below happens unless you
+opt in. When you do, **the scrub runs on the host, before `up`** — that ordering is R2.9's, not a
+convenience:
+
+```bash
+bash scripts/scrub-gitconfig.sh          # writes compose/generated/gitconfig.d/.gitconfig
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml \
+  -f compose/overrides/default.yaml \
+  -f compose/overrides/host-gitconfig.yaml up -d
+```
+
+What gets mounted is the **scrubbed artifact**, never your own `~/.gitconfig`. The scrub removes
+`credential.helper` (in every subsection), `include.path` and every `includeIf` section. The
+includes go because an include is a *pointer*: removing only the literal helper key would satisfy
+R2.9 in letter and defeat it in fact, since the included file could re-introduce a helper from a
+path this solution never mounted. Because the filtering happens before the mount, there is no
+unfiltered copy inside the container for a compromised agent to read — the control is that the
+material is not there, not that something declines to use it.
+
+Re-run the scrub whenever your gitconfig changes; the artifact is a snapshot, and
+`compose/generated/` is git-ignored.
+
+**Behaviour change you will see:** the mount is `:ro` and `GIT_CONFIG_GLOBAL` points into it, so
+**`git config --global` writes fail inside the container.** That is correct under R2.3 and R2.9,
+and it is stated here rather than left to be discovered. Without the fragment, `GIT_CONFIG_GLOBAL`
+is unset and git behaves normally, reading `~/.gitconfig` on the state volume like any container.
+
+### Backing up the state volumes
+
+The per-agent state volumes hold OAuth refresh tokens once an agent authenticates. R8.7 says that
+material stays out of version control *and* out of backups. This solution enforces the first half
+(`.gitignore`, plus the absence of any export path it creates) and **cannot enforce the second**:
+Docker Desktop stores every named volume inside one VM disk image, so there is no per-volume
+exclusion to make. The exclusion is therefore a host procedure, and it is yours to run:
+
+```bash
+tmutil addexclusion ~/Library/Containers/com.docker.docker/Data
+tmutil isexcluded  ~/Library/Containers/com.docker.docker/Data   # expect: [Excluded]
+```
+
+**Recorded residual:** an operator who does not run this has agent refresh tokens inside a Time
+Machine backup, and nothing in this solution can detect that. Note also that the exclusion is
+all-or-nothing — it covers *every* Docker volume on the machine, not only this pod's.
+
 ### When an agent's egress is refused
 
 Every attempt that reaches the mediator produces one JSON line on the audit trail, allow and deny

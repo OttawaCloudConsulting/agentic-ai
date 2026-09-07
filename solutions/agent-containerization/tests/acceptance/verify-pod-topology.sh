@@ -93,12 +93,59 @@ check_mediator_pin_agreement() {
                   || fail "mediator pin agreement (pins.env vs $record)"
 }
 
+# 01.4 SF-1, criterion 3 (R4.7, R8.7, D7): state volumes are secret material.
+#
+# D7 is "no state volume is shared between two services", and the check is by ENUMERATION
+# over the rendered config rather than by reading compose.yaml -- a shared volume introduced
+# by an override fragment would be invisible to the second reading. Sharing one state volume
+# between two agents would put one agent's OAuth refresh token inside another's blast radius,
+# which is the property R4.7 exists to protect and the one a topology test can actually prove.
+check_volume_exclusivity() {
+  local config owners dupes
+  config="$("${COMPOSE_A[@]}" config --format json 2>/dev/null)" || {
+    fail "volume exclusivity: could not render compose config"
+    return
+  }
+  # service -> named volumes it mounts, one "volume service" pair per line.
+  owners="$(echo "$config" | jq -r '
+    .services | to_entries[] as $s
+    | ($s.value.volumes // [])[]
+    | select(.type == "volume")
+    | "\(.source) \($s.key)"' | sort -u)"
+
+  dupes="$(echo "$owners" | awk 'NF {c[$1]=c[$1]" "$2; n[$1]++} END {for (v in n) if (n[v] > 1) print v ":" c[v]}')"
+  if [ -z "$dupes" ]; then
+    pass "volume exclusivity: no named volume is mounted by two services (D7, R4.7)"
+  else
+    echo "$dupes" | while IFS= read -r d; do echo "  shared volume $d"; done
+    fail "volume exclusivity: a named volume is shared between services"
+  fi
+}
+
+# The version-control half of R8.7. The backup half is NOT enforceable from inside a
+# container -- Docker Desktop keeps every named volume in one VM disk image, so there is no
+# per-volume exclusion to make -- and is carried by the documented `tmutil` procedure in
+# README.md with its residual recorded. This asserts only what this solution controls.
+check_credential_gitignore() {
+  local ok=1 p
+  for p in references/.env_keys compose/generated/gitconfig.d/x auth.json .credentials.json; do
+    git check-ignore -q "$p" 2>/dev/null || { echo "  not git-ignored: $p"; ok=0; }
+  done
+  # The scrubbed artifact must be ignored by compose/generated/'s own deny-all too, so the
+  # rule survives someone deleting the root .gitignore block.
+  [ -f compose/generated/.gitignore ] || { echo "  compose/generated/.gitignore is missing"; ok=0; }
+  [ "$ok" -eq 1 ] && pass "credential material is non-committable (R8.7, version-control half)" \
+                  || fail "credential material is non-committable (R8.7, version-control half)"
+}
+
 # shellcheck disable=SC1091
 set -a; source compose/pins.env; set +a
 check_trust_material
 check_pin_agreement
 check_mediator_pin_agreement
 check_sandbox_record
+check_volume_exclusivity
+check_credential_gitignore
 
 # ---------------------------------------------------------------------------
 # Check 1: Compose validity
@@ -212,15 +259,86 @@ for agent in "${AGENTS[@]}"; do
   # fail on all three: on two for missing the secret, on codex for having it.
   # 01.6 extends this again when per-agent client certificates land.
   case "$agent" in
-    claude|agy) expected_mounts="/home/agent,/run/secrets/mediator-ca.crt,/workspace" ;;
-    codex)      expected_mounts="/home/agent,/workspace" ;;
+    claude|agy) expected_list="/home/agent /run/secrets/mediator-ca.crt /workspace" ;;
+    codex)      expected_list="/home/agent /workspace" ;;
   esac
+
+  # 01.4 SF-1: the two OPTIONAL mounts this feature introduces -- /run/gitconfig
+  # (mounts.host_git_config) and /run/oauth-src (the one-shot oauth-mount bootstrap).
+  # Neither is present under profiles/default.yaml, so Phase A below still asserts the
+  # 01.2 set unchanged and T21 is unaffected. A caller that layers one of those override
+  # fragments sets EXPECT_EXTRA_MOUNTS to the destinations it added, and the assertion
+  # stays EQUALITY rather than being relaxed to containment -- which is the whole point of
+  # the check. verify-auth-state.sh (01.4 SF-5) is that caller.
+  if [ -n "${EXPECT_EXTRA_MOUNTS:-}" ]; then
+    expected_list="$expected_list $(echo "$EXPECT_EXTRA_MOUNTS" | tr ',' ' ')"
+  fi
+  # shellcheck disable=SC2086 -- word splitting is how the list becomes one path per line
+  expected_mounts="$(printf '%s\n' $expected_list | sort | paste -sd, -)"
+
   mount_set="$(echo "$inspect" | jq -r '[.[0].Mounts[] | .Destination] | sort | join(",")')"
   if [ "$mount_set" = "$expected_mounts" ]; then
     pass "$agent: mount set equals exactly {$expected_mounts}"
   else
     fail "$agent: mount set is {$mount_set}, expected {$expected_mounts}"
   fi
+
+  # Check 4d (01.4 criterion 2): the authentication surface sits on the state volume.
+  # 01.4 ASSERTS 01.2's environment contract rather than re-deciding it -- these values are
+  # 01.2 Interface Contract 2's, and the reason they are checked here is that every
+  # AUTH_MODE in 01.4 writes its credential relative to one of them. A container whose
+  # CODEX_HOME pointed off the volume would authenticate once and lose it at restart.
+  auth_surface_ok=1
+  got_home="$(docker exec "$cid" printenv HOME 2>/dev/null || true)"
+  [ "$got_home" = "/home/agent" ] || { echo "  HOME=$got_home, expected /home/agent"; auth_surface_ok=0; }
+
+  case "$agent" in
+    claude)
+      got="$(docker exec "$cid" printenv CLAUDE_CONFIG_DIR 2>/dev/null || true)"
+      [ "$got" = "/home/agent/.claude" ] \
+        || { echo "  CLAUDE_CONFIG_DIR=$got, expected /home/agent/.claude"; auth_surface_ok=0; }
+      # R4.4 singles out ~/.claude.json as living OUTSIDE CLAUDE_CONFIG_DIR and holding the
+      # OAuth account. Under 01.2's read_only root filesystem, a $HOME that was not the
+      # volume would make this path unwritable -- so writability here is a pass/fail
+      # property of the wiring, not an incidental one. Probe and remove; never read it.
+      if docker exec "$cid" sh -c 'touch /home/agent/.claude.json.probe && rm -f /home/agent/.claude.json.probe' 2>/dev/null; then
+        :
+      else
+        echo "  /home/agent/.claude.json is not writable (R4.4 account record has nowhere to land)"
+        auth_surface_ok=0
+      fi
+      ;;
+    codex)
+      got="$(docker exec "$cid" printenv CODEX_HOME 2>/dev/null || true)"
+      [ "$got" = "/home/agent/.codex" ] \
+        || { echo "  CODEX_HOME=$got, expected /home/agent/.codex"; auth_surface_ok=0; }
+      # R4.5, and read as the EFFECTIVE value inside the container rather than from the
+      # Dockerfile (criterion 2 requires exactly that distinction). The `keyring` store
+      # hard-fails with no D-Bus and there is no D-Bus here under any mode, so this must
+      # hold in every AUTH_MODE -- verify-auth-state.sh re-checks it per mode.
+      store="$(docker exec "$cid" sh -c 'grep -E "^[[:space:]]*cli_auth_credentials_store[[:space:]]*=" "$CODEX_HOME/config.toml" 2>/dev/null | head -1' || true)"
+      if echo "$store" | grep -qE '=[[:space:]]*"file"[[:space:]]*$'; then
+        :
+      else
+        echo "  \$CODEX_HOME/config.toml does not set cli_auth_credentials_store = \"file\" (got: ${store:-<absent>})"
+        auth_surface_ok=0
+      fi
+      ;;
+    agy)
+      # agy has no HOME-override variable (01.2: absent from --help and from `strings`);
+      # it resolves ~/.gemini from $HOME, so the volume assertion above is what carries it.
+      # Asserted explicitly anyway, because "it follows from HOME" is exactly the kind of
+      # inference that stops being true when someone adds an env var.
+      if docker exec "$cid" sh -c 'test -d /home/agent/.gemini' 2>/dev/null; then
+        :
+      else
+        echo "  /home/agent/.gemini is absent (agy state has nowhere to persist)"
+        auth_surface_ok=0
+      fi
+      ;;
+  esac
+  [ "$auth_surface_ok" -eq 1 ] && pass "$agent: auth surface on the state volume (01.4 criterion 2)" \
+                               || fail "$agent: auth surface is not correctly rooted on the state volume"
 
   # Check 4b (01.3 Interface Contract 2): the proxy hop's scheme is per agent, and
   # the asymmetry is a finding rather than a preference -- 01.1 SF-2 established

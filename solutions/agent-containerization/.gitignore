@@ -30,3 +30,25 @@ workspace/*
 # torn down with it; a self-signed certificate for `*.fixture.test` is not trust material
 # anyone should be able to find in version control and mistake for the mediator's.
 tests/fixtures/tls/
+
+# Generated host-derived material (01.4 SF-1, R8.7). compose/generated/ carries its own
+# deny-all .gitignore; this is the second line of defence, so the operator's scrubbed
+# gitconfig cannot be committed by someone working from the repository root who has not read
+# that file. The scrub removes credential.helper, but name, email and signing config are
+# still the operator's personal configuration and still derived material regenerated before
+# every `up`.
+compose/generated/gitconfig.d/
+
+# Agent credential material (01.4, R4.7/R8.7). None of this SHOULD reach the repository --
+# OAuth credentials live on the per-agent state volumes and API keys arrive by environment --
+# so every one of these patterns firing means something went wrong. They are here to make that
+# mistake non-committable rather than to describe a normal layout.
+#
+# auth.json is Codex's OAuth credential file; .credentials.json is Claude Code's; .claude.json
+# is the account record R4.4 places OUTSIDE CLAUDE_CONFIG_DIR. The oauth-mount staging
+# directory (SF-4) holds a copy of the host credential with OPENAI_API_KEY stripped, and is
+# the one path here an operator is actually expected to create.
+auth.json
+.credentials.json
+.claude.json
+compose/generated/oauth-src/

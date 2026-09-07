@@ -228,7 +228,7 @@ per agent, not both.
 
 ## Sub-Features
 
-- [ ] **SF-1: Authentication surface on the state volume, and the pre-mount git-config scrub** —
+- [x] **SF-1: Authentication surface on the state volume, and the pre-mount git-config scrub** —
   asserts 01.2's environment contract on the running containers; seeds `$CODEX_HOME/config.toml`
   with `cli_auth_credentials_store = "file"` (R4.5, all modes) using merge-not-overwrite semantics;
   ships the host-side `scripts/scrub-gitconfig.sh` and the `compose/generated/gitconfig.d/` mount
@@ -794,4 +794,35 @@ mode 644, invoked as `bash script.sh`.
 
 ## Architectural Deviations
 
-(none)
+### Deviation 1: image-tree paths corrected to 01.2's single multi-stage Dockerfile
+- **What changed:** Every `images/agent-base/…` path in this plan resolves to `images/…` in the
+  implementation, and `images/codex/Dockerfile` does not exist as a file. Concretely:
+  `bootstrap-auth.sh` ships at `images/bootstrap-auth.sh`; the entrypoint modified in SF-1 is
+  `images/entrypoint.sh`; the Dockerfile modified is `images/Dockerfile`; and the Codex
+  `config.toml` skeleton carrying `cli_auth_credentials_store = "file"` (R4.5) is seeded in the
+  **`codex` stage** of that same multi-stage `images/Dockerfile` rather than in a per-agent
+  Dockerfile of its own.
+- **Originally planned:** Interface Contract 2 titles the dispatcher
+  `images/agent-base/bootstrap-auth.sh` and justifies the location with "01.2 set the precedent by
+  placing `entrypoint.sh` at `images/agent-base/entrypoint.sh`". The Files to Create/Modify table
+  lists `images/agent-base/bootstrap-auth.sh` (Create), `images/agent-base/entrypoint.sh` (Modify),
+  `images/agent-base/Dockerfile` (Modify) and `images/codex/Dockerfile` (Modify).
+- **Why necessary:** No `images/agent-base/` directory exists and none of those four paths is real.
+  Feature 01.2 recorded its own Deviation 1 — "single multi-stage `images/Dockerfile` with `target:`
+  selection" — because Compose does not resolve cross-service build order when one service's
+  Dockerfile `FROM`s another service's image tag. 01.2 therefore shipped one shared `agent-base`
+  stage plus one final stage per agent (`claude`, `codex`, `agy`) in `images/Dockerfile`, with the
+  entrypoint at `images/entrypoint.sh`. The 2026-09-07 re-plan of 01.4 was made against 01.3 as
+  built and did not propagate 01.2's deviation into these paths. The **reason** Interface Contract 2
+  gives for the location is unaffected and still binding: the build context is `../images`, so a
+  file under `scripts/` cannot be `COPY`'d into the image, and the copy-to-volume must run inside
+  the container. `images/bootstrap-auth.sh` satisfies that reason exactly; only the directory
+  segment was wrong.
+- **Impact:** No contract, exit code, mount or behaviour changes — this is a path correction, not a
+  design change. Two consequences for later work: (a) SF-2's file-tree correction to
+  `docs/ARCHITECTURE_AND_DESIGN.md` must record the dispatcher at `images/bootstrap-auth.sh`, not at
+  the plan's `images/agent-base/bootstrap-auth.sh`, or the doc acquires a second wrong path in place
+  of the first; and (b) 01.5's build pipeline and `.dockerignore` allowlist extension must
+  allowlist `images/bootstrap-auth.sh` under the `./images` context. `scripts/scrub-gitconfig.sh`
+  is unaffected — it runs on the host and stays in `scripts/` exactly as the plan and the
+  architecture file tree state.
