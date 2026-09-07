@@ -523,7 +523,7 @@ revision — so this is a renumber, not a migration.
   Edge Cases). Includes the T4 fixture — a controlled authoritative
   server the test asserts receives no query. Depends on SF-2 and SF-4.
 
-- [ ] **SF-6: The three egress controls and the per-listener transport surface** — The three
+- [x] **SF-6: The three egress controls and the per-listener transport surface** — The three
   listeners of criterion 6 (two TLS, one plain HTTP CONNECT) in one instance, each selecting its own
   agent's policy from the network it binds — per SF-1's P7 result. Then control 1 (per-agent
   allowlist at CONNECT/SNI, with the SNI-vs-CONNECT-host comparison per P6), control 2
