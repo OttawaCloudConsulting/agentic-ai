@@ -269,8 +269,21 @@ the SF-1..SF-5 / SF-6 boundary.
   the committed-artifact drift check per Interface Contract 4. **Re-scoped 2026-09-07: the build
   context work is already done.** 01.3 SF-4 moved the mediator's context to the solution root and
   wrote the deny-all `.dockerignore`; what remains is extending that allowlist with the compiler's
-  inputs (`profiles/`, `packs/`, the two base policy files), added above the file's trailing deny
-  block. The agent images keep the `images/` context and are now one multi-stage Dockerfile
+  inputs, added above the file's trailing deny block. **Ratified at Gate 4, 2026-09-07 -- the exact
+  four lines, and the reason for their shape:**
+
+  ```
+  !profiles
+  !packs                        # inert until this feature creates the directory
+  !policy/allowlist.base.yaml
+  !policy/denylist.base.yaml
+  ```
+
+  The two base policy files are named **individually rather than as `!policy`**, because
+  `policy/` also holds `allowlist.test.yaml` and `denylist.test.yaml` -- 01.3's harness fixtures,
+  which have no business in a shipped mediator image. All four go **above** the trailing-deny block
+  the file's own comment marks; placed below it they would still be admitted, but the next entry
+  added after them would inherit the wrong position and re-admit `mediator/identity/`. The agent images keep the `images/` context and are now one multi-stage Dockerfile
   (01.2 Deviation 1), so there is no four-Dockerfile change to make.
   Extend `images/mediator/entrypoint.sh` only where the policy path changes — note it already
   copies `scripts/compile-policy.sh` into the image for stage-1 validation, so the compile stage
@@ -307,6 +320,12 @@ the SF-1..SF-5 / SF-6 boundary.
   share: test-scoped Compose project name, `down -v` teardown, assertions against `docker inspect`
   on running containers rather than against the Compose YAML, and no third-party service as a test
   target.
+  **Assert the CA private key is absent from the mediator build context by name, not merely that the
+  context is small** (operator decision, Gate 4, 2026-09-07). Edge Case 1 sizes the context; a size
+  ceiling cannot catch a 1.7 KB private key, which is the exact failure the solution-root
+  `.dockerignore`'s own comment warns about when a future `!` entry lands below its trailing-deny
+  block. The assertion enumerates the context and requires `mediator/identity/ca/mediator-ca.key`
+  and `references/` to be missing from it.
 
 No sub-feature carries the `[OVERSIZED]` flag. SF-4 and SF-5 are the closest calls; SF-4 carries a
 stated split condition and SF-5 is kept whole because the package install, the binary removal and
@@ -441,7 +460,7 @@ compatible with an explicit resolution:
 |---|---|
 | Mediator image build stage | **Compiles authoritatively.** Emits to the image layer. This is the policy the mediator runs |
 | Local build and CI alike | **Fail on drift.** The compiled output must equal the committed `policy/resolved/<profile>.yaml`, comparing every field except `compiled_at` |
-| Operator, when policy inputs change | `bash scripts/compile-policy.sh --write <profile>`, then reviews the diff and commits it — a version-controlled, reviewed policy change |
+| Operator, when policy inputs change | `bash scripts/compile-policy.sh --profile <profile>`, then reviews the diff and commits it — a version-controlled, reviewed policy change |
 
 **The build fails on drift rather than warning.** R5.14 requires policy changes to be
 version-controlled and reviewed, and a warning printed into a build log is neither. A local build
@@ -585,6 +604,8 @@ addition, because the shipped script exits 1 for everything:
 ```
 Exit codes
   0  success, or --check with no drift
+  1  usage error (unknown flag, missing flag value) -- the shipped `fail()` catch-all,
+     narrowed to invocation errors only
   2  input validation failure (malformed profile, pack manifest or policy file)
   3  refusal gate tripped (T27 accepted_risk, R2.8 mount key, R7.6 runtime egress,
      SC-3 project-mount containment)
@@ -592,10 +613,24 @@ Exit codes
 ```
 
 Exit 3 is distinct from exit 2 because a refusal is a *recorded policy decision the operator must
-make*, not a syntax error, and the acceptance harness distinguishes them. **Changing exit 1 to
-these codes is a caller-visible change**: 01.3's harness and the mediator's stage 1 currently test
-only for non-zero, so both keep working, but SF-4 must re-run
-`tests/acceptance/verify-egress-mediator.sh` to prove it rather than assume it.
+make*, not a syntax error, and the acceptance harness distinguishes them. Exit 1 is retained rather
+than reassigned so that a mistyped flag -- the shipped `fail "unknown argument"` path -- keeps the
+shell-conventional code callers already assume, and 2/3/4 carry only meanings the compiler is
+actually asserting (**operator decision, Gate 4, 2026-09-07**).
+
+**Caller impact, verified against disk on 2026-09-07 rather than assumed.** The gate reviewed this
+by reading each caller, and the earlier draft of this paragraph was wrong about one of them:
+
+| Caller | Invocation | Effect of the change |
+|---|---|---|
+| `images/mediator/entrypoint.sh:180` | `if ! bash "$POLICY_VALIDATOR" --validate ...` | None -- tests non-zero, not a value |
+| `tests/acceptance/verify-egress-mediator.sh` | **Does not invoke the compiler at all.** Reads `policy/resolved/default.yaml` directly (`:497`) | None |
+| `README.md:132` | Documented operator command | None -- exit code not surfaced to a human caller |
+
+No caller inspects a specific exit value, so no caller breaks. The obligation on SF-4 to re-run
+`tests/acceptance/verify-egress-mediator.sh` **stands, but for a different reason than first
+stated**: that harness is not an exit-code caller, it is an end-to-end driver of the mediator image
+this feature rebuilds.
 
 ## Edge Cases
 
@@ -697,11 +732,11 @@ only for non-zero, so both keep working, but SF-4 must re-run
     for shape but never exercised drifts. Recorded as a residual with its landing point named,
     rather than presented as satisfying R12.7.
 
-17. **`--write` and the build stage must produce byte-identical output.** The authoritative compile
-    runs inside the mediator image; `--write` runs on the host. The drift check compares the two, so
+17. **The host compile and the build stage must produce byte-identical output.** The authoritative compile
+    runs inside the mediator image; the same script run on the host (`--profile NAME`, writing by default) produces the committed artifact. The drift check compares the two, so
     any difference in validator version, YAML emitter or key ordering makes the check fire on
     identical policy. Two resolutions and `/build` picks one: pin the compiler's toolchain
-    identically on both sides, or make `--write` run *through* the build stage
+    identically on both sides, or make the host invocation run *through* the build stage
     (`docker build --target compile` and extract the artifact) so there is only one implementation.
     The second is more robust and slower; naming the choice here rather than discovering it as a
     permanently red CI job.
@@ -736,8 +771,20 @@ only for non-zero, so both keep working, but SF-4 must re-run
 ## Test Command
 
 ```
-bash tests/acceptance/verify-pack-composition.sh
+bash tests/acceptance/verify-pack-composition.sh \
+  && bash tests/acceptance/verify-pod-topology.sh \
+  && bash tests/acceptance/verify-egress-mediator.sh
 ```
+
+**Composite, ratified at Gate 4 on 2026-09-07.** The two harnesses that already exist must still
+pass at this feature's close, and the operator decision was that the obligation belongs in the test
+command rather than in sub-feature prose: the test command is what actually runs at close, a prose
+obligation is what gets skipped. A failure in any of the three fails the feature; attribute it
+before fixing, since the later two are pre-existing and a break in them is a regression this
+feature caused.
+
+SF-4 is the sub-feature that makes the third one non-optional: it rebuilds the mediator image that
+`verify-egress-mediator.sh` (77 assertions) drives end to end.
 
 ## Test Strategy
 
@@ -751,7 +798,7 @@ third-party service as a test target.
 | A — Manifest and profile validation | R7.3, R7.11 | A manifest missing each mandatory field in turn fails with exit 2 naming the field. Every package entry, `apt` included, carries a SHA-256. A well-formed manifest passes |
 | B — Refusal gates | R4.17/**T27**, R2.8, R7.6, SC-3 | `oauth-mount` without a complete five-field `accepted_risk` exits 3; an unknown `mounts.*` key exits 3; a pack with `egress.runtime` entries and `runtime_install: false` exits 3; `mounts.project.path` set to the solution root, an ancestor, and a control-plane-exposing descendant each exit 3 |
 | C — Composition and determinism | R7.4 | Two consecutive compiles are byte-identical. Per-agent keying preserved. A pack-supplied wildcard is rejected; a pack-supplied non-443 port is flagged. `--check` exits 4 on drift, and a drifted committed artifact fails the **local** build, not only CI |
-| D — Rebuild on the documented command | SC-6, R12.1, D10 | Change the profile's pack set, refresh with `--write`, review and commit the recomposed artifact, then run **only** the documented start command (`up --build`). Both the mediator and the agent images rebuild — `PACK_SET_HASH` having changed — and the resolved policy in the running mediator reflects the change. Asserted separately: omitting the `--write` refresh fails the build rather than silently running stale policy |
+| D — Rebuild on the documented command | SC-6, R12.1, D10 | Change the profile's pack set, refresh with `bash scripts/compile-policy.sh --profile <profile>`, review and commit the recomposed artifact, then run **only** the documented start command (`up --build`). Both the mediator and the agent images rebuild — `PACK_SET_HASH` having changed — and the resolved policy in the running mediator reflects the change. Asserted separately: omitting the recompile fails the build rather than silently running stale policy |
 | E — Load/unload | R7.5/**T14** | With `language-runtimes` loaded then unloaded: package set and mounts change; the resolved `allow_fqdns`/`allow_cidrs` sections are **byte-identical in both states**. Rebuilt container has no residue of the unloaded pack's binaries. Each state needs its own committed artifact under the fail-on-drift rule, so the phase uses 01.3's `policy/resolved/test-fixtures.yaml` for the loaded state rather than mutating the operator's committed `default.yaml` |
 | F — Build-time only, both manager classes | R7.18, R7.19/**T33**, **T15** | Installed versions match the profile pins and the snapshot repository. **T33 (OS manager):** as the `agent` user, `apt`/`apt-get`/`dpkg` are absent and an install attempt fails for want of privilege and write access. **T15 (language managers):** `pip`, `ensurepip` and the bundled `npm` tree are absent, and `python3 -m pip` and a direct `npm-cli.js` path both fail; then a *deliberately vendored* installer is run to prove the residual — it reaches the network, is denied at the mediator, and the denial appears in the audit log |
 | G — Mounts | R2.8/**T21**, R2.10/**T23** | On `default`: only the project directory and that agent's state volume; no socket forwarded. With the build cache enabled for two agents: distinct paths, neither writable by the other |
@@ -765,10 +812,10 @@ third-party service as a test target.
 - `packs/README.md` — **create.** The manifest schema field by field, and why the reference pack
   grants no runtime egress, including what fails at runtime as a result (Edge Case 9).
 - `policy/resolved/README.md` — **extend** 01.3's generated-output notice with the drift-check
-  contract and the `--write` refresh procedure.
+  contract and the recompile-and-commit refresh procedure.
 - `README.md` — **extend.** Adding and removing a pack, the profile fields this feature adds, the
   CI workflow, the first-publish bootstrap for `AGENT_BASE_DIGEST`, the amended `up --build` entry
-  point, and the `--write` refresh procedure an operator runs when policy inputs change.
+  point, and the recompile-and-commit refresh procedure an operator runs when policy inputs change.
 - `docs/ARCHITECTURE_AND_DESIGN.md` — **extend.** Record the build-context departure from the
   ratified file organisation (Contract 5), the D21 reading that CI publishes `agent-base` only while
   the mediator retains a local `build:` (Approach), and the amended entry point. Following 01.4's
@@ -780,13 +827,13 @@ third-party service as a test target.
 |------|--------|---------|
 | `packs/language-runtimes/pack.yaml` | Create | The reference pack. Node, Python, Go; build-time only; empty runtime egress |
 | `packs/README.md` | Create | Manifest schema and the no-runtime-egress decision |
-| `.dockerignore` (solution root) | Modify | **Exists (01.3 SF-4)** — deny-all + allowlist. Add `profiles/`, `packs/` and the two base policy files **above** the trailing deny block |
+| `.dockerignore` (solution root) | Modify | **Exists (01.3 SF-4)** — deny-all + allowlist. Add `!profiles`, `!packs` and the two base policy files **by name** (not `!policy` — that would ship the `.test.yaml` fixtures) **above** the trailing deny block. Exact form ratified in SF-4 |
 | `.github/workflows/agent-sandbox-image.yml` | Create | **Repository root.** Builds `images/agent-base`, publishes to GHCR with SBOM; policy-drift job |
 | `tests/acceptance/verify-pack-composition.sh` | Create | Phases A-H |
 | `scripts/build.sh` | Create | Per-profile image build; records digests, emits SBOM per image (R9.9) |
 | `images/keyrings/debian-archive.gpg` | Create | Committed signing key for the snapshot repository; fingerprint asserted at build. Under `images/` — the agent build context — since there is no `images/agent-base/` directory |
 | `policy/resolved/default.yaml` | Modify | Recomposed with `compiled_from.packs` populated; runtime egress sections byte-identical |
-| `scripts/compile-policy.sh` | Modify | Pack composition, refusal gates, CLI and exit codes, deterministic output, `--write`/`--check` |
+| `scripts/compile-policy.sh` | Modify | Pack composition, refusal gates, CLI and exit codes, deterministic output, `--check` |
 | `scripts/lint-policy.sh` | Modify | Pack manifest well-formedness (01.1's Test Command host) |
 | `profiles/default.yaml` | Modify | `packs`, `package_repository`, `authorization`; `mounts.build_cache` shape |
 | `images/mediator/Dockerfile` | Modify | Policy compile stage; copies compiler inputs from the new context |
@@ -797,7 +844,7 @@ third-party service as a test target.
 | `compose/overrides/default.yaml` | Modify | Keeps the Compose counterpart aligned with the extended profile |
 | `compose/overrides/build-cache.yaml` | Create | Per-agent build cache fragment, never selected by `default` |
 | `compose/pins.env` | Modify | `AGENT_BASE_DIGEST`, no default |
-| `policy/resolved/README.md` | Modify | Drift-check contract and `--write` refresh |
+| `policy/resolved/README.md` | Modify | Drift-check contract and recompile-and-commit refresh |
 | `tests/acceptance/verify-pod-topology.sh` | Modify | Mount-set equality extended for the build cache — the fourth extension |
 | `tests/acceptance/verify-egress-mediator.sh` | Modify | Control-plane assertion set extended to name `packs/` |
 | `README.md` | Modify | Pack add/remove, new profile fields, CI, bootstrap, and the `up --build` entry-point amendment |

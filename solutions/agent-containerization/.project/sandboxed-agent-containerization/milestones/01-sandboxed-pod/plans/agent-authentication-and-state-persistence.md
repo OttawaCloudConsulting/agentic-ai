@@ -261,10 +261,40 @@ per agent, not both.
   SF-3's measured rotation consequence. Codex only — the matrix has no other supported cell.
   Depends on SF-3.
 
+  **Host precondition, verified 2026-09-07 (Gate 4).** `~/.codex/auth.json` exists on the operator's
+  Mac, mode `0600`, and is **file-backed rather than Keychain-backed** — `cli_auth_credentials_store`
+  is unset in `~/.codex/config.toml`, and this Codex install's default writes to file. So R4.5's
+  setting is required inside the container but is already satisfied on the host side, and SF-4's
+  precondition is met without an extra host login step.
+
+  **The staged copy must strip `OPENAI_API_KEY`, and this is a test-validity control before it is a
+  security one.** The host file's top-level keys are `OPENAI_API_KEY`, `auth_mode`, `last_refresh`
+  and `tokens` — one file carrying *both* an OAuth token set and a raw API key. Mounted as-is, the
+  `oauth-mount` cell could authenticate off the API key and pass green while the OAuth path is
+  broken, which is precisely the cell this sub-feature exists to prove. R4.14 already requires a
+  dedicated **directory** rather than the credential file itself; the staging step that builds that
+  directory therefore copies `auth.json` with `OPENAI_API_KEY` removed, and SF-5 asserts the key is
+  absent from the mounted source. It also narrows what the container holds: `~/.codex` itself is a
+  54-entry directory of sessions, archived sessions and global state, none of which has any business
+  crossing the boundary.
+
 - [ ] **SF-5: Acceptance harness** — `tests/acceptance/verify-auth-state.sh` implementing T24 across
   all seven supported cells, T22, T25 including the steady-state no-host-mount assertion, and T9 in
-  both its restart and its rebuild form. Runs against throwaway credentials only. Depends on SF-1 to
-  SF-4.
+  both its restart and its rebuild form. **Runs against the operator's real provider accounts
+  (decision, Gate 4, 2026-09-07)** -- superseding this line's original "throwaway credentials only".
+  The three API keys already exist in `references/.env_keys`; the four OAuth cells use the
+  operator's live Anthropic and ChatGPT accounts. Two obligations follow from that choice and are
+  part of this sub-feature's close, not advice:
+
+  - **Revoke the `claude setup-token` credential at feature close.** The `oauth-token` cell mints a
+    **one-year** `CLAUDE_CODE_OAUTH_TOKEN` (the R4.16 risk this plan already records). A year-long
+    token for a live account, minted to prove a test cell, is not something to leave outstanding
+    once the cell has passed.
+  - **The harness must not print credential material.** It iterates live credentials, so any
+    diagnostic echoing an environment value or a credential file is a leak into CI logs and terminal
+    scrollback. Assert on presence, shape and exit status, never on value.
+
+  Depends on SF-1 to SF-4.
 
 Sizing note: five sub-features, each judged a single reviewable unit against DD-1's ~120k-token
 session guideline. The git-config scrub (SF-1) is small enough on its own — one host-side script and
@@ -458,7 +488,7 @@ identity material here than it assumed:**
 Since 01.3 the mediator reads `policy/resolved/default.yaml` **from its own image layer**, never
 from a bind mount, and startup stage 1 validates that file's *schema*, not its currency. So SF-2's
 addition of the provider OAuth endpoints to `policy/allowlist.base.yaml` takes effect only after
-`bash scripts/compile-policy.sh --write` regenerates `policy/resolved/default.yaml` **and**
+`bash scripts/compile-policy.sh` regenerates `policy/resolved/default.yaml` **and**
 `docker compose build egress-mediator` (or `up --build`) bakes it in. Editing the base file and
 bringing the pod up produces `control=allowlist` / `reason=host_not_allowlisted` on the very
 endpoint just added, with no warning that the policy is stale — SF-2's flow must run the compile
@@ -575,8 +605,21 @@ fills — measured detection-to-revocation time (**empty at this gate, by design
 ## Test Command
 
 ```
-bash tests/acceptance/verify-auth-state.sh
+bash tests/acceptance/verify-auth-state.sh \
+  && bash tests/acceptance/verify-pod-topology.sh \
+  && bash tests/acceptance/verify-egress-mediator.sh
 ```
+
+**Composite, ratified at Gate 4 on 2026-09-07.** The two harnesses that already exist must still
+pass at this feature's close, and the operator decision was that the obligation belongs in the test
+command rather than in sub-feature prose: the test command is what actually runs at close, a prose
+obligation is what gets skipped. A failure in any of the three fails the feature; attribute it
+before fixing, since the later two are pre-existing and a break in them is a regression this
+feature caused.
+
+`verify-pod-topology.sh` matters here specifically because SF-1 and SF-4 amend its mount-set
+equality assertion (`/run/oauth-src`, `/run/gitconfig`); `verify-egress-mediator.sh` matters because
+SF-2 changes the compiled policy the mediator enforces.
 
 ## Test Strategy
 

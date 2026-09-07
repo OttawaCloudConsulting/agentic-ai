@@ -1,5 +1,5 @@
 # Milestone 01: Sandboxed Pod
-# Status: [~] in progress  6 features, 2 complete
+# Status: [~] in progress  6 features, 3 complete
 
 ## Features
 
@@ -14,7 +14,9 @@
     Notes: Completed 2026-09-04. 3 architectural deviations recorded (Deviation 1: single
     multi-stage images/Dockerfile with target: selection; Deviation 2: native agent sandboxes
     disabled by default, D14 amendment needed; Deviation 3: egress-net not a live Docker
-    resource until 01.3 attaches a service to it). Consider /design refresh to consolidate.
+    resource until 01.3 attaches a service to it). Consolidated into ARCHITECTURE_AND_DESIGN.md
+    on 2026-09-07 (commit 162faec, with 882b86c finishing data flow, resource inventory and the
+    file tree) -- no /design refresh outstanding.
 
 [x] Feature 01.3: Egress mediator
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/egress-mediator.md
@@ -33,13 +35,17 @@
     worked around: Squid's cache_peers are DEAD at start and cost the first fronted request a 500
     (the entrypoint now warms the cascade), and unbound answers RFC 6761 special-use TLDs itself
     and never forwards them (docs/records/resolver-verification.md addendum -- worth a
-    compile-time warning in 01.5). Consider /design refresh to consolidate the deviations.
+    compile-time warning in 01.5). All 11 consolidated into ARCHITECTURE_AND_DESIGN.md on
+    2026-09-07 (commits 162faec and 882b86c) -- no /design refresh outstanding. The 01.1 deny_fqdns
+    re-plan queued here is also closed: recorded as a SUPERSEDED block in 01.1's plan rather than
+    re-planned, since 01.1's built artifacts were correct and only its prose was stale.
 
 [~] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
     Sub-features: 0/5 complete
-    Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07, Gate 4
-    checklist OPEN on three items (supersedes the 2026-09-04 approval). The plan consumed per-agent client certificates that 01.3 does not issue
+    Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
+    CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
+    2026-09-04 approval). Ready to build. The plan consumed per-agent client certificates that 01.3 does not issue
     -- they left with R8.8 for Feature 01.6 at the milestone revision -- and set
     CODEX_CA_CERTIFICATE on an agent that has no TLS hop to anchor. Interface Contract 6 now states
     what each agent actually gets. Sub-feature count unchanged. Three checklist items need the
@@ -49,8 +55,9 @@
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
     Sub-features: 0/7 complete
-    Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07, Gate 4
-    checklist OPEN on three items (supersedes the prior approval). The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it
+    Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
+    CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
+    prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it
     would have broken the README, both harnesses and the mediator's own stage-1 self-check -- and
     scheduled a build-context change 01.3 had already made. Contract 6 now extends the shipped CLI
     and keeps the exit-code contract as the real addition; SF-4 shrank accordingly. Also picks up
