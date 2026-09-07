@@ -35,14 +35,24 @@ agents:
       # refuses to start a login whose endpoint the mediator would deny. Per R5.8/D17 the flow
       # itself is the observation, so any entry here NOT seen carrying real traffic in the
       # mediator audit log during that flow must be REMOVED before this sub-feature closes.
+      # OBSERVED and CROSS-VALIDATED (01.4 SF-2, D17 bar met). Claude Code's own startup fails
+      # with "Failed to connect to platform.claude.com: Status 403" and the mediator's audit line
+      # for the same attempt reads control=allowlist, reason=host_not_allowlisted -- two
+      # independent sources naming the same host. This is one of the six hosts 01.1's discovery
+      # capture saw only via the sbx kit's bypass rule and deliberately EXCLUDED for want of
+      # evidence (see docs/records/egress-discovery.md); the login flow is that evidence.
+      - fqdn: platform.claude.com
+        port: 443
+        upgrade: false
+        source: [agent-error-message, mediator-audit-denial]
       - fqdn: claude.ai
         port: 443
         upgrade: false
-        source: [oauth-flow-candidate]    # NOT yet observed -- pending the SF-2 login run
+        source: [oauth-flow-candidate]    # NOT yet observed carrying flow traffic -- see note below
       - fqdn: console.anthropic.com
         port: 443
         upgrade: false
-        source: [oauth-flow-candidate]    # NOT yet observed -- pending the SF-2 login run
+        source: [oauth-flow-candidate]    # NOT yet observed carrying flow traffic -- see note below
     allow_cidrs: []        # R7.3/R7.4 -- shape must compose with CIDR-bearing packs
 
   # codex 0.152.1 (SF-2 pin). Genuine deny-all discovery -- no kit bypass observed for this

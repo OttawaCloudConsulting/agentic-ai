@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check
 schema: 1
 profile: default
-compiled_at: 2026-09-07T20:34:55Z
+compiled_at: 2026-09-07T20:42:47Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
@@ -19,6 +19,7 @@ agents:
     listener: {scheme: https, tls: true, port: 3128}
     allow_fqdns:
       - {fqdn: api.anthropic.com, port: 443, upgrade: false}
+      - {fqdn: platform.claude.com, port: 443, upgrade: false}
       - {fqdn: claude.ai, port: 443, upgrade: false}
       - {fqdn: console.anthropic.com, port: 443, upgrade: false}
     allow_cidrs: []
