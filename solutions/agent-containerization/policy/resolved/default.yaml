@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check
 schema: 1
 profile: default
-compiled_at: 2026-09-07T14:21:22Z
+compiled_at: 2026-09-07T20:34:55Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
@@ -19,6 +19,8 @@ agents:
     listener: {scheme: https, tls: true, port: 3128}
     allow_fqdns:
       - {fqdn: api.anthropic.com, port: 443, upgrade: false}
+      - {fqdn: claude.ai, port: 443, upgrade: false}
+      - {fqdn: console.anthropic.com, port: 443, upgrade: false}
     allow_cidrs: []
     limits: {max_concurrent: 16, bytes_per_second: 2000000}
   codex:
@@ -30,6 +32,8 @@ agents:
       - {fqdn: chatgpt.com, port: 443, upgrade: false}
       - {fqdn: api.github.com, port: 443, upgrade: false}
       - {fqdn: github.com, port: 443, upgrade: false}
+      - {fqdn: auth.openai.com, port: 443, upgrade: false}
+      - {fqdn: platform.openai.com, port: 443, upgrade: false}
     allow_cidrs: []
     limits: {max_concurrent: 16, bytes_per_second: 2000000}
   agy:

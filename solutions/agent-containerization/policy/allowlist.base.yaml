@@ -30,6 +30,19 @@ agents:
         port: 443
         upgrade: false     # R5.9 -- Upgrade permitted on TCP/443 where an agent requires it
         source: [sbx-discovery-capture]   # kit-bypassed traffic, not a deny-then-observe result; NOT cross-validated against a second source in this run
+      # OAuth authentication endpoints (01.4 SF-2). PROVISIONAL and CANDIDATE-ONLY at this
+      # commit: added so the oauth-interactive flow can run at all -- the exit-4 precondition
+      # refuses to start a login whose endpoint the mediator would deny. Per R5.8/D17 the flow
+      # itself is the observation, so any entry here NOT seen carrying real traffic in the
+      # mediator audit log during that flow must be REMOVED before this sub-feature closes.
+      - fqdn: claude.ai
+        port: 443
+        upgrade: false
+        source: [oauth-flow-candidate]    # NOT yet observed -- pending the SF-2 login run
+      - fqdn: console.anthropic.com
+        port: 443
+        upgrade: false
+        source: [oauth-flow-candidate]    # NOT yet observed -- pending the SF-2 login run
     allow_cidrs: []        # R7.3/R7.4 -- shape must compose with CIDR-bearing packs
 
   # codex 0.152.1 (SF-2 pin). Genuine deny-all discovery -- no kit bypass observed for this
@@ -56,6 +69,18 @@ agents:
         port: 443
         upgrade: false
         source: [sbx-discovery-capture]   # single-source; matches SF-2's incidental observation
+      # OAuth authentication endpoints (01.4 SF-2). Same provisional terms as claude's above.
+      # auth.openai.com and platform.openai.com were both OBSERVED denied (control=allowlist,
+      # reason=host_not_allowlisted) during the SF-2 probe -- that establishes they are blocked,
+      # NOT that the flow needs them. The login run decides which stay.
+      - fqdn: auth.openai.com
+        port: 443
+        upgrade: false
+        source: [oauth-flow-candidate, mediator-audit-denial]
+      - fqdn: platform.openai.com
+        port: 443
+        upgrade: false
+        source: [oauth-flow-candidate, mediator-audit-denial]
     allow_cidrs: []
 
   # agy -- no real pin (SF-2: installer always fetches the live manifest); this run observed
