@@ -73,12 +73,18 @@ static address on that agent's network, so the addresses below must match `compo
 ```bash
 bash scripts/issue-identity.sh ca
 bash scripts/issue-identity.sh listener claude --ip 172.31.10.2
+bash scripts/issue-identity.sh listener codex  --ip 172.31.20.2
 bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2
 bash scripts/issue-identity.sh status
 ```
 
-`codex` gets no certificate: it rejects an `https://`-scheme proxy URL at parse time and its hop is
-plain HTTP CONNECT (`docs/records/agent-verification.md`).
+**`codex` needs a certificate too, and it is not a proxy hop.** Its hop *is* plain HTTP CONNECT —
+it rejects an `https://`-scheme proxy URL at parse time (`docs/records/agent-verification.md`) —
+but its single listener also peeks at the ClientHello, and Squid loads no signing context on a
+peeking port without `tls-cert=`: it parses cleanly and then silently declines to bump, at which
+point the SNI control enforces nothing. The certificate is never presented on an allowed path
+(peek+splice hands the origin's own chain through untouched) and `codex` neither trusts nor
+validates it. The mediator refuses to start without it. See the feature plan's Deviation 5.
 
 **2. Bring the pod up with the profile override layered on.**
 
@@ -167,14 +173,22 @@ audit trail at every start, so a pod running without a proven path out says so i
 `docs/ARCHITECTURE_AND_DESIGN.md` as an earlier version of this note (and the architecture
 document's own file tree) stated; the path discrepancy itself is recorded as a finding for
 `/project`, not fixed here. Dockerfiles (`images/`) and Compose files (`compose/`) exist as of
-Feature 01.2. Still not produced:
+Feature 01.2.
 
-- Feature 01.3's acceptance harness — SF-8, the last sub-feature. The mediator itself is complete
-  as of SF-7: the three agent-facing listeners and the three egress controls (SF-6), the closed DNS
-  forwarder (SF-5), and the audit writer, denial surface and startup self-checks (SF-7). What does
-  not exist yet is `tests/acceptance/verify-egress-mediator.sh` and its fixtures, so the properties
-  above are verified by hand rather than by a repeatable harness.
-- Tool-pack manifests and the policy compiler — Feature 01.5
+Feature 01.3 is **complete**: the three agent-facing listeners and the three egress controls, the
+closed DNS forwarder, the audit writer, the denial surface and the two-stage startup self-check.
+Its acceptance harness is `tests/acceptance/verify-egress-mediator.sh` — 77 assertions across
+phases A–G, driven against fixtures the harness owns and reaching no third-party host:
+
+```bash
+bash tests/acceptance/verify-egress-mediator.sh
+```
+
+Still not produced:
+
+- Agent authentication and state persistence — Feature 01.4
+- Tool-pack manifests and pack composition in the policy compiler — Feature 01.5
+- Per-agent workload identity (client certificates, R8.8, T34) — Feature 01.6
 - AWS access (R6) — Milestone 03
 
 Note that requirements R6 (AWS access) and R7 (loadable tool packs) were added after the options analysis was written. The three options remain valid — both requirements are orthogonal to the choice of enforcement architecture — but the options analysis does not yet evaluate them per option.
