@@ -19,6 +19,11 @@
 !images/mediator
 !policy/resolved
 !mediator/config
+# One file, not the directory: stage 1 of the mediator's startup self-check (SF-7)
+# calls the SAME schema validator the compiler uses, and the rest of scripts/ has no
+# business in the enforcement point -- issue-identity.sh in particular is the offline
+# CA tool whose whole premise is that it never runs here.
+!scripts/compile-policy.sh
 
 # Trailing denies. Docker's rules are order-sensitive -- the LAST matching line
 # decides -- so these sit below every `!` above and re-exclude regardless of what

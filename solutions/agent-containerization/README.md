@@ -101,6 +101,65 @@ reads its policy from its own image layer and its Compose secrets, never from a 
 write. The exposure is the *next build*, which is why the fix is the default binding rather than a
 warning, and why the acceptance harness asserts no agent's mount set contains a control-plane path.
 
+### When an agent's egress is refused
+
+Every attempt that reaches the mediator produces one JSON line on the audit trail, allow and deny
+alike (R9.1). That line is the **authoritative** denial record — the operator surface R12.2 asks
+for — and it is where diagnosis starts:
+
+```bash
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml logs egress-mediator | grep '"verdict":"deny"' | jq .
+```
+
+```json
+{"ts":"2026-09-07T15:55:53.392Z","agent":"codex","identity_source":"listener",
+ "dest_host":"collector.example.com","dest_port":443,"resolved_ip":null,"verdict":"deny",
+ "control":"allowlist","reason":"host_not_allowlisted",
+ "policy":"policy/resolved/default.yaml","sni":null,"method":"CONNECT","http_status":200}
+```
+
+`control` names the refusing control and `reason` says which of its cases fired:
+
+| `control` | `reason` | What to do |
+|---|---|---|
+| `allowlist` | `host_not_allowlisted` / `port_not_allowlisted` | Add the host to `policy/allowlist.base.yaml` under that agent, then `bash scripts/compile-policy.sh` and rebuild the mediator image |
+| `allowlist` | `sni_does_not_match_connect_host` | The ClientHello named a different host than the CONNECT line. This is the domain-fronting refusal — investigate before allowlisting anything |
+| `allowlist` | `agent_has_no_allowlist` | That agent has no allowed names at all in the compiled artifact |
+| `denylist` | `fqdn_on_denylist` / `resolved_address_on_denylist` | Deny wins. Edit `policy/denylist.base.yaml` only if the range is genuinely not the one R5.6 requires |
+| `ratelimit` | `concurrency_ceiling_exceeded` | Raise `rate_limits.<agent>.max_concurrent` in `profiles/default.yaml` — but a ceiling hit repeatedly is a signal first |
+| `method` | `method_not_connect` | Something spoke plain HTTP through the proxy. The mediator tunnels TLS and never handles a plaintext request |
+
+`identity_source` is `listener` on every line at this feature: the agent was identified by the
+network its connection arrived on, not by a credential it presented. Feature 01.6 is what changes
+that, and the field is there so a network-derived attribution is never read later as a
+cryptographic one.
+
+**What the agent itself sees depends on which listener refused it.** `claude` and `agy` reach a
+non-bumping front listener, so a verdict decided before the CONNECT is accepted comes back as a
+403 whose body names the destination, the control and the policy path. `codex`'s listener peeks at
+the ClientHello and therefore accepts the CONNECT first, so *every* refusal reaches it as a
+terminated connection with no body — as does any post-ClientHello refusal on the other two. The
+mediator never mints a certificate for the destination to deliver an error through, which is the
+capability the architecture rules out. **Diagnosis of which destination was refused is the audit
+line, always.**
+
+### The startup self-check
+
+The mediator refuses to start on a policy that does not validate (stage 1, not skippable) and, by
+default, proves the enforcement path before serving (stage 2): one allowed and one denied
+destination driven through the rendered proxy from a loopback listener. Both stages record their
+result:
+
+```bash
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml logs egress-mediator | grep startup_check
+```
+
+On a host with no working internet, stage 2 will fail a pod that is otherwise correct. Set
+`startup_check.offline: true` in `profiles/default.yaml` and recompile — the skip is written to the
+audit trail at every start, so a pod running without a proven path out says so in its own record.
+
 ## What Now Exists, and What's Still Out of Scope
 
 `prd.md` and `progress.txt` exist at this directory's root. The architecture document exists at
@@ -110,10 +169,11 @@ document's own file tree) stated; the path discrepancy itself is recorded as a f
 `/project`, not fixed here. Dockerfiles (`images/`) and Compose files (`compose/`) exist as of
 Feature 01.2. Still not produced:
 
-- The egress mediator's policy engine, pod resolver and audit writer — Feature 01.3, in progress.
-  The mediator image, its place in the Compose topology and the per-agent proxy environment exist
-  (SF-4); the three agent-facing listeners, the closed DNS forwarder and the audit sink's contents
-  do not yet — the container comes up on a holding configuration that refuses everything.
+- Feature 01.3's acceptance harness — SF-8, the last sub-feature. The mediator itself is complete
+  as of SF-7: the three agent-facing listeners and the three egress controls (SF-6), the closed DNS
+  forwarder (SF-5), and the audit writer, denial surface and startup self-checks (SF-7). What does
+  not exist yet is `tests/acceptance/verify-egress-mediator.sh` and its fixtures, so the properties
+  above are verified by hand rather than by a repeatable harness.
 - Tool-pack manifests and the policy compiler — Feature 01.5
 - AWS access (R6) — Milestone 03
 

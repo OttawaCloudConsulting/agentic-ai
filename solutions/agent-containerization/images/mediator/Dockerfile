@@ -124,6 +124,20 @@ COPY mediator/config/ /etc/mediator/config/
 # execute only where it is a directory.
 RUN chmod -R a=rX /etc/mediator
 
+# SF-7's two pieces that are not configuration.
+#
+# The schema validator is 01.3 SF-2's, shipped in rather than reimplemented: stage 1
+# of the startup self-check (T17) must agree with what the compiler considers valid,
+# and two implementations of "valid" would drift. Only `--validate` is used here, and
+# that mode reads nothing but the file it is given.
+#
+# The audit writer turns Squid's intermediate line into Interface Contract 4's JSON.
+# Bash, not awk, and the reason is in its own header: `mawk` -- the only awk in this
+# image -- produces NO output at all from a FIFO whose writer is still open, so an
+# awk writer would emit the whole trail at shutdown and nothing before it.
+COPY --chmod=0755 scripts/compile-policy.sh /usr/local/bin/mediator-compile-policy
+COPY --chmod=0755 images/mediator/audit-writer.sh /usr/local/bin/mediator-audit-writer
+
 COPY --chmod=0755 images/mediator/entrypoint.sh /usr/local/bin/mediator-entrypoint
 
 # Rootfs is read-only at runtime (D15). Everything written at start lands under the

@@ -92,6 +92,49 @@ ssl_bump splice all
 # ---------------------------------------------------------------- policy ACLs
 acl CONNECT method CONNECT
 
+# ------------------------------------------- SF-7: control naming and deny_info
+# Two jobs, one ACL. `annotate_transaction` ALWAYS matches and decides nothing, so
+# appending `... rsn_x ctl_y` to a deny line changes no verdict -- but the
+# annotation only happens when every term BEFORE it matched, which is exactly when
+# that line is the one refusing. So the note is populated on the refusing line and
+# on no other.
+#
+# The second job is `deny_info`, which keys on the LAST ACL of the matched line.
+# That is why the control ACL is last on every deny rule below and why there is one
+# ACL per control rather than one per rule: the page an operator sees and the
+# `control` field a parser reads are then the same fact, and they cannot drift.
+#
+# `method` is a FOURTH control value. Interface Contract 4 enumerated allowlist,
+# denylist and ratelimit; the CONNECT-only restriction refuses on its own terms and
+# would otherwise be logged as one of the other three or as nothing at all.
+# Recorded as a deviation on the feature plan.
+acl ctl_method    annotate_transaction control=method
+acl ctl_allowlist annotate_transaction control=allowlist
+acl ctl_denylist  annotate_transaction control=denylist
+acl ctl_ratelimit annotate_transaction control=ratelimit
+
+# The reason is a TOKEN, not a sentence: annotation values cannot carry spaces, and
+# a machine-read audit trail is better served by a closed vocabulary anyway. The
+# human sentence lives in the error page the same ACL selects.
+acl rsn_method  annotate_transaction reason=method_not_connect
+acl rsn_host    annotate_transaction reason=host_not_allowlisted
+acl rsn_port    annotate_transaction reason=port_not_allowlisted
+acl rsn_noallow annotate_transaction reason=agent_has_no_allowlist
+acl rsn_sni     annotate_transaction reason=sni_does_not_match_connect_host
+acl rsn_fqdn    annotate_transaction reason=fqdn_on_denylist
+acl rsn_cidr    annotate_transaction reason=resolved_address_on_denylist
+acl rsn_maxconn annotate_transaction reason=concurrency_ceiling_exceeded
+
+# The client half of Interface Contract 6, and it is BEST EFFORT by construction:
+# these pages are only reachable for a verdict reached BEFORE the CONNECT is
+# accepted. A post-ClientHello refusal (the SNI control) terminates with no body,
+# because writing one would mean minting a destination certificate. The pages are
+# rendered into error_directory by the entrypoint, on top of the packaged set.
+deny_info ERR_MEDIATOR_METHOD    ctl_method
+deny_info ERR_MEDIATOR_ALLOWLIST ctl_allowlist
+deny_info ERR_MEDIATOR_DENYLIST  ctl_denylist
+deny_info ERR_MEDIATOR_RATELIMIT ctl_ratelimit
+
 @DENY_ACLS@
 
 @AGENT_ACLS@
@@ -114,7 +157,7 @@ acl CONNECT method CONNECT
 # http://host/` through this proxy would arrive as an absolute-URI request that the
 # mediator would hold in PLAINTEXT -- the content-inspection capability D4 states
 # this architecture does not have.
-http_access deny !CONNECT
+http_access deny !CONNECT rsn_method ctl_method
 
 # Control 1a -- the per-agent allowlist gate, on both layers, decided from the
 # CONNECT host and port alone. Default-deny: a name absent from THIS agent's list is
@@ -161,7 +204,7 @@ http_access deny !CONNECT
 
 # Anything reaching here matched no paired host+SNI rule -- including a CONNECT to
 # an allowlisted host carrying a different SNI, which is the domain-fronting case.
-http_access deny all
+http_access deny all rsn_sni ctl_allowlist
 
 # ----------------------------------------------- control 3b -- byte rate ceiling
 # One class-1 pool per agent, bound by `myportname` to that agent's INNER listener
@@ -174,16 +217,22 @@ http_access deny all
 @DELAY_POOLS@
 
 # ----------------------------------------------------------------------- audit
-# SF-6's format, and a placeholder shape rather than the contract: SF-7 owns the
-# audit line schema (Interface Contract 4), the JSON writer behind it and the
-# denial surface. `sni=` is here now because it is THIS sub-feature's control being
-# recorded -- without it a fronting refusal and an allowlist refusal are the same
-# line. `%note{agent}` carries the network-derived identity from the annotation
-# above, on allow and deny alike.
+# SF-7's Interface Contract 4. This is the INTERMEDIATE format, not the audit trail:
+# it is written to a FIFO that images/mediator/audit-writer.awk reads and turns into
+# one JSON object per line. Squid emits no structure, so a hostile SNI or CONNECT
+# authority carrying a quote would corrupt a machine-parsed trail at exactly the
+# moment it matters. `%#` URL-escapes every attacker-controlled field, so a valid
+# hostname reaches the log unchanged and a hostile one cannot leave its string.
 #
-# SF-7 must also take the verdict from the INNER line: on a fronted agent the front
-# reports the tunnel (`status=200 squid=TCP_TUNNEL`) while the inner reports the
-# real verdict, so a front line read alone says a denied connection succeeded.
-logformat mediator %ts.%03tu agent=%note{agent} port=%la:%lp url=%ru status=%>Hs squid=%Ss bytes=%<st sni="%ssl::>sni"
-access_log stdio:@AUDIT_LOG@ mediator
+# The field ORDER is a contract with the writer; the writer asserts the count. Change
+# either alone and the trail breaks silently.
+#
+# `%note{agent}` carries the network-derived identity annotated at the listener, on
+# allow and deny alike. `%note{layer}` is what lets the writer discard a fronted
+# agent's FRONT allow line: the front reports its tunnel to the peer (200,
+# TCP_TUNNEL) while the inner reports the real verdict, so a front line read alone
+# says a denied connection succeeded. Front DENIES are kept -- control 3's
+# concurrency ceiling is enforced there and nowhere else.
+logformat mediator_raw %{%Y-%m-%dT%H:%M:%S}tg.%03tuZ %#{agent}note %#{layer}note %#{control}note %#{reason}note %#ru %>Hs %Ss %>st %<st %#ssl::>sni %#>rm %<a
+access_log stdio:@AUDIT_RAW@ mediator_raw
 error_directory @ERROR_DIR@

@@ -532,7 +532,7 @@ revision — so this is a renumber, not a migration.
   certificate verification is **configured off** on all three listeners; 01.6 turns it on for the
   listeners whose agent can present one. Covers T3, T5, T6, T7. Depends on SF-4 and SF-5.
 
-- [ ] **SF-7: Audit writer, denial surface and startup self-checks** — The audit line schema
+- [x] **SF-7: Audit writer, denial surface and startup self-checks** — The audit line schema
   (Interface Contract 4) and the writer behind it, including `identity_source` emitting `listener`
   for all three agents at this feature and the field being present so 01.6 extends its enumeration
   rather than the schema. The two-path denial surface of Interface Contract 6 — a 403-with-destination
@@ -1364,3 +1364,79 @@ anywhere in the repository. Shell scripts follow `#!/usr/bin/env bash`, `set -eu
   "no private key material in any image layer" assertion covers one more secret; Phase B's
   "`codex-net` listener does not speak TLS" assertion is unaffected and remains the one that would
   catch this being mistaken for a hop. 01.6 inherits a third listener certificate in the lifecycle.
+
+### Deviation 6: `control` carries a fourth value, `method`
+- **What changed:** The audit line's `control` field takes `method` in addition to `allowlist`,
+  `denylist` and `ratelimit`. It is emitted by the CONNECT-only restriction, which has its own
+  `deny_info` page (`ERR_MEDIATOR_METHOD`) alongside the other three.
+- **Originally planned:** Interface Contract 4: "`verdict: "deny"` carries `control` as one of
+  `allowlist`, `denylist`, `ratelimit`".
+- **Why necessary:** The CONNECT-only restriction (criterion 3) is a refusing control and it refuses
+  on its own terms — a `GET http://host/` through this proxy is denied by neither the allowlist nor
+  the denylist nor a ceiling. Without a value of its own it would have to be logged as one of the
+  other three, which would misname the control that refused, or as `null`, which would leave an
+  operator with a deny line that does not say why. Contract 4's own premise is that the line names
+  the refusing control.
+- **Impact:** The enumeration is four values, not three. 01.6 extends `identity_source`, not this
+  field, so the two extensions do not collide. SF-8 asserts the value on a non-CONNECT request.
+
+### Deviation 7: the deny line carries `reason` and `policy`, and both lines carry `http_status`
+- **What changed:** A deny line adds `reason` (a closed-vocabulary token: `host_not_allowlisted`,
+  `port_not_allowlisted`, `agent_has_no_allowlist`, `sni_does_not_match_connect_host`,
+  `fqdn_on_denylist`, `resolved_address_on_denylist`, `concurrency_ceiling_exceeded`,
+  `method_not_connect`), `policy` (the artifact path an operator edits and recompiles), `sni` and
+  `http_status`. An allow line adds `http_status`.
+- **Originally planned:** Contract 4's example object, which carries `ts`, `agent`,
+  `identity_source`, `dest_host`, `dest_port`, `resolved_ip`, `verdict`, `control` and `bytes_*`.
+- **Why necessary:** Contract 6 requires the structured denial record to name "the reason, and the
+  policy source and remediation path", and Contract 4 as written had nowhere to put any of them.
+  `reason` is also the only thing that distinguishes a domain-fronting refusal from an ordinary
+  allowlist refusal — both are `control: allowlist`, and the post-ClientHello one delivers no body,
+  so the line is the only record that exists. `http_status` on the allow line exists because a
+  front whose peer was still cold answers **500**: not a refusal by policy, so not a deny, but a
+  line reading only `"verdict":"allow"` would report a failed connection as one that worked.
+- **Impact:** Contract 4's object is the superset above. Nothing was removed or renamed, so a
+  consumer written against the original field set still reads. The `event` lines the startup
+  self-check writes carry no `verdict` key at all, so they cannot be misparsed as verdicts.
+
+### Deviation 8: `codex` receives no client-visible 403 for any verdict, not only post-ClientHello
+- **What changed:** Interface Contract 6's client half is narrowed again. Its two-path split was
+  written as "before the CONNECT is accepted → 403 with body" versus "after the ClientHello →
+  terminate without a body". On `codex-net` the **first path does not exist**: every refusal is
+  delivered as a terminated connection with no body, including a plain allowlist refusal decided
+  before anything resolves.
+- **Originally planned:** Contract 6 as amended on 2026-09-06 (Deviation 2), which promised the 403
+  body for CONNECT-host allowlist, `deny_fqdns` and `deny_cidrs` verdicts on every agent.
+- **Why necessary:** Measured on the shipped image. `codex`'s single listener carries `ssl-bump`,
+  and a bumping `http_port` answers `HTTP/1.1 200 Connection established` **before** evaluating
+  `http_access` — it must, because the verdict it is heading for may need the ClientHello. The 403
+  page is generated after the client has already been told the tunnel is up, so it is never
+  delivered as a response. Verified from `codex-net`: `CONNECT collector.example.com:443` returns
+  200 and is then terminated, while the audit line records `verdict=deny control=allowlist
+  reason=host_not_allowlisted`. The same request through `claude`'s **front** listener — an
+  `https_port`, which does not bump — returns the full 403 body over the verified TLS hop.
+  Closing the gap would mean giving `codex` a non-bumping front and a second listener, which is the
+  cascade `codex` exists to avoid, and it would still not produce a body once the peek stage runs.
+- **Impact:** The 403-with-destination surface is `claude`'s and `agy`'s (their front listeners) and
+  the self-check shadow's. `codex`'s operator surface is the audit record alone, which Contract 6
+  already calls the authoritative half. R9.3's "a legitimate gap is distinguishable from an attack
+  in-band" is therefore **not** met for `codex` and is recorded as a residual, not claimed. SF-8's
+  denial-surface assertions must be per agent rather than uniform.
+
+### Deviation 9: stage 2's denied target is refused by the allowlist, not the denylist
+- **What changed:** Nothing in the code — the plan's reasoning is corrected. Stage 2 asserts that
+  `169.254.169.254:443` is refused **and** that the refusal carries the denial surface; it does not
+  assert which control refused it. The observed line is `control=allowlist
+  reason=host_not_allowlisted`.
+- **Originally planned:** Criterion 8: "The denied target is `169.254.169.254:443` — a denylist hit
+  that is resolvable and would otherwise connect".
+- **Why necessary:** SF-6's ordering makes the allowlist gate run before `deny_cidrs`, and its
+  `dstdomain -n` refuses the reverse lookup that would give an IP literal a name to match. A bare
+  address therefore matches no allowlisted name and is refused by default-deny before the `dst` ACL
+  is ever evaluated. That ordering is a control — it is what stops the mediator resolving an
+  attacker-chosen CONNECT host — so the fixture reaches the right verdict by the right path, and it
+  is the plan's one-line rationale that predates the ordering.
+- **Impact:** The target is unchanged and still correct: it is resolvable, would otherwise connect,
+  and fails on policy rather than on resolution. What stage 2 proves is default-deny plus the
+  denial surface. A dedicated `deny_cidrs` assertion belongs to SF-8, which can drive a name that
+  resolves into a denied range.

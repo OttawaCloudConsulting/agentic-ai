@@ -18,7 +18,7 @@
 
 [~] Feature 01.3: Egress mediator
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/egress-mediator.md
-    Sub-features: 6/8 complete
+    Sub-features: 7/8 complete
     Notes: Re-planned 2026-09-05, Gate 4 re-approved (supersedes the 2026-09-04 approval, which the
     /milestone revision invalidated). Identity, R8.8 and T34 moved to Feature 01.6; 01.3 keeps L7
     controls, DNS, audit, the non-uniform listener surface (claude/agy https, codex plain http

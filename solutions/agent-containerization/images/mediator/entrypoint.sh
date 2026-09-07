@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mediator entrypoint (01.3, SF-4 + SF-5 + SF-6).
+# Mediator entrypoint (01.3, SF-4 + SF-5 + SF-6 + SF-7).
 #
 # SF-4 brought the container up hardened and holding. SF-5 replaced the holding
 # resolver with the pod's real DNS authority. SF-6 replaces the holding proxy with
@@ -21,6 +21,16 @@
 #   * squid    -- the L7 CONNECT/SNI policy engine. Five listeners for three agents
 #                 (the self-cascade -- see mediator/config/proxy.conf.tmpl), the
 #                 three controls of D5 evaluated in order, and CONNECT-only.
+#   * writer   -- the audit writer (SF-7). Squid writes an intermediate line to a
+#                 FIFO and this turns it into Interface Contract 4's JSON. It is a
+#                 supervised child like the daemons: an enforcement point that has
+#                 stopped recording is not enforcing as far as R9.1 is concerned.
+#
+# SF-7 also adds the two-stage startup self-check (R9.5, T17). Stage 1 validates the
+# resolved policy before anything binds and is not skippable. Stage 2 drives one
+# allowed and one denied destination THROUGH the rendered proxy -- not around it, so
+# a rendering bug in proxy.conf.tmpl fails the check rather than passing it -- from a
+# loopback shadow listener that mirrors the checked agent's own topology.
 #
 # The two-daemon resolver and the five-listener proxy are both verified necessities
 # rather than preferences; the evidence, including what each stage fails to do
@@ -31,6 +41,12 @@ set -euo pipefail
 RUN_DIR=/run/mediator
 AUDIT_DIR=/var/log/mediator
 AUDIT_LOG="$AUDIT_DIR/egress-audit.log"
+# The intermediate trail Squid writes and the audit writer reads. A FIFO on the /run
+# tmpfs rather than a file: an intermediate log would grow without bound inside the
+# enforcement point, and rotating it would be a second failure mode. It also makes
+# the writer's death loud -- Squid takes SIGPIPE and exits, and the supervisor takes
+# the mediator down.
+AUDIT_RAW="$RUN_DIR/audit.fifo"
 CACHE_LOG="$AUDIT_DIR/squid-cache.log"
 DNS_AUDIT_LOG="$AUDIT_DIR/dns-audit.log"
 SQUID_CONF="$RUN_DIR/squid.conf"
@@ -47,6 +63,22 @@ REORIGIN_PORT=5353
 
 MEDIATOR_PROFILE="${MEDIATOR_PROFILE:-default}"
 RESOLVED_POLICY="$POLICY_DIR/${MEDIATOR_PROFILE}.yaml"
+# What the denial surface NAMES, which is not what the mediator reads. The mediator
+# reads its own image layer; the operator edits and recompiles the repository file,
+# and telling them about a path inside a container they cannot write is a dead end.
+# Interface Contract 6's example names this form.
+POLICY_SOURCE="policy/resolved/${MEDIATOR_PROFILE}.yaml"
+
+# The mediator's copy of the schema validator (01.3 SF-2), for stage 1. Shipped into
+# the image rather than reimplemented here: a second validator is a second opinion
+# about what a valid policy is, and the two would drift.
+POLICY_VALIDATOR=/usr/local/bin/mediator-compile-policy
+AUDIT_WRITER=/usr/local/bin/mediator-audit-writer
+
+# The loopback shadow listener stage 2 probes through. Above the inner listeners'
+# range (3200+) so a profile with many agents cannot collide with it.
+SC_FRONT_PORT=3300
+SC_INNER_PORT=3301
 
 # Where allowlisted names are actually resolved. Docker's embedded resolver in this
 # container's own namespace by default, which forwards to the daemon's configured
@@ -67,12 +99,24 @@ MEDIATOR_DNS_UPSTREAM="${MEDIATOR_DNS_UPSTREAM:-127.0.0.11}"
 fail() { echo "mediator: FATAL: $*" >&2; exit 1; }
 note() { echo "mediator: $*" >&2; }
 
+# The self-check's own audit lines. They are EVENTS, not connection attempts, and
+# they carry no `verdict` -- a parser reading the egress trail must never mistake a
+# startup record for a verdict about an agent's traffic. Written straight to the
+# audit log rather than through the writer, because the writer's input is Squid's
+# and nothing else's.
+audit_event() { # <json body, no braces>
+  printf '{"ts":"%s","event":"startup_check",%s}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)" "$1" >> "$AUDIT_LOG" 2>/dev/null || true
+}
+
 # --------------------------------------------------------------- writable paths
 # The rootfs is read-only (D15) and /run arrives as an empty tmpfs, so every
 # writable path is created here. A missing one is a start failure, which is the
 # intended failure mode: a mediator that silently could not open its audit log
 # would be an enforcement point running without R9.1.
 mkdir -p "$RUN_DIR" "$ERROR_DIR" /run/squid
+[ -p "$AUDIT_RAW" ] || mkfifo -m 0600 "$AUDIT_RAW" \
+  || fail "cannot create the audit FIFO at $AUDIT_RAW -- the audit writer has nothing to read"
 
 [ -d "$AUDIT_DIR" ] || fail "$AUDIT_DIR is absent -- the audit volume is not mounted"
 touch "$AUDIT_LOG" "$CACHE_LOG" "$DNS_AUDIT_LOG" 2>/dev/null \
@@ -89,6 +133,28 @@ else
   fail "packaged Squid error pages not found -- error_directory cannot be composed"
 fi
 
+# The mediator's own pages on top (Interface Contract 6's client half). One per
+# refusing control; `deny_info` in proxy.conf.tmpl selects them from the same ACL
+# that names the control on the audit line, so the page and the record cannot
+# disagree about which control refused.
+#
+# They are RENDERED rather than copied: an error page cannot read the environment and
+# Squid substitutes no note macros in it, so the policy path and profile have to be
+# baked in at start. `%H`, `%p` and `%i` are Squid's own per-request macros and are
+# left alone.
+_pages=0
+for _page in "$TMPL_DIR"/errors/ERR_MEDIATOR_*; do
+  [ -f "$_page" ] || continue
+  POLICY_SOURCE="$POLICY_SOURCE" MEDIATOR_PROFILE="$MEDIATOR_PROFILE" \
+  awk '{ gsub(/@POLICY_PATH@/, ENVIRON["POLICY_SOURCE"]); gsub(/@PROFILE@/, ENVIRON["MEDIATOR_PROFILE"]); print }' \
+    "$_page" > "$ERROR_DIR/$(basename "$_page")" \
+    || fail "cannot render the denial page $(basename "$_page") into $ERROR_DIR"
+  _pages=$(( _pages + 1 ))
+done
+[ "$_pages" -eq 4 ] \
+  || fail "expected 4 ERR_MEDIATOR_* denial pages in $TMPL_DIR/errors, rendered $_pages. proxy.conf.tmpl binds one deny_info to each control; a missing page makes that control's refusal fall back to Squid's generic page and lose the destination, the policy path and the remediation."
+
+
 # =============================================================== resolver render
 # The agent networks. One `<agent>=<mediator address>/<prefix>` per agent, and it
 # is the SAME fact as compose.yaml's `ipam` blocks, the agents' `dns:` literals and
@@ -102,6 +168,39 @@ fi
 
 [ -f "$RESOLVED_POLICY" ] \
   || fail "resolved policy $RESOLVED_POLICY not found (profile '$MEDIATOR_PROFILE'). It is baked into the image from policy/resolved/ -- recompile with scripts/compile-policy.sh and rebuild."
+
+# ================================================ stage 1 of the self-check (T17)
+# Unconditional, fatal, and BEFORE any listener binds. A corrupt or unparseable
+# policy aborts the start naming the file and the failing field rather than
+# rendering a half-understood configuration and enforcing it. There is no skip: the
+# `startup_check.offline` escape applies to stage 2 only.
+[ -f "$POLICY_VALIDATOR" ] \
+  || fail "the policy schema validator is missing from the image at $POLICY_VALIDATOR -- stage 1 of the startup self-check (T17) cannot run, and starting without it would mean enforcing a policy nothing has validated"
+if ! _v1="$(bash "$POLICY_VALIDATOR" --validate "$RESOLVED_POLICY" 2>&1)"; then
+  audit_event "\"stage\":1,\"result\":\"fail\",\"profile\":\"${MEDIATOR_PROFILE}\""
+  echo "$_v1" >&2
+  fail "stage 1 self-check: $RESOLVED_POLICY does not validate against schema 1 (see the line above). Fix the inputs and recompile with scripts/compile-policy.sh, then rebuild the image."
+fi
+audit_event "\"stage\":1,\"result\":\"pass\",\"profile\":\"${MEDIATOR_PROFILE}\",\"policy\":\"${POLICY_SOURCE}\""
+note "stage 1 self-check: ${_v1}"
+
+# ---------------------------------------------- stage 2's inputs, read and checked
+# Read here rather than at probe time so a malformed startup_check fails the start
+# next to stage 1's other checks, not eight steps later with the listeners already up.
+SC_AGENT="$(yq eval '.startup_check.allowed.agent' "$RESOLVED_POLICY")"
+SC_FQDN="$(yq eval '.startup_check.allowed.fqdn' "$RESOLVED_POLICY")"
+SC_PORT="$(yq eval '.startup_check.allowed.port' "$RESOLVED_POLICY")"
+SC_DENY_IP="$(yq eval '.startup_check.denied.ip' "$RESOLVED_POLICY")"
+SC_DENY_PORT="$(yq eval '.startup_check.denied.port' "$RESOLVED_POLICY")"
+SC_OFFLINE="$(yq eval '.startup_check.offline' "$RESOLVED_POLICY")"
+[[ "$SC_FQDN" =~ ^[A-Za-z0-9.-]+$ ]] && [ "${#SC_FQDN}" -le 253 ] \
+  || fail "$RESOLVED_POLICY: startup_check.allowed.fqdn is '$SC_FQDN', which is not a hostname"
+[[ "$SC_DENY_IP" =~ ^[0-9a-fA-F:.]+$ ]] \
+  || fail "$RESOLVED_POLICY: startup_check.denied.ip is '$SC_DENY_IP', which is not an address"
+[[ "$SC_PORT" =~ ^[0-9]+$ ]] && [[ "$SC_DENY_PORT" =~ ^[0-9]+$ ]] \
+  || fail "$RESOLVED_POLICY: startup_check ports must be numbers (found '$SC_PORT' and '$SC_DENY_PORT')"
+[ "$SC_OFFLINE" = "true" ] || [ "$SC_OFFLINE" = "false" ] \
+  || fail "$RESOLVED_POLICY: startup_check.offline must be true or false, found '$SC_OFFLINE'"
 
 # ipv4_network <addr> <prefix> -> the network address, so the rendered configuration
 # reads as the subnet it actually matches rather than a host address with a mask
@@ -157,6 +256,9 @@ P_DELAY_POOLS=""
 P_FRONT_ALLOW=""
 P_FRONTED=""          # port names of the TLS front listeners, for `never_direct`
 P_INNER_NAMES=""      # port names of every peeking listener -- where deny_cidrs runs
+P_FRONT_NAMES=""      # port names of every FRONT listener -- the layer annotation
+P_SELFCHECK_NAMES=""  # the shadow listener's port names, attributed to `selfcheck`
+SC_RENDERED=0
 P_DELAY_N=0
 # Loopback ports for the inner (peeking) listeners of the TLS-fronted agents. They
 # all share 127.0.0.1, so unlike the front listeners they cannot share a port.
@@ -241,14 +343,42 @@ for spec in "${_agent_specs[@]}"; do
       || fail "agent '${agent}' has a TLS proxy hop but $crt / $key is not readable. The listener key pair arrives as a Compose secret (compose.yaml) and is issued by scripts/issue-identity.sh with an iPAddress SAN for ${addr}."
     P_LISTENERS="${P_LISTENERS}https_port ${addr}:${lport} name=${agent} tls-cert=${crt} tls-key=${key}"$'\n'
     P_LISTENERS="${P_LISTENERS}http_port 127.0.0.1:${inner} name=${agent}in ssl-bump generate-host-certificates=off tls-cert=${crt} tls-key=${key}"$'\n'
-    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_front myportname ${agent}"$'\n'
-    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_inner myportname ${agent}in"$'\n'
-    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}       myportname ${agent} ${agent}in"$'\n'
     P_PEERS="${P_PEERS}cache_peer 127.0.0.1 parent ${inner} 0 no-query no-digest no-netdb-exchange name=${agent}peer"$'\n'
-    P_PEERS="${P_PEERS}cache_peer_access ${agent}peer allow p_${agent}_front"$'\n'
+    # The agent's REAL front port, not `p_${agent}_front` -- that ACL also names the
+    # self-check shadow, and a peer reachable from the shadow lets stage 2's probe be
+    # forwarded to the AGENT's inner listener, where it is annotated with the agent's
+    # identity. Measured at the SF-7 build: the probe's allow lines arrived attributed
+    # to `claude`. The shadow has its own peer below and must use only that one.
+    P_PEERS="${P_PEERS}acl p_${agent}_frontreal myportname ${agent}"$'\n'
+    P_PEERS="${P_PEERS}cache_peer_access ${agent}peer allow p_${agent}_frontreal"$'\n'
     P_PEERS="${P_PEERS}cache_peer_access ${agent}peer deny all"$'\n'
+    _front_names="${agent}"
+    _inner_names="${agent}in"
     P_FRONTED="${P_FRONTED} ${agent}"
-    P_INNER_NAMES="${P_INNER_NAMES} ${agent}in"
+
+    if [ "$agent" = "$SC_AGENT" ]; then
+      # The shadow. It MIRRORS this agent's topology -- a front and a peeking inner,
+      # because that is what this agent has -- and its ports are appended to this
+      # agent's own policy ACLs below, so stage 2 traverses the rendered rules
+      # rather than a second copy of them. Criterion 8: the check probes THROUGH the
+      # proxy, so a rendering bug in proxy.conf.tmpl fails it.
+      #
+      # The shadow front is PLAIN, unlike the agent's: the probe is openssl's
+      # `-proxy`, which speaks HTTP CONNECT and cannot do a TLS proxy hop. The hop's
+      # own TLS is SF-8 Phase B's assertion, not this one's; what stage 2 proves is
+      # that the POLICY allows what it should and refuses what it should.
+      P_LISTENERS="${P_LISTENERS}http_port 127.0.0.1:${SC_FRONT_PORT} name=selfcheck"$'\n'
+      P_LISTENERS="${P_LISTENERS}http_port 127.0.0.1:${SC_INNER_PORT} name=selfcheckin ssl-bump generate-host-certificates=off tls-cert=${crt} tls-key=${key}"$'\n'
+      P_PEERS="${P_PEERS}acl p_selfcheck_front myportname selfcheck"$'\n'
+      P_PEERS="${P_PEERS}cache_peer 127.0.0.1 parent ${SC_INNER_PORT} 0 no-query no-digest no-netdb-exchange name=selfcheckpeer"$'\n'
+      P_PEERS="${P_PEERS}cache_peer_access selfcheckpeer allow p_selfcheck_front"$'\n'
+      P_PEERS="${P_PEERS}cache_peer_access selfcheckpeer deny all"$'\n'
+      P_FRONTED="${P_FRONTED} selfcheck"
+      _front_names="${_front_names} selfcheck"
+      _inner_names="${_inner_names} selfcheckin"
+      P_SELFCHECK_NAMES="selfcheck selfcheckin"
+      SC_RENDERED=1
+    fi
   else
     # One listener doing both jobs. `codex`'s hop is plain HTTP CONNECT, so there
     # is no proxy-hop TLS to terminate and the single port can carry `ssl-bump`.
@@ -264,14 +394,47 @@ for spec in "${_agent_specs[@]}"; do
     [ -r "$crt" ] && [ -r "$key" ] \
       || fail "agent '${agent}' has a plain-HTTP proxy hop but still needs a BUMPING certificate at $crt / $key for its peek stage -- without one Squid loads no signing certificate on that port. It is never presented on an allowed path and ${agent} never validates it. Issue it with: bash scripts/issue-identity.sh listener ${agent} --ip ${addr}"
     P_LISTENERS="${P_LISTENERS}http_port ${addr}:${lport} name=${agent} ssl-bump generate-host-certificates=off tls-cert=${crt} tls-key=${key}"$'\n'
-    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_front myportname ${agent}"$'\n'
-    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_inner myportname ${agent}"$'\n'
-    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}       myportname ${agent}"$'\n'
-    P_INNER_NAMES="${P_INNER_NAMES} ${agent}"
+    _front_names="${agent}"
+    _inner_names="${agent}"
+
+    if [ "$agent" = "$SC_AGENT" ]; then
+      # One listener mirrors one listener. No peer and no `never_direct`: this agent
+      # has no cascade to mirror.
+      P_LISTENERS="${P_LISTENERS}http_port 127.0.0.1:${SC_FRONT_PORT} name=selfcheck ssl-bump generate-host-certificates=off tls-cert=${crt} tls-key=${key}"$'\n'
+      _front_names="${_front_names} selfcheck"
+      _inner_names="${_inner_names} selfcheck"
+      P_SELFCHECK_NAMES="selfcheck"
+      SC_RENDERED=1
+    fi
   fi
 
+  # The per-agent policy ACLs, built from the port-name lists above so the shadow is
+  # covered by every rule this agent has with no rule duplicated. `sort -u` because a
+  # single-listener agent's front and inner are the SAME port and the union would
+  # otherwise name it twice.
+  _both="$(printf '%s\n' ${_front_names} ${_inner_names} | sort -u | tr '\n' ' ')"
+  P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_front myportname ${_front_names}"$'\n'
+  P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_inner myportname ${_inner_names}"$'\n'
+  P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}       myportname ${_both}"$'\n'
+
+  # The LAYER lists, and the asymmetry is deliberate. A fronted agent's front is the
+  # `front` layer; a single-listener agent's only port is where the verdict and the
+  # bytes are, so it is `inner` and appears in no front list. Without that, its one
+  # port would be annotated twice and `%note{layer}` would read `front,inner` --
+  # which the audit writer's "drop the front's allow line" rule could not act on.
+  if [ "$ltls" = "true" ]; then
+    P_FRONT_NAMES="${P_FRONT_NAMES} ${_front_names}"
+  fi
+  P_INNER_NAMES="${P_INNER_NAMES} ${_inner_names}"
+
+  # The identity annotation names the REAL ports only. The shadow shares this agent's
+  # policy but not its identity: stage 2's traffic is the mediator's own, and an audit
+  # trail whose premise is honest attribution cannot carry a synthetic `claude` allow
+  # line at every start.
+  P_IDENTITY_RULES="${P_IDENTITY_RULES}acl p_${agent}_real myportname $(printf '%s\n' ${_front_names} ${_inner_names} | sort -u | grep -v '^selfcheck' | tr '\n' ' ')"$'\n'
+
   P_IDENTITY_RULES="${P_IDENTITY_RULES}acl tag_${agent} annotate_transaction agent=${agent}"$'\n'
-  P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent} tag_${agent} !all"$'\n'
+  P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent}_real tag_${agent} !all"$'\n'
 
   P_DELAY_N=$(( P_DELAY_N + 1 ))
   P_DELAY_POOLS="${P_DELAY_POOLS}delay_class ${P_DELAY_N} 1"$'\n'
@@ -280,7 +443,7 @@ for spec in "${_agent_specs[@]}"; do
   P_DELAY_POOLS="${P_DELAY_POOLS}delay_access ${P_DELAY_N} deny all"$'\n'
 
   P_MAXCONN_RULES="${P_MAXCONN_RULES}acl maxconn_${agent} maxconn ${maxconn}"$'\n'
-  P_MAXCONN_RULES="${P_MAXCONN_RULES}http_access deny p_${agent}_front maxconn_${agent}"$'\n'
+  P_MAXCONN_RULES="${P_MAXCONN_RULES}http_access deny p_${agent}_front maxconn_${agent} rsn_maxconn ctl_ratelimit"$'\n'
 
   # Exact names only. The compiler already refuses a wildcard entry at compile time
   # (scripts/compile-policy.sh) because the resolver matches exactly and a wildcard
@@ -354,12 +517,12 @@ for spec in "${_agent_specs[@]}"; do
     # `dst` deny and get its destinations resolved on the way to being refused.
     note "resolver: agent '$agent' has no allowlisted names -- every DNS query from ${network} will be REFUSED"
     note "proxy: agent '$agent' has no allowlisted names -- every CONNECT from ${network} will be refused"
-    P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent}"$'\n'
+    P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent} rsn_noallow ctl_allowlist"$'\n'
   else
     P_AGENT_ACLS="${P_AGENT_ACLS}acl hany_${agent} dstdomain -n${agent_hosts}"$'\n'
     P_AGENT_ACLS="${P_AGENT_ACLS}acl tany_${agent} port$(printf '%s\n' $agent_ports | sort -un | tr '\n' ' ' | sed 's/ $//;s/^/ /')"$'\n'
-    P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent} !hany_${agent}"$'\n'
-    P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent} !tany_${agent}"$'\n'
+    P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent} !hany_${agent} rsn_host ctl_allowlist"$'\n'
+    P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent} !tany_${agent} rsn_port ctl_allowlist"$'\n'
   fi
 
   rule="allow_${agent}"
@@ -368,6 +531,35 @@ for spec in "${_agent_specs[@]}"; do
 done
 
 [ -n "$ACL_ENTRIES" ] || fail "MEDIATOR_AGENT_NETWORKS produced no agent networks"
+
+# The shadow has to exist, or stage 2 has nothing to probe through and would either
+# be skipped silently or aimed at an agent's own listener -- which is the attribution
+# problem the shadow exists to avoid.
+[ "$SC_RENDERED" -eq 1 ] \
+  || fail "$RESOLVED_POLICY names startup_check.allowed.agent '$SC_AGENT', which is not among the agents MEDIATOR_AGENT_NETWORKS declares ('$MEDIATOR_AGENT_NETWORKS'). Stage 2 of the self-check probes through a loopback listener mirroring that agent; there is nothing to mirror."
+
+# --------------------------------------------------------------- the layer ACLs
+# `front` and `inner` as ACLs, so the audit line can say which layer produced it.
+# A profile with no TLS-fronted agent renders no front ACL at all: an empty
+# `myportname` list is a parse error, and there is no front layer to name.
+if [ -n "$P_FRONT_NAMES" ]; then
+  P_LISTENER_ACLS="${P_LISTENER_ACLS}acl front_layer myportname${P_FRONT_NAMES}"$'\n'
+fi
+P_LISTENER_ACLS="${P_LISTENER_ACLS}acl inner_layer myportname${P_INNER_NAMES}"$'\n'
+
+# The layer and self-check annotations, on the same never-matching shape the agent
+# tags use. They decide nothing; they populate `%note{layer}` and `%note{agent}` so
+# the writer can tell a front's tunnel line from the inner line carrying the real
+# verdict, and the mediator's own probe traffic from an agent's.
+if [ -n "$P_FRONT_NAMES" ]; then
+  P_IDENTITY_RULES="${P_IDENTITY_RULES}acl tag_front annotate_transaction layer=front"$'\n'
+  P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny front_layer tag_front !all"$'\n'
+fi
+P_IDENTITY_RULES="${P_IDENTITY_RULES}acl tag_inner annotate_transaction layer=inner"$'\n'
+P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny inner_layer tag_inner !all"$'\n'
+P_IDENTITY_RULES="${P_IDENTITY_RULES}acl p_selfcheck   myportname ${P_SELFCHECK_NAMES}"$'\n'
+P_IDENTITY_RULES="${P_IDENTITY_RULES}acl tag_selfcheck annotate_transaction agent=selfcheck"$'\n'
+P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_selfcheck tag_selfcheck !all"$'\n'
 
 # One audit call and one pool decision for the union of the per-agent rules, rather
 # than a matching pair per agent: the verdict is the same on every allowed path, and
@@ -414,12 +606,15 @@ done <<< "$deny_cidrs"
 # populated.
 if [ -n "$_df" ]; then
   P_DENY_ACLS="${P_DENY_ACLS}acl deny_fqdns dstdomain -n${_df}"$'\n'
-  P_DENY_RULES="${P_DENY_RULES}http_access deny deny_fqdns"$'\n'
+  P_DENY_RULES="${P_DENY_RULES}http_access deny deny_fqdns rsn_fqdn ctl_denylist"$'\n'
 fi
 if [ -n "$_dc" ]; then
   P_DENY_ACLS="${P_DENY_ACLS}acl deny_cidrs dst${_dc}"$'\n'
-  P_DENY_ACLS="${P_DENY_ACLS}acl inner_layer myportname${P_INNER_NAMES}"$'\n'
-  P_DENY_RULES="${P_DENY_RULES}http_access deny inner_layer deny_cidrs"$'\n'
+  # `inner_layer` is defined once, with the listener ACLs above. It used to be
+  # defined here, which was safe only while control 2 was its only consumer; the
+  # layer annotation is a second consumer and a second definition would APPEND to
+  # the first rather than replace it.
+  P_DENY_RULES="${P_DENY_RULES}http_access deny inner_layer deny_cidrs rsn_cidr ctl_denylist"$'\n'
 fi
 
 # `never_direct` on the fronted listeners. Without it a front whose peer is briefly
@@ -449,6 +644,7 @@ render() { # <template> <output>
   P_MAXCONN_RULES="$P_MAXCONN_RULES" P_FRONT_ALLOW="$P_FRONT_ALLOW" \
   P_ALLOW_RULES="$P_ALLOW_RULES" P_DELAY_POOLS="$P_DELAY_POOLS" \
   CACHE_LOG="$CACHE_LOG" AUDIT_LOG="$AUDIT_LOG" ERROR_DIR="$ERROR_DIR" \
+  AUDIT_RAW="$AUDIT_RAW" \
   DNS_NAMESERVERS="$DNS_NAMESERVERS" \
   awk '
     function emit(v) { printf "%s", ENVIRON[v]; if (ENVIRON[v] !~ /\n$/) printf "\n" }
@@ -476,6 +672,7 @@ render() { # <template> <output>
       gsub(/@REORIGIN_PORT@/, ENVIRON["REORIGIN_PORT"])
       gsub(/@CACHE_LOG@/, ENVIRON["CACHE_LOG"])
       gsub(/@AUDIT_LOG@/, ENVIRON["AUDIT_LOG"])
+      gsub(/@AUDIT_RAW@/, ENVIRON["AUDIT_RAW"])
       gsub(/@ERROR_DIR@/, ENVIRON["ERROR_DIR"])
       gsub(/@DNS_NAMESERVERS@/, ENVIRON["DNS_NAMESERVERS"])
       print
@@ -536,6 +733,15 @@ tail -n 0 -F "$AUDIT_LOG"     >&1 & CHILDREN+=($!); TAIL_AUDIT=$!
 tail -n 0 -F "$CACHE_LOG"     >&2 & CHILDREN+=($!); TAIL_CACHE=$!
 tail -n 0 -F "$DNS_AUDIT_LOG" >&1 & CHILDREN+=($!); TAIL_DNS=$!
 
+# The audit writer, started BEFORE squid. It blocks opening the FIFO until a writer
+# appears, and squid blocks opening it until a reader does -- so this order is what
+# keeps the first verdicts of the pod's life from being lost, or squid from stalling
+# at start. `policy` is the path the denial record names: the repository file an
+# operator edits and recompiles, not the image path the mediator reads.
+[ -f "$AUDIT_WRITER" ] || fail "the audit writer is missing from the image at $AUDIT_WRITER -- R9.1 makes the audit trail a property of the enforcement point, so this is a start failure rather than a degraded start"
+bash "$AUDIT_WRITER" "$POLICY_SOURCE" < "$AUDIT_RAW" >> "$AUDIT_LOG" \
+  & CHILDREN+=($!); WRITER_PID=$!
+
 unbound -d -c "$REORIGIN_CONF" & CHILDREN+=($!); UNBOUND_PID=$!
 # The re-originating resolver must be answering before the policy engine starts, or
 # dnsdist's first queries hit a backend that is not listening yet.
@@ -593,6 +799,123 @@ trap on_signal TERM INT
 note "up: squid $(squid -v 2>/dev/null | head -1 | sed 's/^Squid Cache: //'), dnsdist $(dnsdist --version 2>&1 | head -1), unbound $(unbound -V 2>/dev/null | head -1)"
 note "policy: profile '${MEDIATOR_PROFILE}', networks '${MEDIATOR_AGENT_NETWORKS}', upstream '${MEDIATOR_DNS_UPSTREAM}'"
 
+# ================================================ stage 2 of the self-check (R9.5)
+# Through the rendered proxy, never around it. Checking the policy by re-reading the
+# artifact here would test a re-implementation: a rendering bug in proxy.conf.tmpl
+# would pass while stage 1 caught nothing but malformed YAML. So both probes go
+# through the loopback shadow listener, which shares every one of the checked agent's
+# rendered rules.
+#
+# Failing here is fatal, and the failure path is not `fail()`: the daemons are
+# already running and exiting without reaping them would leave PID 1 gone and the
+# children orphaned.
+selfcheck_fatal() { # <detail token> <message>
+  audit_event "\"stage\":2,\"result\":\"fail\",\"detail\":\"$1\",\"profile\":\"${MEDIATOR_PROFILE}\""
+  note "FATAL: stage 2 self-check: $2"
+  stop_children
+  exit 1
+}
+
+if [ "$SC_OFFLINE" = "true" ]; then
+  # R9.5 is a SHOULD, which is what makes a recorded exception defensible. The skip
+  # is on the audit line at EVERY start, so a pod running without a proven
+  # enforcement path says so in its own trail rather than looking identical to one
+  # that proved it.
+  audit_event "\"stage\":2,\"result\":\"skipped\",\"reason\":\"startup_check.offline\",\"profile\":\"${MEDIATOR_PROFILE}\""
+  note "stage 2 self-check: SKIPPED -- startup_check.offline is true in ${POLICY_SOURCE}. The mediator is enforcing, but nothing has proven the path out works."
+else
+  # Wait for the shadow listener rather than assuming squid bound it. TCP table, hex,
+  # 0100007F is 127.0.0.1 little-endian -- the same read the resolver wait uses,
+  # because `ss` is not installed.
+  _sc_hex="$(printf '0100007F:%04X' "$SC_FRONT_PORT")"
+  _sc_up=0
+  for _ in $(seq 1 100); do
+    if grep -qi " ${_sc_hex} " /proc/net/tcp 2>/dev/null; then _sc_up=1; break; fi
+    kill -0 "$SQUID_PID" 2>/dev/null || selfcheck_fatal "squid_exited" "squid exited before the self-check listener bound"
+    sleep 0.1
+  done
+  [ "$_sc_up" -eq 1 ] || selfcheck_fatal "listener_absent" "the self-check listener did not bind 127.0.0.1:${SC_FRONT_PORT} within 10s"
+
+  # --- the ALLOWED destination must succeed.
+  # openssl rather than a bare CONNECT: control 1b pairs the CONNECT host with the
+  # SNI, and only a real ClientHello carries one. A bare CONNECT would be answered
+  # 200 by the front and prove nothing about the control that actually decides.
+  # This also warms the cascade, so the first agent request does not pay the peer's
+  # first-connection cost.
+  #
+  # What "succeed" means here is the TUNNEL AND THE HANDSHAKE, not a verified origin
+  # chain. The check is of the policy, not of the destination's PKI -- and SF-8
+  # Phase F aims this at a harness fixture whose certificate no store trusts.
+  #
+  # RETRIED, and the retry is the cascade-warming the feature plan's Deviation 1
+  # calls for rather than a flake-hider. Squid probes its `cache_peer` parents at
+  # start, marks them DEAD before its own inner listeners are accepting, and revives
+  # them about a second later; a fronted request arriving in that window is answered
+  # 500 with no peer to forward to. Measured at the SF-7 build: DEAD at start,
+  # REVIVED 1s later, and the probe landed between the two. The ceiling is low
+  # enough that a genuinely unreachable destination still fails the start promptly.
+  _sc_out=""
+  _sc_ok=0
+  for _ in $(seq 1 15); do
+    _sc_out="$(printf 'Q\n' | timeout 20 openssl s_client -brief \
+          -proxy "127.0.0.1:${SC_FRONT_PORT}" -servername "$SC_FQDN" \
+          -connect "${SC_FQDN}:${SC_PORT}" 2>&1 || true)"
+    if printf '%s' "$_sc_out" | grep -qE 'Ciphersuite|Protocol version|Handshake'; then
+      _sc_ok=1; break
+    fi
+    kill -0 "$SQUID_PID" 2>/dev/null || selfcheck_fatal "squid_exited" "squid exited during the self-check"
+    sleep 1
+  done
+  if [ "$_sc_ok" -eq 1 ]; then
+    note "stage 2 self-check: allowed ${SC_FQDN}:${SC_PORT} -- reached"
+  else
+    # The probe's own output, on the failure path only. Without it the operator is
+    # told the destination was unreachable and left to guess between a policy that
+    # refused it, a proxy that never answered and a pod with no path out.
+    printf '%s\n' "$_sc_out" | tail -5 | while IFS= read -r _l; do note "stage 2 probe: $_l"; done
+    selfcheck_fatal "allowed_unreachable" "the allowed destination ${SC_FQDN}:${SC_PORT} could not be reached through the mediator. Either the policy does not allow what ${POLICY_SOURCE} says it allows, or the pod has no working path out. Set startup_check.offline: true only if the second is true and intended."
+  fi
+
+  # --- the DENIED destination must fail BY POLICY, with the denial surface on it.
+  # The verdict is reached before the CONNECT is accepted, so this is also the one
+  # start-time proof that Interface Contract 6's client half renders: a 403 whose
+  # body names the destination, the control and the policy path.
+  #
+  # It is the ALLOWLIST that refuses it, not the denylist, and that is by design
+  # rather than an accident of the fixture: `dstdomain -n` plus gate-first ordering
+  # means a bare IP literal matches no allowlisted name and is refused before
+  # `deny_cidrs` -- a `dst` ACL -- can force a resolution of it. The plan's
+  # "denylist hit" reasoning predates that ordering. What is asserted is the verdict
+  # and the surface, not which control got there first.
+  _sc_resp=""
+  # The redirections are wrapped: `exec 3<> x 2>/dev/null` applies BOTH to the shell,
+  # so the `2>/dev/null` would silence the entrypoint's own stderr for the rest of the
+  # run -- every later note, including the supervisor's death diagnosis. Measured at
+  # the SF-7 build, where stage 2's own result line vanished from the log.
+  if { exec 3<>"/dev/tcp/127.0.0.1/${SC_FRONT_PORT}"; } 2>/dev/null; then
+    printf 'CONNECT %s:%s HTTP/1.1\r\nHost: %s:%s\r\n\r\n' \
+      "$SC_DENY_IP" "$SC_DENY_PORT" "$SC_DENY_IP" "$SC_DENY_PORT" >&3 2>/dev/null || true
+    _sc_resp="$(timeout 10 cat <&3 2>/dev/null || true)"
+    exec 3<&- || true
+    exec 3>&- || true
+  else
+    selfcheck_fatal "probe_connect_failed" "could not open the self-check listener at 127.0.0.1:${SC_FRONT_PORT}"
+  fi
+
+  case "$_sc_resp" in
+    *"403"*"egress denied"*)
+      note "stage 2 self-check: denied ${SC_DENY_IP}:${SC_DENY_PORT} -- refused, with the denial surface on it" ;;
+    *"403"*)
+      selfcheck_fatal "denial_surface_missing" "${SC_DENY_IP}:${SC_DENY_PORT} was refused, but the response carried no denial surface. The ERR_MEDIATOR_* pages are what R12.2 asks for; a generic Squid page names neither the destination nor the policy." ;;
+    *)
+      printf '%s\n' "$_sc_resp" | head -5 | while IFS= read -r _l; do note "stage 2 probe: $_l"; done
+      selfcheck_fatal "denied_not_refused" "${SC_DENY_IP}:${SC_DENY_PORT} was NOT refused by the mediator. The enforcement point is up and is not enforcing; refusing to serve." ;;
+  esac
+
+  audit_event "\"stage\":2,\"result\":\"pass\",\"allowed\":\"${SC_FQDN}:${SC_PORT}\",\"denied\":\"${SC_DENY_IP}:${SC_DENY_PORT}\",\"profile\":\"${MEDIATOR_PROFILE}\""
+  note "stage 2 self-check: PASS"
+fi
+
 # Six children, all watched. An unwatched relay is silent by construction: a daemon
 # keeps writing to the volume, the mediator keeps enforcing, and the container's
 # stdout -- one of D12's two sinks -- stops carrying audit lines with nothing to say
@@ -619,6 +942,7 @@ case "$DIED" in
   "$SQUID_PID")   note "squid exited (status $STATUS) -- taking the mediator down; the pod has no enforcement point" ;;
   "$DNSDIST_PID") note "dnsdist exited (status $STATUS) -- taking the mediator down; the pod has no DNS policy engine" ;;
   "$UNBOUND_PID") note "unbound exited (status $STATUS) -- taking the mediator down; the pod's resolver cannot re-originate" ;;
+  "$WRITER_PID") note "the audit writer exited (status $STATUS) -- taking the mediator down; verdicts are no longer being recorded" ;;
   "$TAIL_AUDIT"|"$TAIL_CACHE"|"$TAIL_DNS")
                   note "an audit relay exited (status $STATUS) -- taking the mediator down; stdout is no longer carrying the audit trail" ;;
   *)              note "a supervised child exited (pid ${DIED:-unknown}, status $STATUS) -- taking the mediator down" ;;

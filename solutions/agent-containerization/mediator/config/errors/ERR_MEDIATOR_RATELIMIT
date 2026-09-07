@@ -1,0 +1,7 @@
+403 egress denied
+destination: %H:%p
+control:     ratelimit (this agent's concurrent-connection ceiling is already in use)
+policy:      @POLICY_PATH@  (profile "@PROFILE@")
+remediation: raise rate_limits.<agent>.max_concurrent in profiles/@PROFILE@.yaml, then recompile
+             a ceiling reached repeatedly is a signal before it is a setting
+record:      the mediator's audit line for this attempt is the authoritative denial record
