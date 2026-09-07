@@ -79,6 +79,14 @@
     test is replaying a superseded refresh token against the operator's live account. R4.17 is
     narrowed, not closed, and SF-4 must write accepted_risk.rotation against the conservative
     reading).
+    VOLUME HAZARD, kept by operator decision. Live credentials are in sf3_claude-state and
+    sf3_codex-state ONLY. Four volumes hold SUPERSEDED refresh tokens -- sf2bd_claude-state,
+    sf2bd_codex-state, sf3-claude-pristine, sf3-codex-pristine -- and were kept as authenticated
+    sessions for testing. They are usable only until their ACCESS token lapses: codex ~2026-09-17
+    (10-day exp), claude 2026-09-08T05:03:59Z (8-hour exp). Past those edges the agent refreshes
+    with the superseded token UNATTENDED on first run, which is exactly the replay Deviation 3
+    records as untested. SF-4/SF-5 should use the sf3_* pair. sf2bd is down (no -v); sf3's mediator
+    is up.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     2026-09-04 approval). Ready to build. The plan consumed per-agent client certificates that 01.3 does not issue
