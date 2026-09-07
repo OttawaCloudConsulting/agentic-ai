@@ -465,8 +465,10 @@ Two consequences worth carrying forward:
    re-encoded with a past `exp` — leaving the original signature in place and therefore invalid —
    was accepted as parseable and drove the expiry decision. This is unsurprising for a client
    holding a bearer token it cannot validate anyway, and it is what made the measurement possible in
-   a build session rather than in ten days. It is recorded as an observation, not as a defect: the
-   tampered token is never sent anywhere, since a refresh request carries the refresh token.
+   a build session rather than in ten days. It is recorded as an observation, not as a defect: a
+   refresh request carries the refresh token, not the access token, so the tampered value should not
+   have left the container. That last clause is reasoning about the grant type, **not** an
+   observation — the audit log is tunnel-level and cannot see request bodies.
 
 **A harness note, so the next reader does not chase it.** The final `codex exec` appeared to hang
 for minutes. It was waiting on stdin EOF (`Reading additional input from stdin...`) because the
