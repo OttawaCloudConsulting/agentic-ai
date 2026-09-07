@@ -85,18 +85,18 @@ agents:
         port: 443
         upgrade: false
         source: [sbx-discovery-capture]   # single-source; matches SF-2's incidental observation
-      # OAuth authentication endpoints (01.4 SF-2). Same provisional terms as claude's above.
-      # auth.openai.com and platform.openai.com were both OBSERVED denied (control=allowlist,
-      # reason=host_not_allowlisted) during the SF-2 probe -- that establishes they are blocked,
-      # NOT that the flow needs them. The login run decides which stay.
+      # OAuth device-code endpoint (01.4 SF-2). MEASURED, not assumed: the completed
+      # `codex login --device-auth` drove four sessions through this host (largest 15548 in /
+      # 3132 out), and the device page the operator opens is auth.openai.com/codex/device.
       - fqdn: auth.openai.com
         port: 443
         upgrade: false
-        source: [oauth-flow-candidate, mediator-audit-denial]
-      - fqdn: platform.openai.com
-        port: 443
-        upgrade: false
-        source: [oauth-flow-candidate, mediator-audit-denial]
+        source: [mediator-audit-denial, oauth-flow-measured]
+#
+#     REMOVED at the SF-2 login run: platform.openai.com. It was added as a candidate on the
+#     strength of a probe denial, which establishes only that it was BLOCKED. The completed
+#     device-code login produced no audit line for it at all -- it was never contacted. Same
+#     disposition, and same reasoning, as claude.ai and console.anthropic.com above.
     allow_cidrs: []
 
   # agy -- no real pin (SF-2: installer always fetches the live manifest); this run observed

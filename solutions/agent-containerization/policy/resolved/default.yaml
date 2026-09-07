@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check
 schema: 1
 profile: default
-compiled_at: 2026-09-07T21:05:57Z
+compiled_at: 2026-09-07T21:16:41Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
@@ -32,7 +32,6 @@ agents:
       - {fqdn: api.github.com, port: 443, upgrade: false}
       - {fqdn: github.com, port: 443, upgrade: false}
       - {fqdn: auth.openai.com, port: 443, upgrade: false}
-      - {fqdn: platform.openai.com, port: 443, upgrade: false}
     allow_cidrs: []
     limits: {max_concurrent: 16, bytes_per_second: 2000000}
   agy:

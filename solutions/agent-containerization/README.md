@@ -122,7 +122,7 @@ Seven cells are supported, and the agents are **not** symmetric:
 | Agent | `apikey` | `oauth-interactive` | `oauth-token` | `oauth-mount` |
 |---|---|---|---|---|
 | `claude` | `ANTHROPIC_API_KEY` | **default** — paste-back | `CLAUDE_CODE_OAUTH_TOKEN` (one-year) | unsupported (Keychain-resident) |
-| `codex` | `OPENAI_API_KEY` | **default** — paste-back | unsupported (no env equivalent) | `auth.json` copy-in |
+| `codex` | `OPENAI_API_KEY` | **default** — device code | unsupported (no env equivalent) | `auth.json` copy-in |
 | `agy` | **default** — `GEMINI_API_KEY` | not offered (D9) | unsupported | not offered (D9) |
 
 An unsupported cell **exits 2 and names the supported set**. It never quietly falls back to a
@@ -140,6 +140,17 @@ docker compose --env-file compose/pins.env \
 Open the printed URL **on the host** and paste the code back. Exit codes: `0` authenticated (or
 already was — re-running is a no-op), `2` unsupported cell or unset `AUTH_MODE`, `3` credential
 absent, `4` a provider endpoint the mediator refuses — the message names the FQDN.
+
+**Codex uses device code, and must.** `bootstrap-auth` runs `codex login --device-auth`. Plain
+`codex login` starts a callback server on `localhost:1455` *inside* the container and hands your
+browser `redirect_uri=http://localhost:1455/auth/callback` — but your browser is on the host, where
+nothing is listening: the pod publishes no ports and the agent networks are `internal: true`. The
+provider authorizes and the flow then strands on a callback that can never arrive. Device code
+needs no port at all, and is one of the three paths R4.9 counts as headless.
+
+The **callback forward** is the documented alternative for operators who want it: publish
+`127.0.0.1:1455:1455` (fallback 1457) via a layerable fragment. It is not the default — opening a
+host port the headless path does not need is the wrong default under R2.8.
 
 **On exit 4:** the OAuth endpoints must be in the allowlist, and an allowlist edit is **inert until
 the policy is recompiled and the mediator image rebuilt** — the mediator reads its policy from its

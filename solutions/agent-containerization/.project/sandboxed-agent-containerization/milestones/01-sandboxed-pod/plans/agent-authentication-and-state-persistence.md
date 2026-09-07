@@ -236,7 +236,7 @@ per agent, not both.
   volume-exclusivity assertion (R4.7, R8.7, D7); and extends 01.2's mount-set equality assertion for
   the two optional mounts this feature introduces. Depends on 01.2 only.
 
-- [ ] **SF-2: `AUTH_MODE` dispatcher, the three host-credential-free modes, and the OAuth allowlist
+- [x] **SF-2: `AUTH_MODE` dispatcher, the three host-credential-free modes, and the OAuth allowlist
   entries** — `images/agent-base/bootstrap-auth.sh` implementing the Interface Contract 1 matrix for
   `apikey`, `oauth-interactive` and `oauth-token`, with per-agent defaults, headless paste-back,
   fail-closed exits and the allowlist precondition check. Observes each provider's authentication

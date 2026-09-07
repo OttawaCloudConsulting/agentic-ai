@@ -335,9 +335,39 @@ bypass rule, and which 01.1 deliberately excluded for want of real evidence (see
 this run supplies the missing evidence for exactly one of them: `platform.claude.com` is required,
 `downloads.claude.ai` is not. The other four remain unevidenced and stay out.
 
-### codex 0.152.1 — pending
+### codex 0.152.1 — measured
 
-Not yet run. `auth.openai.com` and `platform.openai.com` are currently in the allowlist as
-`oauth-flow-candidate` on the strength of a probe denial only, which — per the method note above —
-is evidence that they are blocked, not that the flow needs them. They are subject to the same trim
-as `claude.ai` was: whichever the completed `codex login` does not touch must be removed.
+Run as `codex login --device-auth`, which completed and reported `Successfully logged in`.
+
+| FQDN | Verdict | Evidence | Disposition |
+|---|---|---|---|
+| `auth.openai.com` | allow | Four sessions, largest 15548 in / 3132 out. The device page the operator opens is `auth.openai.com/codex/device` | **Added.** Required for the device-code flow |
+| `chatgpt.com` | allow | 14505 in / 773 out | Already allowlisted since 01.1 |
+| `api.openai.com` | allow | 4144 in / 775 out | Already allowlisted since 01.1 |
+| `platform.openai.com` | — | **No audit line at all** during the completed login | **Removed.** Candidate guess; never contacted |
+
+**Attribution caveat, stated rather than glossed.** The precondition probe names all three of
+`auth.openai.com`, `chatgpt.com` and `api.openai.com`, so the smaller `chatgpt.com` and
+`api.openai.com` sessions above cannot be cleanly separated from probe traffic. No decision rests
+on it — both were independently evidenced by 01.1's discovery capture and neither is added or
+removed here — but the byte counts for those two rows should not be read as flow-only measurements.
+`auth.openai.com`'s four sessions are unambiguous: the probe issues one request, not four.
+
+### The callback-forward path, and why it is not the default
+
+`codex login` **without** `--device-auth` cannot work in this pod, and the failure is structural
+rather than a misconfiguration. It starts a callback server on `localhost:1455` *inside* the
+container and hands the browser `redirect_uri=http://localhost:1455/auth/callback`. The operator's
+browser runs on the host, where nothing is listening: the pod publishes no ports (R2.8 default-off)
+and the agent networks are `internal: true`. Observed — the provider side authorized and the
+browser then reported `Unable to connect to localhost:1455`, while the CLI printed *"On a remote or
+headless machine? Use `codex login --device-auth` instead."*
+
+Device code is one of the three paths R4.9 enumerates as headless and needs no published port, so
+it is the default. The callback forward (`127.0.0.1:1455:1455`, fallback 1457) remains documented
+and ships as a layerable fragment for operators who want it; opening a host port the headless path
+does not need is the wrong default under R2.8.
+
+**This is the cell that caught the bug.** The `claude` cell passed while the dispatcher carried the
+same class of error, because Claude Code's paste-back needs no callback port. Only running the
+codex cell exposed it.
