@@ -44,15 +44,21 @@ agents:
       - fqdn: platform.claude.com
         port: 443
         upgrade: false
-        source: [agent-error-message, mediator-audit-denial]
-      - fqdn: claude.ai
-        port: 443
-        upgrade: false
-        source: [oauth-flow-candidate]    # NOT yet observed carrying flow traffic -- see note below
-      - fqdn: console.anthropic.com
-        port: 443
-        upgrade: false
-        source: [oauth-flow-candidate]    # NOT yet observed carrying flow traffic -- see note below
+        source: [agent-error-message, mediator-audit-denial, oauth-flow-measured]
+#
+#     REMOVED at the SF-2 login run, and the removal is the point. claude.ai and
+#     console.anthropic.com were added here as CANDIDATES so the flow could start; the completed
+#     login produced NO audit line for either. They were never contacted. Keeping a host that a
+#     real flow never touched, on the strength of it sounding like an authentication endpoint, is
+#     precisely the "vendor reference allowlist copied verbatim" R5.8 and D17 forbid -- and this
+#     file's own header says provisional must never be read as safe to promote.
+#
+#     NOT ADDED, deliberately: mcp-proxy.anthropic.com (6 attempts) and downloads.claude.ai (1)
+#     were both attempted during the flow and both DENIED -- and the login SUCCEEDED anyway.
+#     Attempted is not required. downloads.claude.ai is an update path and R10.3 makes disabling
+#     those a MUST; mcp-proxy.anthropic.com is an MCP transport with no part in authentication.
+#     Allowing either would widen the boundary to reach traffic the agent demonstrably does not
+#     need to authenticate. See docs/records/agent-verification.md.
     allow_cidrs: []        # R7.3/R7.4 -- shape must compose with CIDR-bearing packs
 
   # codex 0.152.1 (SF-2 pin). Genuine deny-all discovery -- no kit bypass observed for this

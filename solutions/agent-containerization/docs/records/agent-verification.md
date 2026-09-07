@@ -295,3 +295,49 @@ closed (non-zero exit) on anything other than `success`/`ok`/`completed`. The ex
 the values `agy` actually emits for a genuine tool denial have not been observed — 01.2 has no
 egress and no credentials wired (01.4). Confirm against a live, authenticated run before relying on
 this in production.
+
+## OAuth authentication endpoints — 01.4 SF-2 (R5.8, D17)
+
+**Method.** The `oauth-interactive` login was run against the live pod under the default profile,
+with the mediator enforcing the resolved policy. Per R5.8 the flow itself is the observation: no
+endpoint below comes from a vendor reference page. Cross-validation per D17 is the agent's own
+error output against the mediator's independent audit line for the same attempt.
+
+**A note on method that cost a correction.** `bootstrap-auth.sh`'s exit-4 precondition check is
+*itself traffic*. Every host it probes produces an `allow` audit line whether or not the login ever
+touches that host, and such a line is indistinguishable from evidence that the flow required it.
+The first pass probed `claude.ai` and `console.anthropic.com`, logged `allow` for both, and would
+have "corroborated" two hosts the flow never contacted. The probe list is now restricted to
+endpoints already known to be required, and the corroboration below comes from measured byte
+counts, not from the probe's own reachability test.
+
+### claude 2.1.260 — measured
+
+| FQDN | Verdict | Evidence | Disposition |
+|---|---|---|---|
+| `platform.claude.com` | allow | Two sessions carrying 6729/2138 and 6078/1778 bytes. Before allowlisting, Claude Code failed startup with `Failed to connect to platform.claude.com: Status 403` while the mediator logged `control=allowlist, reason=host_not_allowlisted` for the same attempt | **Added.** Required — startup fails closed without it |
+| `api.anthropic.com` | allow | Multiple sessions, largest 8522 in / 46307 out | Already allowlisted since 01.1 |
+| `claude.ai` | — | **No audit line at all** during the completed login | **Removed.** Candidate guess; never contacted |
+| `console.anthropic.com` | — | **No audit line at all** during the completed login | **Removed.** Candidate guess; never contacted |
+| `mcp-proxy.anthropic.com` | deny | 6 attempts, all `host_not_allowlisted`. **The login completed successfully regardless** | **Not added.** MCP transport, no part in authentication |
+| `downloads.claude.ai` | deny | 1 attempt, `host_not_allowlisted`. **The login completed successfully regardless** | **Not added.** Update path; R10.3 makes disabling auto-updaters a MUST |
+
+**Attempted is not required.** Two hosts were contacted during the flow and refused, and the
+authentication still succeeded end to end. Adding a host because the agent reached for it would
+widen the boundary to cover traffic the agent demonstrably does not need in order to authenticate.
+Both stay denied, with the attempt counts recorded here so a future reader sees the decision rather
+than an omission.
+
+**Note on 01.1's kit-bypass finding.** `platform.claude.com` and `downloads.claude.ai` are two of
+the six Anthropic-family hosts that 01.1's sbx capture saw only through the kit's non-removable
+bypass rule, and which 01.1 deliberately excluded for want of real evidence (see
+`docs/records/egress-discovery.md`). That exclusion was correct on the evidence then available, and
+this run supplies the missing evidence for exactly one of them: `platform.claude.com` is required,
+`downloads.claude.ai` is not. The other four remain unevidenced and stay out.
+
+### codex 0.152.1 — pending
+
+Not yet run. `auth.openai.com` and `platform.openai.com` are currently in the allowlist as
+`oauth-flow-candidate` on the strength of a probe denial only, which — per the method note above —
+is evidence that they are blocked, not that the flow needs them. They are subject to the same trim
+as `claude.ai` was: whichever the completed `codex login` does not touch must be removed.
