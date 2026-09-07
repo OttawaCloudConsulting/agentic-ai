@@ -316,9 +316,16 @@ fi
 # proxy-hop TLS verification error at the agent -- and the tempting repair for that
 # is disabling verification, which gives up the server authentication the TLS hop
 # exists for. Asserted here so drift is caught before bring-up, not diagnosed from
-# a handshake failure. codex has no certificate by design and is skipped.
+# a handshake failure.
+#
+# codex is included, and it was NOT before 01.3 SF-6. Its certificate is a BUMPING
+# certificate rather than a proxy hop -- its listener peeks the ClientHello and Squid
+# silently stops peeking without one (feature plan Deviation 5) -- but it carries the
+# same iPAddress SAN and therefore the same coupling to the ipam block. A renumber
+# that missed it would leave the mediator refusing to start, so it is guarded here
+# with the other two rather than left as the one certificate nothing checks.
 san_ok=1
-for a in claude agy; do
+for a in claude codex agy; do
   crt="mediator/identity/listeners/${a}-listener.crt"
   want="$("${COMPOSE_A[@]}" config --format json \
     | jq -r --arg a "${a}-net" '.services["egress-mediator"].networks[$a].ipv4_address')"
