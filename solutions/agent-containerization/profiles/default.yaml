@@ -49,15 +49,19 @@ listeners:
 # could inform them and it was taken under `sbx` with UDP and ICMP invisible to the capture.
 # Adjustable at build time under DD-12 without gate re-approval.
 #
-# `connections_per_minute` is declared here but has NO native mechanism in the proxy selected at
-# 01.3 SF-1 (docs/records/mediator-selection.md, P3): `maxconn` bounds concurrency and
-# `delay_pools` bounds bytes, and Squid 6.13 has no per-client connection-rate directive. SF-6
-# must either implement it with an external_acl_type helper or drop the field -- shipping a
-# policy key that silently enforces nothing is the one option ruled out.
+# `connections_per_minute` was DROPPED at the 01.3 SF-6 build, not omitted by oversight. Squid
+# 6.13 has no per-client connection-rate directive at all (docs/records/mediator-selection.md,
+# P3): `maxconn` bounds concurrency and `delay_pools` bounds bytes, and neither bounds
+# connections per unit time. The two options were an external_acl_type token-bucket helper --
+# a stateful interpreter process inside the enforcement point -- or dropping the field. The
+# field was dropped, because a policy key that silently enforces nothing is worse than an
+# absent one, and it is the same failure shape as the SNI fallback SF-1 found. The compiler
+# now REFUSES an artifact that declares it. D5's control 3 therefore ships as two of its three
+# ceilings; the gap is recorded in the feature plan (Deviation 4) as a residual against D5.
 rate_limits:
-  claude: {max_concurrent: 16, connections_per_minute: 120, bytes_per_second: 2000000}
-  codex:  {max_concurrent: 16, connections_per_minute: 120, bytes_per_second: 2000000}
-  agy:    {max_concurrent: 16, connections_per_minute: 120, bytes_per_second: 2000000}
+  claude: {max_concurrent: 16, bytes_per_second: 2000000}
+  codex:  {max_concurrent: 16, bytes_per_second: 2000000}
+  agy:    {max_concurrent: 16, bytes_per_second: 2000000}
 
 # Entries present in policy/allowlist.base.yaml that this profile deliberately does NOT grant.
 # The compiler drops them from the resolved allowlist and copies the reason into the artifact,

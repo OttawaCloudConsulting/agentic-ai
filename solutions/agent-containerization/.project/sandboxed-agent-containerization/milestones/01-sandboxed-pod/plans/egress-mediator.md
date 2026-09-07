@@ -1313,3 +1313,54 @@ anywhere in the repository. Shell scripts follow `#!/usr/bin/env bash`, `set -eu
   than the blocked destination, so agent-side diagnosis of *which* destination was refused is not
   possible without the operator reading the audit log. **Direction on the criterion-5 amendment was
   referred to an external review at the operator's instruction; it is not resolved by this record.**
+
+### Deviation 4: `connections_per_minute` dropped from the resolved-policy schema
+- **What changed:** D5's control 3 ships as **two** ceilings, not three. `max_concurrent`
+  (Squid `maxconn`, front layer) and `bytes_per_second` (`delay_pools`, inner layer) are enforced;
+  `connections_per_minute` is removed from `profiles/default.yaml`, from
+  `scripts/compile-policy.sh` and from `policy/resolved/default.yaml`. The compiler now **refuses**
+  an artifact that still declares it, so the field cannot quietly return as an unenforced key.
+- **Originally planned:** Interface Contract 1 carries
+  `limits: {max_concurrent, connections_per_minute, bytes_per_second}` on every agent, and
+  acceptance criterion 2 names "per-agent ceilings on **concurrent connections, connection rate and
+  byte rate**".
+- **Why necessary:** SF-1 found Squid 6.13 has no per-client connection-rate directive at all
+  (`docs/records/mediator-selection.md`, P3). The plan's own Edge Cases entry hands SF-6 the choice
+  and rules out exactly one option — "shipping the field while enforcing nothing". The alternative
+  was an `external_acl_type` token-bucket helper, which puts a stateful long-lived interpreter
+  process inside the enforcement point (the objection that kept Debian's Python `yq` out of this
+  image), needs its ACL result cache disabled to be consulted per connection rather than per key,
+  and would have to sit on the front layer only or double-count under the cascade. Operator
+  decision at the SF-6 build, with both options and their costs put alongside each other.
+- **Impact:** Interface Contract 1's `limits` shape changes and 01.5 must emit the two-field form.
+  Control 3 is now explicitly two of D5's three ceilings — a residual against D5's stated rationale
+  that **compounds** the one the plan already records: under D4's splice the mediator counts
+  connections and bytes, never requests, so `bytes_per_second` remains the only ceiling that tracks
+  request volume at all. SF-8 Phase C asserts the two ceilings that exist and must not assert a
+  connection-rate ceiling. Closing the gap later means either the helper or an implementation
+  change, and it is a `/milestone` question, not a tuning one.
+
+### Deviation 5: `codex`'s listener carries a bumping certificate
+- **What changed:** `codex-net`'s single `http_port ... ssl-bump` listener is rendered with
+  `tls-cert=/run/secrets/codex-listener.crt tls-key=...`. A sixth Compose secret is added,
+  `scripts/issue-identity.sh` gains a codex path, and the certificate is issued with an `iPAddress`
+  SAN for `172.31.20.2` like the other two.
+- **Originally planned:** Interface Contract 3's table: "`codex-net` listener — **No certificate** —
+  plain HTTP CONNECT", and criterion 9's "the mediator's **two** listener key pairs — `claude-net`
+  and `agy-net`; `codex-net` has no TLS hop and needs none". `scripts/issue-identity.sh` was written
+  to hard-refuse `listener codex` on exactly that reasoning.
+- **Why necessary:** Verified behaviourally on the shipped image at the SF-6 build, not inferred.
+  A `ssl-bump` listener without `tls-cert=` **parses cleanly** and then silently declines to bump:
+  `Will not bump SSL at http_port 0.0.0.0:3128 due to TLS initialization failure`. With peek
+  disabled the SNI is never observed (`sni="-"` on every line) and even an allowlisted request
+  fails — `curl: (56) CONNECT tunnel failed, response 503`. The certificate is Squid's **bumping**
+  context, which the peek stage needs in order to exist at all; it is not a proxy hop.
+- **Impact:** Interface Contract 3 and criterion 9 both need the correction — the mediator holds
+  **three** listener key pairs, not two, and Compose carries six secrets rather than five. What does
+  **not** change is the property those statements exist to protect: `codex` opens no TLS to the
+  mediator, receives no CA certificate, trusts and validates nothing the mediator presents, and the
+  bumping certificate is never presented on an allowed path because peek+splice hands the origin's
+  own chain through untouched. Criterion 5 and the amended T28 are untouched. SF-8 Phase A's
+  "no private key material in any image layer" assertion covers one more secret; Phase B's
+  "`codex-net` listener does not speak TLS" assertion is unaffected and remains the one that would
+  catch this being mistaken for a hop. 01.6 inherits a third listener certificate in the lifecycle.

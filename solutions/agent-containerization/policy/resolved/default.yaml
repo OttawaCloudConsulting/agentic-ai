@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check
 schema: 1
 profile: default
-compiled_at: 2026-09-06T15:35:05Z
+compiled_at: 2026-09-07T14:21:22Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
@@ -20,7 +20,7 @@ agents:
     allow_fqdns:
       - {fqdn: api.anthropic.com, port: 443, upgrade: false}
     allow_cidrs: []
-    limits: {max_concurrent: 16, connections_per_minute: 120, bytes_per_second: 2000000}
+    limits: {max_concurrent: 16, bytes_per_second: 2000000}
   codex:
     identity: codex
     listener_port: 3128
@@ -31,7 +31,7 @@ agents:
       - {fqdn: api.github.com, port: 443, upgrade: false}
       - {fqdn: github.com, port: 443, upgrade: false}
     allow_cidrs: []
-    limits: {max_concurrent: 16, connections_per_minute: 120, bytes_per_second: 2000000}
+    limits: {max_concurrent: 16, bytes_per_second: 2000000}
   agy:
     identity: agy
     listener_port: 3128
@@ -43,7 +43,7 @@ agents:
       - {fqdn: playwright-akamai.azureedge.net, port: 443, upgrade: false}
       - {fqdn: playwright-verizon.azureedge.net, port: 443, upgrade: false}
     allow_cidrs: []
-    limits: {max_concurrent: 16, connections_per_minute: 120, bytes_per_second: 2000000}
+    limits: {max_concurrent: 16, bytes_per_second: 2000000}
 
 deny_cidrs:
   - 169.254.0.0/16

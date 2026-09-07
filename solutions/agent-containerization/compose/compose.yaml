@@ -57,7 +57,15 @@ volumes:
 #
 #   bash scripts/issue-identity.sh ca
 #   bash scripts/issue-identity.sh listener claude --ip 172.31.10.2
+#   bash scripts/issue-identity.sh listener codex  --ip 172.31.20.2
 #   bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2
+#
+# The codex pair is a BUMPING certificate, not a proxy hop, and the distinction is
+# the whole reason it is called out here. codex opens no TLS to the mediator and
+# gets no CA certificate; its listener nonetheless PEEKS the ClientHello, and
+# Squid's peek stage silently declines to run without a signing certificate --
+# verified at 01.3 SF-6, feature plan Deviation 5. It is never presented on an
+# allowed path, because peek+splice hands the origin's own chain through untouched.
 secrets:
   mediator-ca.crt:
     file: ../mediator/identity/ca/mediator-ca.crt
@@ -65,6 +73,10 @@ secrets:
     file: ../mediator/identity/listeners/claude-listener.crt
   claude-listener.key:
     file: ../mediator/identity/listeners/claude-listener.key
+  codex-listener.crt:
+    file: ../mediator/identity/listeners/codex-listener.crt
+  codex-listener.key:
+    file: ../mediator/identity/listeners/codex-listener.key
   agy-listener.crt:
     file: ../mediator/identity/listeners/agy-listener.crt
   agy-listener.key:
@@ -165,6 +177,8 @@ services:
       - mediator-ca.crt
       - claude-listener.crt
       - claude-listener.key
+      - codex-listener.crt
+      - codex-listener.key
       - agy-listener.crt
       - agy-listener.key
 

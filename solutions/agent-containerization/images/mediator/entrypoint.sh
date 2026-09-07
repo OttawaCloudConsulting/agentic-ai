@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Mediator entrypoint (01.3, SF-4 + SF-5).
+# Mediator entrypoint (01.3, SF-4 + SF-5 + SF-6).
 #
-# SF-4 brought the container up hardened and holding. SF-5 replaces the holding
-# resolver with the real one: the pod's DNS authority, RENDERED from the resolved
-# policy artifact so the configuration is generated and never hand-edited (SC-6).
+# SF-4 brought the container up hardened and holding. SF-5 replaced the holding
+# resolver with the pod's real DNS authority. SF-6 replaces the holding proxy with
+# the real enforcement point. Both are RENDERED from the resolved policy artifact,
+# so the mediator's configuration is generated and never hand-edited (SC-6), and
+# both are rendered in ONE pass over ONE agent list -- the proxy and the resolver
+# must allow exactly the same names, and a second pass is a second chance for them
+# to disagree.
 #
 # What runs here now:
 #
@@ -14,13 +18,14 @@
 #   * unbound  -- the re-originating resolver, on loopback. No policy. It exists
 #                 because dnsdist proxies the client's packet and criterion 4
 #                 requires a fresh query with the client's EDNS options dropped.
-#   * squid    -- STILL HOLDING. Loopback only, `http_access deny all`. SF-6 owns
-#                 the three agent-facing listeners and renders the real one from
-#                 mediator/config/proxy.conf.tmpl.
+#   * squid    -- the L7 CONNECT/SNI policy engine. Five listeners for three agents
+#                 (the self-cascade -- see mediator/config/proxy.conf.tmpl), the
+#                 three controls of D5 evaluated in order, and CONNECT-only.
 #
-# The two-daemon resolver is a verified necessity rather than a preference; the
-# evidence, including what each stage fails to do alone, is in
-# docs/records/resolver-verification.md.
+# The two-daemon resolver and the five-listener proxy are both verified necessities
+# rather than preferences; the evidence, including what each stage fails to do
+# alone, is in docs/records/resolver-verification.md and
+# docs/records/mediator-selection.md.
 set -euo pipefail
 
 RUN_DIR=/run/mediator
@@ -134,6 +139,29 @@ AGENT_NAMESETS=""
 AGENT_ALLOW_RULES=""
 ALLOW_RULE_NAMES=""
 
+# --- the proxy's half, accumulated in the SAME pass over the same agent list.
+# One loop rather than two because the resolver and the proxy must allow exactly
+# the same set of names: a second pass over the same artifact is a second chance
+# for the two enforcement surfaces to disagree about what is allowed, and that
+# disagreement is invisible until an operator hits it.
+P_LISTENERS=""
+P_LISTENER_ACLS=""
+P_IDENTITY_RULES=""
+P_PEERS=""
+P_AGENT_ACLS=""
+P_GATE_RULES=""
+P_DENY_RULES=""
+P_MAXCONN_RULES=""
+P_ALLOW_RULES=""
+P_DELAY_POOLS=""
+P_FRONT_ALLOW=""
+P_FRONTED=""          # port names of the TLS front listeners, for `never_direct`
+P_INNER_NAMES=""      # port names of every peeking listener -- where deny_cidrs runs
+P_DELAY_N=0
+# Loopback ports for the inner (peeking) listeners of the TLS-fronted agents. They
+# all share 127.0.0.1, so unlike the front listeners they cannot share a port.
+P_INNER_PORT=3200
+
 IFS=',' read -r -a _agent_specs <<< "$MEDIATOR_AGENT_NETWORKS"
 for spec in "${_agent_specs[@]}"; do
   agent="${spec%%=*}"
@@ -171,14 +199,99 @@ for spec in "${_agent_specs[@]}"; do
   LISTENERS="${LISTENERS}addLocal(\"${addr}:53\")   -- ${agent}"$'\n'
   AGENT_NETS="${AGENT_NETS}AGENT_NETS[\"${agent}\"] = newNMG(); AGENT_NETS[\"${agent}\"]:addMask(\"${network}\")"$'\n'
 
+  # ------------------------------------------------------------ proxy listeners
+  # Which transport this agent's hop uses. Not a preference: 01.1 SF-2 established
+  # that `codex` rejects an `https://`-scheme proxy URL at URL-PARSE time, before
+  # any handshake, while `claude` and `agy` both reach an `https://` listener. The
+  # artifact carries `scheme` and `tls` as two spellings of one fact and the
+  # compiler already refuses them if they disagree; `tls` is read here.
+  ltls="$(yq eval ".agents.${agent}.listener.tls" "$RESOLVED_POLICY")"
+  lport="$(yq eval ".agents.${agent}.listener.port // .agents.${agent}.listener_port" "$RESOLVED_POLICY")"
+  [[ "$lport" =~ ^[0-9]+$ ]] && [ "$lport" -ge 1 ] && [ "$lport" -le 65535 ] \
+    || fail "$RESOLVED_POLICY: agents.${agent} has no usable listener port (found '$lport')"
+
+  # A CIDR allow entry cannot be paired with an SNI check -- there is no name to
+  # compare the ClientHello against -- so honouring one would punch a hole straight
+  # through control 1b for that agent. The field is empty in every shipped profile;
+  # 01.5 composes pack-supplied entries into the same artifact, which is why this
+  # refuses at the boundary instead of trusting the producer.
+  ncidr="$(yq eval ".agents.${agent}.allow_cidrs | length" "$RESOLVED_POLICY")"
+  [ "$ncidr" = "0" ] \
+    || fail "$RESOLVED_POLICY: agents.${agent}.allow_cidrs has ${ncidr} entr(y|ies). SF-6 implements hostname allowlisting only: a CIDR allow has no name for the SNI equality control (control 1b) to compare against, so honouring it would bypass that control silently. Express the destination as an allow_fqdns entry, or extend this render deliberately."
+
+  # `max_concurrent` is control 3's concurrency ceiling; `bytes_per_second` is its
+  # byte-rate ceiling. `connections_per_minute` is deliberately absent from the
+  # schema -- Squid 6.13 has no per-client connection-rate directive at all
+  # (docs/records/mediator-selection.md, P3) and a policy key that enforces nothing
+  # is worse than an absent one. Recorded as a deviation on the feature plan.
+  maxconn="$(yq eval ".agents.${agent}.limits.max_concurrent" "$RESOLVED_POLICY")"
+  bps="$(yq eval ".agents.${agent}.limits.bytes_per_second" "$RESOLVED_POLICY")"
+  [[ "$maxconn" =~ ^[0-9]+$ ]] && [[ "$bps" =~ ^[0-9]+$ ]] \
+    || fail "$RESOLVED_POLICY: agents.${agent}.limits must carry integer max_concurrent and bytes_per_second (found '$maxconn' and '$bps')"
+
+  if [ "$ltls" = "true" ]; then
+    # Two listeners. The front terminates the proxy hop and can never peek
+    # (`https_port` refuses `ssl-bump`); the inner peeks and can never terminate a
+    # proxy hop. SF-1's P6/P7.
+    inner="$P_INNER_PORT"
+    P_INNER_PORT=$(( P_INNER_PORT + 1 ))
+    crt="/run/secrets/${agent}-listener.crt"
+    key="/run/secrets/${agent}-listener.key"
+    [ -r "$crt" ] && [ -r "$key" ] \
+      || fail "agent '${agent}' has a TLS proxy hop but $crt / $key is not readable. The listener key pair arrives as a Compose secret (compose.yaml) and is issued by scripts/issue-identity.sh with an iPAddress SAN for ${addr}."
+    P_LISTENERS="${P_LISTENERS}https_port ${addr}:${lport} name=${agent} tls-cert=${crt} tls-key=${key}"$'\n'
+    P_LISTENERS="${P_LISTENERS}http_port 127.0.0.1:${inner} name=${agent}in ssl-bump generate-host-certificates=off tls-cert=${crt} tls-key=${key}"$'\n'
+    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_front myportname ${agent}"$'\n'
+    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_inner myportname ${agent}in"$'\n'
+    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}       myportname ${agent} ${agent}in"$'\n'
+    P_PEERS="${P_PEERS}cache_peer 127.0.0.1 parent ${inner} 0 no-query no-digest no-netdb-exchange name=${agent}peer"$'\n'
+    P_PEERS="${P_PEERS}cache_peer_access ${agent}peer allow p_${agent}_front"$'\n'
+    P_PEERS="${P_PEERS}cache_peer_access ${agent}peer deny all"$'\n'
+    P_FRONTED="${P_FRONTED} ${agent}"
+    P_INNER_NAMES="${P_INNER_NAMES} ${agent}in"
+  else
+    # One listener doing both jobs. `codex`'s hop is plain HTTP CONNECT, so there
+    # is no proxy-hop TLS to terminate and the single port can carry `ssl-bump`.
+    #
+    # It still needs a `tls-cert=`, and that is a Squid requirement rather than a
+    # hop: without one the port loads no signing certificate and Squid reports
+    # "Requiring client certificates". The certificate is never presented on an
+    # allowed path -- peek+splice hands the origin's own chain through untouched --
+    # and `codex` neither trusts nor validates it. Recorded as a deviation against
+    # Interface Contract 3, which says codex's listener gets no certificate.
+    crt="/run/secrets/${agent}-listener.crt"
+    key="/run/secrets/${agent}-listener.key"
+    [ -r "$crt" ] && [ -r "$key" ] \
+      || fail "agent '${agent}' has a plain-HTTP proxy hop but still needs a BUMPING certificate at $crt / $key for its peek stage -- without one Squid loads no signing certificate on that port. It is never presented on an allowed path and ${agent} never validates it. Issue it with: bash scripts/issue-identity.sh listener ${agent} --ip ${addr}"
+    P_LISTENERS="${P_LISTENERS}http_port ${addr}:${lport} name=${agent} ssl-bump generate-host-certificates=off tls-cert=${crt} tls-key=${key}"$'\n'
+    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_front myportname ${agent}"$'\n'
+    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}_inner myportname ${agent}"$'\n'
+    P_LISTENER_ACLS="${P_LISTENER_ACLS}acl p_${agent}       myportname ${agent}"$'\n'
+    P_INNER_NAMES="${P_INNER_NAMES} ${agent}"
+  fi
+
+  P_IDENTITY_RULES="${P_IDENTITY_RULES}acl tag_${agent} annotate_transaction agent=${agent}"$'\n'
+  P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent} tag_${agent} !all"$'\n'
+
+  P_DELAY_N=$(( P_DELAY_N + 1 ))
+  P_DELAY_POOLS="${P_DELAY_POOLS}delay_class ${P_DELAY_N} 1"$'\n'
+  P_DELAY_POOLS="${P_DELAY_POOLS}delay_parameters ${P_DELAY_N} ${bps}/${bps}"$'\n'
+  P_DELAY_POOLS="${P_DELAY_POOLS}delay_access ${P_DELAY_N} allow p_${agent}_inner"$'\n'
+  P_DELAY_POOLS="${P_DELAY_POOLS}delay_access ${P_DELAY_N} deny all"$'\n'
+
+  P_MAXCONN_RULES="${P_MAXCONN_RULES}acl maxconn_${agent} maxconn ${maxconn}"$'\n'
+  P_MAXCONN_RULES="${P_MAXCONN_RULES}http_access deny p_${agent}_front maxconn_${agent}"$'\n'
+
   # Exact names only. The compiler already refuses a wildcard entry at compile time
   # (scripts/compile-policy.sh) because the resolver matches exactly and a wildcard
   # would reopen DNS exfiltration; this stage is what makes that refusal meaningful.
-  names="$(yq eval ".agents.${agent}.allow_fqdns[].fqdn" "$RESOLVED_POLICY" 2>/dev/null || true)"
+  names="$(yq eval ".agents.${agent}.allow_fqdns[] | .fqdn + \" \" + (.port | tostring)" "$RESOLVED_POLICY" 2>/dev/null || true)"
 
   set_lua="NAMES_${agent} = newDNSNameSet()"$'\n'
+  agent_hosts=""
+  agent_ports=""
   count=0
-  while IFS= read -r fqdn; do
+  while IFS=' ' read -r fqdn fport; do
     [ -n "$fqdn" ] && [ "$fqdn" != "null" ] || continue
     case "$fqdn" in
       *'*'*) fail "$RESOLVED_POLICY: agents.${agent} allows the wildcard '$fqdn'. The resolver matches exactly; a wildcard here would forward every name beneath it (R5.4)." ;;
@@ -191,16 +304,52 @@ for spec in "${_agent_specs[@]}"; do
     # with capitals cannot produce an entry no canonical query can ever match.
     lower="$(printf '%s' "$fqdn" | tr '[:upper:]' '[:lower:]')"
     set_lua="${set_lua}NAMES_${agent}:add(newDNSName(\"${lower}.\"))"$'\n'
+
+    # The destination port is about to become squid.conf source in exactly the way
+    # the name is, and it is validated at the same boundary and for the same reason.
+    [[ "$fport" =~ ^[0-9]+$ ]] && [ "$fport" -ge 1 ] && [ "$fport" -le 65535 ] \
+      || fail "$RESOLVED_POLICY: agents.${agent} allows '${fqdn}' on port '${fport}', which is not a port number."
+
+    # One PAIRED rule per name. `dstdomain` matches the CONNECT host and
+    # `ssl::server_name --client-requested` matches the ClientHello's SNI; requiring
+    # both on one line is how SNI-equals-CONNECT-host is expressed in a Squid that
+    # has no mismatch predicate at all (SF-1, P6). N entries produce N rules.
+    #
+    # The `.` prefix Squid uses for subdomain matching is NOT used: `dstdomain
+    # api.anthropic.com` matches that name exactly, and a leading dot would match
+    # every host beneath it -- the same hole the resolver's exact matching closes.
+    P_AGENT_ACLS="${P_AGENT_ACLS}acl h_${agent}_${count} dstdomain ${lower}"$'\n'
+    P_AGENT_ACLS="${P_AGENT_ACLS}acl s_${agent}_${count} ssl::server_name --client-requested ${lower}"$'\n'
+    P_AGENT_ACLS="${P_AGENT_ACLS}acl t_${agent}_${count} port ${fport}"$'\n'
+    P_ALLOW_RULES="${P_ALLOW_RULES}http_access allow p_${agent}_inner h_${agent}_${count} s_${agent}_${count} t_${agent}_${count}"$'\n'
+
+    agent_hosts="${agent_hosts} ${lower}"
+    agent_ports="${agent_ports} ${fport}"
     count=$(( count + 1 ))
   done <<< "$names"
 
   AGENT_NAMESETS="${AGENT_NAMESETS}-- ${agent}: ${count} exact name(s) from ${RESOLVED_POLICY}"$'\n'"${set_lua}"$'\n'
 
+  # Control 1a's gate: the UNION of this agent's names and ports, matched on the
+  # CONNECT line alone. It exists so that a name absent from this agent's allowlist
+  # is refused BEFORE `deny_cidrs` (a `dst` ACL) forces Squid to resolve it. Without
+  # it the mediator would resolve every attacker-chosen CONNECT host through its own
+  # upstream, on no audit line and outside the pod resolver entirely -- the DNS
+  # exfiltration channel criterion 4 closes, reopened at the proxy.
   if [ "$count" -eq 0 ]; then
-    # Not an error: an agent with no allowlisted name resolves nothing, which is the
-    # correct default-deny outcome. Said out loud because silent is how it would be
-    # mistaken for a rendering bug.
+    # Not an error: an agent with no allowlisted name resolves nothing and reaches
+    # nothing, which is the correct default-deny outcome. An empty `dstdomain` ACL
+    # is a parse error, so the gate degenerates to an unconditional refusal rather
+    # than being omitted -- omitting it would let the agent fall through to the
+    # `dst` deny and get its destinations resolved on the way to being refused.
     note "resolver: agent '$agent' has no allowlisted names -- every DNS query from ${network} will be REFUSED"
+    note "proxy: agent '$agent' has no allowlisted names -- every CONNECT from ${network} will be refused"
+    P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent}"$'\n'
+  else
+    P_AGENT_ACLS="${P_AGENT_ACLS}acl hany_${agent} dstdomain${agent_hosts}"$'\n'
+    P_AGENT_ACLS="${P_AGENT_ACLS}acl tany_${agent} port$(printf '%s\n' $agent_ports | sort -un | tr '\n' ' ' | sed 's/ $//;s/^/ /')"$'\n'
+    P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent} !hany_${agent}"$'\n'
+    P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent} !tany_${agent}"$'\n'
   fi
 
   rule="allow_${agent}"
@@ -218,6 +367,64 @@ anyAllow = OrRule({${ALLOW_RULE_NAMES}})
 addAction(anyAllow, LuaAction(function(dq) return auditDNS(dq, \"allow\", nil) end))
 addAction(anyAllow, PoolAction(\"reorigin\"))"
 
+# ================================================================= proxy render
+# The two halves of control 2, applied to every agent (R5.3, R5.7 -- deny wins).
+# They are global rather than per-agent because the artifact declares them once:
+# `deny_cidrs` is the post-resolution address deny and `deny_fqdns` is R5.1's FQDN
+# deny, which 01.1's approved contract omitted and criterion 10 restores.
+P_DENY_ACLS=""
+P_DENY_RULES=""
+
+deny_fqdns="$(yq eval '.deny_fqdns[]' "$RESOLVED_POLICY" 2>/dev/null || true)"
+_df=""
+while IFS= read -r d; do
+  [ -n "$d" ] && [ "$d" != "null" ] || continue
+  [ "${#d}" -le 253 ] && [[ "$d" =~ $FQDN_RE ]] \
+    || fail "$RESOLVED_POLICY: deny_fqdns carries '$d', which is not a valid hostname. It is interpolated into squid.conf."
+  _df="${_df} $(printf '%s' "$d" | tr '[:upper:]' '[:lower:]')"
+done <<< "$deny_fqdns"
+
+deny_cidrs="$(yq eval '.deny_cidrs[]' "$RESOLVED_POLICY" 2>/dev/null || true)"
+_dc=""
+while IFS= read -r c; do
+  [ -n "$c" ] && [ "$c" != "null" ] || continue
+  # The compiler normalises a bare address to /32 or /128 (criterion 10), so a
+  # prefix length is expected here. Anything else is refused rather than handed to
+  # Squid, which would either reject the whole configuration or -- worse -- accept a
+  # mis-sized mask and deny a wider range than the operator wrote.
+  [[ "$c" =~ ^[0-9a-fA-F:.]+/[0-9]{1,3}$ ]] \
+    || fail "$RESOLVED_POLICY: deny_cidrs carries '$c', which is not an address/prefix. scripts/compile-policy.sh normalises a bare address to /32 or /128; recompile."
+  _dc="${_dc} ${c}"
+done <<< "$deny_cidrs"
+
+# An empty `dstdomain`/`dst` ACL is a parse error, so an empty list renders no ACL
+# and no rule at all. That is correct and not a silent weakening: default-deny is
+# carried by the allowlist gate above, and `deny_fqdns` is empty in every shipped
+# profile precisely because criterion 10 asked for the field to be SUPPORTED, not
+# populated.
+if [ -n "$_df" ]; then
+  P_DENY_ACLS="${P_DENY_ACLS}acl deny_fqdns dstdomain${_df}"$'\n'
+  P_DENY_RULES="${P_DENY_RULES}http_access deny deny_fqdns"$'\n'
+fi
+if [ -n "$_dc" ]; then
+  P_DENY_ACLS="${P_DENY_ACLS}acl deny_cidrs dst${_dc}"$'\n'
+  P_DENY_ACLS="${P_DENY_ACLS}acl inner_layer myportname${P_INNER_NAMES}"$'\n'
+  P_DENY_RULES="${P_DENY_RULES}http_access deny inner_layer deny_cidrs"$'\n'
+fi
+
+# `never_direct` on the fronted listeners. Without it a front whose peer is briefly
+# unreachable falls back to connecting DIRECT -- which bypasses its own peek stage,
+# and with it the entire SNI control. It is a fail-closed rule, not routing tidiness.
+if [ -n "$P_FRONTED" ]; then
+  P_PEERS="${P_PEERS}acl fronted myportname${P_FRONTED}"$'\n'
+  P_PEERS="${P_PEERS}never_direct allow fronted"$'\n'
+  P_FRONT_ALLOW="http_access allow fronted"$'\n'
+else
+  P_FRONT_ALLOW="# no TLS-fronted agent in this profile -- no cascade, no front allow"$'\n'
+fi
+
+P_DELAY_POOLS="delay_pools ${P_DELAY_N}"$'\n'"${P_DELAY_POOLS}"
+
 render() { # <template> <output>
   local tmpl="$1" out="$2"
   [ -f "$tmpl" ] || fail "template $tmpl not found in the image"
@@ -225,6 +432,14 @@ render() { # <template> <output>
   AGENT_ALLOW_RULES="$AGENT_ALLOW_RULES" ACL_ENTRIES="$ACL_ENTRIES" \
   LISTENERS="$LISTENERS" DNS_AUDIT_LOG="$DNS_AUDIT_LOG" \
   REORIGIN_PORT="$REORIGIN_PORT" FORWARD_ADDRS="$FORWARD_ADDRS" \
+  P_LISTENERS="$P_LISTENERS" P_LISTENER_ACLS="$P_LISTENER_ACLS" \
+  P_IDENTITY_RULES="$P_IDENTITY_RULES" P_PEERS="$P_PEERS" \
+  P_DENY_ACLS="$P_DENY_ACLS" P_AGENT_ACLS="$P_AGENT_ACLS" \
+  P_GATE_RULES="$P_GATE_RULES" P_DENY_RULES="$P_DENY_RULES" \
+  P_MAXCONN_RULES="$P_MAXCONN_RULES" P_FRONT_ALLOW="$P_FRONT_ALLOW" \
+  P_ALLOW_RULES="$P_ALLOW_RULES" P_DELAY_POOLS="$P_DELAY_POOLS" \
+  CACHE_LOG="$CACHE_LOG" AUDIT_LOG="$AUDIT_LOG" ERROR_DIR="$ERROR_DIR" \
+  DNS_NAMESERVERS="$DNS_NAMESERVERS" \
   awk '
     function emit(v) { printf "%s", ENVIRON[v]; if (ENVIRON[v] !~ /\n$/) printf "\n" }
     /^@ACL@$/                { next }
@@ -234,9 +449,25 @@ render() { # <template> <output>
     /^@AGENT_NAMESETS@$/     { emit("AGENT_NAMESETS");    next }
     /^@AGENT_ALLOW_RULES@$/  { emit("AGENT_ALLOW_RULES"); next }
     /^@FORWARD_ADDRS@$/      { emit("FORWARD_ADDRS");     next }
+    /^@PROXY_LISTENERS@$/    { emit("P_LISTENERS");       next }
+    /^@LISTENER_ACLS@$/      { emit("P_LISTENER_ACLS");   next }
+    /^@IDENTITY_RULES@$/     { emit("P_IDENTITY_RULES");  next }
+    /^@PEERS@$/              { emit("P_PEERS");           next }
+    /^@DENY_ACLS@$/          { emit("P_DENY_ACLS");       next }
+    /^@AGENT_ACLS@$/         { emit("P_AGENT_ACLS");      next }
+    /^@GATE_RULES@$/         { emit("P_GATE_RULES");      next }
+    /^@DENY_RULES@$/         { emit("P_DENY_RULES");      next }
+    /^@MAXCONN_RULES@$/      { emit("P_MAXCONN_RULES");   next }
+    /^@FRONT_ALLOW@$/        { emit("P_FRONT_ALLOW");     next }
+    /^@ALLOW_RULES@$/        { emit("P_ALLOW_RULES");     next }
+    /^@DELAY_POOLS@$/        { emit("P_DELAY_POOLS");     next }
     {
       gsub(/@DNS_AUDIT_LOG@/, ENVIRON["DNS_AUDIT_LOG"])
       gsub(/@REORIGIN_PORT@/, ENVIRON["REORIGIN_PORT"])
+      gsub(/@CACHE_LOG@/, ENVIRON["CACHE_LOG"])
+      gsub(/@AUDIT_LOG@/, ENVIRON["AUDIT_LOG"])
+      gsub(/@ERROR_DIR@/, ENVIRON["ERROR_DIR"])
+      gsub(/@DNS_NAMESERVERS@/, ENVIRON["DNS_NAMESERVERS"])
       print
     }
   ' "$tmpl" > "$out"
@@ -248,6 +479,12 @@ render() { # <template> <output>
   fi
 }
 
+# Both resolvers-of-last-resort, from one variable. unbound takes one
+# `forward-addr:` line each; Squid takes them space-separated on `dns_nameservers`.
+# Assigned before the first render because render() passes every marker's value on a
+# single env prefix and `set -u` evaluates them all.
+DNS_NAMESERVERS="${MEDIATOR_DNS_UPSTREAM//,/ }"
+
 FORWARD_ADDRS=""
 for up in ${MEDIATOR_DNS_UPSTREAM//,/ }; do
   FORWARD_ADDRS="${FORWARD_ADDRS}    forward-addr: ${up}"$'\n'
@@ -256,32 +493,13 @@ done
 render "$TMPL_DIR/resolver-policy.conf.tmpl"   "$POLICY_CONF"
 render "$TMPL_DIR/resolver-reorigin.conf.tmpl" "$REORIGIN_CONF"
 
-# ------------------------------------------------------------- holding configs
-# Loopback only. Criterion 1's permitted listener set on each AGENT network is
-# exactly {proxy, resolver}; a listener that binds no agent network at all is
-# inside that bound, and SF-6 is what opens the three agent-facing proxy ports.
-cat > "$SQUID_CONF" <<CONF
-# HOLDING configuration -- 01.3 SF-4. Replaced by SF-6's render of
-# mediator/config/proxy.conf.tmpl from the resolved policy. Not the shipped policy.
-pid_filename none
-cache deny all
-# The ICMP pinger is a helper Squid starts to measure peer RTTs. It needs a raw
-# socket, which \`cap_drop: ALL\` does not grant, and it FATALs on every start --
-# noise in the log for a feature this mediator has no use for (it has no ICMP path
-# out by construction, criterion 3). Off, rather than granting NET_RAW.
-pinger_enable off
-cache_log ${CACHE_LOG}
-shutdown_lifetime 1 seconds
-
-http_port 127.0.0.1:3128 name=holding
-
-acl CONNECT method CONNECT
-http_access deny all
-
-logformat mediator %ts.%03tu agent=%note{agent} lport=%lp url=%ru status=%>Hs squid=%Ss bytes=%<st
-access_log stdio:${AUDIT_LOG} mediator
-error_directory ${ERROR_DIR}
-CONF
+# ================================================================= proxy render
+# The three agent-facing listeners, the three controls and the CONNECT-only
+# restriction, rendered from the same artifact and the same agent list the resolver
+# above was rendered from. This replaces SF-4's HOLDING configuration: the mediator
+# is an enforcement point from this sub-feature on.
+#
+render "$TMPL_DIR/proxy.conf.tmpl" "$SQUID_CONF"
 
 # ------------------------------------------------------------------- pre-flight
 # All three parsers fail hard on an unknown directive, which is how configuration
@@ -362,8 +580,8 @@ on_signal() {
 }
 trap on_signal TERM INT
 
-note "up: squid $(squid -v 2>/dev/null | head -1 | sed 's/^Squid Cache: //') [HOLDING -- SF-6], dnsdist $(dnsdist --version 2>&1 | head -1), unbound $(unbound -V 2>/dev/null | head -1)"
-note "resolver: profile '${MEDIATOR_PROFILE}', networks '${MEDIATOR_AGENT_NETWORKS}', upstream '${MEDIATOR_DNS_UPSTREAM}'"
+note "up: squid $(squid -v 2>/dev/null | head -1 | sed 's/^Squid Cache: //'), dnsdist $(dnsdist --version 2>&1 | head -1), unbound $(unbound -V 2>/dev/null | head -1)"
+note "policy: profile '${MEDIATOR_PROFILE}', networks '${MEDIATOR_AGENT_NETWORKS}', upstream '${MEDIATOR_DNS_UPSTREAM}'"
 
 # Six children, all watched. An unwatched relay is silent by construction: a daemon
 # keeps writing to the volume, the mediator keeps enforcing, and the container's

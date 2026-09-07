@@ -13,16 +13,25 @@ Nothing in this directory except this file and `.gitignore` is committed.
 | CA certificate | `ca/mediator-ca.crt` | Yes, as a Compose secret — mediator, `claude`, `agy`. **Not `codex`** |
 | `claude` listener key pair | `listeners/claude-listener.{crt,key}` | Yes, as a Compose secret — mediator only |
 | `agy` listener key pair | `listeners/agy-listener.{crt,key}` | Yes, as a Compose secret — mediator only |
-| `codex` listener certificate | — | **None by design.** `codex`'s proxy hop is plain HTTP CONNECT |
+| `codex` **bumping** key pair | `listeners/codex-listener.{crt,key}` | Yes, as a Compose secret — mediator only. **Not a proxy hop** — see below |
 
 Keeping the CA private key off the mediator is narrower than
 `docs/ARCHITECTURE_AND_DESIGN.md`'s original "CA private key injected at runtime from a secret
 manager", and it moves in the safer direction: a mediator compromise yields the certificates the
 mediator presents, but not the ability to mint agent identities (criterion 9).
 
-`codex` gets no CA and no certificate because it opens no TLS to the mediator — 01.1 SF-2 recorded
-that it rejects an `https://`-scheme proxy URL at URL-parse time, before any handshake. Its
-destination TLS is unaffected: the mediator splices and never terminates it (D4, R5.15).
+`codex` gets no CA certificate because it opens no TLS to the mediator — 01.1 SF-2 recorded that it
+rejects an `https://`-scheme proxy URL at URL-parse time, before any handshake. Its destination TLS
+is unaffected: the mediator splices and never terminates it (D4, R5.15).
+
+**`codex` nevertheless has a listener key pair, and it is a different thing from the other two.**
+`claude`'s and `agy`'s are *server* certificates for their TLS proxy hops. `codex`'s is Squid's
+*bumping* certificate: its listener peeks the ClientHello to enforce the SNI control, and a
+`ssl-bump` port with no `tls-cert=` parses cleanly and then silently stops peeking — measured at
+01.3 SF-6 (`docs/records/proxy-verification.md`, finding 4). It is never presented on an allowed
+path, because peek+splice hands the origin's own chain through untouched, and `codex` neither trusts
+nor validates it. Recorded as Deviation 5 on the feature plan, which is where criterion 9's "two
+listener key pairs" is corrected to three.
 
 ## Subject naming
 
@@ -110,11 +119,12 @@ certificate under it**, then restarting the mediator and redistributing the CA c
 ```bash
 bash scripts/issue-identity.sh ca --force
 bash scripts/issue-identity.sh claude
+bash scripts/issue-identity.sh codex
 bash scripts/issue-identity.sh agy
 ```
 
-This is a recorded choice, not an oversight. The pod holds two listener certificates today and at
-most five after 01.6 adds client certificates; every consumer of this CA is inside one Compose
+This is a recorded choice, not an oversight. The pod holds three listener certificates today and at
+most six after 01.6 adds client certificates; every consumer of this CA is inside one Compose
 project on one host and is restarted by the same command that reissues. A CRL or an OCSP responder
 would add a distribution channel and a second failure mode to protect a population that can be
 replaced wholesale in three commands. Revisit if the population ever outgrows one pod.

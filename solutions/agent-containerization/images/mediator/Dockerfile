@@ -10,8 +10,11 @@
 #
 #   docker build -f images/mediator/Dockerfile .
 #
-# Nothing secret is baked in (R8.1, criterion 9). The CA certificate and the two
-# listener key pairs arrive at runtime as Compose secrets under /run/secrets.
+# Nothing secret is baked in (R8.1, criterion 9). The CA certificate and the THREE
+# listener key pairs arrive at runtime as Compose secrets under /run/secrets. Three,
+# not the two criterion 9 anticipated: codex's listener has no TLS hop but still
+# peeks, and Squid's peek stage silently declines to run without a signing
+# certificate (feature plan Deviation 5).
 
 # Both the package version AND the base image digest are pinned, because
 # docs/records/mediator-selection.md verified P1-P8 against exactly this build and
@@ -99,8 +102,8 @@ RUN mkdir -p /var/log/mediator \
 # enforcement point; the exposure was always the next build, which is why
 # compose/overrides/default.yaml no longer binds this checkout into /workspace.
 #
-# SF-6 adds its proxy template alongside the two resolver templates SF-5 lands
-# here; both are rendered at start from the policy artifact below.
+# Three templates: SF-5's two resolver stages and SF-6's proxy. All three are
+# rendered at start from the policy artifact below, in one pass over one agent list.
 # `--chmod` is load-bearing, not tidiness. COPY preserves the source mode, and
 # scripts/compile-policy.sh writes the artifact through mktemp -- which creates
 # 0600. The mediator runs as uid 13, so an image built from a tree where the

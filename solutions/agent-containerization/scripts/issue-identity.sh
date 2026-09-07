@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 # Proxy-hop trust anchors: offline CA and mediator listener certificates (01.3 SF-3).
 #
-# Creates the mediator CA on the OPERATOR HOST and issues the two listener server certificates
-# the TLS proxy hops need -- one for `claude-net`, one for `agy-net`. `codex-net` is a plain
-# HTTP CONNECT listener (01.1 SF-2: `codex` rejects an `https://`-scheme proxy URL at parse
-# time) and gets no certificate.
+# Creates the mediator CA on the OPERATOR HOST and issues THREE listener certificates, and the
+# third one is not a proxy hop. `claude-net` and `agy-net` get server certificates for their TLS
+# hops. `codex-net` is a plain HTTP CONNECT listener (01.1 SF-2: `codex` rejects an `https://`
+# -scheme proxy URL at parse time) and opens no TLS to the mediator -- but its listener still
+# PEEKS the ClientHello, and Squid's peek stage needs a bumping certificate to exist at all.
+# Verified at the 01.3 SF-6 build: without `tls-cert=` the port parses and then silently declines
+# to bump ("Will not bump SSL ... due to TLS initialization failure"), the SNI control never runs,
+# and even an allowlisted request fails. See the feature plan, Deviation 5.
+#
+# The codex certificate is never presented on an allowed path -- peek+splice hands the origin's
+# own chain through untouched -- and `codex` neither trusts nor validates it. It is a Squid
+# requirement, not a hop, and nothing about `codex` trusting no mediator CA changes.
 #
 # The CA private key never enters the mediator, never enters an image layer and never lands on
 # an agent-reachable volume (criterion 9). Issuance is offline, here, by hand.
@@ -58,8 +66,13 @@ CA_SUBJECT="/CN=agent-pod mediator CA"
 # listener. Two certificate roles sharing a subject form would make that check ambiguous.
 listener_subject() { printf '/CN=mediator-listener-%s' "$1"; }
 
-# `codex` is absent by construction, not by omission.
+# Agents whose listener terminates a TLS PROXY HOP. `codex` is absent by construction: its hop
+# is plain HTTP. It appears in BUMP_AGENTS below instead, which is a different role.
 TLS_AGENTS=(claude agy)
+# Agents whose listener PEEKS, and therefore needs a bumping certificate regardless of whether
+# its hop is TLS. All three: claude and agy peek on their inner cascade listeners, codex on its
+# single one. The two lists overlap because the two roles are independent.
+BUMP_AGENTS=(claude agy codex)
 
 fail() { echo "issue-identity: FAIL: $*" >&2; exit 1; }
 note() { echo "issue-identity: $*" >&2; }
@@ -68,18 +81,10 @@ require_openssl() {
   command -v openssl >/dev/null 2>&1 || fail "openssl not found on PATH"
 }
 
-is_tls_agent() {
-  local a="$1" x
-  for x in "${TLS_AGENTS[@]}"; do [[ "$x" == "$a" ]] && return 0; done
-  return 1
-}
-
 check_agent() {
-  local a="$1"
-  if [[ "$a" == "codex" ]]; then
-    fail "codex has no TLS proxy hop and needs no listener certificate (01.1 SF-2: it rejects an https:// proxy URL at parse time). Its listener is plain HTTP CONNECT."
-  fi
-  is_tls_agent "$a" || fail "unknown agent: $a (expected one of: ${TLS_AGENTS[*]})"
+  local a="$1" x
+  for x in "${BUMP_AGENTS[@]}"; do [[ "$x" == "$a" ]] && return 0; done
+  fail "unknown agent: $a (expected one of: ${BUMP_AGENTS[*]})"
 }
 
 check_ipv4() {
@@ -242,7 +247,7 @@ status() {
   fi
 
   local agent crt ipfile
-  for agent in "${TLS_AGENTS[@]}"; do
+  for agent in "${BUMP_AGENTS[@]}"; do
     crt="$LISTENER_DIR/${agent}-listener.crt"
     ipfile="$LISTENER_DIR/${agent}-listener.ip"
     if [[ -f "$crt" ]]; then
@@ -263,7 +268,8 @@ status() {
       echo "listener $agent: none"
     fi
   done
-  echo "listener codex: none by design -- plain HTTP CONNECT, no TLS hop (01.1 SF-2)"
+  echo "note: the codex certificate is a BUMPING certificate for its peek stage, not a proxy hop."
+  echo "      codex opens no TLS to the mediator and validates nothing it presents (Deviation 5)."
 }
 
 # ---------------------------------------------------------------------------- arguments

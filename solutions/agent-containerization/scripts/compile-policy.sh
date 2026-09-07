@@ -116,12 +116,19 @@ validate_resolved() {
       [[ "$(yq eval ".agents.${agent} | has(\"$field\")" "$f")" == "true" ]] \
         || fail "$f: agents.${agent} is missing field '$field'"
     done
-    for field in max_concurrent connections_per_minute bytes_per_second; do
+    # `connections_per_minute` is deliberately NOT in this list. Squid 6.13 has no
+    # per-client connection-rate directive (docs/records/mediator-selection.md, P3),
+    # so the field was dropped at 01.3 SF-6 rather than shipped as a policy key that
+    # silently enforces nothing. It is also refused below, so an artifact carrying it
+    # fails loudly instead of implying a ceiling that does not exist.
+    for field in max_concurrent bytes_per_second; do
       [[ "$(yq eval ".agents.${agent}.limits | has(\"$field\")" "$f")" == "true" ]] \
         || fail "$f: agents.${agent}.limits.$field is missing"
       local v; v="$(yq eval ".agents.${agent}.limits.$field" "$f")"
       [[ "$v" =~ ^[0-9]+$ ]] || fail "$f: agents.${agent}.limits.$field must be a non-negative integer, found '$v'"
     done
+    [[ "$(yq eval ".agents.${agent}.limits | has(\"connections_per_minute\")" "$f")" == "false" ]] \
+      || fail "$f: agents.${agent}.limits carries 'connections_per_minute', which no longer exists. The selected proxy has no per-client connection-rate mechanism (01.3 SF-6, deviation 4); recompile from a profile that does not declare it."
     local scheme; scheme="$(yq eval ".agents.${agent}.listener.scheme" "$f")"
     [[ "$scheme" == "https" || "$scheme" == "http" ]] \
       || fail "$f: agents.${agent}.listener.scheme must be 'https' or 'http', found '$scheme'"
@@ -234,7 +241,7 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
     LISTENER_TLS="$(yq eval ".listeners.${agent}.tls" "$PROFILE_FILE")"
     LISTENER_PORT="$(yq eval ".listeners.${agent}.port" "$PROFILE_FILE")"
 
-    for k in max_concurrent connections_per_minute bytes_per_second; do
+    for k in max_concurrent bytes_per_second; do
       [[ "$(yq eval ".rate_limits.${agent} | has(\"$k\")" "$PROFILE_FILE")" == "true" ]] \
         || fail "$REL_PROFILE has no rate_limits.${agent}.${k}"
     done
@@ -283,9 +290,8 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
     fi
 
     MC="$(yq eval ".rate_limits.${agent}.max_concurrent" "$PROFILE_FILE")"
-    CPM="$(yq eval ".rate_limits.${agent}.connections_per_minute" "$PROFILE_FILE")"
     BPS="$(yq eval ".rate_limits.${agent}.bytes_per_second" "$PROFILE_FILE")"
-    echo "    limits: {max_concurrent: ${MC}, connections_per_minute: ${CPM}, bytes_per_second: ${BPS}}"
+    echo "    limits: {max_concurrent: ${MC}, bytes_per_second: ${BPS}}"
   done <<< "$AGENTS"
 
   echo ""
