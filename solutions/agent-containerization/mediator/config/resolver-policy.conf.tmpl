@@ -88,13 +88,43 @@ function agentOf(dq)
   return "unattributed"
 end
 
+-- A QNAME reaches this line as attacker-chosen bytes. dnsdist presents unusual
+-- labels in escaped form, which can contain a backslash or a quote -- either would
+-- break the JSON line, and a crafted name could forge a whole extra field in a
+-- record an operator or a later parser is meant to trust.
+function jsonEscape(s)
+  s = string.gsub(s, "\\", "\\\\")
+  s = string.gsub(s, '"', '\\"')
+  s = string.gsub(s, "%c", function(c) return string.format("\\u%04X", string.byte(c)) end)
+  return s
+end
+
+-- Latched so a failing sink reports once rather than once per query.
+auditFailed = false
+
 function auditDNS(dq, verdict, control)
   local qt = QTYPE_NAME[dq.qtype] or tostring(dq.qtype)
-  auditfh:write(string.format(
+  local line = string.format(
     '{"ts":"%s","agent":"%s","identity_source":"listener","qname":"%s","qtype":"%s","verdict":"%s","control":%s}\n',
-    os.date("!%Y-%m-%dT%H:%M:%SZ"), agentOf(dq), dq.qname:toString(), qt, verdict,
-    control and ('"' .. control .. '"') or "null"))
-  auditfh:flush()
+    os.date("!%Y-%m-%dT%H:%M:%SZ"), jsonEscape(agentOf(dq)), jsonEscape(dq.qname:toString()),
+    jsonEscape(qt), verdict, control and ('"' .. jsonEscape(control) .. '"') or "null")
+
+  -- The write is CHECKED, and a failure refuses the query rather than serving it.
+  -- R9.1 makes the audit trail a property of the enforcement point, not a
+  -- convenience: a full or erroring audit volume must not silently downgrade this
+  -- into a resolver that answers without recording. Same posture as the supervisor
+  -- taking the mediator down when an audit relay dies. The cost is stated rather
+  -- than hidden -- an agent that can fill the audit volume can deny itself DNS --
+  -- and it is the direction R9.1 chooses.
+  local ok, wrote = pcall(function() return auditfh:write(line) and auditfh:flush() end)
+  if not ok or not wrote then
+    if not auditFailed then
+      auditFailed = true
+      io.stderr:write("mediator: FATAL: DNS audit sink write failed -- refusing every query; serving DNS unaudited is not an option (R9.1)\n")
+      io.stderr:flush()
+    end
+    return DNSAction.Refused, ""
+  end
   return DNSAction.None, ""
 end
 
@@ -124,6 +154,15 @@ addAction(isNonCanonicalName, RCodeAction(DNSRCode.REFUSED))
 -- agent using the pod resolver cannot obtain one. See the feature plan's
 -- domain-fronting edge case -- a real control, not a complete one.
 AorAAAA = OrRule({QTypeRule(DNSQType.A), QTypeRule(DNSQType.AAAA)})
+
+-- QCLASS must be IN, and this is an explicit control rather than a tidy-up.
+-- Measured before adding it: `api.anthropic.com A CH` was matched by the allow rule
+-- and audited `verdict=allow`, then refused by the backend, which declines non-IN.
+-- So nothing leaked -- but the trail said "allow" for a query that was never
+-- forwarded, and the refusal was a property of unbound rather than of policy. A
+-- control that holds by accident is the same failure shape as a policy key that
+-- enforces nothing.
+ClassIN = QClassRule(DNSClass.IN)
 
 @AGENT_NAMESETS@
 

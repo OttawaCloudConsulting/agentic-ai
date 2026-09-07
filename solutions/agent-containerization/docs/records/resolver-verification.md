@@ -163,9 +163,11 @@ and under `HTTPS_PROXY` most do not resolve the destination at all.
 
 ### What actually left the pod, end to end
 
-Every query reaching the controlled authoritative server across the full battery — twelve
-probes spanning six allowed and six refused cases — was an allowlisted name, lowercased,
-`A` or `AAAA`, carrying no EDNS option:
+Every query reaching the controlled authoritative server across the twelve probes below
+— six allowed and six refused — was an allowlisted name, lowercased, `A` or `AAAA`,
+carrying no EDNS option. (This battery is UDP, `IN`-class and A/AAAA/TXT/HTTPS only;
+TCP, QCLASS, the root QNAME and other EDNS options were added later, under
+§ Adversarial review.)
 
 ```
 qname='api.anthropic.com'                  qtype=A     edns=['OPT/no-options']
@@ -211,7 +213,7 @@ network"). The permitted per-network set remains `{proxy, resolver}`.
 
 ## As built — the shipped mediator, not the fixture
 
-The findings above were taken on a throwaway fixture. The same battery was then run
+The findings above were taken on a throwaway fixture. The battery below was then run
 against the real pod: `compose/compose.yaml`'s `egress-mediator`, its configuration
 **rendered by the entrypoint from `policy/resolved/default.yaml`** rather than
 hand-written, with probe containers attached to the pod's own agent networks.
@@ -281,6 +283,101 @@ build that works on one machine and not another.
   directory without the execute bit cannot be traversed — so the policy became
   unreadable a second time, more confusingly. `RUN chmod -R a=rX` is the correct
   form; the capital `X` sets execute only where the target is a directory.
+
+## Adversarial review, and what it found
+
+An independent adversarial pass was run over the landed sub-feature with the brief
+"assume it is wrong and prove it". Six findings, two rated blocking. **All six were
+reproduced or refuted empirically before anything was changed**, which is how one of
+them changed severity and one of the reviewer's uncertainties was settled.
+
+### Confirmed and fixed
+
+**1. Policy data could become policy CODE (blocking).** The entrypoint interpolates
+every allowed FQDN into the Lua configuration that *is* the pod's DNS policy, and
+the compiler only checked for non-empty, an integer port and no `*`. Reproduced: an
+allowlist entry of `x")); SF5_INJECTED_MARKER = 1; --` **passed validation** — the
+compiler printed "validates against schema 1" — and would have closed the Lua string
+and appended statements inside the enforcement point. The same held for agent keys,
+which become Lua *variable* names (`NAMES_<agent>`).
+
+This is not a hypothetical input path. The plan's own wildcard edge case already
+argues that allowlist content is security-relevant because **01.5 composes
+pack-supplied entries into the same field**, and the Edge Cases entry on the project
+mount observes that "the exposure was always the next build". Wildcards were refused
+at compile time for exactly this reason; nothing else about the string was.
+
+Fixed at **both** ends, deliberately. The compiler refuses a non-hostname FQDN and a
+non-identifier agent key, at the source file and in the validator. The entrypoint
+refuses them again at the render boundary — because the compiler is one producer
+today and 01.5 makes the artifact a channel from third-party content, so guarding
+only at the producer would put the check on the wrong side of the boundary. Verified
+after the fix: the payload is refused by the validator, and refused again by the
+entrypoint when mounted straight into the image's policy path, which is the route a
+pack would take.
+
+**2. QCLASS was a control by accident, and the audit line lied about it
+(downgraded from bypass, but real).** The allow rule checked source subnet, exact
+name and QTYPE, and nothing checked class. The reviewer could not tell without
+running the pod whether a non-IN query would be forwarded. Measured:
+`api.anthropic.com A CH` was **matched by the allow rule and audited
+`verdict=allow`**, then refused by the backend — `unbound` declines non-IN — and the
+controlled authoritative server received nothing.
+
+So there was no leak, and the finding is not a bypass. But the trail recorded
+"allow" for a query that was never forwarded, and the refusal was a property of the
+backend rather than of policy. A control that holds by accident is the same failure
+shape as a policy key that enforces nothing, which this plan rules out elsewhere.
+`QClassRule(DNSClass.IN)` is now part of the allow rule. After: `CH` and `HS` return
+REFUSED and audit as `verdict=deny`, `IN` is unaffected.
+
+**3. DNS kept serving when the audit sink failed (blocking).** `auditfh:write()` and
+`:flush()` return values were ignored, so a full or erroring audit volume would have
+left the resolver answering allowed queries **unaudited** — a silent downgrade of the
+property R9.1 makes constitutive of the enforcement point, and the same failure shape
+as the unsupervised audit relay a previous review caught in SF-4.
+
+Reproduced on a 1 MB audit tmpfs. The first attempt was **inconclusive and is
+recorded as such**: `df` read 100% full but writes still succeeded, absorbed into the
+last partially-filled page. Filling it properly and issuing 40 allowed queries:
+**40/40 REFUSED, zero bytes written to the sink, and one latched FATAL on stderr.**
+The write is now checked and a failure refuses the query. The cost is stated rather
+than hidden — an agent that can fill the audit volume can deny itself DNS — and it is
+the direction R9.1 chooses.
+
+**4. The audit JSON was unescaped.** A QNAME arrives as attacker-chosen bytes and
+dnsdist presents unusual labels in escaped form. Measured after adding escaping: a
+query for `a\"b.example.com` emits `"qname":"a\\"b.example.com."` and all 24 lines
+in the sink parse as valid JSON. Before the fix that line would have been malformed,
+and a crafted name could have forged an additional field in a record an operator is
+meant to trust.
+
+### The reviewer was also right that this record overclaimed
+
+It said "the same battery" and "every query ... across the full battery", where the
+documented shipped-pod battery covered A/AAAA, cross-agent, subdomain, `TXT`,
+`HTTPS`, mixed case and the criterion-12 exclusion — and **not** DNS-over-TCP,
+QCLASS, the root QNAME, or EDNS options beyond client-subnet and cookie. The claim
+has been narrowed to what was actually run, and the gaps have since been run:
+
+```
+api.anthropic.com      A      +tcp   -> NXDOMAIN  (forwarded; TCP path allows)
+leak.api.anthropic.com A      +tcp   -> REFUSED
+api.anthropic.com      TXT    +tcp   -> REFUSED
+ApI.AnThRoPiC.CoM      A      +tcp   -> REFUSED
+.                      NS            -> REFUSED   (root QNAME)
+api.anthropic.com      AAAA +padding +cookie -> reached upstream as OPT/no-options
+```
+
+TCP is policed identically to UDP — `addLocal` binds both and the same rule chain
+runs — and EDNS padding is dropped alongside client-subnet and cookie.
+
+### Not accepted
+
+The reviewer noted that an agent present in the policy but absent from
+`MEDIATOR_AGENT_NETWORKS` is silently ignored. That is correct and is left as is: no
+listener is bound and no rule is created for such an agent, so it has no path to the
+resolver at all. It is unreachable rather than unpoliced.
 
 ## Results carried forward
 

@@ -111,6 +111,22 @@ ipv4_network() {
                           $(( (net >> 8) & 255 ))  $(( net & 255 )) "$p"
 }
 
+# Every value below is interpolated into a Lua configuration that IS the pod's DNS
+# policy. Policy data becoming executable policy code is the whole risk, so the
+# shapes are enforced here as well as in the compiler: the compiler is one producer
+# today, and 01.5 adds pack composition, which makes the artifact a channel from
+# third-party content into this render. Guarding only at the producer would put the
+# check on the wrong side of that boundary -- the same argument the wildcard
+# rejection already makes.
+#
+# A hostname label is letters, digits and hyphens, not leading or trailing a hyphen,
+# 63 bytes at most; the name is 253 bytes at most. Nothing here can close a Lua
+# string.
+FQDN_RE='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$'
+# An agent name becomes part of a Lua VARIABLE name (`NAMES_<agent>`), so it must be
+# an identifier and not merely quotable.
+AGENT_RE='^[a-z][a-z0-9_]{0,31}$'
+
 ACL_ENTRIES=""
 LISTENERS=""
 AGENT_NETS=""
@@ -127,6 +143,8 @@ for spec in "${_agent_specs[@]}"; do
 
   [ -n "$agent" ] && [ "$agent" != "$spec" ] \
     || fail "MEDIATOR_AGENT_NETWORKS entry '$spec' is malformed -- expected '<agent>=<addr>/<prefix>'"
+  [[ "$agent" =~ $AGENT_RE ]] \
+    || fail "MEDIATOR_AGENT_NETWORKS names agent '$agent', which is not a valid identifier. It is interpolated into the Lua policy as a variable name, so it must match ${AGENT_RE}."
   [[ "$prefix" =~ ^[0-9]+$ ]] && [ "$prefix" -ge 8 ] && [ "$prefix" -le 32 ] \
     || fail "MEDIATOR_AGENT_NETWORKS entry '$spec' has no usable prefix length"
 
@@ -165,6 +183,10 @@ for spec in "${_agent_specs[@]}"; do
     case "$fqdn" in
       *'*'*) fail "$RESOLVED_POLICY: agents.${agent} allows the wildcard '$fqdn'. The resolver matches exactly; a wildcard here would forward every name beneath it (R5.4)." ;;
     esac
+    # The name is about to become Lua source. Anything that is not a hostname is
+    # refused here, at the boundary, rather than trusted from the artifact.
+    [ "${#fqdn}" -le 253 ] && [[ "$fqdn" =~ $FQDN_RE ]] \
+      || fail "$RESOLVED_POLICY: agents.${agent} allows '$fqdn', which is not a valid hostname. It is interpolated into the mediator's Lua policy, so a name carrying quotes, escapes or newlines would become policy CODE rather than policy data. Refusing to start."
     # Canonicalised at render time as well as at query time, so a base file written
     # with capitals cannot produce an entry no canonical query can ever match.
     lower="$(printf '%s' "$fqdn" | tr '[:upper:]' '[:lower:]')"
@@ -182,7 +204,7 @@ for spec in "${_agent_specs[@]}"; do
   fi
 
   rule="allow_${agent}"
-  AGENT_ALLOW_RULES="${AGENT_ALLOW_RULES}${rule} = AndRule({NetmaskGroupRule(AGENT_NETS[\"${agent}\"]), QNameSetRule(NAMES_${agent}), AorAAAA})"$'\n'
+  AGENT_ALLOW_RULES="${AGENT_ALLOW_RULES}${rule} = AndRule({NetmaskGroupRule(AGENT_NETS[\"${agent}\"]), QNameSetRule(NAMES_${agent}), ClassIN, AorAAAA})"$'\n'
   ALLOW_RULE_NAMES="${ALLOW_RULE_NAMES}${ALLOW_RULE_NAMES:+, }${rule}"
 done
 

@@ -28,6 +28,21 @@ VALIDATE_TARGET=""
 fail() { echo "compile-policy: FAIL: $*" >&2; exit 1; }
 note() { echo "compile-policy: $*" >&2; }
 
+# These names do not stay data. The mediator's entrypoint interpolates every allowed
+# FQDN and every agent key into the Lua configuration that IS the pod's DNS policy
+# (01.3 SF-5), so a name carrying a quote, an escape or a newline would become
+# policy CODE inside the enforcement point. The wildcard rejection below already
+# accepts that allowlist content is security-relevant input; these are the rest of
+# that argument, and they matter more once 01.5 composes PACK-supplied entries into
+# the same field.
+#
+# Hostname: labels of letters, digits and hyphens, no leading or trailing hyphen,
+# 63 bytes per label, 253 for the name.
+FQDN_RE='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$'
+# Agent key: becomes part of a Lua VARIABLE name, so an identifier, not merely
+# something quotable.
+AGENT_RE='^[a-z][a-z0-9_]{0,31}$'
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile)  PROFILE="${2:?--profile needs a value}"; shift 2 ;;
@@ -95,6 +110,8 @@ validate_resolved() {
   local agents; agents="$(yq eval '.agents | keys | .[]' "$f")"
   [[ -n "$agents" ]] || fail "$f: field 'agents' is empty"
   while IFS= read -r agent; do
+    [[ "$agent" =~ $AGENT_RE ]] \
+      || fail "$f: agent key '$agent' is not a valid identifier. It is interpolated into the mediator's Lua policy as a variable name."
     for field in identity listener_port allow_fqdns allow_cidrs limits listener; do
       [[ "$(yq eval ".agents.${agent} | has(\"$field\")" "$f")" == "true" ]] \
         || fail "$f: agents.${agent} is missing field '$field'"
@@ -128,6 +145,10 @@ validate_resolved() {
       # an open forwarder for everything under the suffix, which is the DNS exfiltration channel
       # R5.4 exists to close. Refused at compile time, not at run time.
       [[ "$fqdn" != *"*"* ]] || fail "$f: agents.${agent}.allow_fqdns[$j].fqdn '$fqdn' is a wildcard; exact names only"
+      # Not merely "non-empty": this value becomes Lua source in the enforcement
+      # point, so it has to be a hostname and nothing else.
+      [[ "${#fqdn}" -le 253 && "$fqdn" =~ $FQDN_RE ]] \
+        || fail "$f: agents.${agent}.allow_fqdns[$j].fqdn '$fqdn' is not a valid hostname. It is interpolated into the mediator's Lua policy, so quotes, escapes or newlines would become policy code."
       # A non-443 port is a design question, not a config detail (criterion 3).
       [[ "$port" == "443" ]] || note "WARNING: agents.${agent}.allow_fqdns[$j] '$fqdn' uses port $port, not 443 -- review before shipping"
     done
@@ -201,6 +222,8 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
 
   AGENTS="$(yq eval '.agents | keys | .[]' "$ALLOWLIST")"
   while IFS= read -r agent; do
+    [[ "$agent" =~ $AGENT_RE ]] \
+      || fail "$REL_ALLOWLIST: agent key '$agent' is not a valid identifier; it becomes a Lua variable name in the mediator's policy"
     # has(), not `// "null"`: `tls: false` is the codex listener's correct value and yq's
     # alternative operator would report it as absent.
     for k in scheme tls port; do
@@ -234,6 +257,8 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
       fi
       [[ "$FQDN" != *"*"* ]] \
         || fail "$REL_ALLOWLIST: agents.${agent}.allow_fqdns[$i].fqdn '$FQDN' is a wildcard; the pod resolver matches exactly and a wildcard would reopen DNS exfiltration (R5.4)"
+      [[ "${#FQDN}" -le 253 && "$FQDN" =~ $FQDN_RE ]] \
+        || fail "$REL_ALLOWLIST: agents.${agent}.allow_fqdns[$i].fqdn '$FQDN' is not a valid hostname; it would be interpolated into the mediator's Lua policy (01.3 SF-5)"
       # Exclusions are declared, not hardcoded: an entry present in the base allowlist and named
       # in the profile's egress_exclusions is NOT copied through, and the reason travels into the
       # artifact (criterion 12, R10.3).
