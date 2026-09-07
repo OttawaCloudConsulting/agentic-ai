@@ -42,7 +42,7 @@
 
 [~] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
-    Sub-features: 2/5 complete
+    Sub-features: 3/5 complete
     Build started 2026-09-07. SF-1 complete (commit fbe5e06): R4.5 config seed + merge, host-side
     scrub-gitconfig.sh, host-gitconfig override, .gitignore/tmutil, and the pod-topology harness
     extensions (parameterized mount-set, volume exclusivity, auth-surface assertions).
@@ -62,6 +62,23 @@
     browser cannot reach. The claude cell passed while carrying that same second bug. 2 architectural deviations recorded (1: image-tree paths corrected
     to 01.2's multi-stage Dockerfile; 2: absent credential warns at start, fatal only on explicit
     invocation -- operator decision, prevents a verify-pod-topology.sh regression).
+    SF-3 complete 2026-09-07. BOTH providers ROLL the refresh token on refresh -- measured, not
+    assumed: claude's refreshToken and codex's tokens.refresh_token both changed, each cross-validated
+    against a mediator audit line for the refresh endpoint (platform.claude.com 6728/2119 at
+    21:32:58Z; auth.openai.com 12492/2168 at 21:35:58Z). Neither endpoint needed an allowlist change --
+    SF-2 added both off the LOGIN flow and this is the first evidence the REFRESH flow uses the same
+    two hosts. Also measured: claude's refreshTokenExpiresAt is NOT extended by a refresh (same
+    absolute instant before and after), so the family dies ~28 days after the original login however
+    often it refreshes; codex's refresh trigger is the access token's own 10-day JWT exp, NOT the
+    last_refresh field (backdating it 60 days was inert, as was backdating the id_token exp), and
+    codex does not verify that JWT's signature locally. SF-4 gate answered: oauth-mount is a one-shot
+    bootstrap. Deliverables: docs/records/credential-inventory.md (new, Contract 7, 8 rows incl. the
+    not-yet-populated secret-mounted path, 02.5 column empty by design) and the rotation section
+    appended to docs/records/agent-verification.md. 1 architectural deviation recorded (3: criterion
+    8's cross-client invalidation half is recorded as UNMEASURED by operator decision -- the only
+    test is replaying a superseded refresh token against the operator's live account. R4.17 is
+    narrowed, not closed, and SF-4 must write accepted_risk.rotation against the conservative
+    reading).
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     2026-09-04 approval). Ready to build. The plan consumed per-agent client certificates that 01.3 does not issue

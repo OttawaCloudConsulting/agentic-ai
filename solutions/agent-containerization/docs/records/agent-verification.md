@@ -371,3 +371,132 @@ does not need is the wrong default under R2.8.
 **This is the cell that caught the bug.** The `claude` cell passed while the dispatcher carried the
 same class of error, because Claude Code's paste-back needs no callback port. Only running the
 codex cell exposed it.
+
+## Refresh-token rotation semantics — 01.4 SF-3 (criterion 8, R4.16, R4.17)
+
+**Method.** SF-2b's live state volumes were cloned (`sf2bd_claude-state` → `sf3_claude-state`,
+`sf2bd_codex-state` → `sf3_codex-state`, plus untouched `sf3-*-pristine` restore copies), a refresh
+was forced inside the pod, and the credential files were compared before and after by SHA-256 of
+each token field. Cross-validation is the mediator's own audit line for the same instant, on the
+same D17 terms SF-2 used: the client's file change is one source, the mediator's independent record
+of the token-endpoint session is the other.
+
+**Two projects cannot run at once, and that is the topology working.** The agent networks carry
+static subnets because each listener certificate holds a matching `iPAddress` SAN, so a second
+Compose project fails at network creation with `Pool overlaps with other one on this address
+space`. The `sf2bd` project was brought down **without `-v`** and `sf3` brought up in its place;
+`sf2bd_claude-state`, `sf2bd_codex-state` and `sf2bd_audit` survive untouched.
+
+**No token material was read, logged or recorded.** Every value below is a 16-hex prefix of the
+field's SHA-256. Expiry claims and timestamps are not secret and are quoted directly.
+
+### Scope: question 1 measured, question 2 deliberately not (operator decision, 2026-09-07)
+
+Criterion 8 asks two questions. Only the first is answered here, and the second is left open on
+purpose rather than by omission.
+
+- **"Does a refresh roll the refresh token?"** — **measured, both providers.**
+- **"Does a refresh in one client invalidate the token held by another?"** — **not measured.** The
+  only test that answers it is replaying a rotated refresh token against a live provider account.
+  A provider that treats refresh-token replay as evidence of compromise may revoke the whole session
+  family, and the accounts here are the operator's own rather than the throwaways edge case 16
+  assumed. The operator's decision at build was to stop short of the replay. Recorded as an open
+  residual against R4.17, whose register text — "per-session refresh-token revocation is unverified
+  for all three providers" — is therefore **narrowed but not closed** by this sub-feature.
+
+### Result
+
+| Provider | Client | Refresh rolls the refresh token | Refresh endpoint | Audit evidence (independent source) |
+|---|---|---|---|---|
+| Anthropic | `claude` 2.1.260 | **Yes** | `platform.claude.com:443` | `allow`, 6728 in / 2119 out at `21:32:58.593Z`, between the forced expiry and the first `api.anthropic.com` call |
+| OpenAI | `codex` 0.152.1 | **Yes** | `auth.openai.com:443` | `allow`, 12492 in / 2168 out at `21:35:58.105Z`, immediately after the poke |
+| Google | `agy` | **N/A** | — | `apikey` is `agy`'s only offered cell (D9); no OAuth credential and therefore no refresh token exists to roll |
+
+Neither refresh endpoint required an allowlist change: `platform.claude.com` and `auth.openai.com`
+were both added by SF-2 off the *login* flow, and this run is the first evidence that the same two
+hosts carry the *refresh* flow. That the sets coincide was not guaranteed and is now measured.
+
+**Token-field hashes (SHA-256, first 16 hex).**
+
+| Field | Before | After | Changed |
+|---|---|---|---|
+| claude `accessToken` | `ac01f846cfc29ddc` | `841efe8f316a6ffe` | yes |
+| claude `refreshToken` | `54fc0caebd6139c6` | `d087cad4c709bc1e` | **yes — rolls** |
+| codex `tokens.access_token` | `97e60e29ca8f8cb9` | `b81a38b97d280bf3` | yes |
+| codex `tokens.refresh_token` | `a99a5ca5a9d70c58` | `ae0afef4e42b1459` | **yes — rolls** |
+| codex `tokens.id_token` | `2f410848d499e98c` | `e1bca6c0bee7e62e` | yes |
+
+### Measured lifetimes (for the credential inventory's "stated lifetime" column)
+
+| Credential | Lifetime | Source |
+|---|---|---|
+| claude access token | **8 h** | `expiresAt − issue` = 28 800 601 ms on the token this run minted |
+| claude refresh token | **~28 days from the original login, not sliding** | `refreshTokenExpiresAt` was `1791253704285` before the refresh and `1791253703601` after — the same absolute instant. A refresh mints a new refresh token but does **not** extend the family's expiry |
+| codex access token | **10 days** | JWT `exp − iat` = 864 000 s, on both the pre- and post-refresh token |
+| codex `id_token` | **1 h** | JWT `exp − iat` = 3600 s |
+| codex refresh token | **not stated** | `auth.json` carries no expiry field for it and the value is opaque |
+
+The claude finding is the load-bearing one: refreshing does not buy more time. A container that
+refreshes every 8 h for a month still loses the session ~28 days after the operator's original
+login, which is the outer bound on how long a stolen volume stays useful without a further
+compromise.
+
+### How each refresh was forced, including what did not work
+
+**claude — one lever, and it is client-side.** `expiresAt` in `.credentials.json` is the client's
+own record of expiry. Backdating it by an hour and running `claude -p` produced the refresh. No
+token material was touched.
+
+**codex — three levers tried, one worked.** Recorded because the two negatives are findings about
+0.152.1, not failed attempts:
+
+| Lever | Result |
+|---|---|
+| `last_refresh` backdated 60 days | **Inert.** `codex login status` is local-only and produced no egress at all; a full `codex exec` then ran a complete `chatgpt.com` API session with no `auth.openai.com` line and no token change |
+| `id_token` `exp` claim backdated | **Inert.** `codex exec` again completed with no refresh |
+| `access_token` `exp` claim backdated | **Triggered the refresh** |
+
+Two consequences worth carrying forward:
+
+1. **The refresh trigger is the access token's own `exp`, so codex refreshes roughly every 10 days**
+   under continuous use — not per session and not on the `last_refresh` interval the field name
+   suggests. The field is written by a refresh; it does not appear to drive one.
+2. **codex does not verify the access token's signature locally.** A token whose payload was
+   re-encoded with a past `exp` — leaving the original signature in place and therefore invalid —
+   was accepted as parseable and drove the expiry decision. This is unsurprising for a client
+   holding a bearer token it cannot validate anyway, and it is what made the measurement possible in
+   a build session rather than in ten days. It is recorded as an observation, not as a defect: the
+   tampered token is never sent anywhere, since a refresh request carries the refresh token.
+
+**A harness note, so the next reader does not chase it.** The final `codex exec` appeared to hang
+for minutes. It was waiting on stdin EOF (`Reading additional input from stdin...`) because the
+invocation had been backgrounded, not stalled on the network. The refresh had already completed at
+startup, 12 s in.
+
+### Consequence for SF-4 and `oauth-mount`
+
+`codex` is the only agent with an `oauth-mount` cell, and codex rolls. So the container's first
+refresh mints a new refresh token onto the state volume and leaves the operator's host
+`~/.codex/auth.json` holding the **previous** one.
+
+Stated precisely, because the difference matters and one half of it is unmeasured:
+
+- **Measured:** after the container refreshes, the host copy is *superseded* — it is no longer the
+  current refresh token for that session family.
+- **Not measured:** whether the provider *rejects* the superseded token when the host CLI next
+  presents it. One-time-use rotation is the common OAuth implementation and would mean rejection,
+  but that is an expectation, not this run's evidence.
+
+**The conservative reading is the one SF-4 must build against:** treat `oauth-mount` as a one-shot
+bootstrap that costs the operator their host codex login, and record it in R4.17's
+`accepted_risk.rotation` field on that basis. Being wrong in this direction costs a documented
+re-login that was not strictly necessary; being wrong in the other direction breaks the operator's
+host CLI without warning.
+
+**The cost is deferred, not immediate.** Because the trigger is the 10-day access-token expiry, a
+container bootstrapped from the host credential can run for up to ten days before its first refresh.
+An operator who bootstraps and then stops using the pod may never pay the cost at all.
+
+**Where the value lands.** SF-3 produces this result; it does not write it into `profiles/`. The
+`rotation:` field in the feature plan's Interface Contract 3 profile schema and R4.17's
+`accepted_risk.rotation` are both written by SF-4, which consumes the row above.

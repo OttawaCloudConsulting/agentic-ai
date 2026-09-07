@@ -246,7 +246,7 @@ per agent, not both.
   register amendment** (criterion 4) into `REQUIREMENTS.md` and `docs/ARCHITECTURE_AND_DESIGN.md`,
   subject to the operator decision recorded at this gate. Depends on SF-1.
 
-- [ ] **SF-3: Refresh-token rotation semantics and the credential inventory** — using the live
+- [x] **SF-3: Refresh-token rotation semantics and the credential inventory** — using the live
   credentials SF-2 produces, establishes per provider whether a refresh rolls the refresh token and
   whether a refresh in one client invalidates another's; records the results in
   `docs/records/agent-verification.md`; and produces `docs/records/credential-inventory.md` covering
@@ -865,3 +865,29 @@ mode 644, invoked as `bash script.sh`.
   will read every missing-credential case as a pass; and the `--at-start` contract is a second
   entry point that 01.5's compiler and any future caller must not confuse with the strict one.
   No exit code, mount, or matrix cell changed.
+
+### Deviation 3: criterion 8's cross-client invalidation question is recorded as unmeasured, not answered
+
+- **What changed:** SF-3 measured the first half of criterion 8 for both providers — a refresh
+  **rolls** the refresh token, for Anthropic and for OpenAI alike, cross-validated against the
+  mediator audit log. It did not measure the second half: whether a refresh in one client
+  invalidates the token held by another. That result is recorded as *unmeasured, with its reason*
+  in `docs/records/agent-verification.md` and as residual 3 in `docs/records/credential-inventory.md`.
+- **Originally planned:** criterion 8 poses both questions per provider, and SF-3's sub-feature line
+  makes both its scope: "establishes per provider whether a refresh rolls the refresh token **and
+  whether a refresh in one client invalidates another's**".
+- **Why necessary:** the only test that answers the second question is replaying a superseded
+  refresh token against a live provider account. A provider that treats replay as evidence of
+  compromise may revoke the whole session family, and Gate 4 put SF-5 on the operator's **real**
+  Anthropic and ChatGPT accounts rather than on the throwaways edge case 16 assumed — so the cost of
+  a revocation lands on the operator's own host CLI logins, not on a disposable account. The
+  operator's decision at build (2026-09-07) was to stop at the rolling measurement.
+- **Impact:** R4.17's register text — "per-session refresh-token revocation is unverified for all
+  three providers" — is **narrowed but not closed**: the rolling behaviour is now measured, the
+  rejection behaviour is not. SF-4 must therefore write `accepted_risk.rotation` against the
+  conservative reading (treat `oauth-mount` as a one-shot bootstrap that costs the operator their
+  host codex login) rather than against a measured one; being wrong in that direction costs a
+  documented re-login, being wrong in the other breaks the host CLI without warning. Nothing else
+  moves: no exit code, mount, matrix cell or allowlist entry changed, and both SF-3 deliverables
+  ship complete. If the question is wanted later, the cheap way to buy it is a throwaway provider
+  account, which is a `/milestone` scope item and not a re-plan of 01.4.
