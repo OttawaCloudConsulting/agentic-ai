@@ -43,6 +43,17 @@
 [~] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
     Sub-features: 1/5 complete
+    Build started 2026-09-07. SF-1 complete (commit fbe5e06): R4.5 config seed + merge, host-side
+    scrub-gitconfig.sh, host-gitconfig override, .gitignore/tmutil, and the pod-topology harness
+    extensions (parameterized mount-set, volume exclusivity, auth-surface assertions).
+    SF-2 PARTIAL -- SF-2a complete (commit 56a318e): dispatcher, seven-cell matrix, exits 2/3/4,
+    compose AUTH_MODE seam, profile enum surface, T24 amendment, architecture file-tree correction.
+    SF-2b OPEN and BLOCKED ON THE OPERATOR: the live OAuth flows must be run to observe each
+    provider's authentication endpoints, which are then added to policy/allowlist.base.yaml and
+    cross-validated against the mediator audit log per D17. This is the plan's own sanctioned
+    split condition for SF-2. 2 architectural deviations recorded (1: image-tree paths corrected
+    to 01.2's multi-stage Dockerfile; 2: absent credential warns at start, fatal only on explicit
+    invocation -- operator decision, prevents a verify-pod-topology.sh regression).
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     2026-09-04 approval). Ready to build. The plan consumed per-agent client certificates that 01.3 does not issue
