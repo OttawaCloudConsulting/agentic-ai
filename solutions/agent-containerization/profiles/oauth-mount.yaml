@@ -72,19 +72,25 @@ oauth_mount:
         with NO stated provider expiry (unlike claude's ~28 days, nothing bounds it) plus a
         10-day access token, both readable from the state volume by the agent that owns it.
         The staged copy strips OPENAI_API_KEY, so E2's API-key blast radius is not silently
-        added to this one.
+        added to this one. WIDER THAN SF-4 ASSUMED: SF-5 measured that a superseded refresh
+        token still redeems, so a captured copy does not expire out of usefulness when the
+        legitimate client refreshes -- see rotation below.
       rotation: >-
-        MEASURED, 01.4 SF-3 (docs/records/agent-verification.md): codex ROLLS its refresh
-        token on refresh. The container's first refresh mints a new token onto the state
-        volume and leaves the host ~/.codex/auth.json holding the previous one. What was
-        measured is that the host copy is SUPERSEDED; what was NOT measured is whether the
-        provider REJECTS it when the host CLI next presents it. The conservative reading is
-        the one accepted here: treat oauth-mount as a ONE-SHOT BOOTSTRAP THAT COSTS THE
-        OPERATOR THEIR HOST CODEX LOGIN. Being wrong in this direction costs a documented
-        re-login that was not strictly necessary; being wrong the other way breaks the host
-        CLI without warning. The cost is deferred, not immediate -- the refresh trigger is
-        the access token's own 10-day expiry, so a pod that is bootstrapped and then left
-        alone may never pay it.
+        MEASURED TWICE, and the second measurement corrected the first. SF-3
+        (docs/records/agent-verification.md): codex ROLLS its refresh token on refresh, so the
+        container's first refresh mints a new token onto the state volume and leaves the host
+        ~/.codex/auth.json holding the previous one. SF-3 could not say whether the provider
+        REJECTS that superseded copy, and this field was written on the conservative reading --
+        that oauth-mount costs the operator their host codex login. SF-5's harness then replayed
+        it without being designed to: two runs staged the same parent refresh token and BOTH
+        refreshes SUCCEEDED (51ffa144 -> f0952196, then the same 51ffa144 -> 1ffe309a). So the
+        host copy is superseded but STILL REDEEMABLE, and the host CLI keeps working. Measured
+        over minutes, for OpenAI only; Anthropic was not replayed.
+        THE SECURITY CONSEQUENCE RUNS THE OTHER WAY, and it is the half that matters here:
+        rotation is NOT a revocation mechanism. A refresh token captured from this state volume
+        stays valid after the legitimate client has refreshed past it, so the age of a stolen
+        copy is not mitigation and nothing about normal use retires it. Only the revocation_path
+        above ends it.
 
 limits:
   cpus: "2.0"

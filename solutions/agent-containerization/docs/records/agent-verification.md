@@ -502,3 +502,56 @@ An operator who bootstraps and then stops using the pod may never pay the cost a
 **Where the value lands.** SF-3 produces this result; it does not write it into `profiles/`. The
 `rotation:` field in the feature plan's Interface Contract 3 profile schema and R4.17's
 `accepted_risk.rotation` are both written by SF-4, which consumes the row above.
+
+## Refresh-token replay — 01.4 SF-5 (criterion 8's second question, measured)
+
+**SF-3 left this open on purpose; SF-5's acceptance harness answered it as a side effect of
+running twice, and the answer is the less comfortable one.**
+
+SF-3 measured that both providers *roll* the refresh token, and deliberately did not measure
+whether a refresh in one client invalidates the token another client holds — the only test being
+to replay a superseded refresh token against the operator's live account, which risks the provider
+revoking the whole session family (Deviation 3 on the 01.4 feature plan). That replay then happened
+without being planned as one: `tests/acceptance/verify-auth-state.sh` phase D stages a **copy** of
+the seed volume's credential and forces a refresh, and the harness was run twice from the same
+unchanged seed.
+
+### Result — OpenAI / `codex` 0.152.1: a superseded refresh token still works
+
+| Run | Parent refresh token staged | Refresh outcome | Child refresh token minted |
+|---|---|---|---|
+| 2 (2026-09-07) | `51ffa14430f309a6` | **succeeded** | `f0952196e402fac2` |
+| 3 (2026-09-07, minutes later) | `51ffa14430f309a6` — **the same, now superseded, parent** | **succeeded** | `1ffe309a0f5ee23a` |
+
+Both runs began from the byte-identical staged source (`c83f0763a44f7428`, asserted unchanged by
+the `:ro` mount in both runs). Run 3 presented a refresh token that run 2 had already spent, and
+the provider honoured it, minting a *second, different* child.
+
+**What this measures:** for OpenAI, the refresh token is **not one-time-use**, and a refresh in one
+client does **not** invalidate the copy another client holds — over a window of minutes, from a
+second client instance, on the same account.
+
+**What it does not measure**, stated so the claim is not read wider than the evidence:
+
+- **Claude was not replayed.** This says nothing about Anthropic, whose refresh token also rolls.
+- **The window was minutes, not days.** A provider that expires superseded tokens on a delay, or
+  on a later heuristic, would look exactly like this at this timescale.
+- **Both clients were the same `codex` build on the same account.** A genuinely different client
+  or a different account may be treated differently.
+
+### Consequence, and it cuts both ways
+
+**Operationally cheaper than assumed.** SF-4 wrote `accepted_risk.rotation` on the conservative
+reading — treat `oauth-mount` as a one-shot bootstrap that *costs the operator their host
+`codex login`*. Measured, it does not: the host copy is superseded but still redeemable, so the
+host CLI keeps working. That text is corrected in `profiles/oauth-mount.yaml` rather than left
+standing, because a record that is now known to be wrong is worse than no record.
+
+**Security consequence is the reverse, and it is the load-bearing half.** Rotation is not a
+revocation mechanism here. A refresh token captured from a state volume stays valid after the
+legitimate client has refreshed past it, so "the volume was copied a while ago" is not mitigation
+and nothing about normal use retires the stolen copy. Explicit revocation at the provider — the
+`revocation_path` field, not rotation — is the only control that ends it. Row V3 of
+`docs/records/credential-inventory.md` states this in its blast-radius column.
+
+**R4.17 is now closed for OpenAI and still open for Anthropic**, rather than open for both.

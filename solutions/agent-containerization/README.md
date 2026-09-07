@@ -372,9 +372,26 @@ phases A–G, driven against fixtures the harness owns and reaching no third-par
 bash tests/acceptance/verify-egress-mediator.sh
 ```
 
+Feature 01.4 is **complete**: the `AUTH_MODE` dispatcher and its seven supported cells, the
+pre-mount git-config scrub, the `oauth-mount` bootstrap boundary, the refresh-token rotation
+record and the credential inventory. Its acceptance harness is
+`tests/acceptance/verify-auth-state.sh` — phases A–E covering T24, T22, T25 and T9. Unlike
+01.3's harness it iterates **live provider credentials**, so read its header before running it:
+it seeds its own state volumes from the operator's, and its phase D forces a codex refresh,
+which rolls the refresh token and costs the host `codex login`.
+
+The feature's test command is composite — the two earlier harnesses must still pass, and only
+one Compose project can hold the agent subnets at a time, so bring any running pod down
+(**without** `-v`) first:
+
+```bash
+bash tests/acceptance/verify-auth-state.sh \
+  && bash tests/acceptance/verify-pod-topology.sh \
+  && bash tests/acceptance/verify-egress-mediator.sh
+```
+
 Still not produced:
 
-- Agent authentication and state persistence — Feature 01.4
 - Tool-pack manifests and pack composition in the policy compiler — Feature 01.5
 - Per-agent workload identity (client certificates, R8.8, T34) — Feature 01.6
 - AWS access (R6) — Milestone 03

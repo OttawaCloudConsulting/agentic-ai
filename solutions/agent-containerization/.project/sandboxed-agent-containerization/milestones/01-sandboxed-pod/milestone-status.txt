@@ -1,5 +1,5 @@
 # Milestone 01: Sandboxed Pod
-# Status: [~] in progress  6 features, 3 complete
+# Status: [~] in progress  6 features, 4 complete
 
 ## Features
 
@@ -40,9 +40,9 @@
     re-plan queued here is also closed: recorded as a SUPERSEDED block in 01.1's plan rather than
     re-planned, since 01.1's built artifacts were correct and only its prose was stale.
 
-[~] Feature 01.4: Agent authentication and state persistence
+[x] Feature 01.4: Agent authentication and state persistence
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
-    Sub-features: 4/5 complete
+    Sub-features: 5/5 complete
     Build started 2026-09-07. SF-1 complete (commit fbe5e06): R4.5 config seed + merge, host-side
     scrub-gitconfig.sh, host-gitconfig override, .gitignore/tmutil, and the pod-topology harness
     extensions (parameterized mount-set, volume exclusivity, auth-surface assertions).
@@ -101,6 +101,41 @@
     with the superseded token UNATTENDED on first run, which is exactly the replay Deviation 3
     records as untested. SF-4/SF-5 should use the sf3_* pair. sf2bd is down (no -v); sf3's mediator
     is up.
+    SF-5 complete 2026-09-07. tests/acceptance/verify-auth-state.sh, 56 assertions across phases
+    A-E: all seven supported cells, three fail-closed cells plus the unset-AUTH_MODE case, the R4.5
+    read in every Codex mode, T22 on the mounted file, T25 in both stages and T9 in both forms.
+    FEATURE COMPLETE 2026-09-07 -- the composite test command passes end to end: verify-auth-state
+    56/56, verify-pod-topology and verify-egress-mediator 137/137 together, 0 failures.
+    TWO DEFECTS FOUND BY RUNNING, NOT BY REASONING. (1) Sourcing references/.env_keys LEAKED A
+    CREDENTIAL: the operator's pasted CLAUDE_CODE_OAUTH_TOKEN line was missing its `=`, bash treated
+    the line as a command and echoed the token in cleartext to the terminal and the run log. The
+    harness now PARSES the file and never executes it; the token is scheduled for revocation (see
+    OUTSTANDING below). (2) NO AGENT IMAGE CONTAINS git -- all three are node:22-slim and none
+    installs it -- so criterion 6's `git config --global --get-all credential.helper` assertion could
+    not be made as written. R2.9/T22 still hold (with no git binary nothing can resolve a helper, and
+    the mounted-file assertion carries T22), but mounts.host_git_config currently mounts a config
+    nothing in the container can read. Whether git belongs in the images is 01.5's pack-composition
+    call, recorded not fixed.
+    CRITERION 8'S SECOND QUESTION IS NOW MEASURED, and SF-3's Deviation 3 is closed for OpenAI. The
+    harness was run twice from the same unchanged seed, so phase D replayed a SUPERSEDED refresh
+    token -- and it WORKED: parent 51ffa144 refreshed to f0952196 on run 2 and to 1ffe309a on run 3.
+    A refresh in one client does NOT invalidate another's copy (OpenAI, minutes-long window, same
+    account; Anthropic was NOT replayed). Two consequences, opposite in sign: oauth-mount does NOT
+    cost the operator their host codex login, and -- the load-bearing half -- ROTATION IS NOT A
+    REVOCATION MECHANISM, so a refresh token captured from a state volume stays valid after the
+    legitimate client refreshes past it. Only explicit provider revocation ends it. Recorded in
+    docs/records/agent-verification.md, and the now-known-wrong conservative text in
+    profiles/oauth-mount.yaml accepted_risk.rotation and credential-inventory.md row V3 was corrected
+    rather than left standing.
+    4 architectural deviations recorded (6: the harness SEEDS its state volumes from the operator's
+    sf3_* pair, operator decision, which makes each run destructive to credential state -- codex rolls,
+    so the seed is one refresh behind afterwards; 7: `set -uo pipefail` and phase D last, so one
+    failure does not hide the rest and D's destructive half does not precede E's persistence
+    assertions; 8: .env_keys parsed not sourced, from the leak above; 9: the git-absence finding).
+    OUTSTANDING, and it is this feature's close obligation rather than advice: REVOKE THE
+    CLAUDE_CODE_OAUTH_TOKEN. It is a ONE-YEAR credential minted to prove one test cell (R4.16), and
+    it additionally leaked in cleartext during the first run. The operator deferred revocation until
+    testing finished; testing has finished.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     2026-09-04 approval). Ready to build. The plan consumed per-agent client certificates that 01.3 does not issue

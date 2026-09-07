@@ -278,7 +278,7 @@ per agent, not both.
   54-entry directory of sessions, archived sessions and global state, none of which has any business
   crossing the boundary.
 
-- [ ] **SF-5: Acceptance harness** — `tests/acceptance/verify-auth-state.sh` implementing T24 across
+- [x] **SF-5: Acceptance harness** — `tests/acceptance/verify-auth-state.sh` implementing T24 across
   all seven supported cells, T22, T25 including the steady-state no-host-mount assertion, and T9 in
   both its restart and its rebuild form. **Runs against the operator's real provider accounts
   (decision, Gate 4, 2026-09-07)** -- superseding this line's original "throwaway credentials only".
@@ -945,3 +945,80 @@ mode 644, invoked as `bash script.sh`.
   rather than the only one. 01.5's T27 has a real profile to refuse the build against, and the
   `accepted_risk` shape is now exercised by a producer rather than only documented. Two new files
   join the repository's host-side script surface, and `README.md` documents the three-step sequence.
+
+### Deviation 6: the harness seeds its state volumes from the operator's, and phase D therefore spends a real refresh
+
+- **What was built:** `tests/acceptance/verify-auth-state.sh` creates its own project-scoped state
+  volumes and then **copies** the operator's `sf3_claude-state` and `sf3_codex-state` into them
+  (`SEED_CLAUDE_VOLUME` / `SEED_CODEX_VOLUME`), rather than obtaining credentials itself. Phase D
+  stages a copy of the seeded codex credential through `scripts/stage-oauth-mount.sh` and forces a
+  real refresh.
+- **Originally planned:** the Test Strategy says only "a test-scoped Compose project name (`-p`)
+  throughout, so no phase touches the operator's real state volumes", and Gate 4 replaced
+  "throwaway credentials only" with the operator's real accounts without saying how the harness
+  obtains them.
+- **Why necessary:** four of the seven supported cells need a working OAuth credential, and no
+  unattended test can mint one — `oauth-interactive` is a paste-back or device-code flow by
+  construction. Seeding is the only mechanism that keeps the test-scoped-project rule intact while
+  giving those cells something real to assert against. Operator decision at the SF-5 build
+  (2026-09-07), taken against the two alternatives of running the cells directly against the
+  operator's live volumes or asserting only the bootstrap path.
+- **Impact:** the harness is **destructive to credential state by design**, and says so in its
+  header and before phase D runs. Because codex rolls its refresh token, each run supersedes the
+  seed volume's copy. The properties T25 asks for — the refreshed credential lands on the state
+  volume, the `:ro` host source is unchanged — cannot be asserted without spending exactly that.
+  Whoever runs this harness should expect the seed volume to be one refresh behind afterwards.
+
+### Deviation 7: `set -uo pipefail`, and phase D runs last
+
+- **What was built:** the harness uses `set -uo pipefail` and runs its phases in the order
+  A, B, C, E, D.
+- **Originally planned:** the Test Strategy specifies `set -euo pipefail` and lists the phases
+  A through E in order.
+- **Why necessary:** `-e` aborts at the first failing assertion, which for a five-phase harness
+  means one failure hides every later one — 01.3's `verify-egress-mediator.sh` is the closer
+  precedent and uses `-uo` for the same reason, while 01.2's single-pass harness can afford `-e`.
+  The phase order is a consequence of Deviation 6: phase D forces a refresh and then **deletes the
+  volume credential** to prove the steady-state exit `3`, so running it before E would leave E
+  asserting the persistence of a credential D had just destroyed.
+- **Impact:** none on coverage — every assertion the plan lists is made. The harness reports all
+  failures in one run rather than the first.
+
+### Deviation 8: `references/.env_keys` is parsed, not sourced — after sourcing it leaked a credential
+
+- **What was built:** the harness reads the credential file with a `sed` matcher for `NAME=VALUE`
+  lines. A line that is not one reads as an **absent variable**, and the diagnostic names the
+  variable without ever holding its value.
+- **Originally planned:** nothing — the plan does not say how the harness obtains the API keys.
+  The first implementation did the obvious thing and sourced the file.
+- **Why necessary:** **found by running.** The operator's pasted `CLAUDE_CODE_OAUTH_TOKEN` line was
+  missing its `=`, so `set -a; . references/.env_keys` made bash treat the whole line as a command
+  and **echo the token in cleartext** into the terminal and the run log. The failure mode is
+  general: sourcing an operator-edited credential file executes it, and one malformed line prints
+  whatever is on it. This is precisely the leak the sub-feature's own "must not print credential
+  material" obligation exists to prevent, arriving through the one path that obligation did not
+  cover — the harness's *input*, not its output. The affected token is scheduled for revocation at
+  feature close, as this sub-feature already required.
+- **Impact:** the harness never executes operator-supplied content. A malformed credential line now
+  fails the precondition check by name. The same reasoning applies to any future script reading
+  that file, and the comment in the harness says so.
+
+### Deviation 9: criterion 6's third assertion could not be made as written — no agent image contains `git`
+
+- **What was built:** the harness asserts `git config --global --get-all credential.helper` is empty
+  inside the container **when `git` exists**, and otherwise asserts the absence of the binary and
+  emits a named FINDING. It does not add `git` to any image.
+- **Originally planned:** criterion 6 and the Test Strategy both state the assertion unconditionally
+  — "asserting, inside the container, that `git config --global --get-all credential.helper` is
+  empty".
+- **Why necessary:** **found by running.** All three agent images are built from `node:22-slim`
+  (01.2) and none installs `git`; the first pass failed with
+  `exec: "git": executable file not found in $PATH`. The property R2.9 protects still holds, and
+  holds *more* strongly than the original assertion would have shown — with no git binary, no
+  credential helper is resolvable by anything — and the mounted-file assertion is what carries T22
+  either way.
+- **Impact:** a real gap is now named rather than hidden by a passing test. **`mounts.host_git_config`
+  currently mounts a configuration nothing in the container can read**, and an agent asked to run
+  git cannot. Whether `git` belongs in the images is a scope question for 01.5's pack composition
+  (R7), not a change to make from inside an acceptance test. R2.9 and T22 are met; their *utility*
+  is contingent on that later decision.
