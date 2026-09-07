@@ -226,7 +226,8 @@ the bootstrap command, and because the entrypoint runs under `set -e` that **fai
 start**. Re-bootstrapping is a deliberate act.
 
 Skipping step 1 is fail-closed rather than silent: Compose creates the missing source directory
-empty, and `bootstrap-auth` exits `3` saying the directory holds no `auth.json`.
+empty, and `bootstrap-auth` exits `3` — at the *risk record*, which is the first thing it checks
+after the mount mode, saying the directory carries no `accepted-risk.yaml`.
 
 **The browser-redirect alternative.** If you want plain `codex login` (callback on `localhost:1455`)
 instead of device code, layer `compose/overrides/codex-callback.yaml` and invoke the CLI directly —
@@ -238,6 +239,10 @@ docker compose --env-file compose/pins.env \
   -f compose/overrides/codex-callback.yaml \
   run --rm --service-ports codex codex login
 ```
+
+**Not exercised.** The fragment was verified only as far as `docker compose config` renders it at
+SF-4 — the flow itself has not been run, and the device-code path is what SF-2 actually measured.
+`--service-ports` is required because `run` publishes nothing without it.
 
 That publishes `127.0.0.1:1455:1455` — a host-side publish so your browser can reach *into* the
 container. It gives the container no route *out*: `internal: true` is untouched and egress still

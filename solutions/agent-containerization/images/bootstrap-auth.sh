@@ -190,7 +190,12 @@ already_authenticated() {
       [ -s "$CLAUDE_CONFIG_DIR/.credentials.json" ] || [ -s "$HOME/.claude.json" ]
       ;;
     codex)
-      [ -s "$CODEX_HOME/auth.json" ]
+      # SHAPE, not just presence (edge case 11): a bootstrap interrupted mid-copy, or an
+      # auth.json holding only OPENAI_API_KEY, must not read as authenticated -- this test
+      # short-circuits the whole branch, so a partial state here would skip the login under
+      # oauth-interactive and skip the copy under oauth-mount. grep rather than jq: only the
+      # agy image carries jq.
+      [ -s "$CODEX_HOME/auth.json" ] && grep -q '"refresh_token"' "$CODEX_HOME/auth.json"
       ;;
     agy)
       # agy's apikey cell is env-delivered: the credential is not persisted, so "already
