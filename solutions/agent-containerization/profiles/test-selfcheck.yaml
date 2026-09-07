@@ -1,0 +1,96 @@
+# TEST-SCOPED profile (01.3 SF-8). Never a shipped profile; `compose/overrides/test-egress.yaml`
+# is its Compose counterpart and `policy/allowlist.test.yaml` / `policy/denylist.test.yaml` are
+# its bases. Compile with:
+#
+#   bash scripts/compile-policy.sh --profile test-selfcheck \
+#     --allowlist policy/allowlist.test.yaml --denylist policy/denylist.test.yaml
+#
+# The Phase F profile, and the only one in the repository that runs stage 2 for real against
+# something other than a provider endpoint. `startup_check.allowed` points at the harness's own
+# TLS fixture and `denied` at the link-local address, so the reachability check R9.5 asks for is
+# DEMONSTRATED end to end -- through the rendered proxy -- while the harness still reaches no
+# third-party host. A permanently-offline harness would let a broken stage 2 pass unnoticed;
+# this profile is what stops that.
+#
+# The allowed target must TERMINATE TLS. Stage 2 sends a real ClientHello (control 1b pairs the
+# SNI with the CONNECT host, so a probe without one proves nothing) and peek+splice hands it
+# straight to the fixture. A plain-HTTP fixture on 443 would fail the handshake, fail the probe,
+# and take the mediator down at every start.
+
+name: test-selfcheck
+
+packs: []                      # 01.5 composes egress from these. Empty at this profile
+
+auth_mode:                     # R4.12 defaults, consumed by 01.4
+  claude: oauth-interactive
+  codex: oauth-interactive
+  agy: apikey
+
+mounts:
+  project:
+    path: <host path>          # operator-supplied. This profile's Compose override binds a
+                                # git-ignored `workspace/` directory, NOT `..` -- binding the
+                                # solution tree would put the policy files, the mediator config
+                                # and the identity material inside the agents' own writable mount
+                                # (01.3 SF-4). The comment previously said `..`; corrected here.
+    mode: rw                   # :ro where the agent only reviews (R2.7). Default is rw;
+                                # T2's read-only fixture comes from a test-only override,
+                                # not from changing this
+  build_cache: false            # R2.10, per-agent where enabled
+  host_git_config: false        # R2.9, :ro with credential.helper stripped
+
+limits:                         # R1.10, applied per agent container
+  cpus: "2.0"
+  memory: 4g
+  pids: 512
+
+# Per-agent proxy listener surface (01.3 criterion 6). The three listeners are NOT identical,
+# because the agents' HTTP clients are not: 01.1 SF-2 established that `codex` rejects an
+# `https://`-scheme proxy URL at URL-parse time and must be given plain HTTP CONNECT, while
+# `claude` and `agy` both reach an `https://` listener. `scheme` and `tls` are two spellings of
+# one fact and the compiler refuses them if they disagree.
+listeners:
+  claude: {scheme: https, tls: true,  port: 3128}
+  codex:  {scheme: http,  tls: false, port: 3128}
+  agy:    {scheme: https, tls: true,  port: 3128}
+
+# D5's third control, per agent. PROPOSALS for confirmation, not measurements -- sized to sit
+# comfortably above an interactive agent session and well below a runaway loop. No traffic has
+# been observed to derive them from; docs/records/egress-discovery.md is the first data that
+# could inform them and it was taken under `sbx` with UDP and ICMP invisible to the capture.
+# Adjustable at build time under DD-12 without gate re-approval.
+#
+# `connections_per_minute` was DROPPED at the 01.3 SF-6 build, not omitted by oversight. Squid
+# 6.13 has no per-client connection-rate directive at all (docs/records/mediator-selection.md,
+# P3): `maxconn` bounds concurrency and `delay_pools` bounds bytes, and neither bounds
+# connections per unit time. The two options were an external_acl_type token-bucket helper --
+# a stateful interpreter process inside the enforcement point -- or dropping the field. The
+# field was dropped, because a policy key that silently enforces nothing is worse than an
+# absent one, and it is the same failure shape as the SNI fallback SF-1 found. The compiler
+# now REFUSES an artifact that declares it. D5's control 3 therefore ships as two of its three
+# ceilings; the gap is recorded in the feature plan (Deviation 4) as a residual against D5.
+rate_limits:
+  claude: {max_concurrent: 16, bytes_per_second: 2000000}
+  codex:  {max_concurrent: 16, bytes_per_second: 2000000}
+  agy:    {max_concurrent: 16, bytes_per_second: 2000000}
+
+# The test base carries no entry this profile needs to withhold.
+egress_exclusions: []
+
+# The mediator's two-stage startup self-check (R9.5, 01.3 SF-7). Stage 1 validates the resolved
+# policy and aborts on corruption (T17); stage 2 proves the enforcement point actually enforces,
+# by driving one allowed and one denied destination through the rendered proxy. `offline: true`
+# skips stage 2 only, and the skip is recorded on the audit line at every start.
+#
+# `denied` is a link-local address so the check fails on POLICY rather than on resolution --
+# an unresolvable name would pass the check for the wrong reason.
+startup_check:
+  allowed: {agent: claude, fqdn: allowed.fixture.test, port: 443}
+  denied:  {ip: 169.254.169.254, port: 443}
+  offline: false
+
+exports:                        # R9.9 -- export toggles only; recording is not disableable
+  egress_audit_log: true
+  agent_action_log: true
+  resolved_policy: true
+  image_digest_sbom: true

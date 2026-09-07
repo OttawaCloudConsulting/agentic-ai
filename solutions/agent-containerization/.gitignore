@@ -25,3 +25,8 @@ mediator/identity/listeners/
 # are the operator's scratch work and are never this repository's.
 workspace/*
 !workspace/.gitkeep
+
+# The acceptance harness's throwaway fixture PKI (01.3 SF-8). Generated before every run and
+# torn down with it; a self-signed certificate for `*.fixture.test` is not trust material
+# anyone should be able to find in version control and mistake for the mediator's.
+tests/fixtures/tls/

@@ -20,6 +20,26 @@ bash scripts/compile-policy.sh --check                      # is the committed a
 bash scripts/compile-policy.sh --validate <path>            # schema check only
 ```
 
+## The test-scoped artifacts
+
+`test-fixtures.yaml` and `test-selfcheck.yaml` are compiled from **different bases** — the
+acceptance harness (01.3 SF-8) drives its assertions against fixtures it owns, and those
+hostnames must not enter `policy/allowlist.base.yaml`, which is discovery-derived and carries
+`provisional: true` against `docs/records/agent-verification.md`. `--allowlist` and `--denylist`
+select the bases; every artifact records which ones it was built from in `compiled_from`, and its
+own header repeats the invocation that re-verifies it:
+
+```bash
+bash scripts/compile-policy.sh --profile test-fixtures \
+  --allowlist policy/allowlist.test.yaml --denylist policy/denylist.test.yaml
+```
+
+`policy/denylist.test.yaml` deliberately omits `172.16.0.0/12`, which the shipped denylist
+carries and R5.6 requires — Docker's bridges are RFC 1918, so the harness's own fixtures sit
+inside that range and no allowed-path assertion could pass with it loaded. The file says so at
+the top. `bash scripts/lint-policy.sh` checks the **base** denylist for all five ranges and is
+unaffected.
+
 ## Why the output is committed
 
 SC-6: the mediator's configuration is generated from this artifact and never hand-authored, and the
