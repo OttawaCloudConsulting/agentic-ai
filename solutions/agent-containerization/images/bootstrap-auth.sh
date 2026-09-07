@@ -257,7 +257,19 @@ do_oauth_interactive() {
 
   case "$AGENT" in
     claude) claude /login ;;
-    codex)  codex login ;;
+    # --device-auth is REQUIRED here, not a preference. Plain `codex login` starts a callback
+    # server on localhost:1455 INSIDE the container and hands the browser a
+    # redirect_uri of http://localhost:1455/auth/callback. The operator's browser runs on the
+    # HOST, where that port is nothing -- the pod publishes no ports (R2.8 default-off) and the
+    # agent networks are `internal: true`. The flow completes at the provider and then strands on
+    # a callback that can never arrive; codex itself says "On a remote or headless machine? Use
+    # `codex login --device-auth` instead." Device code is one of the three paths R4.9 enumerates
+    # as headless, and it needs no published port at all.
+    #
+    # The callback-forward alternative (publish 127.0.0.1:1455:1455, fallback 1457) is documented
+    # and ships as a layerable fragment for operators who want it -- it is not the default,
+    # because opening a host port the headless path does not need is the wrong default under R2.8.
+    codex)  codex login --device-auth ;;
   esac
 
   already_authenticated \
