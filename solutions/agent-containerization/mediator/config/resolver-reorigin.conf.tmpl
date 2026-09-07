@@ -1,0 +1,56 @@
+# The re-originating resolver (01.3 SF-5). RENDERED at start by
+# images/mediator/entrypoint.sh -- never hand-edited (SC-6).
+#
+# Back half of the closed forwarder. It carries NO policy: it is bound to loopback
+# inside the mediator and never sees a query the policy engine in front of it has
+# not already allowed. Its whole job is the half criterion 4 asks for that a proxy
+# cannot do -- "constructs a fresh query ... drops every EDNS option it did not
+# originate".
+#
+# Verified (docs/records/resolver-verification.md): a client EDNS CLIENT-SUBNET and
+# COOKIE sent through this stage arrive at the upstream as OPT with no options,
+# where the same query forwarded by the policy engine alone arrives carrying both
+# verbatim.
+server:
+    verbosity: 1
+    username: ""
+    chroot: ""
+    pidfile: ""
+    directory: "/run/mediator"
+    logfile: ""
+    use-syslog: no
+    do-daemonize: no
+    log-time-ascii: yes
+
+    # Query logging is OFF here on purpose. Every DNS DECISION is audited by the
+    # policy engine in front, which is the stage that has the agent's identity and
+    # the verdict; this stage would add a second, unattributed copy of the allowed
+    # subset and nothing else.
+    log-queries: no
+
+    interface: 127.0.0.1
+    port: @REORIGIN_PORT@
+    access-control: 0.0.0.0/0 refuse
+    access-control: 127.0.0.0/8 allow
+
+    # The upstream is Docker's embedded resolver by default, which is on loopback
+    # in this container's own namespace -- unbound refuses to query localhost
+    # unless told otherwise, and the refusal would be silent.
+    do-not-query-localhost: no
+
+    # Do NOT add 0x20 encoding of our own. The agent-facing stage refuses
+    # non-canonical names precisely so no case entropy reaches the upstream;
+    # re-introducing it here would put back the channel that check closes.
+    use-caps-for-id: no
+
+    # The names forwarded from here are exact allowlist entries, already public and
+    # already known to the upstream. Minimisation would split them into additional
+    # queries without hiding anything that is not already in the one that matters.
+    qname-minimisation: no
+
+    hide-identity: yes
+    hide-version: yes
+
+forward-zone:
+    name: "."
+@FORWARD_ADDRS@

@@ -517,7 +517,7 @@ revision — so this is a renumber, not a migration.
   the moment the CA secret is mounted into `claude` and `agy`, so the allowed set is extended here
   rather than left to break. Depends on SF-1, SF-2 and SF-3.
 
-- [ ] **SF-5: Pod DNS authority** — The closed forwarder: exact-match allowlisted names
+- [x] **SF-5: Pod DNS authority** — The closed forwarder: exact-match allowlisted names
   re-originated as canonicalised `A`/`AAAA` queries to a named upstream, everything else REFUSED and
   forwarded nowhere, every decision audited. Rejects wildcard allowlist entries at compile time (see
   Edge Cases). Includes the T4 fixture — a controlled authoritative
@@ -1108,7 +1108,8 @@ Paths are relative to `solutions/agent-containerization/`.
 | `images/mediator/Dockerfile` | Create | Selected proxy + resolver + audit writer. Non-root, read-only rootfs layout, no secret in any layer |
 | `images/mediator/entrypoint.sh` | Create | Stage-1 schema validation, config render from the resolved policy, stage-2 reachability check, then exec the proxy |
 | `mediator/config/proxy.conf.tmpl` | Create | The three per-network listeners (two TLS, one plain HTTP CONNECT), per-listener policy selection, the three controls, CONNECT-only method restriction, log format with `identity_source`, `deny_info` body. Client-certificate verification present but **switched off** — 01.6 turns it on |
-| `mediator/config/resolver.conf.tmpl` | Create | Closed resolver: allowlisted names answered, everything else REFUSED, no forwarding |
+| `mediator/config/resolver-policy.conf.tmpl` | Create | The DNS policy engine: per-agent exact-match allowlist, QTYPE restricted to `A`/`AAAA`, non-canonical QNAMEs refused, everything else REFUSED and forwarded nowhere, every decision audited |
+| `mediator/config/resolver-reorigin.conf.tmpl` | Create | The re-originating resolver, loopback-bound. No policy; it constructs the fresh upstream query and drops the client's EDNS options |
 | `mediator/identity/.gitignore` | Create | Excludes all private key material (R8.7's spirit; nothing secret in version control) |
 | `mediator/identity/README.md` | Create | CA layout, subject naming, validity, renewal and revocation path — the lifecycle 01.6 inherits |
 | `scripts/issue-identity.sh` | Create | Offline CA creation and **listener** certificate issuance for `claude-net` and `agy-net`, each with an `iPAddress` SAN matching that network's static mediator address. Runs on the operator host; the CA private key never leaves it. 01.6 extends the same script with client certificates |
@@ -1117,6 +1118,7 @@ Paths are relative to `solutions/agent-containerization/`.
 | `policy/resolved/test-fixtures.yaml` | Create | Test-scoped resolved policy allowlisting the harness fixtures. Never loaded by the default profile |
 | `workspace/.gitkeep` | Create | Bind source for the repointed default project mount, committed so Docker does not auto-create it root-owned |
 | `compose/overrides/test-egress.yaml` | Create | Test-only override: the four harness fixtures on `egress-net`, the test-scoped policy, `startup_check.offline: true`. Not a shipped profile |
+| `tests/fixtures/authoritative-dns/` | Create | The T4 fixture: a controlled authoritative DNS server that answers locally, forwards nowhere, and captures every arriving query. T4 asserts an ABSENCE, which needs a server the harness owns and can read |
 | `tests/acceptance/verify-egress-mediator.sh` | Create | The Test Command. Phases A–G. `#!/usr/bin/env bash`, `set -euo pipefail`, mode 644, invoked as `bash` |
 | `tests/acceptance/verify-pod-topology.sh` | Modify | Extend the allowed mount set with `/run/secrets` entries and the expected proxy/DNS environment, so 01.2's equality assertion survives 01.3 |
 | `.gitignore` | **Modify** | Add private key material and generated secret files under `mediator/identity/`, plus the new `workspace/` project-mount directory. **Changed from Create at the 2026-09-05 re-plan** — 01.2 landed a `.gitignore` in `solutions/agent-containerization/` (verified on disk), so the pre-revision plan's "no `.gitignore` today" is stale |
@@ -1231,6 +1233,55 @@ anywhere in the repository. Shell scripts follow `#!/usr/bin/env bash`, `set -eu
   must take the verdict from the inner listener or the log will misreport denials for two of three
   agents. SF-7's stage-2 self-check should also warm the cascade — the first request through a cold
   `cache_peer` returned 500 while the peer was still being probed.
+
+### Deviation 3: the pod resolver is two daemons, and `unbound` is not the policy engine
+- **What changed:** The closed forwarder is a two-stage cascade inside the mediator.
+  `dnsdist` 1.9.16 binds the mediator's static address on each agent network and holds **all**
+  of criterion 4's policy — per-agent exact-match allowlist selected by the arriving subnet,
+  QTYPE restricted to `A`/`AAAA`, non-canonical QNAMEs refused, `REFUSED` default-deny, and one
+  JSON audit line per decision. `unbound` moves to `127.0.0.1:5353` behind it, holds no policy
+  at all, and does only the re-origination. The image gains `dnsdist`, and it gains a pinned
+  `yq` because the entrypoint now renders configuration from the resolved policy artifact and
+  the image had no YAML parser.
+- **Originally planned:** One resolver from one package. The Files table lists a single
+  `mediator/config/resolver.conf.tmpl`, and SF-4's Dockerfile installed `unbound` as "the
+  resolver binary the pod's DNS authority (SF-5) is expected to be built from", anticipating at
+  most a swap: "If SF-5 finds it cannot express them, the package changes here and nothing else
+  does."
+- **Why necessary:** `unbound` 1.22 fails **three** of criterion 4's six properties, and each
+  failure is a live channel rather than a cosmetic gap
+  (`docs/records/resolver-verification.md`). Its `local-zone` is subtree-scoped, so
+  "this exact name and nothing below it" has no expression and
+  `leak.api.anthropic.com` **reached the upstream** — the DNS tunnel R5.4 exists to close, and
+  the one the compiler's wildcard rejection was built to prevent. It has no QTYPE-based policy
+  at all, so `TXT`, `HTTPS`, `MX` and `ANY` on an allowlisted name all reached the upstream,
+  taking the structural ECH mitigation with them. And it forwards a mixed-case QNAME with the
+  client's case intact, so the 0x20 channel survives an exact-match allowlist. A wildcard
+  `local-data` was tried as the one pure-unbound repair for the first of those and did not
+  intercept. **The second stage was tested, not assumed:** pointing `dnsdist` straight at the
+  upstream, the client's EDNS `CLIENT-SUBNET` and `COOKIE` arrived **verbatim**, because
+  `dnsdist` proxies the client's packet rather than constructing a new one. Each stage closes
+  exactly what the other cannot, and removing either reopens a named criterion-4 channel.
+  Operator decision taken at the SF-5 build on that evidence, with the two alternatives —
+  ship `unbound` and record three residuals, or spend another verification round on
+  `knot-resolver` — put alongside it.
+- **Impact:** The mediator image carries two more packages and the supervisor watches six
+  children rather than four. SF-6 inherits the `yq` dependency for its own render and SF-7
+  inherits it for stage-1 validation, so neither has to introduce a parser. SF-6 must also
+  know that pointing Squid's `dns_nameservers` at the pod resolver does **not** work as
+  written — Squid's queries arrive from `127.0.0.1`, match no agent network, and are refused by
+  default-deny; SF-1's verified `dns_nameservers 127.0.0.11` remains available and is the
+  expected path. SF-8's criterion-1 listener enumeration must count **listening services**, not
+  every bound UDP socket, because the resolver's ephemeral outbound socket is wildcard-bound.
+  Criterion 1's permitted per-network set is unaffected: still exactly {proxy, resolver}, with
+  the second resolver stage on loopback, which criterion 1 already permits.
+  **One sub-deviation inside this one:** criterion 4 says the resolver "constructs a fresh
+  query from the canonicalised (lowercased) name". `dnsdist` has no QNAME-rewrite action and
+  its `RegexRule` is case-insensitive, so a non-canonical name is **refused** rather than
+  rewritten. The channel is closed either way and the refusal is the more auditable outcome —
+  a logged `control=qname_case` decision instead of a silent normalisation — but a client that
+  deliberately randomises case as an anti-spoofing measure would be refused. No agent in this
+  pod does so.
 
 ### Deviation 2: no client-visible 403 body; the denial surface is operator-facing only
 - **What changed:** A refused connection reaches the agent as a **TLS failure**, not as an HTTP 403

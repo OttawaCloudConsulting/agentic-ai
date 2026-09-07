@@ -98,7 +98,32 @@ services:
         MEDIATOR_BASE_DIGEST: ${MEDIATOR_BASE_DIGEST}
         SQUID_VERSION: ${SQUID_VERSION}
         UNBOUND_VERSION: ${UNBOUND_VERSION}
+        DNSDIST_VERSION: ${DNSDIST_VERSION}
+        YQ_VERSION: ${YQ_VERSION}
+        YQ_SHA256_ARM64: ${YQ_SHA256_ARM64}
+        YQ_SHA256_AMD64: ${YQ_SHA256_AMD64}
     image: sandboxed-agent/mediator:local
+    environment:
+      # Which network belongs to which agent (01.3 SF-5). The pod resolver applies
+      # a PER-AGENT allowlist and each `internal: true` network carries exactly one
+      # agent, so the subnet a query arrives from is that agent's identity -- but
+      # the mediator cannot infer the NAME from an address, and guessing it would
+      # mean serving one agent's allowlist to another.
+      #
+      # This is a fourth copy of the fact the `ipam` blocks above, the agents'
+      # `dns:` literals and the listener certificates' iPAddress SANs already
+      # carry. It is deliberately adjacent to the ipam blocks, and the entrypoint
+      # refuses to start if an address named here is not one the container actually
+      # holds -- so a renumber that misses this line fails loudly at start rather
+      # than quietly applying the wrong policy.
+      MEDIATOR_AGENT_NETWORKS: "claude=172.31.10.2/24,codex=172.31.20.2/24,agy=172.31.30.2/24"
+      # Where allowlisted names are resolved. Docker's embedded resolver inside the
+      # mediator's own namespace, which forwards to the daemon's configured
+      # upstreams: the pod inherits the operator's DNS instead of this repository
+      # hardcoding a third-party resolver, and the query leaves over egress-net --
+      # the mediator's only external interface. The acceptance harness overrides
+      # this to aim at its own controlled authoritative server (T4).
+      MEDIATOR_DNS_UPSTREAM: "127.0.0.11"
     user: "13:13"
     cap_drop:
       - ALL

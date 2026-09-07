@@ -319,5 +319,11 @@ fi
 
 mkdir -p "$(dirname "$OUT")"
 cp "$TMP" "$OUT"
+# mktemp creates 0600 and `cp` carries that onto the artifact. This file is
+# generated, committed and carries no secret -- and the mediator image COPYs it and
+# reads it as uid 13, so a 0600 artifact produces an enforcement point that cannot
+# read its own policy. Since git records only the executable bit, that failure
+# appears only for whoever last ran this compiler and not for a fresh clone.
+chmod 0644 "$OUT"
 validate_resolved "$OUT"
 echo "compile-policy: wrote $OUT"

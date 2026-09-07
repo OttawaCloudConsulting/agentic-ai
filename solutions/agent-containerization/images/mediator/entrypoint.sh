@@ -1,33 +1,63 @@
 #!/usr/bin/env bash
-# Mediator entrypoint (01.3 SF-4).
+# Mediator entrypoint (01.3, SF-4 + SF-5).
 #
-# At this sub-feature the mediator's job is to come up hardened and hold: SF-4 owns
-# the image, the Compose seam and the runtime, not the policy engine. So the two
-# daemons start against HOLDING configurations rendered below --
+# SF-4 brought the container up hardened and holding. SF-5 replaces the holding
+# resolver with the real one: the pod's DNS authority, RENDERED from the resolved
+# policy artifact so the configuration is generated and never hand-edited (SC-6).
 #
-#   * Squid on loopback only, `http_access deny all`. No agent network gets a
-#     listener until SF-6 renders the real one from the resolved policy.
-#   * unbound on :53 of every attached network, `local-zone "." refuse` with
-#     query logging. Every query is refused and recorded. SF-5 replaces this with
-#     the closed forwarder (exact-match allowlisted names re-originated upstream,
-#     everything else REFUSED).
+# What runs here now:
 #
-# -- and are replaced, not extended, when `mediator/config/*.tmpl` land. They exist
-# so this sub-feature can VERIFY rather than assume the two runtime properties it is
-# responsible for: that a privileged port binds under `cap_drop: ALL`, and that
-# Compose `dns:` really does redirect Docker's embedded resolver to a container
-# address on an `internal: true` bridge. Both are confirmed by capture on the
-# mediator (docs/records/mediator-runtime-verification.md), because the second is
-# the whole of D3's mechanism and reading the Compose documentation is not evidence.
+#   * dnsdist  -- the DNS policy engine, on the mediator's static address on each
+#                 agent network, port 53. Exact-match allowlist per agent, QTYPE
+#                 restricted to A/AAAA, non-canonical QNAMEs refused, everything
+#                 else REFUSED and forwarded nowhere, every decision audited.
+#   * unbound  -- the re-originating resolver, on loopback. No policy. It exists
+#                 because dnsdist proxies the client's packet and criterion 4
+#                 requires a fresh query with the client's EDNS options dropped.
+#   * squid    -- STILL HOLDING. Loopback only, `http_access deny all`. SF-6 owns
+#                 the three agent-facing listeners and renders the real one from
+#                 mediator/config/proxy.conf.tmpl.
+#
+# The two-daemon resolver is a verified necessity rather than a preference; the
+# evidence, including what each stage fails to do alone, is in
+# docs/records/resolver-verification.md.
 set -euo pipefail
 
 RUN_DIR=/run/mediator
 AUDIT_DIR=/var/log/mediator
 AUDIT_LOG="$AUDIT_DIR/egress-audit.log"
 CACHE_LOG="$AUDIT_DIR/squid-cache.log"
+DNS_AUDIT_LOG="$AUDIT_DIR/dns-audit.log"
 SQUID_CONF="$RUN_DIR/squid.conf"
-RESOLVER_CONF="$RUN_DIR/unbound.conf"
+POLICY_CONF="$RUN_DIR/dnsdist.conf"
+REORIGIN_CONF="$RUN_DIR/unbound.conf"
 ERROR_DIR="$RUN_DIR/errors"
+
+TMPL_DIR=/etc/mediator/config
+POLICY_DIR=/etc/mediator/policy
+
+# The re-originating resolver's loopback port. Not 53: that belongs to the policy
+# engine on the agent networks, and this stage must never be the pod's front door.
+REORIGIN_PORT=5353
+
+MEDIATOR_PROFILE="${MEDIATOR_PROFILE:-default}"
+RESOLVED_POLICY="$POLICY_DIR/${MEDIATOR_PROFILE}.yaml"
+
+# Where allowlisted names are actually resolved. Docker's embedded resolver in this
+# container's own namespace by default, which forwards to the daemon's configured
+# upstreams -- so the pod inherits the operator's DNS rather than this repository
+# hardcoding a third-party resolver, and the query leaves over `egress-net`, the
+# mediator's only external interface.
+#
+# Criterion 4 says "forwarded to a named upstream on egress-net". Read as naming the
+# path rather than requiring a container on that bridge: the traffic leaves through
+# egress-net either way, and pointing at Docker's resolver keeps the mediator's
+# resolution path identical to the one SF-1 verified Squid against, so control 2 and
+# the resolver cannot disagree about what an allowlisted name resolves to.
+#
+# The acceptance harness overrides this to aim at its own controlled authoritative
+# server (T4).
+MEDIATOR_DNS_UPSTREAM="${MEDIATOR_DNS_UPSTREAM:-127.0.0.11}"
 
 fail() { echo "mediator: FATAL: $*" >&2; exit 1; }
 note() { echo "mediator: $*" >&2; }
@@ -40,32 +70,181 @@ note() { echo "mediator: $*" >&2; }
 mkdir -p "$RUN_DIR" "$ERROR_DIR" /run/squid
 
 [ -d "$AUDIT_DIR" ] || fail "$AUDIT_DIR is absent -- the audit volume is not mounted"
-touch "$AUDIT_LOG" "$CACHE_LOG" 2>/dev/null \
+touch "$AUDIT_LOG" "$CACHE_LOG" "$DNS_AUDIT_LOG" 2>/dev/null \
   || fail "cannot write the audit sink at $AUDIT_DIR (uid $(id -u)). The named volume must be owned by the runtime uid; it inherits that from the image."
 
 # ------------------------------------------------------------- error_directory
 # `error_directory` REPLACES the packaged error set rather than overlaying it
 # (docs/records/mediator-selection.md, operational findings), so the directory has
 # to be composed: the packaged English pages first, then the mediator's own pages
-# on top. SF-7 adds ERR_MEDIATOR_DENIED here; at SF-4 the composition itself is
-# what is being established.
+# on top. SF-7 adds ERR_MEDIATOR_DENIED here.
 if [ -d /usr/share/squid/errors/English ]; then
   cp -R /usr/share/squid/errors/English/. "$ERROR_DIR/"
 else
   fail "packaged Squid error pages not found -- error_directory cannot be composed"
 fi
 
+# =============================================================== resolver render
+# The agent networks. One `<agent>=<mediator address>/<prefix>` per agent, and it
+# is the SAME fact as compose.yaml's `ipam` blocks, the agents' `dns:` literals and
+# the listener certificates' iPAddress SANs. Those were already three copies with a
+# guard between them (verify-pod-topology.sh); this is the fourth, and it is checked
+# against the container's own interfaces below rather than trusted, so a renumber
+# that misses one fails at start naming the field instead of silently serving the
+# wrong agent's allowlist.
+[ -n "${MEDIATOR_AGENT_NETWORKS:-}" ] \
+  || fail "MEDIATOR_AGENT_NETWORKS is unset -- expected '<agent>=<addr>/<prefix>,...' (compose.yaml, egress-mediator). Refusing to serve DNS without knowing which network is which agent."
+
+[ -f "$RESOLVED_POLICY" ] \
+  || fail "resolved policy $RESOLVED_POLICY not found (profile '$MEDIATOR_PROFILE'). It is baked into the image from policy/resolved/ -- recompile with scripts/compile-policy.sh and rebuild."
+
+# ipv4_network <addr> <prefix> -> the network address, so the rendered configuration
+# reads as the subnet it actually matches rather than a host address with a mask
+# hanging off it.
+ipv4_network() {
+  local a="$1" p="$2" o1 o2 o3 o4 ip mask net
+  IFS=. read -r o1 o2 o3 o4 <<< "$a"
+  ip=$(( (o1 << 24) | (o2 << 16) | (o3 << 8) | o4 ))
+  mask=$(( (0xFFFFFFFF << (32 - p)) & 0xFFFFFFFF ))
+  net=$(( ip & mask ))
+  printf '%d.%d.%d.%d/%d' $(( (net >> 24) & 255 )) $(( (net >> 16) & 255 )) \
+                          $(( (net >> 8) & 255 ))  $(( net & 255 )) "$p"
+}
+
+ACL_ENTRIES=""
+LISTENERS=""
+AGENT_NETS=""
+AGENT_NAMESETS=""
+AGENT_ALLOW_RULES=""
+ALLOW_RULE_NAMES=""
+
+IFS=',' read -r -a _agent_specs <<< "$MEDIATOR_AGENT_NETWORKS"
+for spec in "${_agent_specs[@]}"; do
+  agent="${spec%%=*}"
+  cidr="${spec#*=}"
+  addr="${cidr%%/*}"
+  prefix="${cidr##*/}"
+
+  [ -n "$agent" ] && [ "$agent" != "$spec" ] \
+    || fail "MEDIATOR_AGENT_NETWORKS entry '$spec' is malformed -- expected '<agent>=<addr>/<prefix>'"
+  [[ "$prefix" =~ ^[0-9]+$ ]] && [ "$prefix" -ge 8 ] && [ "$prefix" -le 32 ] \
+    || fail "MEDIATOR_AGENT_NETWORKS entry '$spec' has no usable prefix length"
+
+  # The declared address must actually be ours. Without this a renumber in
+  # compose.yaml that misses this variable would leave dnsdist trying to bind an
+  # address it does not hold -- or, worse, binding fine while attributing queries to
+  # the wrong agent and applying the wrong allowlist.
+  # `hostname -I` rather than `ip addr`: iproute2 is not installed, and adding it
+  # to the enforcement point to read one list of addresses is not a trade worth
+  # making.
+  case " $(hostname -I 2>/dev/null) " in
+    *" $addr "*) : ;;
+    *) fail "MEDIATOR_AGENT_NETWORKS declares $addr for '$agent', but this container holds no such address (has: $(hostname -I 2>/dev/null)). The ipam block in compose.yaml and this variable are one fact; fix them together." ;;
+  esac
+
+  # The agent must exist in the resolved policy, or its allowlist would render empty
+  # and every one of its names would be refused with nothing saying why.
+  [ "$(yq eval ".agents | has(\"$agent\")" "$RESOLVED_POLICY")" = "true" ] \
+    || fail "$RESOLVED_POLICY has no agents.$agent, but MEDIATOR_AGENT_NETWORKS declares a network for it"
+
+  network="$(ipv4_network "$addr" "$prefix")"
+
+  ACL_ENTRIES="${ACL_ENTRIES}${ACL_ENTRIES:+, }\"${network}\""
+  LISTENERS="${LISTENERS}addLocal(\"${addr}:53\")   -- ${agent}"$'\n'
+  AGENT_NETS="${AGENT_NETS}AGENT_NETS[\"${agent}\"] = newNMG(); AGENT_NETS[\"${agent}\"]:addMask(\"${network}\")"$'\n'
+
+  # Exact names only. The compiler already refuses a wildcard entry at compile time
+  # (scripts/compile-policy.sh) because the resolver matches exactly and a wildcard
+  # would reopen DNS exfiltration; this stage is what makes that refusal meaningful.
+  names="$(yq eval ".agents.${agent}.allow_fqdns[].fqdn" "$RESOLVED_POLICY" 2>/dev/null || true)"
+
+  set_lua="NAMES_${agent} = newDNSNameSet()"$'\n'
+  count=0
+  while IFS= read -r fqdn; do
+    [ -n "$fqdn" ] && [ "$fqdn" != "null" ] || continue
+    case "$fqdn" in
+      *'*'*) fail "$RESOLVED_POLICY: agents.${agent} allows the wildcard '$fqdn'. The resolver matches exactly; a wildcard here would forward every name beneath it (R5.4)." ;;
+    esac
+    # Canonicalised at render time as well as at query time, so a base file written
+    # with capitals cannot produce an entry no canonical query can ever match.
+    lower="$(printf '%s' "$fqdn" | tr '[:upper:]' '[:lower:]')"
+    set_lua="${set_lua}NAMES_${agent}:add(newDNSName(\"${lower}.\"))"$'\n'
+    count=$(( count + 1 ))
+  done <<< "$names"
+
+  AGENT_NAMESETS="${AGENT_NAMESETS}-- ${agent}: ${count} exact name(s) from ${RESOLVED_POLICY}"$'\n'"${set_lua}"$'\n'
+
+  if [ "$count" -eq 0 ]; then
+    # Not an error: an agent with no allowlisted name resolves nothing, which is the
+    # correct default-deny outcome. Said out loud because silent is how it would be
+    # mistaken for a rendering bug.
+    note "resolver: agent '$agent' has no allowlisted names -- every DNS query from ${network} will be REFUSED"
+  fi
+
+  rule="allow_${agent}"
+  AGENT_ALLOW_RULES="${AGENT_ALLOW_RULES}${rule} = AndRule({NetmaskGroupRule(AGENT_NETS[\"${agent}\"]), QNameSetRule(NAMES_${agent}), AorAAAA})"$'\n'
+  ALLOW_RULE_NAMES="${ALLOW_RULE_NAMES}${ALLOW_RULE_NAMES:+, }${rule}"
+done
+
+[ -n "$ACL_ENTRIES" ] || fail "MEDIATOR_AGENT_NETWORKS produced no agent networks"
+
+# One audit call and one pool decision for the union of the per-agent rules, rather
+# than a matching pair per agent: the verdict is the same on every allowed path, and
+# duplicating it invites the two copies to drift.
+AGENT_ALLOW_RULES="${AGENT_ALLOW_RULES}
+anyAllow = OrRule({${ALLOW_RULE_NAMES}})
+addAction(anyAllow, LuaAction(function(dq) return auditDNS(dq, \"allow\", nil) end))
+addAction(anyAllow, PoolAction(\"reorigin\"))"
+
+render() { # <template> <output>
+  local tmpl="$1" out="$2"
+  [ -f "$tmpl" ] || fail "template $tmpl not found in the image"
+  AGENT_NETS="$AGENT_NETS" AGENT_NAMESETS="$AGENT_NAMESETS" \
+  AGENT_ALLOW_RULES="$AGENT_ALLOW_RULES" ACL_ENTRIES="$ACL_ENTRIES" \
+  LISTENERS="$LISTENERS" DNS_AUDIT_LOG="$DNS_AUDIT_LOG" \
+  REORIGIN_PORT="$REORIGIN_PORT" FORWARD_ADDRS="$FORWARD_ADDRS" \
+  awk '
+    function emit(v) { printf "%s", ENVIRON[v]; if (ENVIRON[v] !~ /\n$/) printf "\n" }
+    /^@ACL@$/                { next }
+    $0 == "setACL({@ACL@})"  { printf "setACL({%s})\n", ENVIRON["ACL_ENTRIES"]; next }
+    /^@LISTENERS@$/          { emit("LISTENERS");         next }
+    /^@AGENT_NETS@$/         { emit("AGENT_NETS");        next }
+    /^@AGENT_NAMESETS@$/     { emit("AGENT_NAMESETS");    next }
+    /^@AGENT_ALLOW_RULES@$/  { emit("AGENT_ALLOW_RULES"); next }
+    /^@FORWARD_ADDRS@$/      { emit("FORWARD_ADDRS");     next }
+    {
+      gsub(/@DNS_AUDIT_LOG@/, ENVIRON["DNS_AUDIT_LOG"])
+      gsub(/@REORIGIN_PORT@/, ENVIRON["REORIGIN_PORT"])
+      print
+    }
+  ' "$tmpl" > "$out"
+  # A marker surviving the render means a placeholder was added to a template and
+  # not to this function -- a silently half-configured enforcement point otherwise.
+  if grep -qE '@[A-Z_]+@' "$out"; then
+    grep -nE '@[A-Z_]+@' "$out" >&2
+    fail "$out still contains unsubstituted markers (see above)"
+  fi
+}
+
+FORWARD_ADDRS=""
+for up in ${MEDIATOR_DNS_UPSTREAM//,/ }; do
+  FORWARD_ADDRS="${FORWARD_ADDRS}    forward-addr: ${up}"$'\n'
+done
+
+render "$TMPL_DIR/resolver-policy.conf.tmpl"   "$POLICY_CONF"
+render "$TMPL_DIR/resolver-reorigin.conf.tmpl" "$REORIGIN_CONF"
+
 # ------------------------------------------------------------- holding configs
 # Loopback only. Criterion 1's permitted listener set on each AGENT network is
 # exactly {proxy, resolver}; a listener that binds no agent network at all is
-# inside that bound, and SF-6 is what opens the three agent-facing ports.
+# inside that bound, and SF-6 is what opens the three agent-facing proxy ports.
 cat > "$SQUID_CONF" <<CONF
 # HOLDING configuration -- 01.3 SF-4. Replaced by SF-6's render of
 # mediator/config/proxy.conf.tmpl from the resolved policy. Not the shipped policy.
 pid_filename none
 cache deny all
 # The ICMP pinger is a helper Squid starts to measure peer RTTs. It needs a raw
-# socket, which `cap_drop: ALL` does not grant, and it FATALs on every start --
+# socket, which \`cap_drop: ALL\` does not grant, and it FATALs on every start --
 # noise in the log for a feature this mediator has no use for (it has no ICMP path
 # out by construction, criterion 3). Off, rather than granting NET_RAW.
 pinger_enable off
@@ -82,80 +261,70 @@ access_log stdio:${AUDIT_LOG} mediator
 error_directory ${ERROR_DIR}
 CONF
 
-# unbound runs as the container's uid, so it must not try to setuid or chroot:
-# `cap_drop: ALL` leaves it no way to do either, and the failure would be at start
-# rather than something to discover later. Binding :53 is the privileged-port case
-# this sub-feature verifies -- see compose.yaml's `sysctls` and the record.
-cat > "$RESOLVER_CONF" <<CONF
-# HOLDING configuration -- 01.3 SF-4. Replaced by SF-5's render of
-# mediator/config/resolver.conf.tmpl. Refuses everything and logs every query;
-# it is the capture instrument for the \`dns:\` redirect, not the pod resolver.
-server:
-    verbosity: 1
-    username: ""
-    chroot: ""
-    pidfile: ""
-    directory: "${RUN_DIR}"
-    logfile: ""
-    use-syslog: no
-    log-queries: yes
-    do-daemonize: no
-    interface: 0.0.0.0
-    port: 53
-    access-control: 0.0.0.0/0 allow
-    local-zone: "." refuse
-CONF
-
 # ------------------------------------------------------------------- pre-flight
-# Both parsers fail hard on an unknown directive, which is how configuration
-# correctness is established on an image that ships no squid.conf.documented.
+# All three parsers fail hard on an unknown directive, which is how configuration
+# correctness is established on an image that ships no reference config. A rendered
+# file that does not parse is a start failure, never a daemon started against a
+# configuration nobody checked.
 squid -k parse -f "$SQUID_CONF" >/dev/null 2>&1 \
   || { squid -k parse -f "$SQUID_CONF" || true; fail "squid rejected $SQUID_CONF"; }
-unbound-checkconf "$RESOLVER_CONF" >/dev/null 2>&1 \
-  || { unbound-checkconf "$RESOLVER_CONF" || true; fail "unbound rejected $RESOLVER_CONF"; }
+unbound-checkconf "$REORIGIN_CONF" >/dev/null 2>&1 \
+  || { unbound-checkconf "$REORIGIN_CONF" || true; fail "unbound rejected $REORIGIN_CONF"; }
+dnsdist --check-config -C "$POLICY_CONF" >/dev/null 2>&1 \
+  || { dnsdist --check-config -C "$POLICY_CONF" || true; fail "dnsdist rejected $POLICY_CONF"; }
 
 # ------------------------------------------------------------------------ start
 # Squid cannot open /dev/stdout after dropping to the `proxy` user (the parent
-# directory must be writable by it -- mediator-selection.md), so both logs are
-# files on the audit volume and are relayed to the container's streams from here.
-# That keeps D12's two sinks -- the volume and the container's stdout -- without
-# giving Squid a path it cannot open.
-tail -n 0 -F "$AUDIT_LOG" >&1 &
-TAIL_AUDIT=$!
-tail -n 0 -F "$CACHE_LOG" >&2 &
-TAIL_CACHE=$!
+# directory must be writable by it -- mediator-selection.md), so the logs are files
+# on the audit volume and are relayed to the container's streams from here. That
+# keeps D12's two sinks -- the volume and the container's stdout -- without giving a
+# daemon a path it cannot open. The DNS audit sink is written by dnsdist's Lua and
+# relayed the same way, so both trails reach both sinks.
+CHILDREN=()
 
-unbound -d -c "$RESOLVER_CONF" &
-UNBOUND_PID=$!
-squid -N -f "$SQUID_CONF" &
-SQUID_PID=$!
+tail -n 0 -F "$AUDIT_LOG"     >&1 & CHILDREN+=($!); TAIL_AUDIT=$!
+tail -n 0 -F "$CACHE_LOG"     >&2 & CHILDREN+=($!); TAIL_CACHE=$!
+tail -n 0 -F "$DNS_AUDIT_LOG" >&1 & CHILDREN+=($!); TAIL_DNS=$!
 
-# A half-dead mediator is worse than a dead one: a live proxy with a dead resolver
-# is a pod whose DNS authority has silently gone, and a live resolver with a dead
-# proxy is an enforcement point that is no longer enforcing. Either exit takes the
+unbound -d -c "$REORIGIN_CONF" & CHILDREN+=($!); UNBOUND_PID=$!
+# The re-originating resolver must be answering before the policy engine starts, or
+# dnsdist's first queries hit a backend that is not listening yet.
+# Read from /proc rather than with `ss`, which is not installed. The UDP table
+# lists the port in hex; 0100007F is 127.0.0.1 little-endian.
+_reorigin_hex="$(printf '0100007F:%04X' "$REORIGIN_PORT")"
+_reorigin_up=0
+for _ in $(seq 1 100); do
+  if grep -qi " ${_reorigin_hex} " /proc/net/udp 2>/dev/null; then _reorigin_up=1; break; fi
+  kill -0 "$UNBOUND_PID" 2>/dev/null || fail "the re-originating resolver exited before it began listening -- see its output above"
+  sleep 0.1
+done
+[ "$_reorigin_up" -eq 1 ] \
+  || fail "the re-originating resolver did not bind 127.0.0.1:${REORIGIN_PORT} within 10s -- refusing to start the policy engine in front of a backend that is not answering"
+
+dnsdist --supervised --disable-syslog -C "$POLICY_CONF" & CHILDREN+=($!); DNSDIST_PID=$!
+squid -N -f "$SQUID_CONF" & CHILDREN+=($!); SQUID_PID=$!
+
+# A half-dead mediator is worse than a dead one: a live proxy with a dead resolver is
+# a pod whose DNS authority has silently gone, and a live resolver with a dead proxy
+# is an enforcement point that is no longer enforcing. Either exit takes the
 # container down so the restart policy and the operator both see it.
 # Cleanup is bounded. TERM first, then KILL for anything still alive: a daemon that
 # ignores TERM or wedges would otherwise leave PID 1 waiting forever and the
 # container neither running nor gone. The relays are reaped here too rather than
 # left to container teardown.
 stop_children() {
-  local pid
-  for pid in "$SQUID_PID" "$UNBOUND_PID" "$TAIL_AUDIT" "$TAIL_CACHE"; do
-    kill "$pid" 2>/dev/null || true
-  done
-  local alive
+  local pid alive
+  for pid in "${CHILDREN[@]}"; do kill "$pid" 2>/dev/null || true; done
   for _ in $(seq 1 50); do
     alive=0
-    for pid in "$SQUID_PID" "$UNBOUND_PID" "$TAIL_AUDIT" "$TAIL_CACHE"; do
-      kill -0 "$pid" 2>/dev/null && alive=1
-    done
+    for pid in "${CHILDREN[@]}"; do kill -0 "$pid" 2>/dev/null && alive=1; done
     [ "$alive" -eq 0 ] && break
     sleep 0.1
   done
-  for pid in "$SQUID_PID" "$UNBOUND_PID" "$TAIL_AUDIT" "$TAIL_CACHE"; do
+  for pid in "${CHILDREN[@]}"; do
     kill -0 "$pid" 2>/dev/null && { note "child $pid ignored TERM -- sending KILL"; kill -9 "$pid" 2>/dev/null || true; }
   done
-  wait "$SQUID_PID" "$UNBOUND_PID" "$TAIL_AUDIT" "$TAIL_CACHE" 2>/dev/null || true
+  wait "${CHILDREN[@]}" 2>/dev/null || true
 }
 
 # An asked-for stop (`docker stop`, `compose down`) is not an incident and exits 0.
@@ -171,9 +340,10 @@ on_signal() {
 }
 trap on_signal TERM INT
 
-note "up: squid $(squid -v 2>/dev/null | head -1 | sed 's/^Squid Cache: //'), unbound $(unbound -V 2>/dev/null | head -1) -- HOLDING configuration (SF-4)"
+note "up: squid $(squid -v 2>/dev/null | head -1 | sed 's/^Squid Cache: //') [HOLDING -- SF-6], dnsdist $(dnsdist --version 2>&1 | head -1), unbound $(unbound -V 2>/dev/null | head -1)"
+note "resolver: profile '${MEDIATOR_PROFILE}', networks '${MEDIATOR_AGENT_NETWORKS}', upstream '${MEDIATOR_DNS_UPSTREAM}'"
 
-# Four children, all watched. An unwatched relay is silent by construction: squid
+# Six children, all watched. An unwatched relay is silent by construction: a daemon
 # keeps writing to the volume, the mediator keeps enforcing, and the container's
 # stdout -- one of D12's two sinks -- stops carrying audit lines with nothing to say
 # so. R9.1 makes the audit trail a property of the enforcement point, not a
@@ -190,15 +360,16 @@ note "up: squid $(squid -v 2>/dev/null | head -1 | sed 's/^Squid Cache: //'), un
 # the message.
 DIED=""
 STATUS=0
-wait -n -p DIED "$SQUID_PID" "$UNBOUND_PID" "$TAIL_AUDIT" "$TAIL_CACHE" || STATUS=$?
+wait -n -p DIED "${CHILDREN[@]}" || STATUS=$?
 
 # Past this point a stop request must not overwrite a detected failure with exit 0.
 trap - TERM INT
 
 case "$DIED" in
   "$SQUID_PID")   note "squid exited (status $STATUS) -- taking the mediator down; the pod has no enforcement point" ;;
-  "$UNBOUND_PID") note "unbound exited (status $STATUS) -- taking the mediator down; the pod has no resolver" ;;
-  "$TAIL_AUDIT"|"$TAIL_CACHE")
+  "$DNSDIST_PID") note "dnsdist exited (status $STATUS) -- taking the mediator down; the pod has no DNS policy engine" ;;
+  "$UNBOUND_PID") note "unbound exited (status $STATUS) -- taking the mediator down; the pod's resolver cannot re-originate" ;;
+  "$TAIL_AUDIT"|"$TAIL_CACHE"|"$TAIL_DNS")
                   note "an audit relay exited (status $STATUS) -- taking the mediator down; stdout is no longer carrying the audit trail" ;;
   *)              note "a supervised child exited (pid ${DIED:-unknown}, status $STATUS) -- taking the mediator down" ;;
 esac

@@ -1,0 +1,127 @@
+-- The pod's DNS policy engine (01.3 SF-5). RENDERED at start by
+-- images/mediator/entrypoint.sh from policy/resolved/<profile>.yaml -- never
+-- hand-edited (SC-6). Lines marked @...@ are substituted; everything else ships
+-- as written.
+--
+-- This is the front half of the closed forwarder criterion 4 describes. It holds
+-- ALL of the policy; the resolver behind it (resolver-reorigin.conf.tmpl, on
+-- loopback) holds none, because it never sees a query this file has not already
+-- allowed.
+--
+-- The split is verified, not stylistic -- docs/records/resolver-verification.md:
+-- unbound alone cannot express exact-name matching (its local-zone is subtree
+-- scoped), cannot restrict QTYPE at all, and forwards a mixed-case QNAME with the
+-- client's case intact. dnsdist alone PROXIES the client's packet, so a client
+-- EDNS client-subnet and cookie reach the upstream verbatim. Each stage closes
+-- what the other cannot, and removing either reopens a named criterion-4 channel.
+
+-- Only the agent networks may query at all. The mediator also holds an interface
+-- on the external network; nothing there can reach this listener, both because no
+-- address there is bound below and because the ACL refuses it.
+setACL({@ACL@})
+
+-- One listener per agent network, on the mediator's static address for that
+-- network. NOT 0.0.0.0: criterion 1 permits exactly {proxy, resolver} on each
+-- agent network and nothing outward-facing.
+@LISTENERS@
+
+-- The re-originating resolver, on loopback inside this container. Criterion 1
+-- already permits a loopback-bound listener ("any management, metrics, admin or
+-- health endpoint binds the loopback interface inside the mediator").
+--
+-- Health checks are OFF. The backend is a process in this same container, so a
+-- health probe adds nothing a dead-process check does not already give -- and an
+-- enabled check queries through to the real upstream on an interval, producing
+-- egress traffic attributable to no agent and appearing in no audit line
+-- (docs/records/resolver-verification.md, "Results carried forward").
+newServer({address="127.0.0.1:@REORIGIN_PORT@", pool="reorigin", healthCheckMode="lazy", checkInterval=0, mustResolve=false})
+
+-- ------------------------------------------------------------------ audit sink
+-- One JSON line per DNS decision, allow and deny alike -- the four fields
+-- criterion 4 names (agent, name, QTYPE, verdict), in the shape of Interface
+-- Contract 4 so the DNS trail and the egress trail carry attribution of the same
+-- declared strength. `identity_source` is "listener" for the same reason it is on
+-- the egress line: each agent network carries exactly one agent, so the address a
+-- query arrived from IS the agent's identity. It is network-derived, and the field
+-- says so rather than leaving a later reader to assume otherwise.
+--
+-- Opened once at load and flushed per line. R9.1 makes the audit trail a property
+-- of the enforcement point, so a decision that is not written is a decision that
+-- did not happen as far as the operator can tell.
+-- ------------------------------------------------------------ the agent networks
+-- One entry per agent. Each `internal: true` agent network carries exactly one
+-- agent container, so the network a query arrived on IS that agent's identity.
+AGENT_NETS = {}
+@AGENT_NETS@
+
+auditfh = io.open("@DNS_AUDIT_LOG@", "a")
+if not auditfh then
+  error("cannot open the DNS audit sink at @DNS_AUDIT_LOG@ -- refusing to serve DNS unaudited")
+end
+
+-- QTYPE numbers, so the audit line carries the mnemonic the operator reads. Only
+-- the two forwardable types plus the types worth naming in a denial; anything else
+-- is logged by number, which is enough to identify it.
+QTYPE_NAME = { [1]="A", [28]="AAAA", [16]="TXT", [65]="HTTPS", [64]="SVCB",
+               [15]="MX", [2]="NS", [255]="ANY", [12]="PTR", [33]="SRV", [5]="CNAME" }
+
+-- Attribution uses the same netmask objects the policy rules use, so the agent
+-- named on an audit line and the agent whose allowlist was applied can never
+-- disagree.
+function agentOf(dq)
+  for name, nmg in pairs(AGENT_NETS) do
+    if nmg:match(dq.remoteaddr) then return name end
+  end
+  -- Unreachable while the ACL holds. Logged rather than assumed away: an
+  -- unattributable query is a finding, not a formatting problem.
+  return "unattributed"
+end
+
+function auditDNS(dq, verdict, control)
+  local qt = QTYPE_NAME[dq.qtype] or tostring(dq.qtype)
+  auditfh:write(string.format(
+    '{"ts":"%s","agent":"%s","identity_source":"listener","qname":"%s","qtype":"%s","verdict":"%s","control":%s}\n',
+    os.date("!%Y-%m-%dT%H:%M:%SZ"), agentOf(dq), dq.qname:toString(), qt, verdict,
+    control and ('"' .. control .. '"') or "null"))
+  auditfh:flush()
+  return DNSAction.None, ""
+end
+
+-- --------------------------------------------------------- control: QNAME case
+-- Criterion 4's 0x20 term, and it runs FIRST because it is an envelope-integrity
+-- check rather than a policy decision. DNS name comparison is case-insensitive, so
+-- a mixed-case QNAME passes an exact-match allowlist unchanged while carrying about
+-- one bit per alphabetic character to an upstream the agent has no other route to.
+--
+-- The criterion says the resolver "constructs a fresh query from the canonicalised
+-- (lowercased) name". dnsdist has no QNAME-rewrite action and its RegexRule is
+-- case-INSENSITIVE (verified: RegexRule("[A-Z]") matches an all-lowercase name and
+-- refuses everything), so the channel is closed by refusing the non-canonical query
+-- instead. That is not weaker -- nothing reaches the upstream either way -- and it
+-- is more auditable, because the refusal is a logged decision rather than a silent
+-- normalisation. Recorded as a deviation in the feature plan.
+isNonCanonicalName = LuaRule(function(dq)
+  local n = dq.qname:toString()
+  return n ~= string.lower(n)
+end)
+addAction(isNonCanonicalName, LuaAction(function(dq) return auditDNS(dq, "deny", "qname_case") end))
+addAction(isNonCanonicalName, RCodeAction(DNSRCode.REFUSED))
+
+-- ------------------------------------------- controls: exact name, QTYPE, agent
+-- QTYPE is restricted to A and AAAA. This is also the structural ECH mitigation:
+-- an Encrypted ClientHello configuration is retrieved in HTTPS/SVCB records, so an
+-- agent using the pod resolver cannot obtain one. See the feature plan's
+-- domain-fronting edge case -- a real control, not a complete one.
+AorAAAA = OrRule({QTypeRule(DNSQType.A), QTypeRule(DNSQType.AAAA)})
+
+@AGENT_NAMESETS@
+
+@AGENT_ALLOW_RULES@
+
+-- ----------------------------------------------------------------- default-deny
+-- Anything reaching here matched no agent's EXACT allowlist entry at a forwardable
+-- QTYPE. It is refused and forwarded nowhere -- including every subdomain of an
+-- allowlisted name, which is the DNS tunnel R5.4 exists to close and the reason
+-- exact matching is load-bearing rather than tidy.
+addAction(AllRule(), LuaAction(function(dq) return auditDNS(dq, "deny", "allowlist") end))
+addAction(AllRule(), RCodeAction(DNSRCode.REFUSED))
