@@ -47,7 +47,7 @@ network, both the mediator's `egress-net` address and an agent network address a
 |---|---|---|
 | 1a | Per-agent allowlist, not a union | **PASS** |
 | 1b | SNI equals the CONNECT host (domain fronting refused) | **PASS**, all three paths |
-| 2 | `deny_fqdns` and `deny_cidrs`, deny wins | **PASS**, including the `/32` neighbour discrimination |
+| 2 | `deny_fqdns` and `deny_cidrs`, deny wins | **PASS**, including the `/32` neighbour discrimination — with both names allowlisted, see below |
 | 3a | Per-agent concurrency ceiling | **PASS**, and it calibrates **1:1** — see below |
 | 3b | Per-agent byte-rate ceiling | **PASS** — 67160 B/s against a 65536 B/s pool over a spliced tunnel |
 | — | CONNECT-only method restriction | **PASS** — a plain `GET` through the proxy returns 403 |
@@ -80,14 +80,39 @@ CONNECT) and was still refused — equality, not membership.
 
 ### 2 — deny wins, and the `/32` discriminates
 
-`denied.test` shares the origin's address with `allowed.test` and is refused (`control=deny_fqdns`),
-which is the T6/CDN-rotation shape. For the address deny, `172.33.40.9/32` is denied and the
-adjacent `172.33.40.10` — the actual origin — is not:
+`denied.test` shares the origin's address with `allowed.test` and is refused, which is the
+T6/CDN-rotation shape: same address, different name, opposite verdict, decided per connection at L7
+rather than from an IP snapshot.
+
+**The address deny needs the name to be allowlisted, or the test proves nothing.** The first attempt
+at this measurement was wrong and is recorded rather than quietly replaced: it aimed a CONNECT at
+`neighbour.test` while that name was **not** in `claude`'s allowlist, so the refusal came from the
+host gate (control 1a) and `deny_cidrs` was never reached at all. The audit line gave it away — the
+verdict was on the **front** listener (`172.33.10.2:3128`), which carries no `dst` rule.
+
+Re-run with `neighbour.test` **allowlisted for `claude`**, so it passes the gate and the only thing
+left to refuse it is the post-resolution address deny — which is exactly D5's rebinding/CDN case and
+the whole reason control 2 exists:
 
 ```
-pclaude allowed.test -> .10          expect ALLOW  200
-pclaude allowed.test pinned to .9    expect deny   000 (curl 56)
+pclaude allowed.test    (-> 172.33.40.10, not denied)   200
+pclaude neighbour.test  (-> 172.33.40.9,  deny /32)     000 (curl 35)
 ```
+
+and the verdict lands on the **inner** listener, which is where the connection is actually made:
+
+```
+agent=claude port=127.0.0.1:3200   url=neighbour.test:443 status=200 squid=TCP_DENIED  sni="neighbour.test"
+agent=claude port=172.33.10.2:3128 url=neighbour.test:443 status=200 squid=TCP_TUNNEL  sni="-"
+```
+
+Both names are allowlisted, both resolve to adjacent addresses on the same origin image, one is
+refused and the other is not. That is the `/32` discrimination criterion 10 asks for.
+
+**T7 (`169.254.169.254`) is refused by the host gate, not by `deny_cidrs`** — an IP literal matches
+no `dstdomain` entry, so it never reaches the address deny. It is refused either way
+(`TCP_DENIED_ABORTED`), and refused *earlier*, which is the better outcome; recorded here so the
+control that actually fired is not mis-attributed.
 
 ---
 
@@ -109,6 +134,31 @@ than reasoned about. With the mediator's upstream pointed at the controlled auth
 
 The allowlisted case is what makes the absence meaningful: the observation path demonstrably works,
 so zero is a real zero rather than a broken test.
+
+## Finding 1a — `dstdomain` reverse lookups leaked PTR queries; closed with `-n`
+
+Found while re-testing control 2, and it is the same leak class as finding 1 one query type over.
+Squid's `dstdomain` ACL, given a destination that is a bare IP literal, issues a **reverse (PTR)
+lookup** through its own upstream purely to obtain a name to compare. Measured at the controlled
+resolver:
+
+```
+172.33.40.2 254.169.254.169.in-addr.arpa. PTR IN      <- from CONNECT 169.254.169.254:443
+172.33.40.2 9.40.33.172.in-addr.arpa. PTR IN          <- from CONNECT 172.33.40.9:443
+```
+
+Mediator-originated, agent-triggered, unaudited DNS egress — on a destination the policy was in the
+middle of **refusing**. The same shape as the `dnsdist` security-poll egress SF-5 closed.
+
+Every rendered `dstdomain` ACL now carries `-n`, which disables the lookup: an IP literal matches no
+name and falls through to default-deny, resolving nothing. Re-measured after the change:
+
+| CONNECT target | `in-addr.arpa` queries before | after |
+|---|---|---|
+| `169.254.169.254:443` and `172.33.40.9:443` | 4 | **0** |
+
+Both are still refused, and the name-based controls are unchanged (`allowed.test` 200;
+`neighbour.test`, `denied.test` and `agy-only.test` all refused).
 
 ## Finding 2 — the pre-CONNECT 403 exists on two of three listeners, not none and not all
 
@@ -196,6 +246,9 @@ happy-path assertion — is the one that would catch a regression here.
 | Finding | Lands in |
 |---|---|
 | Allowlist gate must precede any `dst` ACL, or the mediator resolves attacker-chosen names | **shipped** in `mediator/config/proxy.conf.tmpl`; SF-8 asserts the absence of the upstream query |
+| `dstdomain` must carry `-n`, or an IP-literal CONNECT leaks a PTR query | **shipped**; SF-8 should assert the absence of `in-addr.arpa` at the T4 fixture |
+| A `deny_cidrs` assertion is only meaningful when the name is **allowlisted** — otherwise the host gate refuses first and control 2 is never reached | **SF-8** (`policy/resolved/test-fixtures.yaml` must allowlist the denied-address name) |
+| `deny_cidrs` verdicts are decided **post-accept on every agent** (the inner listener peeks), so Interface Contract 6's pre-CONNECT 403 path covers the host gate and `deny_fqdns` only | **SF-7** |
 | Pre-CONNECT 403 reaches `claude`/`agy` and not `codex` | **SF-7** (denial surface), **SF-8** (Phase C assertions differ per listener) |
 | `maxconn` nominal == effective; assert the N+1th with staggered opens | **SF-8** |
 | Front line reports `TCP_TUNNEL` while the inner line reports the verdict | **SF-7** (audit writer must take the inner verdict) — unchanged from SF-1's P4 caveat, re-observed here |

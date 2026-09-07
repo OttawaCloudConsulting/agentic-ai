@@ -318,7 +318,17 @@ for spec in "${_agent_specs[@]}"; do
     # The `.` prefix Squid uses for subdomain matching is NOT used: `dstdomain
     # api.anthropic.com` matches that name exactly, and a leading dot would match
     # every host beneath it -- the same hole the resolver's exact matching closes.
-    P_AGENT_ACLS="${P_AGENT_ACLS}acl h_${agent}_${count} dstdomain ${lower}"$'\n'
+    #
+    # `-n` disables the REVERSE lookup, and it is a control rather than a tuning
+    # flag. Without it a CONNECT to a bare IP literal makes Squid issue a PTR query
+    # through its own upstream just to obtain a name for this ACL to compare --
+    # measured at the SF-6 build: `CONNECT 169.254.169.254:443` produced
+    # `254.169.254.169.in-addr.arpa. PTR IN` at the controlled resolver. That is
+    # mediator-originated, agent-triggered, unaudited DNS egress on a destination the
+    # policy is in the middle of refusing: the same leak the allowlist-gate-first
+    # ordering closes for forward names, one query type over. With `-n` an IP literal
+    # matches no name and falls through to default-deny, resolving nothing.
+    P_AGENT_ACLS="${P_AGENT_ACLS}acl h_${agent}_${count} dstdomain -n ${lower}"$'\n'
     P_AGENT_ACLS="${P_AGENT_ACLS}acl s_${agent}_${count} ssl::server_name --client-requested ${lower}"$'\n'
     P_AGENT_ACLS="${P_AGENT_ACLS}acl t_${agent}_${count} port ${fport}"$'\n'
     P_ALLOW_RULES="${P_ALLOW_RULES}http_access allow p_${agent}_inner h_${agent}_${count} s_${agent}_${count} t_${agent}_${count}"$'\n'
@@ -346,7 +356,7 @@ for spec in "${_agent_specs[@]}"; do
     note "proxy: agent '$agent' has no allowlisted names -- every CONNECT from ${network} will be refused"
     P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent}"$'\n'
   else
-    P_AGENT_ACLS="${P_AGENT_ACLS}acl hany_${agent} dstdomain${agent_hosts}"$'\n'
+    P_AGENT_ACLS="${P_AGENT_ACLS}acl hany_${agent} dstdomain -n${agent_hosts}"$'\n'
     P_AGENT_ACLS="${P_AGENT_ACLS}acl tany_${agent} port$(printf '%s\n' $agent_ports | sort -un | tr '\n' ' ' | sed 's/ $//;s/^/ /')"$'\n'
     P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent} !hany_${agent}"$'\n'
     P_GATE_RULES="${P_GATE_RULES}http_access deny p_${agent} !tany_${agent}"$'\n'
@@ -403,7 +413,7 @@ done <<< "$deny_cidrs"
 # profile precisely because criterion 10 asked for the field to be SUPPORTED, not
 # populated.
 if [ -n "$_df" ]; then
-  P_DENY_ACLS="${P_DENY_ACLS}acl deny_fqdns dstdomain${_df}"$'\n'
+  P_DENY_ACLS="${P_DENY_ACLS}acl deny_fqdns dstdomain -n${_df}"$'\n'
   P_DENY_RULES="${P_DENY_RULES}http_access deny deny_fqdns"$'\n'
 fi
 if [ -n "$_dc" ]; then
