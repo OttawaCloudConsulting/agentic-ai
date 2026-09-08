@@ -199,7 +199,7 @@
     SC-3 project-mount containment. Gates run BEFORE the zero-pack refusal, or the R7.6 gate would
     be unreachable on the only input it exists for -- probed, not reasoned: a profile selecting a
     pack with registry egress exits 3, not 2.
-    EVERY GATE WAS PROBED, 28 probes, all removed afterwards. Positive controls first: --profile
+    EVERY GATE WAS PROBED, 35 probes, all removed afterwards. Positive controls first: --profile
     oauth-mount PASSES T27, and all three committed resolved artifacts are still `--check` current
     (so the new profile fields did not leak into the emitted schema). Then the negatives: each of
     the five accepted_risk fields deleted in turn, mount_mode rw, an unknown mounts key, both and

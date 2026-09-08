@@ -76,7 +76,7 @@ while [[ $# -gt 0 ]]; do
     --denylist)  DENYLIST_IN="${2:?--denylist needs a path}"; shift 2 ;;
     --validate) MODE="validate"; VALIDATE_TARGET="${2:?--validate needs a path}"; shift 2 ;;
     --check)    MODE="check"; shift ;;
-    -h|--help)  sed -n '2,25p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help)  sed -n '2,28p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *)          fail "unknown argument: $1" ;;
   esac
 done

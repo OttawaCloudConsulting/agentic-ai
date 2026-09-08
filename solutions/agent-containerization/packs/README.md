@@ -32,10 +32,18 @@ as a pack that needs none.
 | `packages` | R7.3, R7.18 | `apt.items[]` and `archives[]`, each pinned to an exact version **and carrying a SHA-256** |
 | `egress.runtime` | R7.3 | `allow_fqdns` / `allow_cidrs` composed into the resolved policy. This is reach the running agent gains |
 | `egress.build` | R10.4 | `allow_fqdns` the **image build** reaches. Never enters `policy/resolved/` |
-| `runtime_install` | R7.6 | `true` requires a recorded reason and registry egress declared above |
+| `runtime_install` | R7.6 | `true` requires `runtime_install_reason` **and** non-empty `egress.runtime`. Both directions are enforced |
+| `runtime_install_reason` | R7.6 | mandatory **only** where `runtime_install: true`; absent otherwise, as in this pack |
 | `mounts` | R7.3 | required mounts and their modes. Keys must be in the enumerated R2 set |
 | `env` | R7.3 | required environment variables |
 | `credentials` | R7.3 | required credentials |
+
+`runtime_install` and its reason are refused in **both** directions (01.5 SF-2). Runtime egress
+with `runtime_install: false` is a widening R7.6 requires declared; `runtime_install: true` with
+no reason is a default flipped rather than a decision taken; and `runtime_install: true` with no
+`egress.runtime` records a widening the resolved policy does not carry. `scripts/lint-policy.sh`
+fails on the missing reason (well-formedness, exit 1); `scripts/compile-policy.sh` refuses all
+three at **exit 3**, because which packs a profile may load is a policy decision, not a typo.
 
 A pack may **not** declare `deny_fqdns` or `deny_cidrs`. The denylist is copied from
 `policy/denylist.base.yaml` unmodified and deny wins after resolution; a pack-supplied deny key
