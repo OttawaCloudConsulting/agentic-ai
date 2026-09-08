@@ -33,7 +33,7 @@ as a pack that needs none.
 | `egress.runtime` | R7.3 | `allow_fqdns` / `allow_cidrs` composed into the resolved policy. This is reach the running agent gains |
 | `egress.build` | R10.4 | `allow_fqdns` the **image build** reaches. Never enters `policy/resolved/` |
 | `runtime_install` | R7.6 | `true` requires `runtime_install_reason` **and** non-empty `egress.runtime`. Both directions are enforced |
-| `runtime_install_reason` | R7.6 | mandatory **only** where `runtime_install: true`; absent otherwise, as in this pack |
+| `runtime_install_reason` | R7.6 | mandatory **only** where `runtime_install: true`; absent otherwise, as in this pack. Must be TEXT: an empty list or map is refused, because yq renders both as printable strings and a `[]` here would record nothing while looking filled in |
 | `mounts` | R7.3 | required mounts and their modes. Keys must be in the enumerated R2 set |
 | `env` | R7.3 | required environment variables |
 | `credentials` | R7.3 | required credentials |

@@ -26,6 +26,7 @@
 #
 # Exit codes (01.5 SF-2): 0 success  1 usage error  2 input validation failure
 #                         3 refusal gate tripped (R4.17/T27, R2.8/T21, R7.6, SC-3)
+#                         4 --check drift -- NOT BUILT YET, SF-4. --check still exits 1
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,7 +48,7 @@ VALIDATE_TARGET=""
 #   1  usage / invocation error        fail()
 #   2  input validation failure        invalid()
 #   3  refusal gate tripped            refuse()
-#   4  --check found drift             SF-4
+#   4  --check found drift             SF-4 -- NOT BUILT YET; --check still exits 1 today
 fail()    { echo "compile-policy: FAIL: $*" >&2; exit 1; }
 invalid() { echo "compile-policy: INVALID: $*" >&2; exit 2; }
 refuse()  { echo "compile-policy: REFUSED: $*" >&2; exit 3; }
@@ -230,6 +231,52 @@ REL_PROFILE="profiles/${PROFILE}.yaml"
 # decision about is a REFUSAL (3) -- the operator's job, not the author's typo.
 # --------------------------------------------------------------------------------------------
 
+# scalar_nonblank -- "is this field actually RECORDED?", not "does yq print something".
+# yq renders an empty collection as the two-character strings `[]` and `{}`, so a `-n` test on
+# `yq eval .field` accepts `file: []` as a filled-in field. Every gate below asks whether an
+# OPERATOR WROTE SOMETHING, and an empty list satisfying R4.17's accepted-risk record is exactly
+# the hollow record the requirement exists to prevent. So the tag is checked, not the rendering.
+# Found by the Codex adversarial pass, 2026-09-08.
+scalar_nonblank() {
+  local f="$1" path="$2" tag v
+  tag="$(yq eval "$path | tag" "$f" 2>/dev/null)" || return 1
+  case "$tag" in
+    '!!str'|'!!int'|'!!float'|'!!bool') : ;;
+    *) return 1 ;;
+  esac
+  v="$(yq eval "$path" "$f")"
+  [[ -n "${v//[[:space:]]/}" ]] || return 1
+  printf '%s' "$v"
+}
+
+# require_tag -- a `yq | keys` or `| has()` call on the wrong node type is a RAW yq failure under
+# `set -e`: exit 1 with yq's own message, which is the usage code, and the invalid() handler that
+# was meant to catch it never runs. Every structural traversal below is guarded first.
+require_tag() {
+  local f="$1" path="$2" want="$3" msg="$4" tag
+  tag="$(yq eval "$path | tag" "$f" 2>/dev/null)" || tag="(unreadable)"
+  [[ "$tag" == "$want" ]] || invalid "$msg (found $tag)"
+}
+
+# normalise_abs -- collapse `//`, `/./` and `/x/../` LEXICALLY. No realpath: the gate below must
+# behave identically inside the compile stage, which cannot see the host filesystem. Without this
+# `<root>/./policy` and `<root>/../<root-name>/policy` are different strings from `<root>/policy`
+# and walk straight past a string comparison. Found by the Codex adversarial pass, 2026-09-08.
+# What it still cannot see is a SYMLINK -- that needs the filesystem, and is asserted at SF-7.
+normalise_abs() {
+  local p="$1" out=() seg
+  # The IFS split below drops empty segments, so `//` collapses without a separate pass.
+  local IFS='/'
+  for seg in $p; do
+    case "$seg" in
+      ''|'.') : ;;
+      '..') [[ "${#out[@]}" -eq 0 ]] || unset 'out[${#out[@]}-1]' ;;
+      *) out+=("$seg") ;;
+    esac
+  done
+  printf '/%s' "${out[*]}"
+}
+
 # The agent set is the base allowlist's, which is what the emitted artifact is keyed by. Any
 # per-agent map in the profile is checked against it rather than against a hardcoded list.
 ALLOW_AGENTS="$(yq eval '.agents | keys | .[]' "$ALLOWLIST")"
@@ -241,31 +288,36 @@ ALLOW_AGENTS="$(yq eval '.agents | keys | .[]' "$ALLOWLIST")"
 # explicit alternative is what stops the field from being quietly omitted.
 [[ "$(yq eval 'has("authorization")' "$PROFILE_FILE")" == "true" ]] \
   || invalid "$REL_PROFILE: field 'authorization' is missing (R12.7). Declare either 'classify' (a non-empty list of actions requiring human authorization) or 'waiver' (a recorded reason this profile waives it)"
+require_tag "$PROFILE_FILE" '.authorization' '!!map' \
+  "$REL_PROFILE: field 'authorization' must be a mapping declaring 'classify' or 'waiver' (R12.7)"
 HAS_CLASSIFY="$(yq eval '.authorization | has("classify")' "$PROFILE_FILE")"
 HAS_WAIVER="$(yq eval '.authorization | has("waiver")' "$PROFILE_FILE")"
 if [[ "$HAS_CLASSIFY" == "true" && "$HAS_WAIVER" == "true" ]]; then
   invalid "$REL_PROFILE: authorization declares both 'classify' and 'waiver'; exactly one is required (R12.7). A profile that classifies actions has not waived the requirement"
 elif [[ "$HAS_CLASSIFY" == "true" ]]; then
+  require_tag "$PROFILE_FILE" '.authorization.classify' '!!seq' \
+    "$REL_PROFILE: authorization.classify must be a list of actions (R12.7)"
   CLASSIFY_N="$(yq eval '.authorization.classify | length' "$PROFILE_FILE")"
   [[ "$CLASSIFY_N" =~ ^[0-9]+$ ]] && ((CLASSIFY_N > 0)) \
     || invalid "$REL_PROFILE: authorization.classify is empty. An empty classification is a waiver written so it does not look like one -- declare 'waiver' instead"
   for ((i = 0; i < CLASSIFY_N; i++)); do
-    v="$(yq eval ".authorization.classify[$i]" "$PROFILE_FILE")"
-    [[ -n "$v" && "$v" != "null" ]] \
-      || invalid "$REL_PROFILE: authorization.classify[$i] is empty"
+    scalar_nonblank "$PROFILE_FILE" ".authorization.classify[$i]" >/dev/null \
+      || invalid "$REL_PROFILE: authorization.classify[$i] is empty or is not a scalar"
   done
 elif [[ "$HAS_WAIVER" == "true" ]]; then
-  v="$(yq eval '.authorization.waiver' "$PROFILE_FILE")"
-  [[ -n "$v" && "$v" != "null" ]] \
+  scalar_nonblank "$PROFILE_FILE" '.authorization.waiver' >/dev/null \
     || invalid "$REL_PROFILE: authorization.waiver is empty. R12.7 requires the waiver to be explicit AND recorded; an empty one is neither"
 else
   invalid "$REL_PROFILE: authorization declares neither 'classify' nor 'waiver'; exactly one is required (R12.7)"
 fi
 
 # ---- packs: every selected name must resolve to a manifest --------------------------------
+# The tag, not the length: `yq '.packs | length'` returns 0 for a missing key, for `packs: ""`
+# and for `packs: {}` alike, so a length test reads three malformed shapes as a zero-pack profile
+# and skips every pack gate below (Codex adversarial pass, 2026-09-08).
+require_tag "$PROFILE_FILE" '.packs' '!!seq' \
+  "$REL_PROFILE: field 'packs' must be a list (declare 'packs: []' where a profile selects none)"
 PACKS_LEN="$(yq eval '.packs | length' "$PROFILE_FILE")"
-[[ "$PACKS_LEN" =~ ^[0-9]+$ ]] \
-  || invalid "$REL_PROFILE: field 'packs' is missing or is not a list (declare 'packs: []' where a profile selects none)"
 PACK_FILES=()
 PACK_NAMES=()
 for ((i = 0; i < PACKS_LEN; i++)); do
@@ -290,9 +342,11 @@ done
 if ((PACKS_LEN > 0)); then
   [[ "$(yq eval 'has("package_repository")' "$PROFILE_FILE")" == "true" ]] \
     || invalid "$REL_PROFILE: field 'package_repository' is missing, but the profile selects $PACKS_LEN pack(s) whose apt items are sourced from it (R7.18)"
+  require_tag "$PROFILE_FILE" '.package_repository.apt' '!!map' \
+    "$REL_PROFILE: field 'package_repository.apt' must be a mapping (R7.18)"
   for field in url suite signed_by fingerprint; do
-    v="$(yq eval ".package_repository.apt.$field // \"\"" "$PROFILE_FILE")"
-    [[ -n "$v" ]] || invalid "$REL_PROFILE: field 'package_repository.apt.$field' is missing or empty (R7.18)"
+    scalar_nonblank "$PROFILE_FILE" ".package_repository.apt.$field" >/dev/null \
+      || invalid "$REL_PROFILE: field 'package_repository.apt.$field' is missing, empty or not a scalar (R7.18)"
   done
   REPO_URL="$(yq eval '.package_repository.apt.url' "$PROFILE_FILE")"
   [[ "$REPO_URL" == https://* ]] \
@@ -307,9 +361,11 @@ fi
 # ---- mounts: shape (exit 2) then the R2.8 key allowlist (exit 3, GATE) ----------------------
 [[ "$(yq eval 'has("mounts")' "$PROFILE_FILE")" == "true" ]] \
   || invalid "$REL_PROFILE: field 'mounts' is missing (declare at least mounts.project)"
+require_tag "$PROFILE_FILE" '.mounts' '!!map' \
+  "$REL_PROFILE: field 'mounts' must be a mapping"
 for field in path mode; do
-  v="$(yq eval ".mounts.project.$field // \"\"" "$PROFILE_FILE")"
-  [[ -n "$v" ]] || invalid "$REL_PROFILE: field 'mounts.project.$field' is missing or empty"
+  scalar_nonblank "$PROFILE_FILE" ".mounts.project.$field" >/dev/null \
+    || invalid "$REL_PROFILE: field 'mounts.project.$field' is missing, empty or not a scalar"
 done
 PROJECT_MODE="$(yq eval '.mounts.project.mode' "$PROFILE_FILE")"
 [[ "$PROJECT_MODE" == "rw" || "$PROJECT_MODE" == "ro" ]] \
@@ -324,9 +380,13 @@ case "$BC_TAG" in
     BC_KEYS="$(yq eval '.mounts.build_cache | keys | .[]' "$PROFILE_FILE")"
     [[ -n "$BC_KEYS" ]] || invalid "$REL_PROFILE: mounts.build_cache is an empty map; use false to disable it for every agent"
     while IFS= read -r bca; do
-      grep -qx "$bca" <<< "$ALLOW_AGENTS" \
+      # -F, and a quoted yq path. A key is arbitrary YAML text: `[c]odex` is a REGEX that matches
+      # the agent `codex` under plain grep, and then walks into an unquoted yq path expression
+      # where it is a lexer error -- a raw exit 1 wearing none of this script's error format
+      # (Codex adversarial pass, 2026-09-08).
+      grep -qFx "$bca" <<< "$ALLOW_AGENTS" \
         || invalid "$REL_PROFILE: mounts.build_cache names agent '$bca', which is not an agent in $REL_ALLOWLIST"
-      bcv="$(yq eval ".mounts.build_cache.${bca}" "$PROFILE_FILE")"
+      bcv="$(yq eval ".mounts.build_cache[\"${bca}\"]" "$PROFILE_FILE")"
       [[ "$bcv" == "true" || "$bcv" == "false" ]] \
         || invalid "$REL_PROFILE: mounts.build_cache.${bca} must be true or false, found '$bcv'"
     done <<< "$BC_KEYS"
@@ -359,6 +419,8 @@ done <<< "$MOUNT_KEYS"
 # `rotation` must carry 01.4 SF-3's MEASURED per-provider result (Edge Case 7). That is not
 # mechanically checkable from here -- non-empty is what this enforces, and saying so is better
 # than implying the compiler verified the measurement.
+require_tag "$PROFILE_FILE" '.auth_mode' '!!map' \
+  "$REL_PROFILE: field 'auth_mode' must be a mapping keyed by agent (R4.12)"
 AUTH_AGENTS="$(yq eval '.auth_mode | keys | .[]' "$PROFILE_FILE")"
 [[ -n "$AUTH_AGENTS" ]] || invalid "$REL_PROFILE: field 'auth_mode' is empty"
 while IFS= read -r aa; do
@@ -366,9 +428,8 @@ while IFS= read -r aa; do
   [[ "$(yq eval ".oauth_mount.${aa} | has(\"accepted_risk\")" "$PROFILE_FILE")" == "true" ]] \
     || refuse "$REL_PROFILE: auth_mode.${aa} is 'oauth-mount' but oauth_mount.${aa}.accepted_risk is absent. R4.17 requires the decision to be RECORDED before the credential crosses the boundary: file, mount_mode, revocation_path, blast_radius and rotation"
   for field in file mount_mode revocation_path blast_radius rotation; do
-    v="$(yq eval ".oauth_mount.${aa}.accepted_risk.$field // \"\"" "$PROFILE_FILE")"
-    [[ -n "$v" ]] \
-      || refuse "$REL_PROFILE: oauth_mount.${aa}.accepted_risk.$field is missing or empty (R4.17, T27)"
+    scalar_nonblank "$PROFILE_FILE" ".oauth_mount.${aa}.accepted_risk.$field" >/dev/null \
+      || refuse "$REL_PROFILE: oauth_mount.${aa}.accepted_risk.$field is missing, empty, blank or an empty collection (R4.17, T27). yq renders '[]' and '{}' as text, so this asks whether the field was RECORDED, not whether it prints"
   done
   MM="$(yq eval ".oauth_mount.${aa}.accepted_risk.mount_mode" "$PROFILE_FILE")"
   [[ "$MM" == "ro" ]] \
@@ -393,8 +454,7 @@ for ((i = 0; i < PACKS_LEN; i++)); do
     refuse "packs/$PN/pack.yaml declares $RT_N runtime egress entr(y|ies) with runtime_install: false. Runtime egress to a package registry is what makes runtime installation possible, so R7.6 requires it declared: set runtime_install: true WITH runtime_install_reason, or remove the entries. Note that registry egress also re-enables arbitrary 'npx <server>' and breaks T31 on every profile loading this pack"
   fi
   if [[ "$RI" == "true" ]]; then
-    RIR="$(yq eval '.runtime_install_reason // ""' "$PF")"
-    [[ -n "$RIR" ]] \
+    scalar_nonblank "$PF" '.runtime_install_reason' >/dev/null \
       || refuse "packs/$PN/pack.yaml sets runtime_install: true without 'runtime_install_reason'. R7.6 requires the exception to be explicitly declared, and a flag with no recorded reason is a default flipped rather than a decision taken"
     ((RT_N > 0)) \
       || refuse "packs/$PN/pack.yaml sets runtime_install: true but declares no egress.runtime entries. Runtime installation without registry egress cannot work, so this records a widening the resolved policy does not carry -- declare the registries or set runtime_install: false"
@@ -419,7 +479,7 @@ done
 # control-plane assertion). Recorded rather than presented as full coverage of SC-3.
 PROJECT_PATH="$(yq eval '.mounts.project.path' "$PROFILE_FILE")"
 if [[ "$PROJECT_PATH" == /* ]]; then
-  PP="${PROJECT_PATH%/}"; ROOT="${REPO_ROOT%/}"
+  PP="$(normalise_abs "$PROJECT_PATH")"; ROOT="$(normalise_abs "$REPO_ROOT")"
   [[ "$PP" != "$ROOT" ]] \
     || refuse "$REL_PROFILE: mounts.project.path is the solution root ($ROOT). That mounts the policy files, the mediator configuration and the identity material inside the agent's own project mount, so the agent can widen its policy at the next build (SC-3, R5.14). Use a sibling directory"
   [[ "$ROOT/" != "$PP"/* ]] \

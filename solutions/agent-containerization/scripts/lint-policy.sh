@@ -101,9 +101,13 @@ lint_pack_manifest() {
   # reference pack -- and every pack that behaves like it -- carries neither. The compiler
   # REFUSES the same condition at exit 3 (a policy decision); this is the well-formedness half.
   if [[ "$(yq eval '.runtime_install' "$f")" == "true" ]]; then
-    local reason; reason="$(yq eval '.runtime_install_reason // ""' "$f")"
-    [[ -n "$reason" ]] \
-      || fail "$rel: field 'runtime_install_reason' is missing, but 'runtime_install' is true. R7.6 requires the exception to be declared, and a flag with no recorded reason is a default flipped rather than a decision taken"
+    # The TAG, not the rendering: yq prints an empty list as the two-character string `[]`, which
+    # satisfies a `-n` test while recording nothing. The question here is whether a human wrote a
+    # reason (Codex adversarial pass, 2026-09-08).
+    local reason_tag; reason_tag="$(yq eval '.runtime_install_reason | tag' "$f" 2>/dev/null || echo missing)"
+    local reason; reason="$(yq eval '.runtime_install_reason' "$f" 2>/dev/null || echo "")"
+    [[ "$reason_tag" == "!!str" && -n "${reason//[[:space:]]/}" ]] \
+      || fail "$rel: field 'runtime_install_reason' is missing, blank or not text, but 'runtime_install' is true. R7.6 requires the exception to be declared, and a flag with no recorded reason is a default flipped rather than a decision taken"
   fi
 
   # A pack may not carry a deny entry. Deny wins POST-resolution and is copied from

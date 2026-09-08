@@ -213,6 +213,39 @@
     written LEXICALLY rather than with realpath, which removes the premise that confined it to the
     host; 4: exit codes 2 and 3 pulled from SF-4, because a refusal gate cannot be built without
     the code that expresses a refusal. Exit 4 stays with SF-4's drift check).
+    CODEX ADVERSARIAL PASS, 2026-09-08, following 01.3's and Edge Case 17's precedent for
+    recording one. 11 findings; 6 FIXED, 5 DECLINED with their reasons rather than dropped. The
+    fixes are one shape: the gates asked yq what a field PRINTS, not what it IS.
+    FIXED. (1) SC-3 was string-comparable only, so `<root>/./policy`, `<root>/../<root>/policy`,
+    `<root>//policy` and `<root>/workspace/../scripts` all walked past it -- HIGH, and the gate
+    now normalises `.`, `..` and `//` lexically first (normalise_abs), still without realpath, so
+    Deviation 3's compile-stage premise holds. A symlink still needs the filesystem and stays
+    SF-7's. (2) yq renders `[]` and `{}` as two-character STRINGS, so `-n` accepted them: an
+    accepted_risk record of five empty lists passed T27, which is precisely the hollow record
+    R4.17 exists to prevent. scalar_nonblank now checks the tag and rejects blank-only text too.
+    (3) Same bypass on runtime_install_reason, in both the compiler and lint-policy.sh.
+    (4) `packs` was length-checked, and yq reports length 0 for missing, `""` and `{}` alike --
+    three malformed shapes read as zero-pack profiles and skipped every pack gate. Now tag-checked
+    as !!seq. (5) A missing or scalar `auth_mode` died inside yq's own `keys` with exit 1, wearing
+    the USAGE code and none of this script's error format; require_tag guards every structural
+    traversal (auth_mode, mounts, authorization, classify, package_repository.apt). (6) The
+    build_cache agent-key check used `grep -x` -- a REGEX -- and then interpolated the key into an
+    unquoted yq path: `[c]odex` matched the agent `codex` and then failed yq's lexer at exit 1.
+    Now `grep -Fx` and a quoted path.
+    DECLINED, each with the reason recorded. (a) Pack-manifest `mounts` entries are not gated by
+    R2.8 here: Contract 1 never defines an entry's shape, and inventing one at SF-2 pre-empts the
+    composition that consumes it. SF-3's, recorded. (b) `package_repository.apt.url` accepts any
+    https host ending in a snapshot timestamp -- the URL is not the trust anchor, the FINGERPRINT
+    is, and it is asserted at build (SF-5); a host allowlist is SF-5's call. (c) Quoted `"true"`
+    passing a boolean check: yq renders it identically, the profiles are version-controlled and
+    reviewed, and the tag work needed to close it buys nothing a reviewer does not already see.
+    (d) The plan's Edge Case 18 still describing the lint-policy.sh home is what Deviation 3
+    RECORDS; /build does not edit plan prose. (e) The exit-code comment claiming 4 for --check
+    drift was the one real doc defect in that group and is corrected in place rather than argued
+    with -- the header now says exit 4 is not built and --check still exits 1.
+    ALL 35 ORIGINAL PROBES RE-RUN after the fixes, plus 23 new ones written from Codex's own
+    reproductions. Every positive control still passes, all three committed artifacts are still
+    `--check` current, and `--validate` on the committed default still passes.
     NOT DONE, and deliberately: profiles/default.yaml keeps `packs: []` though SF-2's text says
     the list becomes populated. The schema accepts, resolves and gates a populated list, but
     composition is SF-3's and the compiler still refuses a non-zero list -- populating it now
