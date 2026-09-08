@@ -27,6 +27,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | Rule Creator | `/rule-creator` | Interactive rule generation with documentation and catalog updates | [View](skills/rule-creator.md) |
 | Over-Engineering Review | `/over-engineering-review` | On-demand 3-clause discriminator pass over a diff/file/plan; classifies findings safe-remove / needs-decision / keep / harmful-theater; composes `/simplify` and `/code-review` | [View](skills/over-engineering-review.md) |
 | Narrative | `/narrative` | Write the argued prose record of a work session into `DailyReports/narratives/`, source for daily reports and status conversations | [View](skills/narrative.md) |
+| Daily Report | `/daily-report` | Write the daily status report into `DailyReports/YYYYMMDD.txt` from session narratives, git commits, and project artifacts; defaults to today, reconstructs past dates on request | [View](skills/daily-report.md) |
 
 ## How Skills Work
 

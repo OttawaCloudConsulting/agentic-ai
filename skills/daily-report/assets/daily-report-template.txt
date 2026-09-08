@@ -1,0 +1,25 @@
+Date: YYYY-MM-DD
+
+Today:
+<What you actually did, as a bulleted list. One "- " bullet per discrete piece of work.
+Each bullet states what you did and, where relevant, the problem, root cause, fix, and how
+you verified it (render-verified, tests, CI run). Include hard references so the day is
+reproducible: repo and file names, CI run IDs, environment or account names,
+insertion counts, and links to investigation notes. Do not include identifiers that only
+resolve inside this workspace's own planning documents (milestone or feature numbers,
+gate numbers) -- describe the work instead. Detail scales with the day: a light
+day is one or two bullets, a heavy day is several. Target around 110 words total. No
+emojis, no em-dashes.>
+
+Commits:
+- {repo} | <short sha> | description
+
+WorkItems:
+<Required - bullet list of tracker work item IDs (Jira, GitHub Issues, Linear, etc.)>
+
+Tomorrow:
+<What comes next and what "done" looks like, as a bulleted list. One "- " bullet per next
+step or objective, with nested "  - " sub-bullets for the acceptance criteria or checks
+that prove it complete. Call out blockers or dependencies that sit with other teams and
+cannot be done by you, and note any cleanup still pending. Same bullet style and hard
+references as Today. Target around 80 words total. No emojis, no em-dashes.>

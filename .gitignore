@@ -13,3 +13,10 @@ scratch/
 
 # Generated knowledge-graph cache (local-only; rebuilt by graphify)
 graphify-out/
+
+__pycache__/
+*.pyc
+
+# Workspace-specific repo locations for the narrative/daily-report skills
+skills/narrative/scripts/repo_config.json
+skills/daily-report/scripts/repo_config.json
