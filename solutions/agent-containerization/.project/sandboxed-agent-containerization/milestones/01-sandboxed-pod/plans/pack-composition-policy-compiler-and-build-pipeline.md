@@ -242,7 +242,7 @@ session guideline; DD-1's 2-5 ceiling governs features per milestone, not sub-fe
 The milestone README's own split point — "01.5 splits cleanly at compiler versus CI pipeline" — is
 the SF-1..SF-5 / SF-6 boundary.
 
-- [ ] **SF-1: Pack manifest schema and the `language-runtimes` reference pack** -- Define
+- [x] **SF-1: Pack manifest schema and the `language-runtimes` reference pack** -- Define
   `packs/<name>/pack.yaml` covering all seven R7.3 fields plus R7.11's blast-radius contribution.
   Write `packs/language-runtimes/pack.yaml` declaring Node, Python and Go toolchains as build-time
   only with an empty runtime egress set, and `packs/README.md` recording why the reference pack
@@ -888,4 +888,46 @@ GitHub CLI packs are 02.3 and 03.3; this feature ships the mechanism and one ref
 
 ## Architectural Deviations
 
-(none)
+### Deviation 1: The reference pack pins Node to the base image's version, not to 20.18.1
+- **What changed:** `packs/language-runtimes/pack.yaml` declares `node` at **22.23.2**, the exact
+  version `node:22-slim` ships as of 2026-09-07, fetched as a checksum-verified archive from
+  `nodejs.org`.
+- **Originally planned:** Interface Contract 1 declares `{name: node, version: "20.18.1", url: <url>,
+  sha256: <64 hex>}` in `packages.archives`.
+- **Why necessary:** 01.2 built all three agent stages `FROM node:22-slim` (01.2 Deviation 1, one
+  multi-stage Dockerfile), so Node 22 and its bundled npm are already in `agent-base` — and the
+  `claude` and `codex` stages *use* that npm at build time to install their CLIs. Installing Node
+  20.18.1 alongside it leaves two runtimes on `PATH`, and whichever wins decides what the agent
+  CLIs execute against. The plan was written before 01.2 built and could not have known the base
+  image's Node version. Operator decision, 2026-09-07: keep Node as an explicit checksummed
+  manifest entry (rather than treating it as base-provided) so the pin is verified rather than
+  riding the moving `node:22-slim` tag, but pin it to what the base actually carries.
+- **Impact:** SF-5's install step overwrites `/usr/local` with the same Node version rather than
+  adding a second one, so no `PATH` ordering decision is needed. The pin now has a **coupling to
+  the base image** that the plan's version did not: if `node:22-slim` moves and `agent-base` is
+  rebuilt, the manifest's Node version and the base's diverge until the pin is refreshed. SF-6
+  digest-pins `agent-base` via `AGENT_BASE_DIGEST`, which bounds that drift to a deliberate
+  digest bump. Contract 1's shape is otherwise unchanged — no field was added or removed.
+
+### Deviation 2: `git` is installed in the `agent-base` stage, not supplied by a pack
+- **What changed:** `git` is installed in the `agent-base` stage of `images/Dockerfile` (SF-5),
+  version-pinned and checksummed against the same snapshot repository the packs use. It is not a
+  member of `language-runtimes` and is not a pack of its own.
+- **Originally planned:** The plan does not mention `git` at all. Feature 01.4 Deviation 9 found
+  that no agent image contains it, recorded that `mounts.host_git_config` therefore mounts a
+  config nothing in the container can read, and assigned the decision to this feature as "01.5's
+  pack-composition call". The plan's own composition model implies capability arrives through
+  packs.
+- **Why necessary:** Operator decision, 2026-09-07. R2.9's `host_git_config` mount and
+  `scripts/scrub-gitconfig.sh` are **profile-level** features built in 01.4, and they are inert
+  without a `git` binary. Making them depend on which packs a profile happens to select would
+  mean a profile can enable `host_git_config: true`, pass every gate, and still mount a file
+  nothing reads — the exact failure 01.4 Deviation 9 recorded. Putting `git` in the base makes
+  the profile-level feature unconditional, like the mount it serves.
+- **Impact:** Every profile gets `git` regardless of pack selection, which is a departure from
+  the composition model this feature exists to demonstrate — recorded rather than hidden. It adds
+  **no egress**: `github.com` is not in the resolved allowlist, so `git` works for local commits
+  under `/workspace` and is denied at the mediator on fetch or push. It re-enables 01.4's
+  criterion 6 assertion (`git config --global --get-all credential.helper`), which 01.4 SF-5
+  could not make as written; SF-7 Phase G is the place to add it. It also enlarges `agent-base`
+  and therefore the CI-published image SF-6 attests.

@@ -147,7 +147,22 @@
 
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
-    Sub-features: 0/7 complete
+    Sub-features: 1/7 complete
+    Build started 2026-09-07. Codebase assessment ABSENT (no .project/<slug>/docs/codebase-assessment.md);
+    the refresh was skipped with a warning rather than blocking, per the /build spec.
+    SF-1 complete 2026-09-07: packs/language-runtimes/pack.yaml, packs/README.md, and the pack-manifest
+    validator added to scripts/lint-policy.sh (18 negative assertions run against a throwaway probe pack --
+    every mandatory field removed in turn, plus deny_* rejection, checksum shape, non-https URL and
+    name/directory mismatch -- all fired). CHECKSUMS ARE REAL AND THEIR CHAIN WAS VERIFIED, not copied:
+    the bookworm archive key from the base image's own keyring gives a good gpgv signature on the
+    snapshot 20260901T000000Z InRelease, the downloaded Packages.xz hash matches that signed index, and
+    the per-.deb sha256 values come from it. Node and Go hashes from nodejs.org SHASUMS256.txt and the
+    go.dev release index. 2 architectural deviations recorded, both operator-ratified before writing
+    (1: Node pinned to 22.23.2, the version node:22-slim already ships, not the plan's 20.18.1 -- 01.2
+    built agent-base FROM node:22-slim and a second older Node would shadow the runtime the agent CLIs
+    execute against; 2: git installed in the agent-base stage rather than supplied by a pack, closing
+    01.4 Deviation 9 -- mounts.host_git_config and scrub-gitconfig.sh are profile-level features and
+    were inert with no git binary, so they cannot depend on pack selection. Lands at SF-5).
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it
