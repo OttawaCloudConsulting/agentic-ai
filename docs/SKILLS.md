@@ -26,6 +26,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | Project Codex Skills | `$project` | Codex project suite -- bootstraps state, reports status, routes to the next explicit `$project-*` skill | [View](skills/project.md) |
 | Rule Creator | `/rule-creator` | Interactive rule generation with documentation and catalog updates | [View](skills/rule-creator.md) |
 | Over-Engineering Review | `/over-engineering-review` | On-demand 3-clause discriminator pass over a diff/file/plan; classifies findings safe-remove / needs-decision / keep / harmful-theater; composes `/simplify` and `/code-review` | [View](skills/over-engineering-review.md) |
+| Narrative | `/narrative` | Write the argued prose record of a work session into `DailyReports/narratives/`, source for daily reports and status conversations | [View](skills/narrative.md) |
 
 ## How Skills Work
 
