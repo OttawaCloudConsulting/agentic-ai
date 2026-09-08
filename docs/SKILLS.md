@@ -28,6 +28,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | Over-Engineering Review | `/over-engineering-review` | On-demand 3-clause discriminator pass over a diff/file/plan; classifies findings safe-remove / needs-decision / keep / harmful-theater; composes `/simplify` and `/code-review` | [View](skills/over-engineering-review.md) |
 | Narrative | `/narrative` | Write the argued prose record of a work session into `DailyReports/narratives/`, source for daily reports and status conversations | [View](skills/narrative.md) |
 | Daily Report | `/daily-report` | Write the daily status report into `DailyReports/YYYYMMDD.txt` from session narratives, git commits, and project artifacts; defaults to today, reconstructs past dates on request | [View](skills/daily-report.md) |
+| Work Items | `/workitems` | Generate a linked Epic/Feature/Story work item document set from project artifacts, for Jira, Azure DevOps, or any tracker | [View](skills/workitems.md) |
 
 ## How Skills Work
 
@@ -91,6 +92,7 @@ cp -r skills/occ-skill-creator/         <target-repo>/.claude/skills/occ-skill-c
 cp -r skills/occ-skill-refactor/        <target-repo>/.claude/skills/occ-skill-refactor/
 cp -r skills/rule-creator/              <target-repo>/.claude/skills/rule-creator/
 cp -r skills/over-engineering-review/   <target-repo>/.claude/skills/over-engineering-review/
+cp -r skills/workitems/                 <target-repo>/.claude/skills/workitems/
 
 # Gated project suite — MUST be flattened; see "Flatten the project suite" below.
 # Prefer the installer, which does this for you.
