@@ -129,6 +129,13 @@ scalar_nonblank() {
   printf '%s' "$v"
 }
 
+# lower -- DNS names are case-insensitive, so the collision key is case-folded before entries from
+# the base and from a pack are compared. `${v,,}` would be shorter and is what this first used, but
+# it is a bash-4 parameter expansion and stock macOS /bin/bash is 3.2 -- and README.md tells a
+# fresh-clone operator to run this compiler on the host directly. `tr` costs a subprocess per entry
+# and works everywhere this script is invoked.
+lower() { tr '[:upper:]' '[:lower:]' <<< "$1"; }
+
 # require_tag -- a `yq | keys` or `| has()` call on the wrong node type is a RAW yq failure under
 # `set -e`: exit 1 with yq's own message, which is the usage code, and the invalid() handler that
 # was meant to catch it never runs. Every structural traversal below is guarded first.
@@ -283,7 +290,7 @@ validate_resolved() {
       # off `.test` for exactly this reason. A WARNING, not a refusal -- the operator may run a
       # local resolver that does serve one. Assigned here by the Gate 2 refresh because this is
       # where the allowlist is validated.
-      case "${fqdn,,}" in
+      case "$(tr '[:upper:]' '[:lower:]' <<< "$fqdn")" in
         *.test|*.invalid|*.localhost|*.example|test|invalid|localhost|example)
           note "WARNING: agents.${agent}.allow_fqdns[$j] '$fqdn' is under an RFC 6761 special-use TLD. The pod resolver answers these names itself and never forwards them, so this entry will be audited as allowed and will still not resolve (docs/records/resolver-verification.md, addendum)" ;;
       esac
@@ -780,7 +787,7 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
         || invalid "$REL_ALLOWLIST: agents.${agent}.allow_fqdns[$i].fqdn '$FQDN' is a wildcard; the pod resolver matches exactly and a wildcard would reopen DNS exfiltration (R5.4)"
       [[ "${#FQDN}" -le 253 && "$FQDN" =~ $FQDN_RE ]] \
         || invalid "$REL_ALLOWLIST: agents.${agent}.allow_fqdns[$i].fqdn '$FQDN' is not a valid hostname; it would be interpolated into the mediator's Lua policy (01.3 SF-5)"
-      ENTRIES+="${FQDN,,}|${PORT}|${UPGRADE}|${REL_ALLOWLIST}"$'\n'
+      ENTRIES+="$(lower "$FQDN")|${PORT}|${UPGRADE}|${REL_ALLOWLIST}"$'\n'
     done
 
     # Pack-supplied entries reach the SAME checks, named against the manifest that supplied them
@@ -807,7 +814,7 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
           || invalid "$REL_PF: egress.runtime.allow_fqdns[$i].fqdn '$PFQDN' is a wildcard; the pod resolver matches exactly and a wildcard would reopen DNS exfiltration (R5.4)"
         [[ "${#PFQDN}" -le 253 && "$PFQDN" =~ $FQDN_RE ]] \
           || invalid "$REL_PF: egress.runtime.allow_fqdns[$i].fqdn '$PFQDN' is not a valid hostname; it would be interpolated into the mediator's Lua policy (01.3 SF-5)"
-        ENTRIES+="${PFQDN,,}|${PPORT}|${PUPG}|${REL_PF}"$'\n'
+        ENTRIES+="$(lower "$PFQDN")|${PPORT}|${PUPG}|${REL_PF}"$'\n'
       done
     done
 
@@ -845,7 +852,9 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
       if [[ -n "$DUPES" ]]; then
         while IFS= read -r dk; do
           [[ -n "$dk" ]] || continue
-          SRCS="$(grep -F "${dk}|" <<< "${ENTRIES%$'\n'}" | cut -d'|' -f3,4 | LC_ALL=C sort -u | tr '\n' ' ')"
+          # ANCHORED: an unanchored match would let `xapi.example.com|443` contribute its source to
+          # `api.example.com|443`'s message. The refusal itself is unaffected; the source list is not.
+          SRCS="$(grep -F -- "${dk}|" <<< "${ENTRIES%$'\n'}" | grep -E "^${dk//./\\.}\\|" | cut -d'|' -f3,4 | LC_ALL=C sort -u | tr '\n' ' ')"
           refuse "agents.${agent}: conflicting R5.9 upgrade metadata for the same resolved destination ${dk%%|*} port ${dk##*|}. Sources (upgrade|origin): ${SRCS}-- one destination carries one record. Reconcile the base allowlist entry and the pack manifest rather than letting either silently overwrite the other"
         done <<< "$DUPES"
       fi
