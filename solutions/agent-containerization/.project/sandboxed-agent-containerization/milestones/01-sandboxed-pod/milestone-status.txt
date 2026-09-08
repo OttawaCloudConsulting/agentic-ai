@@ -163,6 +163,28 @@
     execute against; 2: git installed in the agent-base stage rather than supplied by a pack, closing
     01.4 Deviation 9 -- mounts.host_git_config and scrub-gitconfig.sh are profile-level features and
     were inert with no git binary, so they cannot depend on pack selection. Lands at SF-5).
+    EDGE CASE 17 RESOLVED EARLY, 2026-09-07, ahead of SF-4 rather than at it. The plan deferred the
+    host-compile-versus-build-stage-compile choice to /build; the pick is the SECOND option -- the
+    host invocation runs THROUGH the build stage, so there is one emitter and toolchain skew is
+    impossible by construction. Decided on evidence plus a Codex adversarial pass (4 sections,
+    verdict: reject the version-assertion form of option A, adopt option B), following 01.3's
+    precedent for recording a Codex pass. MEASURED FIRST: the same script run host-side (yq 4.53.6,
+    bash 5.3.15) and inside the built mediator image (yq 4.47.2, bash 5.2.37) against the same
+    inputs with COMPILED_AT fixed produced BYTE-IDENTICAL output -- so the divergence is latent,
+    not active. Option A was rejected on mechanism rather than on divergence: the host yq is
+    Homebrew-managed and can only be asserted, SF-6's CI runner already ships 4.53.6 against this
+    repo's v4.47.2 pin, and a GLOBAL assertion would reach the mediator's own stage-1 --validate
+    call (entrypoint.sh:180), turning an emitter concern into a fatal runtime startup failure.
+    The measurement's scope is also narrower than the decision: packs: [] today, so SF-3's emitter
+    surface has never been compared across the two versions. Four SF-4 obligations recorded on the
+    plan: the wrapper-versus-inner-implementation call, REPO_ROOT's BASH_SOURCE derivation versus
+    the /usr/local/bin copy path, the final image still COPYing the COMMITTED policy/resolved/
+    rather than the stage's output (Dockerfile:117 -- Contract 4 already requires this and the
+    Dockerfile predates it), and --output type=local being UNVERIFIED on the pinned Docker Desktop,
+    to be established before it is built on. ONE Codex recommendation DECLINED with its reason
+    recorded rather than dropped: a structural drift comparison. With one emitter the skew it
+    hedged against is gone, and a byte comparison is strictly stronger -- it catches a hand-reordered
+    committed artifact, which is exactly what SC-6 forbids and what a structural compare would pass.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it

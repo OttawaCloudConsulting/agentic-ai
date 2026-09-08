@@ -741,6 +741,71 @@ this feature rebuilds.
     The second is more robust and slower; naming the choice here rather than discovering it as a
     permanently red CI job.
 
+    **RESOLVED AT BUILD, 2026-09-07 — the second option (run the host invocation through the
+    build stage).** This edge case says "/build picks one"; this is the pick, recorded here rather
+    than discovered at SF-4.
+
+    *Evidence gathered before deciding.* The same script was run on both sides against the same
+    inputs with `COMPILED_AT` fixed to remove the one legitimately-varying field — host
+    (`yq` v4.53.6, bash 5.3.15, darwin/arm64) versus the built mediator image (`yq` v4.47.2,
+    bash 5.2.37, linux/arm64). The outputs were **byte-identical**: no quoting, ordering or
+    numeric-formatting divergence between those two `yq` versions on this schema. So the risk this
+    edge case describes is **latent, not active** — there is no red check waiting today.
+
+    *Why the first option was rejected anyway.* Codex adversarial pass, 2026-09-07, four sections.
+    The measurement establishes that the divergence is currently zero; it does not establish that
+    a version **assertion** is a workable mechanism, and that is where the first option fails —
+    structurally, not probabilistically:
+
+    - The host `yq` is Homebrew-managed, so it cannot be pinned, only asserted. An assertion is a
+      clearer error message on the same underlying skew, not a fix for it.
+    - SF-6's CI drift job runs on GitHub's `ubuntu-latest`, which currently ships `yq` 4.53.6 —
+      already different from the `v4.47.2` this repository pins at `images/mediator/Dockerfile:31`
+      and `compose/pins.env`. The runner image moves on its own schedule, so the assertion would
+      need maintenance against a third party's release cadence.
+    - A **global** assertion would reach the mediator's own stage-1 self-check, which calls this
+      same script with `--validate` at `images/mediator/entrypoint.sh:180` and is fatal before the
+      listeners bind. That turns a host-side emitter concern into a runtime startup failure. A
+      **scoped** assertion no longer covers the path it was added for.
+    - `policy/resolved/README.md` tells a fresh-clone operator to run the compiler directly. An
+      exact-version assertion turns a routine refresh into "first install this exact external
+      binary."
+    - The measurement's scope is narrower than the decision: `profiles/default.yaml` carries
+      `packs: []` and the compiler refuses a non-zero pack list today, so **SF-3's emitter surface
+      — populated `compiled_from.packs`, stable key order, sorted lists — has never been compared
+      across the two versions at all.**
+
+    *What SF-4 must therefore build.* Not merely "move the compiler into a stage":
+
+    1. **The host invocation runs through the build stage.** Whether `scripts/compile-policy.sh`
+       itself becomes the wrapper that shells out to `docker build`, or a new wrapper script calls
+       it and the compiler stays the inner implementation, is **SF-4's call**. The second preserves
+       Contract 6's shipped CLI surface intact and is the default reading; a change to that host
+       surface would be a deviation and is recorded when the code is written, not pre-recorded here.
+    2. **`REPO_ROOT` is derived from `BASH_SOURCE`** (`scripts/compile-policy.sh:28`) and the
+       runtime image copies the script to `/usr/local/bin/mediator-compile-policy`, which would
+       resolve `REPO_ROOT` to `/usr/local`. The **compile stage** must therefore lay its inputs out
+       under a root where the script sits at `<root>/scripts/` — copy into `/src`, `WORKDIR /src`,
+       invoke `bash scripts/compile-policy.sh`. The runtime `--validate` path is unaffected: that
+       mode reads only the file it is handed.
+    3. **The final image must consume the compile stage's artifact.** `images/mediator/Dockerfile`
+       currently does `COPY policy/resolved/ /etc/mediator/policy/` — the **committed** copy, not
+       a compiled one. Contract 4 already says the stage's output is what the mediator runs; the
+       Dockerfile predates the contract and SF-4 makes it mechanically true (`COPY --from=`).
+    4. **Extraction is UNVERIFIED on the pinned Docker Desktop.** A `FROM scratch` artifact stage
+       plus `--output type=local` is the intended shape. Establish that it works **before** building
+       on it, the way Edge Case 13 treats buildx SBOM attestation — not during.
+
+    *One recommendation from the same pass DECLINED, with its reason, rather than silently dropped:*
+    making the drift comparison **structural** (parse both, compare trees) instead of byte-wise.
+    Under the chosen option there is exactly one emitter, so the skew that motivated it is gone —
+    and a byte comparison is not merely sufficient here, it is **stronger**. A committed artifact
+    that someone hand-edited into a different key order but the same structure is precisely what
+    SC-6 forbids, and a byte diff catches it where a structural compare would pass it. The
+    emitter-determinism property Codex wanted separated out already exists as its own check
+    (Edge Case 2, asserted in SF-7). No requirement traces to the structural comparison once the
+    single-emitter property holds, so it is not built.
+
 18. **The project-mount containment gate cannot run in the build stage.** It resolves
     `mounts.project.path`, a host path, through `realpath` — which a Docker build stage cannot see.
     It therefore runs host-side in `scripts/lint-policy.sh` before the build, and is asserted again
