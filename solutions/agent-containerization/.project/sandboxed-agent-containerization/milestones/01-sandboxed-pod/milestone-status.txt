@@ -147,7 +147,7 @@
 
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
-    Sub-features: 2/7 complete
+    Sub-features: 3/7 complete
     Build started 2026-09-07. Codebase assessment ABSENT (no .project/<slug>/docs/codebase-assessment.md);
     the refresh was skipped with a warning rather than blocking, per the /build spec.
     SF-1 complete 2026-09-07: packs/language-runtimes/pack.yaml, packs/README.md, and the pack-manifest
@@ -256,6 +256,51 @@
     compose/overrides/<profile>.yaml, so the gate warns rather than judging. SF-7 Phase A must
     assert the mount that actually exists against `docker inspect`, not treat Phase B's exit 3 as
     SC-3 coverage.
+    SF-3 complete 2026-09-08: pack composition in the compiler. profiles/default.yaml and
+    profiles/oauth-mount.yaml both select language-runtimes (operator decision -- identical pack
+    sets means SF-5 installs one package set and SF-7's T14 exercises one image set).
+    CRITERION 4 / T14's ZERO IS PROVED, not asserted: with COMPILED_AT fixed, the ONLY difference
+    between the zero-pack and pack-loaded artifacts is the two-line compiled_from.packs block --
+    every agent's allow_fqdns and allow_cidrs is byte-identical. The provenance entry carries the
+    manifest's sha256, which is what makes compiled_from a record rather than a list of names.
+    EDGE CASE 17's UNMEASURED HALF IS NOW MEASURED. That edge case recorded that "SF-3's emitter
+    surface -- populated compiled_from.packs, stable key order, sorted lists -- has never been
+    compared across the two yq versions at all". It has now: the same inputs compiled on the host
+    (yq v4.53.6, darwin/arm64) and inside the rebuilt mediator image (yq v4.47.2, linux/arm64)
+    with COMPILED_AT fixed produced BYTE-IDENTICAL output. SF-4's byte-wise drift check has no
+    known divergence to trip over on the surface SF-3 adds.
+    TWO DECISIONS WERE REFERRED TO CODEX BY THE OPERATOR before any code was written (following
+    01.3's and Edge Case 17's precedent), and ONE WAS ESCALATED past it. Codex returned
+    adopt-with-modification on both referrals and both modifications were taken -- see Deviations 5
+    and 6. The escalation is the allow_cidrs residual (Edge Case 21): Contract 3 composes pack
+    CIDRs, the shipped mediator render REFUSES a non-empty allow_cidrs at start, and both are
+    correct as built. Resolved as compose-and-warn rather than refuse-at-build, because
+    validate_resolved has never refused a BASE-supplied non-empty allow_cidrs either and a
+    pack-scoped build refusal would give one field two behaviours.
+    41 PROBES, ALL REMOVED AFTERWARDS, positive controls first. Two defects were found BY PROBING
+    rather than by reading: (1) the deny_* rejection checked the document root and `egress` only,
+    so a manifest declaring deny_cidrs under `egress.runtime` sailed through -- a key that must not
+    appear ANYWHERE is now searched recursively; (2) the recursive form then read a match at the
+    document ROOT as no match, because a root match's rendered path is the empty string -- so the
+    gate counts matches and renders paths separately. Also probed: composition into all three
+    agents without flattening, sorted emission, dedup of an identical base/pack tuple, the exit-3
+    upgrade collision, CIDR normalisation and dedup (bare and /32 forms collapse), all six
+    deferred-surface refusals, pack-name and duplicate-selection rejection, the four
+    pack-supplied-hostname checks named against the MANIFEST rather than the artifact, and four
+    validate_resolved checks on the provenance block.
+    3 architectural deviations recorded (5: pack mounts/env/credentials refused rather than
+    composed, Contract 3 overriding SF-3's prose, with three SEPARATE landing points -- SF-5 for
+    mounts, no contract for env, no contract plus R8's bar on baking secrets for credentials;
+    6: upgrade collision refused, with the recorded reason narrowed after Codex showed the renderer
+    never reads `upgrade`, so an OR would be a contradictory record and not a live widening;
+    7: every list sorted LC_ALL=C, which regenerates all three committed artifacts).
+    THE THREE REGENERATED ARTIFACTS ARE ORDERING-ONLY, PROVED: each file's sorted content is
+    byte-identical to the committed version's, so nothing was added, dropped or altered. The
+    mediator image was REBUILT and its stage-1 --validate accepts the populated artifact, and
+    tests/acceptance/verify-egress-mediator.sh was RE-RUN against the reordered artifact rather
+    than assumed unaffected: 77/77, all phases passed.
+    packs/README.md carried the same contradiction as SF-3's prose (it listed mounts, env and
+    credentials among what the compiler reads) and was corrected in the same commit.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it

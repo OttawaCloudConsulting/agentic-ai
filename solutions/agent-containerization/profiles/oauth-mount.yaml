@@ -24,7 +24,13 @@
 
 name: oauth-mount
 
-packs: []                      # unchanged from default -- SF-3 composes, SF-5 populates
+packs:                         # 01.5 SF-3 composes egress from these. Each name must resolve to
+  - language-runtimes          # packs/<name>/pack.yaml -- the compiler refuses a name that does
+                               # not (exit 2). POPULATED at SF-3: the pack is build-time only and
+                               # declares NO runtime egress, so the resolved allow_fqdns and
+                               # allow_cidrs below are byte-identical to the zero-pack output.
+                               # That zero is the point of Acceptance Criterion 4 and what T14
+                               # asserts; SF-5 installs the package set the selection implies.
 
 # R7.18, unchanged from default.yaml -- see there for why this is a snapshot and not a suite,
 # and packs/README.md for how the fingerprint was verified.

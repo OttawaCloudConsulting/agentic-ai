@@ -8,12 +8,13 @@
 
 name: default
 
-packs: []                      # 01.5 composes egress from these. Each name must resolve to
-                               # packs/<name>/pack.yaml -- the compiler refuses a name that does
-                               # not (exit 2). STILL EMPTY at SF-2: the schema accepts a populated
-                               # list here, but the composition that consumes it is SF-3's, and
-                               # this profile is only populated once that lands (SF-5 installs the
-                               # package set the selection implies)
+packs:                         # 01.5 SF-3 composes egress from these. Each name must resolve to
+  - language-runtimes          # packs/<name>/pack.yaml -- the compiler refuses a name that does
+                               # not (exit 2). POPULATED at SF-3: the pack is build-time only and
+                               # declares NO runtime egress, so the resolved allow_fqdns and
+                               # allow_cidrs below are byte-identical to the zero-pack output.
+                               # That zero is the point of Acceptance Criterion 4 and what T14
+                               # asserts; SF-5 installs the package set the selection implies.
 
 # R7.18 -- the repository pack `apt` items are sourced from. Required only when `packs` above is
 # non-empty; declared here regardless so the schema is complete rather than grown at SF-5.

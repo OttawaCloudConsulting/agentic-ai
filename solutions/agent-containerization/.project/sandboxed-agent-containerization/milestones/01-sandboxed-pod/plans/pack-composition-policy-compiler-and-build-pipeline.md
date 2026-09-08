@@ -257,7 +257,7 @@ the SF-1..SF-5 / SF-6 boundary.
   runtime-install declaration). No composition logic here — this sub-feature is the input contract
   and the gates that reject bad input.
 
-- [ ] **SF-3: Pack composition in the compiler** -- Extend `scripts/compile-policy.sh` from its
+- [x] **SF-3: Pack composition in the compiler** -- Extend `scripts/compile-policy.sh` from its
   degenerate zero-pack form to compose pack-supplied FQDNs, CIDRs, mounts, environment variables and
   credentials into 01.3's fixed resolved schema, populating `compiled_from.packs`. Preserve
   per-agent keying, deny-wins precedence and `provisional:` propagation; extend the wildcard
@@ -833,6 +833,28 @@ this feature rebuilds.
     amendment. `Architectural Deviations` stays `(none)`: that section is populated by `/build`, not
     by `/plan-feature`.
 
+21. **RESIDUAL, opened at SF-3: pack-supplied `allow_cidrs` compile but do not load.** Interface
+    Contract 3 says SF-3 composes a pack's `egress.runtime.allow_cidrs` into the per-agent
+    `allow_cidrs`, and it does. The shipped mediator render, however, **refuses a non-empty
+    `allow_cidrs` at start** (`images/mediator/entrypoint.sh`): a CIDR allow has no name for the
+    SNI equality control (control 1b) to compare a ClientHello against, so honouring one would
+    punch through that control silently. 01.3 put that refusal on the CONSUMER side deliberately
+    and its comment names 01.5's composition as the reason. Both are therefore correct as built,
+    and a pack declaring a CIDR would produce an artifact the mediator will not load.
+
+    **Resolved as compose-and-warn, not refuse-at-build** (operator escalation, 2026-09-08). The
+    compiler emits the entry per Contract 3 and `validate_resolved` WARNS that the shipped render
+    will refuse it. Refusing at build was rejected on consistency: `validate_resolved` has never
+    refused a non-empty `allow_cidrs` from the BASE allowlist either (it checks presence only,
+    line ~143), so a build-time refusal scoped to pack-supplied entries would give one field two
+    behaviours. It would also put a *render limitation* into the producer, which is the wrong side
+    of the boundary this feature opens.
+
+    **Landing point: none, and that is the record.** Extending the render is a deliberate change
+    to a security control, not a sub-feature of 01.5. Until it happens, a pack needing a CIDR
+    destination must express it as an `allow_fqdns` entry. Recorded as a residual the way R12.7/T37
+    is -- declared, enforced by nothing yet, with the gap named rather than implied.
+
 ## Test Command
 
 ```
@@ -1040,3 +1062,79 @@ GitHub CLI packs are 02.3 and 03.3; this feature ships the mechanism and one ref
   disk -- `entrypoint.sh:180` tests non-zero, `verify-egress-mediator.sh` does not invoke the
   compiler, and `README.md` documents an operator command. Same shape as Edge Case 17's early
   resolution: an SF-4 decision taken at the sub-feature that needs it, recorded here.
+
+### Deviation 5: pack `mounts`, `env` and `credentials` are refused, not composed
+
+- **What changed:** `scripts/compile-policy.sh` validates all three manifest fields as lists,
+  gates a pack mount entry's key against the closed R2 set (`project`, `build_cache`,
+  `host_git_config`, exit 3), and then **refuses a populated list** in any of the three at exit 3,
+  naming a different landing point for each.
+- **Originally planned:** SF-3's own bullet says the compiler composes "pack-supplied FQDNs,
+  CIDRs, mounts, environment variables and credentials into 01.3's fixed resolved schema".
+- **Why necessary:** those two halves cannot both be true. Interface Contract 3 states the
+  resolved schema is **unchanged** and names exactly two things packs populate --
+  `compiled_from.packs`, and the per-agent `allow_fqdns`/`allow_cidrs`. 01.3 Interface Contract 1
+  has no field for a mount, an environment variable or a credential, so "compose them into the
+  fixed schema" names no destination. Inventing one would also put content the mediator's stage-1
+  validator does not know about into the artifact it gates. Contract 3 is the authority and the
+  prose is what gives way. Refused rather than ignored for the reason Edge Case 10 gives for the
+  profile's own mount keys: a declared requirement that is silently dropped is indistinguishable
+  from one correctly refused, right up to the day the field is implemented.
+- **The three landing points differ**, and are recorded separately rather than blanket-assigned:
+  `mounts` lands at **SF-5**, which builds the per-agent build cache and extends the mount-set
+  assertion; `env` has **no contract** -- per-variable delivery today is a hand-authored Compose
+  fragment under `compose/overrides/` and extending one to pack content is a decision no
+  sub-feature of 01.5 owns; `credentials` likewise, and **R8 bars baking a secret into an image**,
+  so a build argument is not the mechanism either.
+- **Impact:** none on the reference pack, which declares all three empty. `packs/README.md`
+  carried the same contradiction as SF-3's prose (it listed `mounts`, `env` and `credentials`
+  among what the compiler reads) and is corrected in the same commit rather than left to drift.
+- **Provenance:** operator referred both this and Deviation 6 to a **Codex adversarial pass**
+  (2026-09-08) before either was written. Codex returned *adopt-with-modification* on both. Two
+  modifications were taken: the landing points were split per field rather than all assigned to
+  SF-5, and the pack mount entry shape was kept to the minimum the R2.8 gate needs (a key, as a
+  scalar or a single-key map) with source/target/mode semantics deliberately left to the
+  composition that will consume them. That discharges the obligation SF-2's own Codex pass
+  deferred here as declined item (a).
+
+### Deviation 6: an `upgrade` collision is refused, and the reason recorded is not the one first proposed
+
+- **What changed:** when the base allowlist and a selected pack supply the same
+  `(agent, fqdn, port)` with a **different** `upgrade` value, the compiler refuses at exit 3 and
+  names both sources. Identical tuples dedup silently.
+- **Originally planned:** the plan says only that composition preserves "deny-wins precedence";
+  it does not say what happens when two allow entries collide.
+- **Why necessary:** the alternatives all lose information. Base-wins silently drops a pack's
+  declared need; pack-wins and OR let third-party content overwrite the base record for a
+  destination the base already governs (R5.14).
+- **The recorded reason is narrower than the one first drafted.** The first framing was "OR-ing
+  lets a pack widen policy at runtime (R7.4)". Codex's pass showed that claim is not true of the
+  shipped system: `upgrade` is R5.9 metadata and the mediator's renderer reads only `fqdn` and
+  `port` from `allow_fqdns` (`images/mediator/entrypoint.sh:459-508`), so an OR would produce a
+  **contradictory policy record**, not a live enforcement widening. The refusal stands; its error
+  message says "conflicting R5.9 upgrade metadata for the same resolved destination" and does not
+  claim a consequence the code does not currently have.
+- **Accepted friction, stated:** a future pack needing `upgrade: true` on a host the base lists at
+  `false` cannot express that without an edit to the base allowlist. That is the intended
+  direction -- the base is the canonical record for a destination it already governs -- but the
+  schema has no way to represent a legitimately pack-specific difference on an identical
+  host/port, and that is a real gap rather than an oversight.
+
+### Deviation 7: every emitted list is sorted, so the three committed artifacts are regenerated
+
+- **What changed:** per-agent `allow_fqdns` and `allow_cidrs`, `deny_cidrs`, `deny_fqdns`,
+  `exclusions` and `compiled_from.packs` are all emitted `LC_ALL=C` sorted and deduplicated.
+  `policy/resolved/default.yaml`, `test-fixtures.yaml` and `test-selfcheck.yaml` are regenerated
+  in this commit and their line ORDER changes.
+- **Originally planned:** Edge Case 2 asks for "fixing key order and sorting every list in SF-3",
+  so the sorting itself is planned. What is recorded here is its blast radius: it was not obvious
+  from the edge case that three already-committed, harness-consumed artifacts move.
+- **Why necessary:** SF-4's drift check is a byte comparison (Edge Case 17 declined a structural
+  one), and an emitter whose output depends on the order its inputs happened to be written in
+  makes that check fire on identical policy. `LC_ALL=C` specifically because the host is macOS
+  and the compile stage is Debian.
+- **Verified, not assumed:** the three regenerated artifacts were proved to be **ordering-only**
+  changes -- each file's sorted content is byte-identical to the committed version's, so no entry
+  was added, dropped or altered. The mediator image was rebuilt and its stage-1 `--validate`
+  accepts the populated artifact, and `tests/acceptance/verify-egress-mediator.sh` was re-run
+  against the reordered artifact rather than assumed unaffected.

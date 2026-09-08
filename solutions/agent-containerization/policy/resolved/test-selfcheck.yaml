@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check --profile test-selfcheck --allowlist policy/allowlist.test.yaml --denylist policy/denylist.test.yaml
 schema: 1
 profile: test-selfcheck
-compiled_at: 2026-09-07T17:33:44Z
+compiled_at: 2026-09-08T19:23:47Z
 compiled_from:
   allowlist: policy/allowlist.test.yaml
   denylist: policy/denylist.test.yaml
@@ -20,8 +20,8 @@ agents:
     allow_fqdns:
       - {fqdn: allowed.fixture.lab, port: 443, upgrade: false}
       - {fqdn: claude-only.fixture.lab, port: 443, upgrade: false}
-      - {fqdn: neighbour.fixture.lab, port: 443, upgrade: false}
       - {fqdn: denied-by-fqdn.fixture.lab, port: 443, upgrade: false}
+      - {fqdn: neighbour.fixture.lab, port: 443, upgrade: false}
     allow_cidrs: []
     limits: {max_concurrent: 16, bytes_per_second: 2000000}
   codex:
@@ -30,8 +30,8 @@ agents:
     listener: {scheme: http, tls: false, port: 3128}
     allow_fqdns:
       - {fqdn: allowed.fixture.lab, port: 443, upgrade: false}
-      - {fqdn: upgrade.fixture.lab, port: 443, upgrade: true}
       - {fqdn: neighbour.fixture.lab, port: 443, upgrade: false}
+      - {fqdn: upgrade.fixture.lab, port: 443, upgrade: true}
     allow_cidrs: []
     limits: {max_concurrent: 16, bytes_per_second: 2000000}
   agy:
@@ -44,11 +44,11 @@ agents:
     limits: {max_concurrent: 16, bytes_per_second: 2000000}
 
 deny_cidrs:
-  - 169.254.0.0/16
-  - 127.0.0.0/8
   - 10.0.0.0/8
-  - 192.168.0.0/16
+  - 127.0.0.0/8
+  - 169.254.0.0/16
   - 172.31.40.21/32
+  - 192.168.0.0/16
 deny_fqdns:
   - denied-by-fqdn.fixture.lab
 

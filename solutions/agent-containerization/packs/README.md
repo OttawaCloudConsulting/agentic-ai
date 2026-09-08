@@ -10,8 +10,23 @@ Two consumers read these files, and only one of them is the policy compiler:
 
 | Consumer | Reads | Produces |
 |---|---|---|
-| `scripts/compile-policy.sh`, in the mediator image's compile stage | `egress.runtime`, `mounts`, `env`, `credentials` | the resolved egress policy the mediator enforces |
+| `scripts/compile-policy.sh`, in the mediator image's compile stage | `egress.runtime` | the resolved egress policy the mediator enforces |
 | the agent image build (`images/Dockerfile`) | `packages`, `egress.build` | the installed toolchain in that agent's image layer |
+
+
+**`mounts`, `env` and `credentials` are declared but not yet consumed, and the compiler REFUSES a
+pack that populates them** (exit 3, added at 01.5 SF-3). The resolved policy schema is fixed by
+01.3 Interface Contract 1 and has no field for any of the three, so a declared entry would be
+dropped silently -- which is indistinguishable from one correctly refused, right up to the day the
+field is implemented. The landing points differ and are not one deferral:
+
+| Field | Status | Landing point |
+|---|---|---|
+| `mounts` | key gated against the closed R2 set (`project`, `build_cache`, `host_git_config`) at exit 3; a populated list is refused | 01.5 SF-5, with the per-agent build cache and the mount-set assertion |
+| `env` | populated list refused | no contract exists. Per-variable delivery today is a hand-authored Compose fragment under `compose/overrides/`, and extending one to pack content is a decision no sub-feature of 01.5 owns |
+| `credentials` | populated list refused | no contract exists, and R8 bars baking a secret into an image -- so a build argument is not the mechanism either |
+
+The reference pack declares all three as empty lists, so nothing about it is blocked by this.
 
 A change to the schema below therefore touches both readers.
 

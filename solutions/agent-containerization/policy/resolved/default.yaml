@@ -3,12 +3,13 @@
 # Verify with: bash scripts/compile-policy.sh --check
 schema: 1
 profile: default
-compiled_at: 2026-09-07T21:16:41Z
+compiled_at: 2026-09-08T19:24:11Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
   profile: profiles/default.yaml
-  packs: []
+  packs:
+    - {name: language-runtimes, path: packs/language-runtimes/pack.yaml, sha256: 1bf0613ff53ff4530ad7c17f48de50ddcf798aae3e6b4c5915df86f528991a29}
 provisional: true
 pins: agent-verification.md
 
@@ -27,11 +28,11 @@ agents:
     listener_port: 3128
     listener: {scheme: http, tls: false, port: 3128}
     allow_fqdns:
-      - {fqdn: api.openai.com, port: 443, upgrade: false}
-      - {fqdn: chatgpt.com, port: 443, upgrade: false}
       - {fqdn: api.github.com, port: 443, upgrade: false}
-      - {fqdn: github.com, port: 443, upgrade: false}
+      - {fqdn: api.openai.com, port: 443, upgrade: false}
       - {fqdn: auth.openai.com, port: 443, upgrade: false}
+      - {fqdn: chatgpt.com, port: 443, upgrade: false}
+      - {fqdn: github.com, port: 443, upgrade: false}
     allow_cidrs: []
     limits: {max_concurrent: 16, bytes_per_second: 2000000}
   agy:
@@ -39,18 +40,18 @@ agents:
     listener_port: 3128
     listener: {scheme: https, tls: true, port: 3128}
     allow_fqdns:
-      - {fqdn: generativelanguage.googleapis.com, port: 443, upgrade: false}
       - {fqdn: antigravity-unleash.goog, port: 443, upgrade: false}
-      - {fqdn: playwright.azureedge.net, port: 443, upgrade: false}
+      - {fqdn: generativelanguage.googleapis.com, port: 443, upgrade: false}
       - {fqdn: playwright-akamai.azureedge.net, port: 443, upgrade: false}
       - {fqdn: playwright-verizon.azureedge.net, port: 443, upgrade: false}
+      - {fqdn: playwright.azureedge.net, port: 443, upgrade: false}
     allow_cidrs: []
     limits: {max_concurrent: 16, bytes_per_second: 2000000}
 
 deny_cidrs:
-  - 169.254.0.0/16
-  - 127.0.0.0/8
   - 10.0.0.0/8
+  - 127.0.0.0/8
+  - 169.254.0.0/16
   - 172.16.0.0/12
   - 192.168.0.0/16
 deny_fqdns: []
