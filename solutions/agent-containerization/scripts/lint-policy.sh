@@ -96,6 +96,16 @@ lint_pack_manifest() {
       || fail "$rel: field '$field' must be true or false, found '$v'"
   done
 
+  # R7.6 is "off by default and explicitly declared when used", and "explicitly" is both halves:
+  # the flag AND a recorded reason. The field is mandatory only when the flag is set, so the
+  # reference pack -- and every pack that behaves like it -- carries neither. The compiler
+  # REFUSES the same condition at exit 3 (a policy decision); this is the well-formedness half.
+  if [[ "$(yq eval '.runtime_install' "$f")" == "true" ]]; then
+    local reason; reason="$(yq eval '.runtime_install_reason // ""' "$f")"
+    [[ -n "$reason" ]] \
+      || fail "$rel: field 'runtime_install_reason' is missing, but 'runtime_install' is true. R7.6 requires the exception to be declared, and a flag with no recorded reason is a default flipped rather than a decision taken"
+  fi
+
   # A pack may not carry a deny entry. Deny wins POST-resolution and is copied from
   # denylist.base.yaml unmodified; a pack-supplied `deny_*` key would look like it narrows or
   # widens the denylist and would in fact do neither, which is worse than either.

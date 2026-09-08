@@ -24,7 +24,23 @@
 
 name: oauth-mount
 
-packs: []
+packs: []                      # unchanged from default -- SF-3 composes, SF-5 populates
+
+# R7.18, unchanged from default.yaml -- see there for why this is a snapshot and not a suite,
+# and packs/README.md for how the fingerprint was verified.
+package_repository:
+  apt:
+    url: https://snapshot.debian.org/archive/debian/20260901T000000Z/
+    suite: bookworm
+    signed_by: images/keyrings/debian-archive.gpg
+    fingerprint: B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8
+
+# R12.7, unchanged from default.yaml. Exactly one of `classify` or `waiver`; shape only at this
+# milestone, enforcement is 02.5's (T37).
+authorization:
+  classify:
+    - git-push
+    - infrastructure-apply
 
 auth_mode:
   claude: oauth-interactive    # unchanged from default
@@ -36,7 +52,9 @@ mounts:
   project:
     path: <host path>
     mode: rw
-  build_cache: false
+  build_cache: false            # R2.10, per-agent where enabled. false | true | {<agent>: bool}
+                                # `mounts` is a closed set (R2.8): project, build_cache,
+                                # host_git_config. Any other key is a refusal, not a warning
   host_git_config: false
 
 # R4.17's accepted risk, in the shape Interface Contract 3 fixes. Two consumers, and they

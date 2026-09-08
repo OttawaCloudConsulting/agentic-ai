@@ -147,7 +147,7 @@
 
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
-    Sub-features: 1/7 complete
+    Sub-features: 2/7 complete
     Build started 2026-09-07. Codebase assessment ABSENT (no .project/<slug>/docs/codebase-assessment.md);
     the refresh was skipped with a warning rather than blocking, per the /build spec.
     SF-1 complete 2026-09-07: packs/language-runtimes/pack.yaml, packs/README.md, and the pack-manifest
@@ -185,6 +185,44 @@
     recorded rather than dropped: a structural drift comparison. With one emitter the skew it
     hedged against is gone, and a byte comparison is strictly stronger -- it catches a hand-reordered
     committed artifact, which is exactly what SC-6 forbids and what a structural compare would pass.
+    SF-2 complete 2026-09-07: the profile schema extension (Contract 2) and all four build-refusal
+    gates. Profiles gained `package_repository` (snapshot URL, suite, signed_by, 40-hex fingerprint),
+    `authorization` with EXACTLY ONE of classify/waiver -- default and oauth-mount classify
+    git-push and infrastructure-apply, the two test profiles carry a recorded waiver because a
+    test-scoped profile is never run unattended against anything real -- and `mounts.build_cache`
+    as false | true | per-agent map. A SHARED cache is not expressible in the schema at all, which
+    is how R2.10's cross-agent write channel is closed: by the shape, not by a check on a value.
+    Four gates in scripts/compile-policy.sh, all exit 3: T27 (five accepted_risk fields, the same
+    list scripts/stage-oauth-mount.sh validates at bootstrap, plus mount_mode == ro), R2.8's
+    fail-closed mount-key allowlist, R7.6 in BOTH directions (runtime egress without
+    runtime_install, and runtime_install without either a reason or the egress it claims), and
+    SC-3 project-mount containment. Gates run BEFORE the zero-pack refusal, or the R7.6 gate would
+    be unreachable on the only input it exists for -- probed, not reasoned: a profile selecting a
+    pack with registry egress exits 3, not 2.
+    EVERY GATE WAS PROBED, 28 probes, all removed afterwards. Positive controls first: --profile
+    oauth-mount PASSES T27, and all three committed resolved artifacts are still `--check` current
+    (so the new profile fields did not leak into the emitted schema). Then the negatives: each of
+    the five accepted_risk fields deleted in turn, mount_mode rw, an unknown mounts key, both and
+    neither authorization branches, an empty classify list, a build_cache map naming a non-agent,
+    a `shared` string, an unresolvable pack name, a `../etc` traversal name, a missing
+    package_repository, a suite URL with no snapshot timestamp, a short key id, and eight SC-3
+    paths including the two that must PASS (a sibling, and a name-prefix sibling that a naive
+    prefix test would call an ancestor).
+    2 architectural deviations recorded, both operator-ratified before writing (3: the SC-3 gate
+    is built in the compiler at exit 3 rather than host-side in lint-policy.sh per Edge Case 18 --
+    written LEXICALLY rather than with realpath, which removes the premise that confined it to the
+    host; 4: exit codes 2 and 3 pulled from SF-4, because a refusal gate cannot be built without
+    the code that expresses a refusal. Exit 4 stays with SF-4's drift check).
+    NOT DONE, and deliberately: profiles/default.yaml keeps `packs: []` though SF-2's text says
+    the list becomes populated. The schema accepts, resolves and gates a populated list, but
+    composition is SF-3's and the compiler still refuses a non-zero list -- populating it now
+    would make the default profile uncompilable. Operator decision: not a deviation, a sequencing
+    note. SF-3 populates it.
+    The SC-3 gate is a NO-OP on every profile as they stand: all four carry the literal
+    placeholder `mounts.project.path: <host path>` and the real bind comes from
+    compose/overrides/<profile>.yaml, so the gate warns rather than judging. SF-7 Phase A must
+    assert the mount that actually exists against `docker inspect`, not treat Phase B's exit 3 as
+    SC-3 coverage.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it

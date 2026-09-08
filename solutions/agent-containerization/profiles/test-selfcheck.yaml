@@ -21,6 +21,19 @@ name: test-selfcheck
 
 packs: []                      # 01.5 composes egress from these. Empty at this profile
 
+# R12.7, and this profile takes the OTHER branch. Exactly one of `classify` or `waiver` is
+# required; a TEST-SCOPED profile is never a shipped deployment, runs no unattended action
+# against anything real, and classifying actions here would assert a gate the harness does not
+# exercise. The waiver is the honest form and it is recorded rather than omitted.
+authorization:
+  waiver: >-
+    Test-scoped profile (01.3 SF-8), never shipped and never run unattended against a real
+    target. R12.7's classification is declared by the profiles that deploy -- default.yaml and
+    oauth-mount.yaml -- and enforcement of either branch is 02.5's (T37).
+
+# `package_repository` is DELIBERATELY ABSENT: it is required only when `packs` is non-empty
+# (R7.18 sources pack `apt` items from it) and this profile selects none.
+
 auth_mode:                     # R4.12 defaults, consumed by 01.4
   claude: oauth-interactive
   codex: oauth-interactive
@@ -36,7 +49,7 @@ mounts:
     mode: rw                   # :ro where the agent only reviews (R2.7). Default is rw;
                                 # T2's read-only fixture comes from a test-only override,
                                 # not from changing this
-  build_cache: false            # R2.10, per-agent where enabled
+  build_cache: false            # R2.10, per-agent where enabled. false | true | {<agent>: bool}
   host_git_config: false        # R2.9, :ro with credential.helper stripped
 
 limits:                         # R1.10, applied per agent container

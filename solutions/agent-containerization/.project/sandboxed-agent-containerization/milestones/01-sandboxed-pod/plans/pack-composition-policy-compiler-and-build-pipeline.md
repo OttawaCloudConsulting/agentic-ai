@@ -250,7 +250,7 @@ the SF-1..SF-5 / SF-6 boundary.
   as a function of `scripts/lint-policy.sh` (01.1's Test Command), which is where policy-file
   well-formedness already lives.
 
-- [ ] **SF-2: Profile schema extension and the build-refusal gates** -- Extend 01.2 Interface
+- [x] **SF-2: Profile schema extension and the build-refusal gates** -- Extend 01.2 Interface
   Contract 3 additively: `packs:` becomes a populated list, `authorization:` carries R12.7's
   classification or its recorded waiver, and `mounts.build_cache` gains its per-agent shape. Implement
   the three refusal gates in the compiler's validation pass (T27, T21's mount-key allowlist, R7.6's
@@ -996,3 +996,47 @@ GitHub CLI packs are 02.3 and 03.3; this feature ships the mechanism and one ref
   criterion 6 assertion (`git config --global --get-all credential.helper`), which 01.4 SF-5
   could not make as written; SF-7 Phase G is the place to add it. It also enlarges `agent-base`
   and therefore the CI-published image SF-6 attests.
+
+### Deviation 3: the SC-3 project-mount gate runs in the compiler, not in `lint-policy.sh`
+- **What changed:** The project-mount containment gate is built in `scripts/compile-policy.sh`
+  (SF-2) and exits **3**, alongside the other three gates. It compares `mounts.project.path`
+  against the solution root **lexically** -- not through `realpath` -- so it behaves identically
+  on the host and inside the compile stage. An absolute path that is the solution root, an
+  ancestor of it, or a descendant whose first segment is `policy`, `packs`, `profiles`,
+  `compose`, `images`, `mediator`, `scripts` or `.dockerignore` is refused; a non-absolute path
+  produces a NOTE saying the gate did not run.
+- **Originally planned:** Edge Case 18 states the gate "cannot run in the build stage ... It
+  therefore runs host-side in `scripts/lint-policy.sh` before the build", resolving the path
+  through `realpath`.
+- **Why necessary:** Operator decision, 2026-09-07, on a three-way choice. Two parts of the plan
+  disagree: Edge Case 18 says `lint-policy.sh`, while Contract 6 and Test Strategy Phase B both
+  require **exit 3** -- a code `lint-policy.sh` does not have -- and SF-1's shipped
+  `lint-policy.sh` header already records the gate as the compiler's. Writing the check lexically
+  removes the premise the edge case rests on: only `realpath` needs a host filesystem, and a
+  lexical containment test does not, so the gate is not confined to the host after all.
+- **Impact:** Phase B's fourth assertion needs no re-scoping -- all four gates exit 3 from one
+  script. **Residual, recorded rather than claimed away:** every shipped profile carries the
+  literal placeholder `mounts.project.path: <host path>` and the mount that actually exists comes
+  from `compose/overrides/<profile>.yaml`, so on today's profiles this gate has nothing to judge
+  and warns. It also cannot see a symlink or a relative path resolving into the tree. The mount
+  that exists is asserted at **SF-7 Phase A** against `docker inspect` on the running container,
+  extending 01.3's control-plane assertion; SF-7 must carry that assertion rather than treating
+  Phase B's exits as full SC-3 coverage.
+
+### Deviation 4: exit codes 2 and 3 are implemented at SF-2, not SF-4
+- **What changed:** `scripts/compile-policy.sh` gained `invalid()` (exit 2) and `refuse()`
+  (exit 3) at SF-2, and the 31 existing content-validation failures in `validate_resolved` and
+  the compile path moved from exit 1 to exit 2. Exit 1 is now invocation errors only (unknown
+  flag, missing `yq`). Exit 4 stays unbuilt.
+- **Originally planned:** SF-4 carries "the exit-code contract of Interface Contract 6"; SF-2 is
+  described as the input contract and the gates only.
+- **Why necessary:** A refusal gate cannot be built without the code that expresses a refusal.
+  Test Strategy Phases A and B assert exit **2** for a malformed manifest or profile and exit
+  **3** for each of the four gates, and both phases test SF-2's surface. Splitting the contract
+  so the gates land without their exit codes would ship gates the harness cannot distinguish
+  from validation errors.
+- **Impact:** SF-4's remaining exit-code work is exit **4** only, alongside the `--check` drift
+  comparison it belongs to. No caller breaks: Contract 6's caller table was re-verified against
+  disk -- `entrypoint.sh:180` tests non-zero, `verify-egress-mediator.sh` does not invoke the
+  compiler, and `README.md` documents an operator command. Same shape as Edge Case 17's early
+  resolution: an SF-4 decision taken at the sub-feature that needs it, recorded here.

@@ -8,7 +8,49 @@
 
 name: default
 
-packs: []                      # 01.5 composes egress from these. Empty at this profile
+packs: []                      # 01.5 composes egress from these. Each name must resolve to
+                               # packs/<name>/pack.yaml -- the compiler refuses a name that does
+                               # not (exit 2). STILL EMPTY at SF-2: the schema accepts a populated
+                               # list here, but the composition that consumes it is SF-3's, and
+                               # this profile is only populated once that lands (SF-5 installs the
+                               # package set the selection implies)
+
+# R7.18 -- the repository pack `apt` items are sourced from. Required only when `packs` above is
+# non-empty; declared here regardless so the schema is complete rather than grown at SF-5.
+#
+# A SNAPSHOT, NOT A SUITE. `suite: bookworm` plus name=version resolves today and fails in six
+# months: Debian rotates the archive and drops superseded versions, and SC-8 measures precisely
+# the clean rebuild that happens later. The timestamped snapshot URL is stable in time.
+#
+# `fingerprint` is asserted at build (SF-5), so a key substitution fails the build rather than
+# silently signing with something else. The value below is the Debian Archive Automatic Signing
+# Key (12/bookworm), taken from the base image's own /usr/share/keyrings/ and verified against
+# the snapshot's InRelease -- see packs/README.md, "How these hashes were obtained".
+#
+# `signed_by` is `images/keyrings/` and NOT `images/agent-base/keyrings/`: there is no
+# images/agent-base/ directory (01.2 Deviation 1 made the agent images one multi-stage
+# Dockerfile), and the path must resolve inside the AGENT build context, which is `images/`.
+# The file itself is committed at SF-5, where the install step that reads it is built.
+package_repository:
+  apt:
+    url: https://snapshot.debian.org/archive/debian/20260901T000000Z/
+    suite: bookworm
+    signed_by: images/keyrings/debian-archive.gpg
+    fingerprint: B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8
+
+# R12.7 -- actions classified as irreversible or high-impact require human authorization even in
+# otherwise unattended operation. EXACTLY ONE of `classify` or `waiver` is required; the compiler
+# refuses both and neither (exit 2). Requiring the waiver as the explicit alternative is what
+# stops the field from being quietly omitted for a year.
+#
+# SHAPE ONLY AT THIS MILESTONE. Nothing enforces the classification yet -- T37 is 02.5's, and
+# this is recorded as a residual rather than presented as satisfying R12.7. A field validated
+# for shape and exercised by nothing drifts, so the landing point is named rather than implied.
+authorization:
+  classify:
+    - git-push                 # leaves the pod and rewrites shared history
+    - infrastructure-apply     # Milestone 03's terraform apply; irreversible against real accounts
+  # waiver: <recorded reason this profile waives R12.7>
 
 # R4.12 defaults -- "the safest mode that agent supports". The enum is PER AGENT and the agents
 # are asymmetric; Interface Contract 1 of the 01.4 plan is the authoritative matrix, and
@@ -35,7 +77,20 @@ mounts:
     mode: rw                   # :ro where the agent only reviews (R2.7). Default is rw;
                                 # T2's read-only fixture comes from a test-only override,
                                 # not from changing this
-  build_cache: false            # R2.10, per-agent where enabled
+  # R2.10, PER-AGENT where enabled. Three accepted shapes, and the compiler refuses anything
+  # else (exit 2): `false` (off for every agent, the default), `true` (on for every agent, each
+  # with its own volume), or a map keyed by agent -- {claude: true, codex: false, agy: false} --
+  # keyed exactly like `auth_mode` and `listeners` and refused if it names an agent the base
+  # allowlist does not. A SINGLE SHARED cache is not expressible in this schema at all, which is
+  # how R2.10's cross-agent write channel is closed: by the shape, not by a check on a value.
+  build_cache: false
+  #
+  # `mounts` IS A CLOSED SET (R2.8, T21). Only `project`, `build_cache` and `host_git_config`
+  # may appear -- an unrecognised key is a REFUSAL (exit 3), never a warning and never ignored.
+  # A profile asking for `ssh_auth_sock: true` that is silently ignored is indistinguishable
+  # from one correctly refused, right up to the day the key is implemented. The oauth-mount
+  # credential source is deliberately NOT a `mounts` key: it is declared under `oauth_mount`
+  # and mounted only by a one-shot bootstrap fragment (R4.15).
   host_git_config: false        # R2.9, :ro with credential.helper stripped. When true, run
                                 # `bash scripts/scrub-gitconfig.sh` BEFORE `up` and layer
                                 # compose/overrides/host-gitconfig.yaml -- the scrubbed artifact
