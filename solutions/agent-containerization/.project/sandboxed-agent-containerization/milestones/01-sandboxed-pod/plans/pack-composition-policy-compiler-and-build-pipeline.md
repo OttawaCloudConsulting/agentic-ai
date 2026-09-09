@@ -1187,3 +1187,12 @@ established for Edge Case 17 still holds. Two of the twelve new probes initially
 **probe** defects rather than code defects -- a profile splice that truncated the file at
 `egress_exclusions`, and a sequencing error that left the wrong pack selected -- both fixed and
 re-run rather than accepted as passes.
+
+**Postscript, 2026-09-08: the portability fix is now MEASURED rather than argued.** The
+`${var,,}` removal was justified on the claim that stock macOS `/bin/bash` is 3.2 and would fail,
+but it was never exercised -- `bash` on this host is Homebrew 5.3.15, and the Claude Code tool
+shell's own `$BASH_VERSION` is 3.2.57 only because it is `/bin/bash`, which the compiler is never
+invoked through. Running the compiler explicitly as `/bin/bash scripts/compile-policy.sh`:
+compile exits 0, `--validate` exits 0, and with `COMPILED_AT` fixed the output is **byte-identical
+to the 5.3.15 output**. That is a THIRD axis of the byte-identity Edge Case 17 rests on -- host
+versus compile stage (two `yq` versions, two platforms) and now two `bash` versions on one host.
