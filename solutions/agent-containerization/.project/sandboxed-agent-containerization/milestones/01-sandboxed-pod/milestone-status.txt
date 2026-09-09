@@ -677,7 +677,37 @@
     records image identity only, R10.7's SBOM half stays with the CI-published agent-base. What
     build.sh records is an image ID (config-blob sha256), NOT a registry manifest digest, and is
     labelled as such; a never-pushed image has no manifest digest.
-    VERIFIED AT SF-6a, not asserted. The drift gate was probed in BOTH directions with the
+    A REAL BUG WAS FOUND BY BECOMING SF-5's MISSING CALLER, and fixed here on operator
+    decision. `bash scripts/build.sh --profile test-fixtures` died at "pack-install: repo.env is
+    incomplete", exit 2, in the agent-packs stage. SF-5's Codex finding 3 -- the zero-pack profile
+    refused for a missing package_repository -- was applied to the PRODUCER only: pack-plan.sh's
+    zero-pack branch truncated repo.env and exited, leaving apt-items.txt, archives.txt and
+    packs.txt ABSENT, while pack-install.sh still demanded APT_URL/APT_SUITE/APT_FINGERPRINT
+    unconditionally and would have died at `wc -l < packs.txt` immediately after. It survived
+    because SF-5's own review recorded the agent build's PROFILE arg as "a seam with no caller" --
+    the fix was verified through pack-plan.sh in isolation, never through a build, and
+    scripts/build.sh is the first caller. Reached 2 of the 4 shipped profiles (test-fixtures,
+    test-selfcheck); default and oauth-mount were never affected. Fixed on both sides: the empty
+    plan is now a COMPLETE plan (all four files written empty) and pack-install returns early on
+    an empty packs.txt before the field check, since that check is right for a plan that installs
+    something and wrong for one that installs nothing.
+    VERIFIED AT SF-6a, not asserted.
+    AFTER THE ZERO-PACK FIX, both directions were controlled rather than the fix being observed
+    to stop erroring. test-fixtures builds exit 0 and its image has go ABSENT, python3 ABSENT and
+    no /usr/local/go, with node and git present from agent-base; default's image has go and
+    python3 present. That is D10's per-profile image property demonstrated for the first time --
+    the two profiles produce genuinely different images, not the same image under two tags.
+    Full re-run after the fix: lint-policy.sh exit 0, verify-pod-topology.sh ALL CHECKS PASSED,
+    verify-egress-mediator.sh 77 PASS / 0 FAIL ALL PHASES PASSED.
+    TWO WORKFLOW CORRECTIONS from the review pass, both before any push. `id-token: write` was
+    removed: it was there on the belief that buildx's provenance attestation signs through the
+    OIDC token, which is false -- BuildKit writes an UNSIGNED in-toto statement, and the string
+    ACTIONS_ID_TOKEN appears nowhere in docker/build-push-action's src or dist, only in that
+    repository's own CI. A permission granting nothing to a job already holding packages: write
+    is widening for free, and the rationale was a lying comment. And the run summary called the
+    published digest a "multi-platform index" one paragraph after Deviation 15 established it is
+    single-architecture; it is an index over ONE platform manifest plus the attestation
+    manifests. The drift gate was probed in BOTH directions with the
     compile and drift stages force-rebuilt: clean tree exits 0 ("all emitted artifacts match
     their committed copies"), one perturbed byte in policy/resolved/default.yaml exits 4 and
     fails the build; tree restored and confirmed clean. build.sh run end to end, its four

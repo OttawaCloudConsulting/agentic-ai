@@ -13,6 +13,21 @@ KEYRING="${2:?usage: pack-install.sh <plan-dir> <keyring>}"
 die() { echo "pack-install: $*" >&2; exit 2; }
 
 [ -f "$PLAN/repo.env" ] || die "no plan at $PLAN (expected repo.env)"
+for f in apt-items.txt archives.txt packs.txt; do
+  [ -f "$PLAN/$f" ] || die "no plan at $PLAN (expected $f)"
+done
+
+# --- the zero-pack profile installs nothing, and that is a COMPLETE plan ----------
+# profiles/test-fixtures.yaml and profiles/test-selfcheck.yaml select no packs, and the
+# schema makes package_repository "required only when packs is non-empty" -- so an empty
+# repo.env is correct input here, not missing input. Returning before the field check is
+# what makes that true of the CONSUMER too: the check below is right for a plan that
+# installs something and wrong for one that installs nothing, and running it first is how
+# a correct profile got refused (01.5 SF-6a; SF-5 fixed the producer half only).
+if [ ! -s "$PLAN/packs.txt" ]; then
+  echo "pack-install: profile selects no packs; nothing to install"
+  exit 0
+fi
 
 # shellcheck disable=SC1091
 APT_URL=""; APT_SUITE=""; APT_FINGERPRINT=""

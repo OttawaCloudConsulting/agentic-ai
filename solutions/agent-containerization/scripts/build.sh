@@ -117,4 +117,15 @@ echo
 # operator to re-derive it.
 echo "build: run this profile with"
 echo "build:   AGENT_PROFILE=${PROFILE} docker compose --env-file compose/pins.env \\"
-echo "build:     -f compose/compose.yaml -f compose/overrides/default.yaml up -d"
+# The override is NOT hardcoded to overrides/default.yaml. There is no profile-to-override
+# mapping to assume: `default` has a same-named file, `oauth-mount`'s fragment is
+# `oauth-mount.bootstrap.yaml` and is one-shot, and the two test profiles have none at all.
+# Printing overrides/default.yaml for every profile would print a command that layers the
+# WRONG override -- a run line that is wrong is worse than one that says it does not know.
+if [[ -f "compose/overrides/${PROFILE}.yaml" ]]; then
+  echo "build:     -f compose/compose.yaml -f compose/overrides/${PROFILE}.yaml up -d"
+else
+  echo "build:     -f compose/compose.yaml <-f the fragments this profile needs> up -d"
+  echo "build: (no compose/overrides/${PROFILE}.yaml -- this profile layers no same-named"
+  echo "build:  override; see README for which fragments apply)"
+fi

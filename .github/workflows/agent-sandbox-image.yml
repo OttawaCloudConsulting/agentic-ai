@@ -115,9 +115,14 @@ jobs:
     permissions:
       contents: read
       packages: write
-      # buildx's provenance attestation signs through the OIDC token when one is
-      # available; without this the build still succeeds and attests unsigned.
-      id-token: write
+      # NO `id-token: write`. It was here on the belief that buildx's provenance
+      # attestation signs through the OIDC token; it does not. BuildKit writes an
+      # UNSIGNED in-toto statement into an attestation manifest, and
+      # docker/build-push-action never reads ACTIONS_ID_TOKEN -- checked, the string
+      # appears nowhere in its src/ or dist/, only in that repository's own CI.
+      # Signing would mean actions/attest-build-provenance or cosign, neither of which
+      # this workflow uses. A permission that grants nothing to a job already holding
+      # `packages: write` is widening for free.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -196,6 +201,8 @@ jobs:
             echo "Image: \`${{ env.IMAGE }}\`"
             echo "Tags: \`${{ steps.meta.outputs.tags }}\`"
             echo
-            echo 'The digest is the multi-platform index, not the linux/arm64 manifest.'
-            echo 'Pinning the index is what lets the attestation manifests travel with it.'
+            echo 'This is the index digest: ONE linux/arm64 manifest plus the SBOM and'
+            echo 'provenance attestation manifests. Not a multi-platform index -- the base'
+            echo 'is single-architecture on purpose (Deviation 15). Pinning the index rather'
+            echo 'than the platform manifest is what keeps the attestations reachable from it.'
           } >> "$GITHUB_STEP_SUMMARY"

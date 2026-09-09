@@ -132,8 +132,21 @@ mapfile -t PACK_NAMES < <(yq -r '.packs[]' "$PROFILE_FILE")
 # `--build-arg PROFILE=test-selfcheck` died at "package_repository.apt must be !!map,
 # found !!null" on a profile that is CORRECT as written and deliberately omits it. Found
 # by a Codex adversarial pass and reproduced before fixing.
+#
+# THE EMPTY PLAN MUST BE A COMPLETE PLAN, NOT A TRUNCATED ONE (01.5 SF-6a). The first
+# version of this branch wrote repo.env and exited, leaving the other three files
+# ABSENT -- and images/pack-install.sh reads all four. It died at "repo.env is
+# incomplete" before it could reach them, and would have died at `wc -l < packs.txt`
+# immediately after. The fix was verified through this script in isolation and never
+# through a build, because nothing passed PROFILE to the agent build until
+# scripts/build.sh became its first caller. A producer's contract is the set of files
+# it emits; emitting a subset of them on one branch is the same defect as emitting a
+# malformed one.
 if [ "${#PACK_NAMES[@]}" -eq 0 ]; then
   : > "$OUT/repo.env"
+  : > "$OUT/apt-items.txt"
+  : > "$OUT/archives.txt"
+  : > "$OUT/packs.txt"
   echo "pack-plan: profile '$PROFILE' selects no packs; no package repository required"
   exit 0
 fi

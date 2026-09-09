@@ -357,7 +357,11 @@ bash scripts/build.sh --profile default
 would eventually record identity for images nobody runs — then tags the agent images
 `sandboxed-agent/<agent>:<profile>` and writes `.build-scratch/build/<profile>.images.txt`.
 Compose's own `:local` tag is reused by every profile, so without the second tag a build for one
-profile silently replaces another's.
+profile silently replaces another's — and `:local` is left pointing at whichever profile was built
+last. The documented entry point carries `--build`, which re-establishes it for the profile being
+started; a bare `up -d` after building a different profile would run the other profile's images.
+That is the same class of mismatch `AGENT_PROFILE` closes for policy, and `--build` is what closes
+it here.
 
 **What it records is an image ID, not a registry digest.** A locally built image that was never
 pushed has no manifest digest — the recorded value is the sha256 of its config blob. It is stable
