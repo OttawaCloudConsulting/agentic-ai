@@ -13,11 +13,16 @@ profile) has produced a runnable pod. **This pod is not for real work yet** — 
 
 ```
 docker compose --env-file compose/pins.env \
-  -f compose/compose.yaml -f compose/overrides/default.yaml up
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build
 ```
 
 This is the only entry point — no wrapper script. `--env-file` is required: Compose interpolates
-version pins from it into the image builds, and without it the build fails. The pod starts with no
+version pins from it into the image builds, and without it the build fails.
+
+**`--build` is required, not a convenience** (Feature 01.5 SF-4). The mediator's egress policy is
+compiled by a *build stage*, so a run that reuses a cached image also reuses the policy that was
+current when that image was built. Switching profiles changes only the Compose files, so without
+`--build` a profile switch would appear to work while the pod kept enforcing the previous policy. The pod starts with no
 default route and no route to the internet (Feature 01.3 adds the egress mediator).
 
 **Date of research:** 2026-09-02. Agent tooling in this space moves fast; re-verify version-specific claims before building.
@@ -90,7 +95,7 @@ validates it. The mediator refuses to start without it. See the feature plan's D
 
 ```bash
 docker compose --env-file compose/pins.env \
-  -f compose/compose.yaml -f compose/overrides/default.yaml up -d
+  -f compose/compose.yaml -f compose/overrides/default.yaml up -d --build
 ```
 
 ### The project mount must not be this solution tree
@@ -158,9 +163,13 @@ own image layer, not from a bind mount:
 
 ```bash
 # add the FQDN to policy/allowlist.base.yaml, then BOTH of:
-bash scripts/compile-policy.sh
+bash scripts/compile-policy-build.sh    # recompile through the build stage; review the diff, commit it
 docker compose --env-file compose/pins.env -f compose/compose.yaml build egress-mediator
 ```
+
+Skipping the first step does not silently ship stale policy — since 01.5 SF-4 the second step
+**fails** with `compile-stage: DRIFT`, because the build compiles the policy itself and refuses to
+produce an image whose policy differs from the committed, reviewed artifact.
 
 **Revocation (R12.6).** `docs/records/credential-inventory.md` carries every credential an agent can
 obtain, its lifetime and its documented revocation path. The `oauth-token` cell mints a **one-year**
@@ -317,7 +326,7 @@ docker compose --env-file compose/pins.env -f compose/compose.yaml \
 
 | `control` | `reason` | What to do |
 |---|---|---|
-| `allowlist` | `host_not_allowlisted` / `port_not_allowlisted` | Add the host to `policy/allowlist.base.yaml` under that agent, then `bash scripts/compile-policy.sh` and rebuild the mediator image |
+| `allowlist` | `host_not_allowlisted` / `port_not_allowlisted` | Add the host to `policy/allowlist.base.yaml` under that agent, then `bash scripts/compile-policy-build.sh`, commit the refreshed artifact, and rebuild the mediator image |
 | `allowlist` | `sni_does_not_match_connect_host` | The ClientHello named a different host than the CONNECT line. This is the domain-fronting refusal — investigate before allowlisting anything |
 | `allowlist` | `agent_has_no_allowlist` | That agent has no allowed names at all in the compiled artifact |
 | `denylist` | `fqdn_on_denylist` / `resolved_address_on_denylist` | Deny wins. Edit `policy/denylist.base.yaml` only if the range is genuinely not the one R5.6 requires |

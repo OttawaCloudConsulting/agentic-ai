@@ -25,6 +25,24 @@
 # CA tool whose whole premise is that it never runs here.
 !scripts/compile-policy.sh
 
+# The compiler's INPUTS (01.5 SF-4). The compile stage of images/mediator/Dockerfile
+# recompiles the resolved artifact from these, so what a build stage cannot read, the
+# mediator cannot compile.
+#
+# `packs` is a directory of manifests; `profiles` carries every profile including the
+# two test-scoped ones, which is harmless -- a profile names its inputs, it is not one.
+#
+# The two base policy files are named INDIVIDUALLY rather than as `!policy`, and that
+# is the load-bearing part: `policy/` also holds allowlist.test.yaml and
+# denylist.test.yaml, 01.3's harness fixtures, which have no business in a shipped
+# mediator image. Their absence is why the compile stage cannot recompile
+# policy/resolved/test-fixtures.yaml or test-selfcheck.yaml and carries the committed
+# copies through instead (SF-4 Deviation 9).
+!profiles
+!packs
+!policy/allowlist.base.yaml
+!policy/denylist.base.yaml
+
 # Trailing denies. Docker's rules are order-sensitive -- the LAST matching line
 # decides -- so these sit below every `!` above and re-exclude regardless of what
 # an allowlist entry admitted. That is the whole point of their position: today

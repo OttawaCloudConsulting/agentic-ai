@@ -264,7 +264,7 @@ the SF-1..SF-5 / SF-6 boundary.
   rejection and the port≠443 flag to pack-supplied entries. Make the output **deterministic** —
   stable key order, sorted entry lists — because the drift check in SF-4 is meaningless otherwise.
 
-- [ ] **SF-4: Build-stage relocation and the drift check** -- Move the compiler invocation into a
+- [x] **SF-4: Build-stage relocation and the drift check** -- Move the compiler invocation into a
   stage of `images/mediator/Dockerfile` so it is never an operator step (D10, R7.4), and implement
   the committed-artifact drift check per Interface Contract 4. **Re-scoped 2026-09-07: the build
   context work is already done.** 01.3 SF-4 moved the mediator's context to the solution root and
@@ -1196,3 +1196,56 @@ invoked through. Running the compiler explicitly as `/bin/bash scripts/compile-p
 compile exits 0, `--validate` exits 0, and with `COMPILED_AT` fixed the output is **byte-identical
 to the 5.3.15 output**. That is a THIRD axis of the byte-identity Edge Case 17 rests on -- host
 versus compile stage (two `yq` versions, two platforms) and now two `bash` versions on one host.
+
+### Deviation 9: the two test-scoped artifacts are carried through the compile stage, not compiled by it
+- **What changed:** `images/mediator/compile-stage.sh`'s `emit` branch recompiles an artifact when
+  the bases its own `compiled_from` names are present in the build context, and otherwise — when
+  the missing base is a `*.test.yaml` fixture — copies the committed artifact through unchanged,
+  saying so in the build log. `policy/resolved/test-fixtures.yaml` and `test-selfcheck.yaml` take
+  that second path; `default.yaml` takes the first.
+- **Originally planned:** Interface Contract 4 says without qualification that the mediator image
+  build stage "compiles authoritatively" and that the stage's output is the policy the mediator
+  runs.
+- **Why necessary:** the two test artifacts are compiled from `policy/allowlist.test.yaml` and
+  `policy/denylist.test.yaml`, which the `.dockerignore` allowlist **ratified by this sub-feature**
+  deliberately excludes — the two base files are named individually rather than as `!policy`
+  precisely so 01.3's harness fixtures never enter a shipped mediator image. So the stage cannot
+  recompile them. Dropping them instead is not available either: `compose/overrides/test-egress.yaml`
+  runs the mediator on `test-fixtures`, and `verify-egress-mediator.sh` drives 77 assertions
+  through it. Operator decision, 2026-09-08, ratified before the code was written; the two
+  alternatives put to the operator were admitting the `.test` bases to the context (contradicting
+  a Gate 4-ratified decision) and making the image profile-specific via a build ARG (which would
+  break the one-image-serves-every-profile property `MEDIATOR_PROFILE` rests on).
+- **Impact:** carrying a copy through is a hole in Contract 4 — an artifact nothing recompiled —
+  so the branch is written to make that hole impossible to open silently for a shipped profile.
+  The test is **file presence, not profile name**: an artifact whose declared base is absent and
+  is not a `.test.yaml` fixture **fails the build** (exit 2), so deleting
+  `!policy/allowlist.base.yaml` from `.dockerignore` produces a loud failure rather than a quietly
+  uncompiled `default`. Probed in both directions, host-side: with the `.test` bases admitted to a
+  staged context all three artifacts are compiled and still match their committed copies
+  byte-for-byte, which also demonstrates they remain genuinely reproducible; with the base
+  allowlist removed, `default` fails rather than being carried. SF-7 Phase A should assert the
+  build log names exactly the two carried-through artifacts and no more.
+
+### Deviation 10: the drift gate is a separate stage from the artifact-extraction target
+- **What changed:** the mediator Dockerfile has five stages — `base`, `compile`, `artifact`,
+  `drift`, `runtime`. `compile` emits and refuses nothing; `artifact` (`FROM scratch`) depends on
+  `compile` alone and is what `scripts/compile-policy-build.sh` extracts from; `drift` is
+  `FROM compile` and runs the comparison; `runtime` reaches the policy only via
+  `COPY --from=drift`.
+- **Originally planned:** Contract 4 states the behaviour ("the mediator image build stage compiles
+  authoritatively"; "local build and CI alike fail on drift") as though it were one place, and
+  Edge Case 17 resolved the host invocation to run "through the build stage" without saying which
+  stage.
+- **Why necessary:** the two halves are in direct conflict if they share a stage. The host wrapper
+  exists to REGENERATE the committed artifact when the inputs have changed — which is exactly the
+  condition the drift gate refuses. A gate inside the emitting stage would fail on the only
+  occasion the wrapper is ever run. Splitting them is what lets both halves of Contract 4 hold at
+  once, and it is not merely a convenience: `runtime` copying the policy *out of the drift stage*
+  is what makes fail-on-drift mechanical rather than a build step someone could reorder away.
+- **Impact:** proved by probe rather than asserted — a hand-edit to the committed
+  `policy/resolved/default.yaml` fails a plain `docker build` at the `drift` stage with exit 4, and
+  `scripts/compile-policy-build.sh` regenerates that same hand-edited artifact successfully.
+  SF-6's CI drift job builds the default target and therefore passes through the gate with no
+  extra step. SF-7 Phase C's "a drifted committed artifact fails the LOCAL build" is satisfied by
+  this stage rather than by a separate check.

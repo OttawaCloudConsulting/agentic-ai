@@ -33,7 +33,7 @@
 # Exit codes (01.5 SF-2): 0 success  1 usage error  2 input validation failure
 #                         3 refusal gate tripped (R4.17/T27, R2.8/T21, R7.6, SC-3, and at SF-3
 #                           a pack's unconsumable mounts/env/credentials, and an upgrade collision)
-#                         4 --check drift -- NOT BUILT YET, SF-4. --check still exits 1
+#                         4 --check found drift (01.5 SF-4)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -48,17 +48,25 @@ VALIDATE_TARGET=""
 # are added here because SF-2's gates need them -- a REFUSAL is a recorded policy decision the
 # operator must make, not a syntax error, and the acceptance harness distinguishes them. Exit 1
 # is retained for invocation errors only, so a mistyped flag keeps the shell-conventional code
-# callers already assume. Exit 4 (--check drift) is SF-4's, with the drift check it belongs to.
+# callers already assume. Exit 4 is added at SF-4, with the drift check it belongs to: a build
+# stage compiles authoritatively and refuses to produce an image whose committed artifact does
+# not match, so `--check` needs a code the build can tell apart from a mistyped flag.
 #
 # No caller inspects a specific value: entrypoint.sh:180 tests non-zero, verify-egress-mediator.sh
 # does not invoke the compiler at all, and README.md documents an operator command.
 #   1  usage / invocation error        fail()
 #   2  input validation failure        invalid()
 #   3  refusal gate tripped            refuse()
-#   4  --check found drift             SF-4 -- NOT BUILT YET; --check still exits 1 today
+#   4  --check found drift             drift()
+#
+# A MISSING committed artifact under --check also exits 4, not 1. It is not a usage error --
+# the invocation is well formed -- and the condition the caller cares about is the same one:
+# the committed artifact does not match a fresh compile of its inputs. Absent is the limiting
+# case of different, and the drift stage of images/mediator/Dockerfile must fail on it.
 fail()    { echo "compile-policy: FAIL: $*" >&2; exit 1; }
 invalid() { echo "compile-policy: INVALID: $*" >&2; exit 2; }
 refuse()  { echo "compile-policy: REFUSED: $*" >&2; exit 3; }
+drift()   { echo "compile-policy: DRIFT: $*" >&2; exit 4; }
 note()    { echo "compile-policy: $*" >&2; }
 
 # These names do not stay data. The mediator's entrypoint interpolates every allowed
@@ -1034,16 +1042,16 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
 } > "$TMP"
 
 if [[ "$MODE" == "check" ]]; then
-  [[ -f "$OUT" ]] || fail "$OUT does not exist; run the compiler first"
+  [[ -f "$OUT" ]] || drift "$OUT does not exist. It is a committed artifact and the build refuses to ship without it -- run the compiler and commit the result."
   # compiled_at is the one line that legitimately differs between two runs of the same inputs.
   if diff -u <(grep -v '^compiled_at:' "$OUT") <(grep -v '^compiled_at:' "$TMP") > "$TMP.cmp"; then
     echo "compile-policy: $OUT is current"
     exit 0
   fi
-  echo "compile-policy: FAIL: $OUT does not match a fresh compile of its inputs." >&2
+  echo "compile-policy: DRIFT: $OUT does not match a fresh compile of its inputs." >&2
   echo "compile-policy: the artifact is generated (SC-6) -- recompile rather than hand-editing it." >&2
   cat "$TMP.cmp" >&2
-  exit 1
+  exit 4
 fi
 
 mkdir -p "$(dirname "$OUT")"

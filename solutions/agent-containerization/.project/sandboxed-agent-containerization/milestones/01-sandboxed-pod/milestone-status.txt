@@ -147,7 +147,7 @@
 
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
-    Sub-features: 3/7 complete
+    Sub-features: 4/7 complete
     Build started 2026-09-07. Codebase assessment ABSENT (no .project/<slug>/docs/codebase-assessment.md);
     the refresh was skipped with a warning rather than blocking, per the /build spec.
     SF-1 complete 2026-09-07: packs/language-runtimes/pack.yaml, packs/README.md, and the pack-manifest
@@ -332,6 +332,69 @@
     Edge Case 17's host/image byte-identity still holds. Two of the twelve initially failed for
     PROBE defects, not code defects -- a splice that truncated the profile at egress_exclusions,
     and a sequencing error leaving the wrong pack selected -- both fixed rather than accepted.
+    SF-4 complete 2026-09-08: build-stage relocation and the drift check. The mediator Dockerfile
+    is now FIVE stages -- base (debian + yq, shared so there is ONE yq), compile (emits, refuses
+    nothing), artifact (FROM scratch, the host's extraction target), drift (the gate), runtime.
+    EDGE CASE 17's FOURTH OBLIGATION IS DISCHARGED FIRST, not during: `--output type=local` was
+    UNVERIFIED on the pinned Docker Desktop, so it was probed with a throwaway three-stage context
+    before anything was built on it -- server 28.3.2, buildx v0.25.0-desktop.1, the FROM scratch
+    stage's file landed 0644 with stage-generated content. Probe removed.
+    Obligation 1 (wrapper versus inner implementation) taken in the form the plan called its
+    DEFAULT READING, so no host-surface deviation: scripts/compile-policy-build.sh is new and
+    Contract 6's shipped CLI is untouched. Obligation 2 (BASH_SOURCE/REPO_ROOT) handled by laying
+    the inputs out under /src with the script at /src/scripts/. Obligation 3 (the final image
+    still COPYing the COMMITTED artifact) closed: `COPY --from=drift /out/`.
+    THE DRIFT GATE IS A SEPARATE STAGE FROM THE EXTRACTION TARGET, and that is Deviation 10 rather
+    than a detail. The two halves of Contract 4 are in direct conflict if they share a stage: the
+    wrapper exists to REGENERATE the committed artifact when inputs changed, which is exactly the
+    condition a gate refuses. So `artifact` depends on `compile` alone and `runtime` copies the
+    policy OUT OF `drift` -- which is what makes fail-on-drift mechanical rather than a step
+    someone could reorder away. PROVED, not asserted: a hand-edited policy/resolved/default.yaml
+    fails a plain `docker build` at the drift stage with exit code 4, and the wrapper regenerates
+    that same hand-edited artifact successfully.
+    A FORK THE PLAN DID NOT ANTICIPATE, resolved by operator decision before any code was written
+    (Deviation 9). The image copies ALL FOUR committed artifacts and entrypoint.sh:65 picks one by
+    MEDIATOR_PROFILE at runtime -- but test-fixtures and test-selfcheck are compiled from
+    policy/allowlist.test.yaml, which SF-4's OWN ratified .dockerignore lines deliberately exclude,
+    while compose/overrides/test-egress.yaml:42 runs the mediator on test-fixtures. So the stage
+    cannot recompile them and cannot drop them. Resolved as carry-through, with the branch written
+    on FILE PRESENCE rather than profile name: an artifact whose declared base is absent and is not
+    a `.test.yaml` fixture FAILS THE BUILD, so the hole cannot open silently for a shipped profile.
+    Two alternatives were put to the operator and declined -- admitting the .test bases (contradicts
+    a Gate 4-ratified decision) and an ARG-selected profile (breaks one-image-serves-every-profile).
+    ONE DEFECT WAS FOUND BY PROBING RATHER THAN BY READING, and it is the SF-3 lesson repeating:
+    passing --allowlist/--denylist explicitly made the compiler emit a DIFFERENT re-verification
+    hint in the artifact header, tripping the new drift gate on identical policy. The rule that
+    survives both branches is "reproduce the invocation the artifact records, no more" -- the flags
+    are passed only where they differ from the compiler's defaults.
+    Exit code 4 built (Contract 6's last code). A MISSING committed artifact under --check also
+    exits 4, not 1: the invocation is well formed, and absent is the limiting case of different.
+    17 PROBES, all passing, all removed: 6 on the compiler's exit codes (0/4/4/1 plus both test
+    artifacts still --check current), 7 on compile-stage.sh host-side (base absent for a shipped
+    profile -> 2; .test bases ADMITTED -> all three compiled AND still byte-identical to committed,
+    which also proves the fixtures reproducible; emitted-with-no-committed -> 4; committed-with-
+    nothing-emitted -> 4; content drift -> 4; compiled_at-only -> 0; usage -> 1), and 4 end-to-end
+    (image policy byte-identical to committed for all three, stage-1 --validate still runs off
+    /usr/local/bin/mediator-compile-policy, a drifted build fails at exit 4, the wrapper leaves a
+    clean tree on a clean tree and regenerates a hand-edit).
+    BOTH EXISTING HARNESSES RE-RUN, which is this sub-feature's standing obligation:
+    verify-egress-mediator.sh 77/77 ALL PHASES PASSED against the rebuilt image, and
+    verify-pod-topology.sh ALL CHECKS PASSED. lint-policy.sh exits 0.
+    The README entry point is amended to `up --build` HERE rather than deferred (operator decision):
+    SF-4 is what makes the old command wrong -- a cached image reuses the policy compiled into it,
+    so a profile switch would appear to work while the pod enforced the previous policy. Only the
+    entry point and the recompile-and-commit procedure landed; packs, CI and the AGENT_BASE_DIGEST
+    bootstrap stay SF-5's and SF-6's. policy/resolved/README.md gained the drift contract and the
+    refresh procedure, and its stale "compiled_from.packs is present and empty" claim -- left by
+    SF-3 -- was corrected in the same pass.
+    TWO SMALLER BEHAVIOUR CHANGES, recorded rather than left to be discovered. (1) The wrapper does
+    NOT rewrite an artifact when only compiled_at would move, so `git status` stays a usable answer
+    to "did the policy actually change?"; compiled_at now records when the policy last CHANGED.
+    (2) /etc/mediator/policy no longer contains policy/resolved/README.md, because the copy is now
+    the compile stage's *.yaml output rather than the whole directory. No consumer reads it.
+    Codebase assessment still ABSENT; refresh skipped with a warning, as at SF-1..SF-3.
+    NOT DONE, and deliberately: no Codex adversarial pass on SF-4 yet. SF-2 and SF-3 each had one
+    at operator request after their commits, and the same is available here.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it

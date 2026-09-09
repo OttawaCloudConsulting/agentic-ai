@@ -67,6 +67,10 @@ RESOLVED_POLICY="$POLICY_DIR/${MEDIATOR_PROFILE}.yaml"
 # reads its own image layer; the operator edits and recompiles the repository file,
 # and telling them about a path inside a container they cannot write is a dead end.
 # Interface Contract 6's example names this form.
+#
+# Since 01.5 SF-4 the two are the same policy by construction, not by convention: the
+# build compiles this artifact and refuses to produce an image whose output differs
+# from the committed copy this path names.
 POLICY_SOURCE="policy/resolved/${MEDIATOR_PROFILE}.yaml"
 
 # The mediator's copy of the schema validator (01.3 SF-2), for stage 1. Shipped into
@@ -168,7 +172,7 @@ done
   || fail "MEDIATOR_AGENT_NETWORKS is unset -- expected '<agent>=<addr>/<prefix>,...' (compose.yaml, egress-mediator). Refusing to serve DNS without knowing which network is which agent."
 
 [ -f "$RESOLVED_POLICY" ] \
-  || fail "resolved policy $RESOLVED_POLICY not found (profile '$MEDIATOR_PROFILE'). It is baked into the image from policy/resolved/ -- recompile with scripts/compile-policy.sh and rebuild."
+  || fail "resolved policy $RESOLVED_POLICY not found (profile '$MEDIATOR_PROFILE'). It is COMPILED into the image by the Dockerfile's compile stage (01.5 SF-4), from the inputs policy/resolved/${MEDIATOR_PROFILE}.yaml records -- a profile with no committed artifact is not shipped. Add it, refresh with scripts/compile-policy-build.sh, and rebuild."
 
 # ================================================ stage 1 of the self-check (T17)
 # Unconditional, fatal, and BEFORE any listener binds. A corrupt or unparseable
@@ -180,7 +184,7 @@ done
 if ! _v1="$(bash "$POLICY_VALIDATOR" --validate "$RESOLVED_POLICY" 2>&1)"; then
   audit_event "\"stage\":1,\"result\":\"fail\",\"profile\":\"${MEDIATOR_PROFILE}\""
   echo "$_v1" >&2
-  fail "stage 1 self-check: $RESOLVED_POLICY does not validate against schema 1 (see the line above). Fix the inputs and recompile with scripts/compile-policy.sh, then rebuild the image."
+  fail "stage 1 self-check: $RESOLVED_POLICY does not validate against schema 1 (see the line above). Fix the inputs and refresh with scripts/compile-policy-build.sh, then rebuild the image."
 fi
 audit_event "\"stage\":1,\"result\":\"pass\",\"profile\":\"${MEDIATOR_PROFILE}\",\"policy\":\"${POLICY_SOURCE}\""
 note "stage 1 self-check: ${_v1}"
