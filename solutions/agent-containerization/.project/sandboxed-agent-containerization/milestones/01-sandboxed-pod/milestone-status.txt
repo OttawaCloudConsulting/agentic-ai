@@ -646,6 +646,46 @@
     --check current. BOTH HARNESSES RE-RUN AGAINST THE REBUILT IMAGES: verify-pod-topology.sh ALL
     CHECKS PASSED and verify-egress-mediator.sh 77/77, 0 failures, phases A-G, ALL PHASES PASSED.
     Codebase assessment still ABSENT; refresh skipped with a warning, as at SF-1..SF-4.
+    SF-6 IS SPLIT. SF-6a complete 2026-09-09 (commit f63abbd); SF-6b outstanding, so the
+    checklist item stays [ ] and the count stays 5/7. The split point is the published digest:
+    SF-6a is everything writable without one -- .github/workflows/agent-sandbox-image.yml (this
+    repository's FIRST workflow, D21), scripts/build.sh, the compose profile seam and the docs.
+    SF-6b is the FROM flip to ghcr.io/...@sha256:<digest>, AGENT_BASE_DIGEST in compose/pins.env
+    and the three build args, and cannot be written until the workflow has run once (Edge Case
+    11). Operator decision 2026-09-09, two questions: sequence as two commits with the PUSH
+    handed to the operator rather than run here, and publish the GHCR package PUBLIC so the
+    operator bootstrap needs no docker login (the repo is public; the base is Debian/Node + git
+    and holds no secrets).
+    THE PUSH IS THE BLOCKER FOR SF-6b. Nothing in SF-6a has been exercised by a CI run: the
+    ubuntu-24.04-arm runner label, the GHCR push, the attestation emission and the arm64 build
+    are all unverified until this branch is pushed. Resume: push, read AGENT_BASE_DIGEST off the
+    run summary, set the package public, then /build SF6 again.
+    3 deviations recorded, all three operator-ratified before writing. 14: the GHCR namespace is
+    ottawacloudconsulting/agentic-ai, not the plan's OCC-github/agentic-ai -- the latter is this
+    workstation's directory name and has no GitHub owner behind it. 15: the published base is
+    linux/arm64 ONLY -- pins.env carries one GIT_SHA256, images/apt-pinned.sh hashes whatever
+    apt-get download fetches for the container's dpkg arch, and that hash is the arm64 .deb, so
+    an amd64 runner fails at the checksum rather than subtly; multi-arch is a pins.env change,
+    not a runner-label change. 16: AGENT_PROFILE now selects the mediator's runtime profile as
+    well as the agents' pack set, closing the divergence SF-5's review pass recorded and
+    assigned here -- one line on egress-mediator, probed in both directions against the harness
+    override.
+    EDGE CASE 13 RESOLVED, AND IT DOES NOT HOLD. It recorded local buildx attestation as
+    UNVERIFIED and pre-committed to a fallback. MEASURED: `docker buildx build --sbom=true
+    --load` returns "Attestation is not supported for the docker driver" on the pinned Docker
+    Desktop (buildx v0.25.0-desktop.1, BuildKit v0.23.2). Fallback taken -- scripts/build.sh
+    records image identity only, R10.7's SBOM half stays with the CI-published agent-base. What
+    build.sh records is an image ID (config-blob sha256), NOT a registry manifest digest, and is
+    labelled as such; a never-pushed image has no manifest digest.
+    VERIFIED AT SF-6a, not asserted. The drift gate was probed in BOTH directions with the
+    compile and drift stages force-rebuilt: clean tree exits 0 ("all emitted artifacts match
+    their committed copies"), one perturbed byte in policy/resolved/default.yaml exits 4 and
+    fails the build; tree restored and confirmed clean. build.sh run end to end, its four
+    recorded IDs matching `docker images` independently. After the compose change -- the one
+    thing here that alters runtime behaviour -- lint-policy.sh exit 0, verify-pod-topology.sh ALL
+    CHECKS PASSED, verify-egress-mediator.sh 77 PASS / 0 FAIL, ALL PHASES PASSED. Action SHAs
+    resolved from the GitHub API rather than recalled; workflow YAML parsed and its job, runner
+    and trigger fields read back.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it
