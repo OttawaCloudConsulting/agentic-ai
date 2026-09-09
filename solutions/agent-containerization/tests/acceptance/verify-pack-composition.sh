@@ -117,7 +117,9 @@ for f in mediator/identity/ca/mediator-ca.crt \
          mediator/identity/listeners/claude-listener.crt \
          mediator/identity/listeners/claude-listener.key \
          mediator/identity/listeners/agy-listener.crt \
-         mediator/identity/listeners/agy-listener.key; do
+         mediator/identity/listeners/agy-listener.key \
+         mediator/identity/clients/claude-client.crt \
+         mediator/identity/clients/claude-client.key; do
   [ -f "$f" ] || missing+=("$f")
 done
 if [ "${#missing[@]}" -ne 0 ]; then
@@ -127,6 +129,7 @@ if [ "${#missing[@]}" -ne 0 ]; then
   echo "    bash scripts/issue-identity.sh ca" >&2
   echo "    bash scripts/issue-identity.sh listener claude --ip 172.31.10.2" >&2
   echo "    bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2" >&2
+  echo "    bash scripts/issue-identity.sh client   claude" >&2
   exit 1
 fi
 
@@ -976,6 +979,13 @@ for a in "${AGENTS[@]}"; do
     # (01.3 Interface Contract 3) -- it anchors the proxy hop. A public key, read-only,
     # and codex does not get it. egress-mediator.sh carries the same exception.
     case "$src" in */mediator-ca.crt) continue ;; esac
+    # 01.6 SF-2: claude's own client key pair, mounted into claude alone as a Compose secret
+    # (Interface Contract 5). It lives under mediator/identity/clients/ -- inside the solution
+    # root -- for the same reason the CA does: it is generated, git-ignored trust material with
+    # nowhere else to live. It is this agent's workload identity, arrives read-only, and holding
+    # it is the point. Scoped to the agent's OWN pair by name, so claude binding agy's would
+    # still fail SC-3. verify-egress-mediator.sh carries the matching exception.
+    case "$src" in */clients/"${a}"-client.crt|*/clients/"${a}"-client.key) continue ;; esac
     real="$(cd "$(dirname "$src")" 2>/dev/null && pwd -P)/$(basename "$src")" || real="$src"
     if [ "$real" = "$ROOT_REAL" ] || [ "${real}/" = "${ROOT_REAL}/" ]; then
       bad="${bad}${src} -> ${real} (IS the solution root)"$'\n'

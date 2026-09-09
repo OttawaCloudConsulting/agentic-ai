@@ -887,3 +887,26 @@ once by the operator at the end of SF-2 rather than left unrun.
   must extend it in the same shape if a positive SF-1 branch delivers a per-agent credential
   file, and SF-4's structural T34 case rests on the same "one agent, one identity" property this
   exception is scoped to.
+
+### Deviation 5: a SEVENTH pre-existing assertion breaks, in the harness the plan said to verify rather than assume
+- **What changed:** `tests/acceptance/verify-pack-composition.sh` gains two changes: its
+  trust-material preflight lists `mediator/identity/clients/claude-client.{crt,key}`, and its
+  Phase G SC-3 check gains an exception for the agent's own client pair, in the same
+  name-scoped shape as Deviation 4's.
+- **Originally planned:** Files to Create/Modify says this file changes "**only if** the
+  profile-schema change moves an assertion it makes about the compiled artifact or the build's
+  drift check; verified at SF-2 rather than assumed."
+- **Why necessary:** Verified, and the answer is yes — but for neither of the two reasons the
+  plan anticipated. It makes no assertion about the resolved artifact's listener line, so the
+  schema change is invisible to it. What breaks is the **Compose secret**: the harness runs
+  `docker compose up` against `compose.yaml`, so the new `file:` secret source is now required
+  and its absence produces a daemon path error rather than this preflight's named remediation;
+  and Phase G's SC-3 check walks every agent bind source and fails anything resolving inside the
+  solution root, which `mediator/identity/clients/` is. The `mediator-ca.crt` exception beside
+  it exists for exactly that reason.
+- **Impact:** Together with Deviation 4 this makes **seven** shipped assertions the feature
+  breaks, against Decision 8's five. The two additions share one root cause worth carrying
+  forward: three separate harnesses each hold their own "is this mount control plane" predicate,
+  and generated trust material that legitimately lives under `mediator/` trips all three. A
+  fourth agent-mounted secret would trip them again. Consolidating that predicate is a
+  `/design` refresh item, not this feature's.

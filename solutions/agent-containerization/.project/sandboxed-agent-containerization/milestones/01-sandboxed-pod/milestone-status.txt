@@ -987,6 +987,12 @@
     Deviation 3: three resolved artifacts, not two, and the two test-scoped ones are carried through the
     image build rather than recompiled by it, so they need a host recompile in the same commit.
     Deviation 4: a sixth pre-existing assertion broke (the control-plane mount check flags */mediator*
-    and *.key, which the client secret trips). Test Command NOT yet run -- it is the feature-completion
+    and *.key, which the client secret trips). Deviation 5, found in the post-commit check the plan
+    itself required ("verified at SF-2 rather than assumed"): verify-pack-composition.sh breaks too --
+    it runs compose up, so the new file: secret source is required, and its Phase G SC-3 check fails
+    any agent bind resolving inside the solution root, which mediator/identity/clients/ is. Seven
+    shipped assertions broken in total, against Decision 8's five; the two extras share one root
+    cause -- three harnesses each hold their own "is this mount control plane" predicate and
+    generated trust material under mediator/ trips all three. Test Command NOT yet run -- it is the feature-completion
     gate and SF-3 and SF-4 are outstanding. verify-auth-state.sh is the operator's to run by hand at
     this point, per the plan: it costs the host codex login and is excluded from the Test Command.
