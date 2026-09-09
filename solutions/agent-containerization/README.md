@@ -342,6 +342,76 @@ Every `apt` item a manifest declares is verified against its recorded SHA-256 be
 and the snapshot repository's `InRelease` is checked with `gpgv` against the full key fingerprint
 the profile pins. `packs/README.md` records precisely what that covers and what it does not.
 
+### The image build pipeline, and the profile that selects it
+
+`AGENT_PROFILE` is the single selector for the whole pod (01.5 SF-6). It picks the pack set the
+three agent images are built with **and** the resolved policy the mediator enforces at runtime.
+Unset, both are `default`.
+
+```bash
+# Build one profile's images and record what was built.
+bash scripts/build.sh --profile default
+```
+
+`scripts/build.sh` drives the same Compose files the entry point drives — a second build path
+would eventually record identity for images nobody runs — then tags the agent images
+`sandboxed-agent/<agent>:<profile>` and writes `.build-scratch/build/<profile>.images.txt`.
+Compose's own `:local` tag is reused by every profile, so without the second tag a build for one
+profile silently replaces another's.
+
+**What it records is an image ID, not a registry digest.** A locally built image that was never
+pushed has no manifest digest — the recorded value is the sha256 of its config blob. It is stable
+and comparable across rebuilds on the same host, which is what a per-profile artifact needs to be,
+but it is not the same kind of identifier as `MEDIATOR_BASE_DIGEST`.
+
+**No local SBOM, and the reason is measured rather than assumed.** Docker Desktop's default
+`docker` driver cannot carry a build attestation:
+
+```
+ERROR: failed to build: Attestation is not supported for the docker driver.
+```
+
+The two ways around it both cost more than they buy: a `docker-container` builder drops the
+attestation again on `--load`, and exporting an OCI tarball instead would produce an SBOM for an
+image Compose could not then run. Adding a third-party scanner would mean more supply chain, not
+less. So SBOM emission stays with the CI-published base image, and `scripts/build.sh` records
+identity only. Turning on the containerd image store makes `--sbom=true` available and is the one
+change that would revisit this.
+
+#### CI: `.github/workflows/agent-sandbox-image.yml`
+
+The repository's first workflow, at the **repository root** rather than in this directory. Two
+independent jobs:
+
+- **`policy-drift`** — rebuilds the resolved policy from its committed inputs through the
+  mediator's `drift` build stage and fails if the result differs from the committed
+  `policy/resolved/*.yaml`. One build covers every committed artifact, not one per profile. Runs
+  on every push and pull request. This is the CI half of a gate that already fails the *local*
+  build; it is a second net, not the first one.
+- **`publish-base`** — builds the profile-independent `agent-base` stage and pushes it to
+  `ghcr.io/ottawacloudconsulting/agentic-ai/agent-sandbox-base` with an SBOM and a provenance
+  attestation. Never runs on a pull request: `packages: write` on a fork PR is a registry write
+  granted to an untrusted contributor.
+
+`publish-base` does not depend on `policy-drift` — the base image is profile-independent and
+carries no policy, so a drifted artifact says nothing about its correctness.
+
+**It builds `linux/arm64` only.** `compose/pins.env` carries one `GIT_SHA256`, and
+`images/apt-pinned.sh` hashes the `.deb` that `apt-get download` fetches for the container's own
+architecture. That hash is the arm64 one, because the pod's target is Docker Desktop on Apple
+silicon. An amd64 runner does not fail subtly — it fails at the checksum comparison. Publishing a
+second architecture would mean inventing a pin nothing has verified.
+
+Branch builds are tagged by branch name and by full commit SHA; **nothing is tagged `latest`**, so
+there is no mutable tag for a consumer to drift onto. The published digest is reported in the run
+summary. Consuming it by digest — `AGENT_BASE_DIGEST` in `compose/pins.env` — lands with the next
+sub-feature; today the agent images still build their own base locally, and the workflow publishes
+without anything yet consuming it.
+
+The workflow pins its actions by commit SHA rather than by tag. Every other supply-chain input
+here is pinned by digest or checksum, and `publish-base` holds `packages: write`: an action
+consumed by a movable tag would be a write path into the registry that no pin covers.
+
 ### Per-agent build cache (optional, default off)
 
 `profiles/default.yaml` sets `mounts.build_cache: false`. To give each agent a dedicated cache

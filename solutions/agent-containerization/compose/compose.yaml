@@ -136,6 +136,23 @@ services:
       # the mediator's only external interface. The acceptance harness overrides
       # this to aim at its own controlled authoritative server (T4).
       MEDIATOR_DNS_UPSTREAM: "127.0.0.11"
+      # ONE VARIABLE SELECTS THE WHOLE POD (01.5 SF-6). The agent builds interpolate
+      # their pack set from AGENT_PROFILE; before this line the mediator read nothing
+      # and images/mediator/entrypoint.sh defaulted the runtime profile to `default`.
+      # So `AGENT_PROFILE=oauth-mount docker compose up --build` built agent images for
+      # one profile's pack set and enforced a DIFFERENT profile's policy, with no
+      # surface reporting the mismatch -- recorded as a residual at SF-5's review pass
+      # and assigned here.
+      #
+      # The name stays AGENT_PROFILE rather than becoming POD_PROFILE: renaming it
+      # would touch the three agent build blocks that already read it, and a second
+      # name for one selection is how the divergence comes back. It now means "the
+      # profile this pod is built and run for", and the comment above each agent
+      # `PROFILE:` still explains why it is not the bare `PROFILE`.
+      #
+      # The acceptance harness still wins: compose/overrides/test-egress.yaml sets
+      # MEDIATOR_PROFILE from MEDIATOR_TEST_PROFILE and later files layer over this one.
+      MEDIATOR_PROFILE: ${AGENT_PROFILE:-default}
     user: "13:13"
     cap_drop:
       - ALL

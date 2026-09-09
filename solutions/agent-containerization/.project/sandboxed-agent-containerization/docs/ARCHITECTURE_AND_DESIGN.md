@@ -226,7 +226,10 @@ follows the packaging convention set by `solutions/well-architected-review/` (D1
 ```text
 repository root/
 └── .github/workflows/
-    └── agent-sandbox-image.yml   # (not yet built) builds + publishes the base image to GHCR (D21)
+    └── agent-sandbox-image.yml   # builds + publishes the base image to GHCR (D21). TWO jobs:
+                                  #   policy-drift (every push/PR, x86, --target drift) and
+                                  #   publish-base (never on a PR, linux/arm64 ONLY -- pins.env
+                                  #   carries one GIT_SHA256 and it is the arm64 .deb hash)
 
 solutions/agent-containerization/
 ├── README.md                      # install, prerequisites, first-run auth, troubleshooting (R12.6)
@@ -319,7 +322,11 @@ solutions/agent-containerization/
 │   # multi-stage `images/Dockerfile` with `target:` selection.
 ├── scripts/                       # bash, `set -euo pipefail`, invoked as `bash script.sh`
 │   ├── compile-policy.sh          # profile + packs → policy/resolved/
-│   ├── build.sh                   # (not yet built — 01.5) per-profile image build; digest + SBOM (SC-8)
+│   ├── build.sh                   # per-profile image build (01.5 SF-6, SC-8). Drives the SAME
+│   │                              #   Compose files as the entry point, tags the agent images
+│   │                              #   :<profile>, records image IDs to .build-scratch/build/.
+│   │                              #   NO local SBOM: measured -- the `docker` driver cannot carry
+│   │                              #   an attestation, so R10.7's SBOM half stays with CI
 │   ├── scrub-gitconfig.sh         # HOST-side pre-mount git-config scrub (01.4 SF-1, R2.9/T22).
 │   │                              #   Writes compose/generated/gitconfig.d/; the operator's own
 │   │                              #   ~/.gitconfig is never mounted into any container
@@ -344,9 +351,21 @@ solutions/agent-containerization/
 **Convention notes, observed from this repository rather than assumed:** shell scripts use
 `set -euo pipefail` and are invoked as `bash script.sh` (the executable bit is never set); MCP
 configuration is JSON of the shape `{"mcpServers": {...}}`; the repository had no hosted CI before this
-solution — `cicd/` contains manually-invoked bash only, and there is no `.github/` directory.
-D21 introduces the first workflow, so SC-8's "no manual steps" is carried by the CI-published
-base image and its pinned digest, with `build.sh` retained for local per-profile layering.
+solution — `cicd/` contains manually-invoked bash only, and there was no `.github/` directory
+until 01.5 SF-6 created one. D21's first workflow now exists, so SC-8's "no manual steps" is
+carried by the CI-published base image and its pinned digest, with `build.sh` retained for local
+per-profile layering.
+
+**Two things about that workflow depart from what Gate 2 assumed, and both are mechanism rather
+than preference.** The GHCR namespace is `ottawacloudconsulting/agentic-ai` — the git remote's
+owner — and not the `OCC-github` the plan's Dependencies section named, which is only this
+machine's local directory name. And the publish job builds **`linux/arm64` only**: the
+`agent-base` stage installs `git` through `images/apt-pinned.sh`, which hashes the `.deb` that
+`apt-get download` fetches for the container's own dpkg architecture, and `compose/pins.env`
+carries a single `GIT_SHA256` — the arm64 one, matching R11.1/A1's Docker Desktop on Apple
+silicon. An amd64 runner fails at that checksum comparison. Publishing a second architecture
+therefore needs a second verified pin, not a runner change, and D21's "the base image" is
+consequently single-architecture for as long as A1 holds.
 
 ## Deployment & Operations
 

@@ -715,6 +715,17 @@ this feature rebuilds.
     `agent-base`. Recorded the way 01.1 SF-2 records an unverified capability: established before it
     is built on, not during.
 
+    **RESOLVED 2026-09-09 at SF-6a, and it does NOT hold.** Measured on the pinned Docker
+    Desktop (buildx v0.25.0-desktop.1, BuildKit v0.23.2, default `docker` driver):
+    `docker buildx build --sbom=true --load` returns `ERROR: failed to build: Attestation is
+    not supported for the docker driver.` The fallback this edge case pre-authorised is taken:
+    `scripts/build.sh` records image identity only and R10.7's SBOM half stays with the
+    CI-published `agent-base`, where buildx's `sbom: true` is routine. Neither way around it is
+    worth its cost -- a `docker-container` builder drops the attestation again on `--load`
+    because the classic image store cannot hold one, and an OCI-tarball export would attest an
+    image Compose could not then run. Turning on the containerd image store is the one change
+    that would reopen this.
+
 14. **The per-agent build cache may already be satisfied.** 01.2 places `/home/agent/.cache` on the
     per-agent state volume, so caching is already per-agent and T23 would pass trivially. The
     `build_cache` option therefore means a *separate, larger* dedicated per-agent volume. SF-5
@@ -1381,3 +1392,63 @@ versus compile stage (two `yq` versions, two platforms) and now two `bash` versi
   it was, and still not manifest-pinned. Named here so the count is honest: three packages are
   hash-declared (`python3`, `python3-venv`, `git`) and everything else in the image, `jq`
   included, is covered by the signature and the signed index.
+
+### Deviation 14: the GHCR namespace is `ottawacloudconsulting/agentic-ai`, not `OCC-github/agentic-ai`
+
+- **What changed:** `.github/workflows/agent-sandbox-image.yml` publishes to
+  `ghcr.io/ottawacloudconsulting/agentic-ai/agent-sandbox-base`.
+- **Originally planned:** Dependencies, "External": "a GHCR namespace under `OCC-github/agentic-ai`".
+- **Why necessary:** `OCC-github` is a directory on the operator's workstation, not a GitHub owner.
+  `git remote -v` gives `https://github.com/OttawaCloudConsulting/agentic-ai.git`, and GHCR path
+  components must be lowercase, so the namespace is `ottawacloudconsulting/agentic-ai`. The planned
+  name has no owner behind it and a push to it would fail authentication.
+- **Impact:** The image reference is hardcoded in the workflow's `env.IMAGE` and will be hardcoded
+  again in `images/Dockerfile`'s `FROM` at SF-6b -- two places that must agree, and neither derives
+  from `${{ github.repository }}`, deliberately: a fork must not silently redirect the base image
+  the agent stages pin. Anything in Milestone 02 or 03 that names the published image (T45's
+  provenance check in 02.4) inherits this name.
+
+### Deviation 15: the published base image is single-architecture, `linux/arm64`
+
+- **What changed:** The publish job runs on `ubuntu-24.04-arm` and passes `platforms: linux/arm64`.
+  The drift job stays on the x86 runner and is unconstrained.
+- **Originally planned:** Neither the plan nor D21 names an architecture. D21 says only "the base
+  image is built by GitHub Actions and published to GHCR", which reads as architecture-neutral and
+  would default to the `ubuntu-latest` amd64 runner.
+- **Why necessary:** MECHANISM, not preference, and it fails loudly rather than subtly.
+  `images/apt-pinned.sh` verifies `git` by hashing the `.deb` that `apt-get download` fetches, and
+  `apt-get download` fetches for the container's own dpkg architecture. `compose/pins.env` carries
+  ONE `GIT_SHA256`; it is the arm64 hash, evidenced by SF-5's three images having built on this
+  Apple silicon host. On an amd64 runner the fetched `.deb` is a different file and `apt-pinned.sh`
+  exits at "checksum mismatch". Adding an amd64 pin to go multi-arch would mean deriving a hash
+  nobody has verified against the signed index, which is the discipline SF-1 established against.
+  The pod's only stated target is Docker Desktop on Apple silicon (R11.1, assumption A1).
+- **Impact:** D21's "the base image" is single-architecture for as long as A1 holds. An operator on
+  an x86 workstation cannot consume the published base -- SF-6b's digest pin would resolve to an
+  index with no matching platform. Making the pod multi-architecture is a `pins.env` change (a
+  second, separately verified `GIT_SHA256`) plus a `platforms:` line, in that order; it is not a
+  runner-label change. The drift job is unaffected: the mediator's base digest is a multi-platform
+  index (measured: 8 platforms) and the compile stage's `yq` is pinned for both architectures.
+
+### Deviation 16: `AGENT_PROFILE` now selects the mediator's runtime profile too
+
+- **What changed:** `compose/compose.yaml` sets `MEDIATOR_PROFILE: ${AGENT_PROFILE:-default}` on
+  the `egress-mediator` service, so one variable selects both the agents' pack set and the policy
+  the mediator enforces. `scripts/build.sh` prints the matching run command.
+- **Originally planned:** SF-5's review pass recorded the divergence as a residual and assigned it
+  here -- "the mediator's runtime profile and the agent build's PROFILE arg can diverge... unifying
+  them is the per-profile build assigned to SF-6" -- without saying the unification would be a
+  Compose change rather than something `build.sh` does on its own.
+- **Why necessary:** `build.sh` builds; it cannot constrain a later `docker compose up`. Before this
+  line the base Compose file never set `MEDIATOR_PROFILE` and `images/mediator/entrypoint.sh:64`
+  defaulted it to `default`, so `AGENT_PROFILE=oauth-mount docker compose up --build` built agent
+  images for one profile's pack set while enforcing another profile's policy, with no surface
+  reporting the mismatch. Inert only because the two shipped profiles select identical pack sets.
+- **Impact:** `AGENT_PROFILE` widens from a build-time selector to the pod's profile selector. It is
+  NOT renamed to `POD_PROFILE`: renaming touches the three agent build blocks that already read it,
+  and a second name for one selection is how the divergence returns. `compose/overrides/test-egress.yaml`
+  still wins for the acceptance harness because later `-f` files layer over the base -- probed in
+  both directions: with `AGENT_PROFILE=default MEDIATOR_TEST_PROFILE=test-selfcheck`, the base alone
+  resolves `default` and the harness override resolves `test-selfcheck`. SF-7's Phase D, which
+  changes a profile's pack set and re-runs the documented command, now exercises one selector rather
+  than two.
