@@ -53,8 +53,9 @@ rm -rf \
   /usr/local/lib/node_modules/npm \
   /usr/local/lib/node_modules/corepack \
   /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
-  /usr/local/bin/yarn /usr/local/bin/yarnpkg \
-  /opt/yarn-v* /usr/local/lib/node_modules/yarn /usr/local/lib/node_modules/pnpm
+  /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/local/bin/pnpx \
+  /opt/yarn-v* /usr/local/lib/node_modules/yarn /usr/local/lib/node_modules/pnpm \
+  /usr/bin/pnpm /usr/bin/yarn
 
 echo "remove-package-managers: removing Python-level installers (R7.19 condition 4)"
 rm -rf \
@@ -62,7 +63,9 @@ rm -rf \
   /usr/lib/python3/dist-packages/pip /usr/lib/python3/dist-packages/pip-*.dist-info \
   /usr/lib/python3/dist-packages/setuptools /usr/lib/python3/dist-packages/pkg_resources \
   /usr/share/python-wheels \
-  /usr/bin/pip /usr/bin/pip3 /usr/local/bin/pip /usr/local/bin/pip3
+  /usr/bin/pip /usr/bin/pip3 /usr/local/bin/pip /usr/local/bin/pip3 \
+  /usr/bin/pipx /usr/local/bin/pipx /usr/bin/easy_install /usr/local/bin/easy_install \
+  /usr/lib/python3/dist-packages/pipx
 
 # --- prove it --------------------------------------------------------------------
 # The removals above are a list of PATHS, and a path that moved between base-image
@@ -73,7 +76,14 @@ echo "remove-package-managers: verifying"
 fail=0
 note() { echo "remove-package-managers: STILL PRESENT -- $*" >&2; fail=1; }
 
-for cmd in apt apt-get apt-cache dpkg dpkg-query npm npx corepack yarn yarnpkg pip pip3 easy_install; do
+# THE INVENTORY IS THE ASSERTION, so it must not be shorter than reality. A Codex
+# adversarial pass showed the previous list passing a container in which `pnpm` and
+# `pipx` had been planted -- the script reported "no package manager reachable" and
+# exited 0 while both ran. That is this file's own failure mode: an allowlist of names
+# presented as a reachability proof.
+for cmd in apt apt-get apt-cache apt-config apt-key apt-mark dpkg dpkg-query dpkg-deb \
+           npm npx corepack yarn yarnpkg pnpm pnpx \
+           pip pip3 pipx easy_install easy_install3 conda; do
   if command -v "$cmd" >/dev/null 2>&1; then
     note "$cmd on PATH at $(command -v "$cmd")"
   fi
@@ -85,16 +95,20 @@ for p in /usr/local/lib/node_modules/npm/bin/npm-cli.js \
          /usr/local/lib/node_modules/npm/bin/npx-cli.js \
          /usr/local/lib/node_modules/corepack/dist/corepack.js \
          /usr/share/python-wheels; do
-  [ -e "$p" ] && note "$p"
+  if [ -e "$p" ]; then note "$p"; fi
 done
 
 if command -v python3 >/dev/null 2>&1; then
-  if python3 -c 'import ensurepip' >/dev/null 2>&1; then
-    note "python3 -c 'import ensurepip' succeeds"
-  fi
-  if python3 -m pip --version >/dev/null 2>&1; then
-    note "python3 -m pip succeeds"
-  fi
+  # IMPORTABILITY, not exit status. `python3 -m pip --version` failing proves nothing on
+  # its own -- a pip that is present but broken fails too, and would have passed this
+  # check vacuously. `find_spec` answers the question actually being asked: is the module
+  # reachable at all? Same for ensurepip, setuptools and pkg_resources, each of which can
+  # rebuild an installer.
+  for mod in pip ensurepip setuptools pkg_resources pipx; do
+    if python3 -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('$mod') else 1)" >/dev/null 2>&1; then
+      note "python3 can import the '$mod' module"
+    fi
+  done
 fi
 
 # The database is kept on purpose (SF-6's SBOM). Assert that too, so a future

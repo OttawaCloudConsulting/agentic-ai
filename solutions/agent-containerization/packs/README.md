@@ -202,6 +202,7 @@ built image rather than by reading (operator decision, 2026-09-08):
 | the bundled `npm` tree, `/usr/local/bin/npm`, `npx` | On the list (condition 4) |
 | `corepack` and its `/usr/local/bin` symlink | Ships in `node:22-slim`; installs yarn and pnpm on demand |
 | `yarn`, `yarnpkg`, `/opt/yarn-v1.22.22` | A complete second Node installer, already on `PATH` in the base image |
+| `pnpm`, `pnpx`, `pipx`, `easy_install` | Added after an adversarial pass planted `pnpm` and `pipx` in a built image and the verifier reported "no package manager reachable" |
 | `ensurepip` | On the list (condition 4) |
 | `python3-pip-whl`, `python3-setuptools-whl` (`/usr/share/python-wheels`) | Pulled in by `python3-venv`; they are *how* `python3 -m venv` bootstraps a working `pip`, so removing `ensurepip` alone left the capability intact |
 
@@ -233,7 +234,17 @@ container and are not:
   registry egress, so there is nowhere for a surviving installer to go.
 
 The verification is not a promise. `images/remove-package-managers.sh` asserts its own end state —
-every binary off `PATH`, the direct `npm-cli.js` and `corepack.js` paths absent, `import ensurepip`
-and `python3 -m pip` both failing, and `/var/lib/dpkg/status` still present — and exits 3 if any of
-it is untrue. A path that moves between base-image versions turns an `rm -rf` into a silent no-op,
-which is exactly the failure that block exists to catch.
+21 binaries off `PATH`, the direct `npm-cli.js` / `npx-cli.js` / `corepack.js` paths absent,
+`/usr/share/python-wheels` gone, none of `pip` / `ensurepip` / `setuptools` / `pkg_resources` /
+`pipx` importable, and `/var/lib/dpkg/status` still present — and exits 3 if any of it is untrue. A
+path that moves between base-image versions turns an `rm -rf` into a silent no-op, which is exactly
+the failure that block exists to catch.
+
+Two properties of that block are there because an adversarial pass defeated the previous version:
+
+- **The inventory has to be at least as long as reality.** A planted `pnpm` and `pipx` passed the
+  earlier list and the script reported success. An allowlist of names presented as a reachability
+  proof is only as good as the list.
+- **Importability, not exit status.** The Python check used to be `python3 -m pip --version`
+  failing. A `pip` that is present but broken fails that too, so the check could pass vacuously.
+  It now asks `importlib.util.find_spec` whether the module is reachable at all.

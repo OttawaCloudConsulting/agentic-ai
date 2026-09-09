@@ -67,11 +67,40 @@ trap 'rm -rf "$tmp"' EXIT
 curl -fsSL -o "$tmp/InRelease" "${URL%/}/dists/${SUITE}/InRelease" \
   || die "cannot fetch InRelease from ${URL%/}/dists/${SUITE}/"
 
+# PARSED BY FIELD, NOT BY SUBSTRING. An earlier form of this check was
+# `case "$status" in *"VALIDSIG "*" ${FPR}"*)`, which a Codex adversarial pass broke:
+# GOODSIG carries the key's USER ID as free text, so a substituted keyring whose UID
+# contains the literal string "VALIDSIG filler <pinned-fingerprint>" satisfied the glob
+# while the real VALIDSIG line named a completely different key. Reproduced before
+# fixing. The same glob also ignored EXPKEYSIG/REVKEYSIG, because those status lines are
+# ACCOMPANIED by a VALIDSIG rather than replacing it.
+#
+# VALIDSIG's field 12 is the PRIMARY key fingerprint, which is what the profile pins
+# (field 3 is the signing subkey). gpgv's own exit status is now honoured instead of
+# being swallowed with `|| true`.
+# GPGV'S EXIT STATUS IS DELIBERATELY NOT THE GATE, and that is not laziness. This
+# InRelease carries THREE signatures -- the bookworm archive key this profile pins, plus
+# two Debian keys that are intentionally NOT in our single-key keyring. gpgv therefore
+# exits 2 with ERRSIG/NO_PUBKEY for those two even when our key gives a clean
+# GOODSIG+VALIDSIG (measured, 2026-09-09). apt behaves the same way: a multi-signed index
+# is trusted when ANY held key validates it. A first draft of this fix gated on the exit
+# status and rejected on ERRSIG/NO_PUBKEY, and it refused a perfectly good index -- caught
+# by the build, and worth recording as the mirror image of the defect it was fixing.
 status="$(gpgv --status-fd 1 --keyring "$KEYRING" "$tmp/InRelease" 2>/dev/null)" || true
-case "$status" in
-  *"VALIDSIG "*" ${FPR}"*) : ;;
-  *) die "InRelease is not signed by ${FPR} (gpgv reported: $(printf '%s' "$status" | tr '\n' ';'))" ;;
-esac
+
+# These DO impugn our own key, because the keyring holds exactly one. EXPKEYSIG and
+# REVKEYSIG are the subtle pair: they ACCOMPANY a VALIDSIG rather than replacing it, so a
+# check that only looked for VALIDSIG would accept an expired or revoked signing key.
+for bad in BADSIG EXPKEYSIG REVKEYSIG; do
+  if printf '%s\n' "$status" | awk -v b="$bad" '$1=="[GNUPG:]" && $2==b {found=1} END{exit !found}'; then
+    die "InRelease carries a $bad status for the pinned key; refusing the repository"
+  fi
+done
+
+printf '%s\n' "$status" \
+  | awk -v fpr="$FPR" '$1=="[GNUPG:]" && $2=="VALIDSIG" && $12==fpr {found=1} END{exit !found}' \
+  || die "no VALIDSIG line names primary key ${FPR} (gpgv reported: $(printf '%s' "$status" | tr '\n' ';'))"
+
 echo "apt-pinned: InRelease signature verified against ${FPR}"
 
 # --- 2. make the snapshot the ONLY source ---------------------------------------
