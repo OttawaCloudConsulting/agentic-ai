@@ -315,7 +315,10 @@ the SF-1..SF-5 / SF-6 boundary.
   profile image's digest and emitting its SBOM (R9.9, Edge Case 19). Add the CI job that fails on
   resolved-policy drift. Document the first-publish bootstrap (Edge Case 11).
 
-- [ ] **SF-7: Acceptance harness** -- `tests/acceptance/verify-pack-composition.sh`, phases A-G
+- [ ] **SF-7: Acceptance harness** -- **SPLIT. SF-7a complete 2026-09-09 (phases A-C); SF-7b
+  outstanding (phases D-H), so this item stays `[ ]`.** The bullet says "phases A-G" and the Test
+  Strategy says "Eight phases" and tabulates A-H; the bullet's own T-list includes T31, which is
+  Phase H. Eight is the count that is built to. -- `tests/acceptance/verify-pack-composition.sh`, phases A-H
   covering T14, T15, T21, T23, T27, T31 and T33, following the harness conventions all four siblings
   share: test-scoped Compose project name, `down -v` teardown, assertions against `docker inspect`
   on running containers rather than against the Compose YAML, and no third-party service as a test
@@ -1473,3 +1476,48 @@ versus compile stage (two `yq` versions, two platforms) and now two `bash` versi
   `agent-base` behaviour is inert from a local build and must go through CI or move down a stage.
   `agent-packs` is shared by all three agents, so the hook keeps the property it needed. The next
   base publish drops the (inert) hook from the published image.
+
+### Deviation 18: the Test Strategy's Phase D and Phase E describe a shape the build does not have
+
+- **What changed:** Two rows of the Test Strategy table are superseded, both by decisions this
+  feature already recorded and ratified. **Phase E** proves T14's zero by toggling `packs:` on the
+  **same profile against the same bases** with `COMPILED_AT` fixed, not by comparing `default`
+  against `policy/resolved/test-fixtures.yaml`. **Phase D** observes the rebuild by **image
+  identity**, refreshes through `scripts/compile-policy-build.sh`, and mutates-then-restores the
+  working tree rather than committing anything.
+- **Originally planned:** Phase E: "the phase uses 01.3's `policy/resolved/test-fixtures.yaml` for
+  the loaded state rather than mutating the operator's committed `default.yaml`." Phase D: "refresh
+  with `bash scripts/compile-policy.sh --profile <profile>`, review and commit the recomposed
+  artifact... `PACK_SET_HASH` having changed."
+- **Why necessary:** Four separate things the table's authors could not have known, each of which
+  alone breaks the row.
+  1. **The roles are inverted as built.** SF-3's operator decision gave `default` and `oauth-mount`
+     the `language-runtimes` pack; `test-fixtures` and `test-selfcheck` are `packs: []`. So
+     `test-fixtures` is the UNLOADED state, not the loaded one.
+  2. **The two artifacts do not share a base.** `test-fixtures` compiles from
+     `policy/allowlist.test.yaml`, `default` from `policy/allowlist.base.yaml`. "The resolved
+     `allow_fqdns`/`allow_cidrs` sections are byte-identical in both states" is therefore
+     unreachable that way -- the sections differ because the INPUTS differ, which measures nothing
+     about packs. SF-3 proved the zero correctly, by toggling packs on one profile with
+     `COMPILED_AT` fixed, and that is the mechanism Phase E reproduces.
+  3. **Phase E's stated reason for reaching for a second artifact is a false premise post-SF-4.**
+     "Each state needs its own committed artifact under the fail-on-drift rule" was true of a
+     git-committed comparison; the drift stage compares the emitted artifact against the copy in
+     the **build context**, i.e. the working tree. A working-tree refresh satisfies it, so the
+     unloaded state needs no committed artifact and no fifth profile.
+  4. **Phase D names two things that do not exist.** `PACK_SET_HASH` was never shipped
+     (Deviation 12 -- it has no producer, and a hand-maintained hash reports "unchanged" exactly
+     when it has changed); the `COPY packs/ profiles/` layer carries the property instead, and a
+     rebuild is therefore observed by image ID, which `scripts/build.sh` already records. And SF-4
+     made `scripts/compile-policy-build.sh` the one-emitter refresh, so the direct
+     `compile-policy.sh --profile` invocation the row names is no longer the documented command.
+     A harness also cannot "review and commit" anything.
+- **Impact:** Phase E rides Phase D's single mutation window: save `profiles/default.yaml` and
+  `policy/resolved/default.yaml`, refuse to run if either is dirty, mutate, refresh, rebuild,
+  assert, and restore from the **EXIT trap** so an interrupt mid-phase still restores. Phase E's
+  binary-residue half (Edge Case 4, R7.5) then comes from **that** rebuilt container -- the default
+  profile with its pack removed -- and not from the `test-fixtures` image, which would only prove
+  that a zero-pack profile yields no binaries, a fact SF-6a already established and not the residue
+  question R7.5 asks. One more line of the row is moot rather than wrong: "package set and mounts
+  change" -- Deviation 5 refuses pack-supplied mounts, so only the package set can change, and a
+  mount delta is not asserted because it cannot exist. Both phases are SF-7b's; SF-7a builds A-C.

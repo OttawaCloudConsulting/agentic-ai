@@ -692,6 +692,83 @@
     default and the zero-pack test-fixtures profiles building clean through scripts/build.sh.
     SF-7 (acceptance harness) is the only sub-feature left; the feature's Test Command cannot run
     until it exists, so 01.5 stays [~].
+    SF-7 IS SPLIT. SF-7a complete 2026-09-09 (phases A-C); SF-7b outstanding (phases D-H), so
+    the checklist item stays [ ] and the count stays 6/7. The split point is the POD: A-C are the
+    host-side half plus the assertions that read a built image, and need no bring-up; D-H bring
+    the pod up, rebuild images and assert mounts and registry reach. Following SF-6a/SF-6b's
+    precedent for splitting a sub-feature at a mechanical boundary rather than a size guess.
+    tests/acceptance/verify-pack-composition.sh: 72 PASS 0 FAIL, PHASES A-C PASSED. The script
+    ANNOUNCES D-H as not-yet-built rather than omitting them silently -- a harness reporting
+    "ALL PHASES PASSED" with five phases missing is the same silent-in-the-permissive-direction
+    shape SF-3's and SF-5's Codex passes each found twice.
+    THIS IS WHERE THE THROWAWAY PROBES BECOME PERMANENT. SF-2, SF-3, SF-4 and SF-5 ran 35, 53,
+    30 and 21 probes and REMOVED every one. The 72 assertions here are the surviving half
+    re-expressed to run on every invocation, including the specific reproductions those Codex
+    passes produced: the four SC-3 normalisation forms (`/./`, `/../<root>/`, `//`,
+    `/workspace/../`), the accepted_risk field holding an empty list that yq renders as the
+    two-character string `[]`, the deny_cidrs nested under egress.runtime that a root-only
+    search missed, and both SC-3 positive controls (a sibling, and a NAME-PREFIX sibling that a
+    naive prefix test would call a descendant).
+    THE EXPECT HELPER CHECKS THE EXIT CODE AND THE MESSAGE, and that is not belt-and-braces:
+    SF-2's Codex pass found a gate that died inside yq "wearing the USAGE code and none of this
+    script's error format". A code-only assertion would have passed it.
+    ONE PROBE DEFECT, NOT A CODE DEFECT, found by running and fixed rather than accepted -- the
+    same bookkeeping SF-3's and SF-5's passes recorded. The pack-supplied wildcard probe asserted
+    validate_resolved's "exact names only" message, but the entry is refused at the MANIFEST
+    reader (R5.4) before composition, so it never reaches the second reader. Exit code 2 was
+    right and the message was the wrong reader's; the probe now names the reader that actually
+    fires, which is exactly what a code-only assertion would have hidden.
+    FOUR RECORDED SF-7 OBLIGATIONS DISCHARGED HERE, one deliberately re-homed.
+    (1) SF-4 Deviation 9's first obligation: fixture drift was host-side --check ONLY, run by
+    nothing. Phase C now runs --check on test-fixtures and test-selfcheck WITH their .test bases,
+    and both are current. (2) SF-4 Deviation 9's second: Contract 5's "the mediator image copies
+    policy/, profiles/, packs/" is stale for the RUNTIME stage, so Phase A asserts the shape the
+    image actually has -- /etc/mediator/policy holds exactly the committed *.yaml set and NOT
+    policy/resolved/README.md, and no /src, profiles/, packs/ or base policy file survived into
+    it. Written to Contract 5's text this would fail on a correct image. (3) SF-5 Deviation 11's
+    correction: "the agent images never copy policy/, mediator/ or any identity path" is asserted
+    against the built IMAGES, because the shared context legitimately contains those paths now.
+    (4) The Gate 4 operator decision: the CA private key is asserted absent from the build context
+    BY NAME, and the assertion first checks the key EXISTS on the host -- otherwise it passes on a
+    machine that never issued a CA, which is an assertion that proves nothing.
+    RE-HOMED, RECORDED RATHER THAN DROPPED: SF-2's note that "SF-7 Phase A must assert the mount
+    that actually exists against docker inspect". That needs a running container and therefore
+    belongs with the bring-up phases; it lands at SF-7b Phase G, where docker inspect on running
+    containers already is. What Phase B does assert is the LIMIT: every shipped profile still
+    carries a non-absolute project path, so the SC-3 gate warns rather than judging, and that
+    warning cannot now disappear silently.
+    THE BUILD CONTEXT IS ENUMERATED, NOT REASONED ABOUT. A `FROM scratch` stage COPYing the whole
+    context, extracted with --output type=local -- the mechanism SF-4 verified on this Docker
+    Desktop before building the artifact stage on it. It applies the REAL .dockerignore rather
+    than the harness's reading of one. Measured: 484 KB, no *.key and no mediator/identity path
+    anywhere, references/ absent, and both .test.yaml BASES absent -- which is the premise
+    Deviation 9's carry-through rests on and had never been asserted.
+    C6 IS THE ONE CHECK THAT PERTURBS A COMMITTED FILE, and it has to: the drift gate compares the
+    compile stage's output against the copy in the BUILD CONTEXT and there is nowhere else to
+    point it. Guarded three ways -- the run REFUSES to start if policy/resolved/default.yaml is
+    dirty, the file is saved before the edit, and the restore is in the EXIT trap so an interrupt
+    mid-build still restores. Both directions controlled: a drifted artifact fails a plain
+    `docker build --target drift`, and the restored tree passes the same build. Verified after
+    the run: `git status` shows only the two intended files, no probe pack, no probe profile.
+    DEVIATION 18 RECORDED AND OPERATOR-RATIFIED BEFORE ANY CODE WAS WRITTEN, following SF-2..SF-6's
+    precedent. The Test Strategy's Phase D and Phase E rows describe a shape this build does not
+    have, on four counts: the loaded/unloaded roles are INVERTED as built (SF-3 gave default the
+    pack; test-fixtures is packs: []), the two artifacts do not share a base so the byte-identical
+    assertion is unreachable that way, Phase E's stated reason for a second committed artifact is a
+    false premise post-SF-4 (the drift gate reads the WORKING TREE, not git), and Phase D names
+    PACK_SET_HASH (never shipped, Deviation 12) and the pre-SF-4 refresh command. Phase E now
+    rides Phase D's single mutation window and both are SF-7b's. ONE QUESTION WAS ESCALATED PAST
+    the operator to the advisor and its answer taken: whether to toggle packs on one base, drop the
+    zero assertion, or add a fifth profile. Toggle-on-one-base, for the reason above.
+    ALSO LANDED HERE, from the Files-to-Modify table's one row with no sub-feature owner:
+    verify-egress-mediator.sh's control-plane mount assertion now names packs/. It became control
+    plane when the compiler began composing pack manifests into the resolved allowlist -- an agent
+    that can write a pack.yaml writes its own egress entries at the next build.
+    BOTH EXISTING HARNESSES RE-RUN, this feature's standing obligation since SF-4, and the second
+    one was MODIFIED here so its re-run is not a formality: lint-policy.sh exit 0,
+    verify-pod-topology.sh 61 PASS 0 FAIL ALL CHECKS PASSED, verify-egress-mediator.sh 77 PASS
+    0 FAIL ALL PHASES PASSED with the extended packs/ pattern firing. Codebase assessment still
+    ABSENT; refresh skipped with a warning, as at SF-1..SF-6.
     HISTORICAL, SF-6a: THE PUSH WAS THE BLOCKER FOR SF-6b. Nothing in SF-6a has been exercised by a CI run: the
     ubuntu-24.04-arm runner label, the GHCR push, the attestation emission and the arm64 build
     are all unverified until this branch is pushed. Resume: push, read AGENT_BASE_DIGEST off the

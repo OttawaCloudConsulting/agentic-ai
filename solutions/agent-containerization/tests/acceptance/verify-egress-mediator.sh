@@ -269,6 +269,11 @@ done
 # The control-plane-inside-the-project-mount case (Edge Cases). SF-4 repointed the default
 # profile's project mount off this solution tree; this asserts the outcome rather than the
 # setting, over every mount source every agent actually has.
+#
+# `packs/` was added to the set by 01.5 SF-7a. It became control plane when the compiler
+# began composing pack manifests into the resolved allowlist: an agent that can write a
+# pack.yaml writes its own egress entries at the next build, which is the same widening
+# path policy/ and profiles/ are on this list for.
 cp_bad=""
 for agent in "${AGENTS[@]}"; do
   cid="$("${COMPOSE[@]}" run -d --rm --name "${PROJECT}-ph-a-${agent}" "$agent" sleep 60 2>/dev/null)" || continue
@@ -279,13 +284,13 @@ for agent in "${AGENTS[@]}"; do
       # (Interface Contract 3) -- it is what anchors their proxy hop. It is not control plane:
       # it is a public key, it arrives read-only as a Compose secret, and codex does not get it.
       */mediator-ca.crt) : ;;
-      */agent-containerization|*/agent-containerization/policy*|*/agent-containerization/mediator*|*/agent-containerization/profiles*|*.key)
+      */agent-containerization|*/agent-containerization/policy*|*/agent-containerization/mediator*|*/agent-containerization/profiles*|*/agent-containerization/packs*|*.key)
         cp_bad="${cp_bad}${agent}: ${s}"$'\n' ;;
     esac
   done <<< "$srcs"
   docker rm -f "$cid" >/dev/null 2>&1 || true
 done
-[ -z "$cp_bad" ] && pass "no agent mounts a control-plane path (policy/, mediator/, profiles/, the tree itself)" \
+[ -z "$cp_bad" ] && pass "no agent mounts a control-plane path (policy/, mediator/, profiles/, packs/, the tree itself)" \
                  || { fail "an agent mounts the control plane"; note "$cp_bad"; }
 
 # ---------------------------------------------------------------------------
