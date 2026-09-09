@@ -175,6 +175,11 @@ DOCKER_SOCK_FOUND=0
 DEFAULT_NET_FOUND=0
 EGRESS_NET_ATTACHED=0
 
+# R2.10/T23 accumulator: "<agent> <volume-name>" per agent that mounts /build-cache.
+# Collected in the loop, judged after it -- the property is a relationship BETWEEN
+# agents and no per-agent check can see it.
+BUILD_CACHE_SOURCES=""
+
 for agent in "${AGENTS[@]}"; do
   cid="${CID[$agent]}"
   inspect="$(docker inspect "$cid")"
@@ -263,8 +268,13 @@ for agent in "${AGENTS[@]}"; do
     codex)      expected_list="/home/agent /workspace" ;;
   esac
 
-  # 01.4 SF-1: the two OPTIONAL mounts this feature introduces -- /run/gitconfig
+  # 01.4 SF-1: the two OPTIONAL mounts that feature introduced -- /run/gitconfig
   # (mounts.host_git_config) and /run/oauth-src (the one-shot oauth-mount bootstrap).
+  # 01.5 SF-5 adds the THIRD, /build-cache (mounts.build_cache, compose/overrides/
+  # build-cache.yaml) -- this assertion's FOURTH extension, after 01.3's /run/secrets
+  # and 01.4's two. It travels the same EXPECT_EXTRA_MOUNTS route, and the check that
+  # actually gives T23 its content is the distinctness assertion after the loop: the
+  # mount set alone would pass equally well if all three agents shared one volume.
   # Neither is present under profiles/default.yaml, so Phase A below still asserts the
   # 01.2 set unchanged and T21 is unaffected. A caller that layers one of those override
   # fragments sets EXPECT_EXTRA_MOUNTS to the destinations it added, and the assertion
@@ -281,6 +291,13 @@ for agent in "${AGENTS[@]}"; do
     pass "$agent: mount set equals exactly {$expected_mounts}"
   else
     fail "$agent: mount set is {$mount_set}, expected {$expected_mounts}"
+  fi
+
+  # R2.10: record which named volume backs this agent's build cache, if it has one.
+  bc_src="$(echo "$inspect" | jq -r '.[0].Mounts[] | select(.Destination == "/build-cache") | .Name // .Source')"
+  if [ -n "$bc_src" ]; then
+    BUILD_CACHE_SOURCES="$BUILD_CACHE_SOURCES$agent $bc_src
+"
   fi
 
   # Check 4d (01.4 criterion 2): the authentication surface sits on the state volume.
@@ -411,6 +428,31 @@ for agent in "${AGENTS[@]}"; do
   [ "$t1_ok" -eq 1 ] && pass "$agent: T1 -- reads outside declared mounts fail" \
                      || fail "$agent: T1 -- a read outside declared mounts succeeded"
 done
+
+# Check 4e (R2.10, T23): the per-agent build cache is PER AGENT.
+#
+# Under profiles/default.yaml `mounts.build_cache` is false and no agent mounts
+# /build-cache, so this reports the absence and moves on -- the mount-set equality above
+# is what proves the absence. A caller that layers compose/overrides/build-cache.yaml
+# gets the real assertion: every agent's cache is backed by a DISTINCT named volume.
+#
+# Edge Case 14 asks which volume T23 is asserted against, because 01.2 already puts
+# /home/agent/.cache on the per-agent state volume and a test written against that would
+# pass without the option existing at all. This is asserted against the DEDICATED volume,
+# at /build-cache. Two agents sharing one would be an unaudited write channel between two
+# containers that the mediator never sees, which is the whole of what R2.10 forbids.
+if [ -z "$BUILD_CACHE_SOURCES" ]; then
+  pass "no agent mounts /build-cache (mounts.build_cache is false under this profile)"
+else
+  bc_count="$(printf '%s' "$BUILD_CACHE_SOURCES" | grep -c .)"
+  bc_uniq="$(printf '%s' "$BUILD_CACHE_SOURCES" | awk '{print $2}' | sort -u | grep -c .)"
+  if [ "$bc_count" -eq "$bc_uniq" ]; then
+    pass "build cache: $bc_count agent(s), $bc_uniq distinct volume(s) -- no shared cache"
+  else
+    printf '%s' "$BUILD_CACHE_SOURCES" | sed 's/^/  /'
+    fail "build cache: $bc_count agent(s) share only $bc_uniq volume(s) -- R2.10 forbids a shared cache"
+  fi
+fi
 
 [ "$DEFAULT_NET_FOUND" -eq 0 ] && pass "no agent attached to Compose's implicit default network"
 [ "$EGRESS_NET_ATTACHED" -eq 0 ] && pass "no agent attached to egress-net"

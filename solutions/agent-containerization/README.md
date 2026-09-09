@@ -287,6 +287,78 @@ Re-run the scrub whenever your gitconfig changes; the artifact is a snapshot, an
 and it is stated here rather than left to be discovered. Without the fragment, `GIT_CONFIG_GLOBAL`
 is unset and git behaves normally, reading `~/.gitconfig` on the state volume like any container.
 
+### Language toolchains, and the installers that are not there
+
+The agent images carry Node, Python and Go, installed at **build time** from the pack the profile
+selects (`packs/language-runtimes/pack.yaml`). They carry **no package manager at all** — not
+`apt`, not `npm`, not `pip`, not `yarn` or `corepack`. That is R7.19, and it is deliberate.
+
+```bash
+node --version     # v22.23.2
+python3 --version  # Python 3.11.2
+go version         # go1.23.4
+git --version      # git version 2.39.5
+npm --version      # command not found -- by design
+```
+
+**Two consequences you will hit, and neither is a bug:**
+
+- `python3 -m venv <dir>` fails. Use `python3 -m venv --without-pip <dir>`.
+- A `package.json` cannot be installed inside the container. Vendor dependencies into the project
+  mount from the host.
+
+Even where an installer survives — one you vendor in, or `go install` using the toolchain that has
+to stay for `go build` — it has nowhere to reach: the reference pack grants **no registry egress**,
+so the attempt is denied at the mediator and the denial lands in the audit log. See
+`packs/README.md` for which layer refuses what, and why a filesystem refusal leaves no audit line
+while a mediator denial does.
+
+### Adding or removing a pack
+
+A pack is a directory under `packs/` holding a `pack.yaml`; a profile selects packs by name. Both
+the egress policy and the installed package set are derived from that selection, by two separate
+readers — the policy compiler in the mediator's build, and `images/pack-plan.sh` in the agents'.
+
+```bash
+# 1. Edit the profile's `packs:` list.
+$EDITOR profiles/default.yaml
+
+# 2. Recompile the resolved policy and COMMIT it. The build refuses to proceed on a
+#    committed artifact that disagrees with its inputs (exit 4), so this is not optional.
+bash scripts/compile-policy-build.sh
+git diff policy/resolved/default.yaml     # review before committing
+git add policy/resolved/default.yaml && git commit
+
+# 3. Rebuild. `--build` is required, not decorative -- see "Bring-Up".
+docker compose --env-file compose/pins.env   -f compose/compose.yaml -f compose/overrides/default.yaml up -d --build
+```
+
+Removing a pack is the same three steps with the name deleted. **The rebuild is what removes the
+packages** — recompiling the policy alone leaves the previous image in place, with the removed
+pack's binaries still in it. Editing any file under `packs/` or `profiles/` invalidates the
+agent build's `COPY` layer, so a changed pack set always produces a different image.
+
+Every `apt` item a manifest declares is verified against its recorded SHA-256 before installation,
+and the snapshot repository's `InRelease` is checked with `gpgv` against the full key fingerprint
+the profile pins. `packs/README.md` records precisely what that covers and what it does not.
+
+### Per-agent build cache (optional, default off)
+
+`profiles/default.yaml` sets `mounts.build_cache: false`. To give each agent a dedicated cache
+volume at `/build-cache`, layer the fragment:
+
+```bash
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml \
+  -f compose/overrides/default.yaml \
+  -f compose/overrides/build-cache.yaml up -d
+```
+
+One volume **per agent**, never shared — a shared cache is a write channel between two containers
+that the mediator never sees, which is what R2.10 forbids. The profile schema cannot express a
+shared cache at all, and `verify-pod-topology.sh` asserts that the volumes backing `/build-cache`
+are distinct across agents. To enable it for only some agents, delete the others from the fragment.
+
 ### Backing up the state volumes
 
 The per-agent state volumes hold OAuth refresh tokens once an agent authenticates. R8.7 says that

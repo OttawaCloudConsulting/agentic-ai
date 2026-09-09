@@ -71,7 +71,7 @@ reaches `policy/resolved/`. Conflating the two is exactly how a pack would silen
 runtime registry reach — the pack fetches Go from `go.dev` at build, and an agent then reaches
 `go.dev` at runtime for the rest of the image's life.
 
-### Every package carries a checksum, `apt` items included
+### Every *declared* package carries a checksum, `apt` items included
 
 R7.3 is a MUST and says "checksums" without qualification. The argument that a signed `Release`
 makes a per-package hash redundant is an argument for `apt` being *safe*; it is not an argument
@@ -82,6 +82,37 @@ The repository must also be a **snapshot, not a suite**. `suite: bookworm` plus 
 resolves today and fails in six months, because Debian rotates the archive and drops superseded
 versions. The profile declares a `snapshot.debian.org` URL carrying a timestamp, plus the
 fingerprint of the key that signs it.
+
+#### The residual: a dependency closure is not a manifest (01.5 SF-5, Deviation 13)
+
+What is written above holds for every package a manifest **declares**. It does not hold for their
+transitive dependencies, and the gap is recorded here rather than claimed away.
+
+Measured on 2026-09-08: `apt-get install --no-install-recommends python3 python3-venv git`
+against the pinned snapshot resolves to **40** packages. This manifest declares two, and
+`compose/pins.env` declares `git`. The other 37 arrive as a closure `apt` computes.
+
+Their integrity comes from the same chain that makes the declared hashes worth anything in the
+first place, one link earlier:
+
+1. `images/apt-pinned.sh` fetches `InRelease` and runs `gpgv` against
+   `images/keyrings/debian-archive.gpg`, requiring the `VALIDSIG` line to carry the full
+   40-character primary fingerprint the profile pins. A substituted key fails the build here.
+2. That signature covers the `Packages` index, which carries a SHA-256 for every `.deb` in the
+   suite — including all 37.
+3. `apt` verifies each downloaded `.deb` against that index.
+
+So the closure is *verified*, by the signed index, rather than *pinned*, by a manifest hash. The
+difference that matters: a manifest hash is reproducible against a value a human reviewed, and an
+index hash is reproducible only against whatever the archive served. For a timestamped snapshot
+those are the same bytes forever, which is why the snapshot pin is load-bearing and not a
+convenience.
+
+Enumerating all 40 in the manifest was considered and rejected: it is literal compliance that
+re-breaks on every snapshot bump and on any profile whose base image differs, and it adds no
+trust anchor the fingerprint does not already provide. If a pack ever needs closure-level
+pinning, the mechanism is a `.deb`-level lockfile — a manifest **schema** change, not an
+install-step change.
 
 ## How these hashes were obtained
 
@@ -152,3 +183,57 @@ class. The residual is recorded here rather than claimed away.
   images are built locally per profile, never by CI, so one architecture is the entire supported
   surface. A second architecture means a second manifest or a schema keying hashes by
   architecture; neither is needed yet and neither is invented here.
+
+
+## What the pack installs, and what it takes away
+
+The interpreters land; the installers do not. `images/remove-package-managers.sh` runs as the last
+step of every agent stage, after the pack install and after each agent's own CLI install, and it
+removes both classes of package manager. **Read Feature 01.5's Approach, "R7.19: two classes of
+package manager", for what is claimed and what is not** — in short, T33 is claimed for the OS
+manager and T15 for the language-level ones, and R7.19 is *not* claimed for the latter.
+
+Removed, and wider than the plan first named — the three additions were found by looking at a
+built image rather than by reading (operator decision, 2026-09-08):
+
+| Removed | Why it was not on the original list |
+|---|---|
+| `apt`, `apt-get`, `dpkg` and friends, `/usr/lib/apt`, the apt caches and lists | On the list (R7.19 condition 3) |
+| the bundled `npm` tree, `/usr/local/bin/npm`, `npx` | On the list (condition 4) |
+| `corepack` and its `/usr/local/bin` symlink | Ships in `node:22-slim`; installs yarn and pnpm on demand |
+| `yarn`, `yarnpkg`, `/opt/yarn-v1.22.22` | A complete second Node installer, already on `PATH` in the base image |
+| `ensurepip` | On the list (condition 4) |
+| `python3-pip-whl`, `python3-setuptools-whl` (`/usr/share/python-wheels`) | Pulled in by `python3-venv`; they are *how* `python3 -m venv` bootstraps a working `pip`, so removing `ensurepip` alone left the capability intact |
+
+**Kept on purpose:** `/var/lib/dpkg/status`. Condition 3 says "no binary", not "no database", and
+Feature 01.6's SBOM attestation reads that file to enumerate the image. Removing it would cost the
+provenance R9.9 requires and deny an attacker nothing.
+
+### What an operator will hit, and it is not a bug
+
+Two of these have visible consequences. Edge Case 9 predicted that an operator would read them as
+defects, so they are written down:
+
+- **`python3 -m venv <dir>` fails**, because the wheels that seed `pip` into a new environment are
+  gone. Use `python3 -m venv --without-pip <dir>`. The environment works; it has no installer in
+  it, which is the entire point.
+- **`npm`, `npx`, `yarn` and `corepack` are absent**, so a `package.json` cannot be installed
+  inside the container. `node` runs; nothing fetches. Vendor dependencies into the project mount
+  from the host instead.
+
+And the layer each failure comes from is worth knowing, because they look identical from inside a
+container and are not:
+
+- **A filesystem refusal** — "command not found", "No module named pip". Nothing reached the
+  network, so **nothing appears in the audit log**. This is most install attempts.
+- **A mediator denial** — where an installer survives (a vendored copy, a script the agent writes
+  itself, `go install` using the toolchain that must stay for `go build`), it reaches the
+  enforcement point and is denied there, naming the blocked destination. This is the audited half
+  that T15 requires, and it is the control that actually holds: the reference pack grants no
+  registry egress, so there is nowhere for a surviving installer to go.
+
+The verification is not a promise. `images/remove-package-managers.sh` asserts its own end state —
+every binary off `PATH`, the direct `npm-cli.js` and `corepack.js` paths absent, `import ensurepip`
+and `python3 -m pip` both failing, and `/var/lib/dpkg/status` still present — and exits 3 if any of
+it is untrue. A path that moves between base-image versions turns an `rm -rf` into a silent no-op,
+which is exactly the failure that block exists to catch.

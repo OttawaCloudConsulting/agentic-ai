@@ -12,11 +12,20 @@
 # So this is deny-all plus an explicit allowlist. A new path the image needs must be
 # added here deliberately; the failure mode is a build error, not a leaked secret.
 #
-# Note: `images/.dockerignore` governs the AGENT builds, whose context is `images/`.
-# A .dockerignore applies to the context root it sits in, so both files are needed.
+# ONE FILE, ONE CONTEXT. `images/.dockerignore` used to govern the agent builds, whose
+# context was `images/`. 01.5 SF-5 moved that context to this directory too (Deviation
+# 11) -- the agent images resolve their own package set from `profiles/` and `packs/`,
+# which sit outside `images/`, and a build stage can only read its own context. Docker
+# resolves .dockerignore at the context root, so this file now governs BOTH builds and
+# `images/.dockerignore` was deleted rather than left inert.
 *
 
-!images/mediator
+# The whole `images/` tree, because both builds now read from it: the mediator needs
+# `images/mediator`, and the agent build needs the Dockerfile, the entrypoint, the
+# AUTH_MODE dispatcher, `images/agy/`, the install scripts and `images/keyrings/`. It
+# holds no secret -- the CA private key lives under `mediator/identity/`, which the
+# trailing deny block below re-excludes.
+!images
 !policy/resolved
 !mediator/config
 # One file, not the directory: stage 1 of the mediator's startup self-check (SF-7)

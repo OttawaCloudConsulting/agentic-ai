@@ -294,7 +294,7 @@ the SF-1..SF-5 / SF-6 boundary.
   *Split condition:* if it runs long, SF-4a is the compile stage plus `.dockerignore` extension and
   SF-4b is the drift check plus exit codes.
 
-- [ ] **SF-5: Build-time OS packages, package-manager removal, and the per-agent build cache** --
+- [x] **SF-5: Build-time OS packages, package-manager removal, and the per-agent build cache** --
   Install the profile's composed pack package set in `images/{claude,codex,agy}/Dockerfile` at build
   time only, from the snapshot repository the profile declares, version-pinned and
   checksum-verified. Remove `apt`/`apt-get`/`dpkg`; remove the `pip`, `ensurepip` and bundled `npm`
@@ -1275,3 +1275,84 @@ versus compile stage (two `yq` versions, two platforms) and now two `bash` versi
   SF-6's CI drift job builds the default target and therefore passes through the gate with no
   extra step. SF-7 Phase C's "a drifted committed artifact fails the LOCAL build" is satisfied by
   this stage rather than by a separate check.
+
+### Deviation 11: the agent build context moves to the solution root, resolving a contradiction inside Contract 5
+- **What changed:** The three agent services build with `context: ..` and
+  `dockerfile: images/Dockerfile` (was `context: ../images`). The solution-root `.dockerignore`
+  gains `!images` above its trailing-deny block, every `COPY` in `images/Dockerfile` is rewritten
+  to an `images/`-prefixed path, and `images/.dockerignore` is deleted -- Docker resolves
+  `.dockerignore` at the context root, so a file at `images/` no longer governs anything.
+- **Originally planned:** Contract 5 says two incompatible things. Its re-plan preamble ("The
+  agent images' context does not change") and the Files to Create/Modify table (`compose.yaml` --
+  "the contexts are already correct -- mediator `context: ..`, agents `context: ../images`";
+  `images/.dockerignore` -- "governs the AGENT context, which does not move") say one thing. Its
+  own YAML block (`claude: build: context: ..`), its consequences bullets ("`images/.dockerignore`
+  no longer applies"; "The agent images copy `packs/` and `profiles/` -- which they need to
+  resolve their own package set"; "Two consumers read the pack manifests") and its
+  rejected-alternative paragraph on `additional_contexts:` all say the other.
+- **Why necessary:** Mechanism, not preference. `packs/` and `profiles/` sit outside `images/`,
+  and a build stage can only read its own context -- a `.dockerignore` selects *within* a context
+  and cannot admit a path outside one, so the table's "extend only if a pack input must reach it"
+  describes an operation that does not exist. SF-5 is unbuildable under the `../images` reading:
+  the agent image cannot resolve the profile's pack set from manifests it cannot see. The
+  preamble was written to record that 01.3 SF-4 had already moved the *mediator*, and was not
+  reconciled with the agent-side half below it. Operator decision, 2026-09-08, taken before any
+  code was written.
+- **Impact:** `images/.dockerignore` is deleted rather than left inert, so no one maintains a file
+  that governs nothing. Edge Case 1's context-size concern now applies to the agent builds too,
+  and SF-7 Phase A's context enumeration -- already required to prove
+  `mediator/identity/ca/mediator-ca.key` and `references/` are absent -- covers both build
+  contexts rather than one. The root `.dockerignore`'s own comment ("`images/.dockerignore`
+  governs the AGENT builds ... both files are needed") is now false and is corrected in the same
+  commit. `!images` sits above the trailing-deny block, so `mediator/identity` and `references`
+  stay denied. SF-6's `scripts/build.sh` and CI job must use the root context for agent builds as
+  well as for the mediator, which is one context for the whole solution rather than two.
+
+### Deviation 12: `PACK_SET_HASH` is not shipped; the `COPY` layer is the cache-invalidation mechanism
+- **What changed:** No `PACK_SET_HASH` build argument exists in `compose/compose.yaml`,
+  `compose/pins.env` or `images/Dockerfile`. Edge Case 4's property -- a changed pack set produces
+  a different image -- is carried by the `pack-plan` stage's `COPY packs/ profiles/`, whose layer
+  cache is keyed on the content of those trees.
+- **Originally planned:** Edge Case 4 ("Handled by making the composed pack set a build argument
+  -- `PACK_SET_HASH` -- so a changed pack set produces a different image") and the Files to
+  Create/Modify entry for `compose.yaml` ("`PACK_SET_HASH` and `AGENT_BASE_DIGEST` build args").
+- **Why necessary:** The argument has no producer. The documented entry point is `up --build`
+  (Contract 4, amended at SF-4), and Compose interpolates build args only from the environment and
+  `--env-file compose/pins.env`; nothing in the solution computes a pack-set hash into either.
+  Shipping the argument would ship a value that is either absent or hand-maintained, and a
+  hand-maintained hash that is not recomputed is exactly the stale-cache failure Edge Case 4
+  exists to prevent -- it would report "unchanged" while the manifests had changed. Content-
+  addressed `COPY` invalidation cannot go stale, because BuildKit hashes the files themselves.
+  Operator decision, 2026-09-08, taken before any code was written.
+- **Impact:** SF-7 Phase D asserts the rebuild by comparing image IDs across a pack-set change,
+  not by reading a build argument's value. The property is strengthened, not weakened: a hash
+  argument would have covered only the manifests an operator remembered to hash, while the `COPY`
+  covers every file in `packs/` and `profiles/`. SF-6's `scripts/build.sh` needs no hash-producing
+  step. `AGENT_BASE_DIGEST`, the other half of that table entry, is untouched and stays SF-6's.
+
+### Deviation 13: `apt` checksums are asserted for the declared items only; the transitive closure rides the signed index
+- **What changed:** The build downloads the manifest's declared `apt` items, verifies each
+  `.deb` against its recorded `sha256` before installing, and installs the remaining transitive
+  dependencies through `apt-get` under the pinned snapshot repository, whose `InRelease` signature
+  and full key fingerprint are asserted at build. `packs/README.md` records the gap as a residual
+  against R7.3.
+- **Originally planned:** Interface Contract 1 and Edge Case 8 both state the rule without
+  qualification -- "Every package carries a SHA-256, `apt` items included; R7.3 is a MUST and says
+  'checksums' without qualification" -- and `packs/language-runtimes/pack.yaml` repeats it.
+- **Why necessary:** Measured, not assumed. `apt-get install --no-install-recommends python3
+  python3-venv git` against the pinned snapshot resolves to **40** packages on this base; the
+  manifest declares 3. The 37 others are a dependency closure `apt` computes, and their integrity
+  comes from the same chain that makes the declared hashes trustworthy in the first place: the
+  `bookworm` archive key's `gpgv` signature over `InRelease`, whose `VALIDSIG` line carries
+  `B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8` -- the fingerprint `profiles/default.yaml` pins --
+  and the per-`.deb` hashes in the signed `Packages` index it covers. Enumerating the closure in
+  the manifest would be literal compliance that re-breaks on every snapshot bump and on any
+  profile whose base image differs, and it would not add a trust anchor the fingerprint does not
+  already provide. Operator decision, 2026-09-08, taken before any code was written.
+- **Impact:** R7.3 is met for declared packages and met *by a different mechanism* for their
+  closure; the distinction is recorded rather than claimed away, in the same posture the Approach
+  takes on R7.19's language-level installers. SF-7 Phase A's "every package entry, `apt` included,
+  carries a SHA-256" is an assertion about the **manifest**, not about the installed set, and
+  stays true as written. If a future pack needs closure-level pinning, the mechanism is a
+  `.deb`-level lockfile, which is a manifest-schema change and therefore SF-1's, not an install-
+  step change.

@@ -147,7 +147,7 @@
 
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
-    Sub-features: 4/7 complete
+    Sub-features: 5/7 complete
     Build started 2026-09-07. Codebase assessment ABSENT (no .project/<slug>/docs/codebase-assessment.md);
     the refresh was skipped with a warning rather than blocking, per the /build spec.
     SF-1 complete 2026-09-07: packs/language-runtimes/pack.yaml, packs/README.md, and the pack-manifest
@@ -444,7 +444,103 @@
     profile, and plain content drift still fails at exit 4 -- plus a clean rebuild, lint 0, all
     three artifacts --check current, verify-egress-mediator.sh 77/77 ALL PHASES PASSED and
     verify-pod-topology.sh ALL CHECKS PASSED against the rebuilt image.
-    Codebase assessment still ABSENT; refresh skipped with a warning, as at SF-1..SF-3.
+    SF-5 complete 2026-09-08: build-time OS packages, package-manager removal and the per-agent
+    build cache. THREE PLAN CONTRADICTIONS/GAPS WERE SURFACED BEFORE ANY CODE WAS WRITTEN and
+    resolved by operator decision, following SF-2/SF-3/SF-4's precedent of ratifying deviations
+    ahead of writing rather than recording them after.
+    DEVIATION 11 IS THE ONE THAT DECIDED WHETHER SF-5 WAS BUILDABLE AT ALL. Contract 5 says two
+    incompatible things: its re-plan preamble and the Files-to-Modify table keep the agent context
+    at `../images`, while its own YAML block, its consequences bullets ("the agent images copy
+    packs/ and profiles/", "images/.dockerignore no longer applies") and its rejected-alternative
+    paragraph all assume the solution root. Mechanism, not taste, settles it -- packs/ and
+    profiles/ sit OUTSIDE images/, a build stage can only read its own context, and a
+    .dockerignore selects WITHIN a context and cannot admit a path outside one, so the table's
+    "extend only if a pack input must reach it" names an operation that does not exist. Agents now
+    build with `context: ..` and `dockerfile: images/Dockerfile`; the root .dockerignore gained
+    `!images` ABOVE the trailing-deny block (so mediator/identity and references stay denied); and
+    images/.dockerignore was DELETED rather than left inert, because Docker resolves .dockerignore
+    at the context root. The root file's own now-false claim that "both files are needed" was
+    corrected in the same commit.
+    DEVIATION 12: PACK_SET_HASH IS NOT SHIPPED. Edge Case 4 and the Files-to-Modify table both
+    name it, but it has NO PRODUCER -- the entry point is `up --build` and Compose interpolates
+    build args only from the environment and pins.env, neither of which anything computes a
+    pack-set hash into. A hand-maintained hash that is not recomputed reports "unchanged" exactly
+    when it has changed, which is the stale-cache failure Edge Case 4 exists to prevent. The
+    `pack-plan` stage's `COPY packs/ profiles/` carries the property instead, keyed by BuildKit on
+    file content, and cannot go stale. SF-7 Phase D observes the rebuild by image ID.
+    DEVIATION 13: MEASURED, NOT ASSUMED. Contract 1, Edge Case 8 and the manifest itself all claim
+    "every package carries a SHA-256, apt items included". `apt-get install --no-install-recommends
+    python3 python3-venv git` against the pinned snapshot resolves to 40 PACKAGES; three are
+    declared. The other 37 ride the chain that makes the declared hashes worth anything one link
+    earlier -- gpgv over InRelease requiring the full 40-character primary fingerprint, and the
+    per-.deb hashes in the Packages index that signature covers. Recorded as a residual in
+    packs/README.md rather than claimed away, the same posture the Approach takes on R7.19.
+    THE TRUST ANCHOR WAS VERIFIED, NOT COPIED, and the mechanism was PROBED before it was built
+    on. gpgv is present in node:22-slim and gpg is NOT, so one `gpgv --status-fd 1` invocation
+    proves the signature and names the primary key in a single step -- its VALIDSIG last field is
+    B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8, exactly the fingerprint profiles/default.yaml pins.
+    images/keyrings/debian-archive.gpg was extracted from the base image's own keyring and then
+    re-verified against the live snapshot InRelease through the committed copy. git's pin was
+    derived the same way SF-1 derived the python hashes -- InRelease verified, Packages.xz checked
+    against the SIGNED index hash, git's .deb SHA-256 read from it -- and the run REPRODUCED SF-1's
+    python3/python3-venv values exactly, which is a free cross-check on both.
+    ONE PLAN ASSUMPTION WAS FALSIFIED BY MEASUREMENT: `Acquire::Check-Valid-Until=false`, the usual
+    snapshot.debian.org workaround, is NOT used and its absence is deliberate. This snapshot's
+    InRelease carries no Valid-Until field at all, so apt has nothing to reject; setting the flag
+    would disable a real check for a problem this repository does not have.
+    THREE DEFECTS WERE FOUND BY BUILDING RATHER THAN BY READING. (1) snapshot.debian.org serves
+    over HTTP/2 and drops streams mid-transfer -- the 7,152,820-byte git .deb truncated at ~1.7 MB
+    on two of three hand-fetches with PROTOCOL_ERROR. Fixed with bounded `Acquire::Retries=5` on an
+    idempotent transfer; what is retried is the transfer, never the verification, and 3/3 then
+    succeeded with the hash matching. (2) node:22-slim ships no `xz`, and the pinned Node archive
+    is a .tar.xz -- xz-utils added to agent-base's install line. (3) apt's `_apt` sandbox user
+    cannot read the root-owned download directory; `APT::Sandbox::User=root` silences a warning
+    that was otherwise noise on every build.
+    THE REMOVAL LIST IS WIDER THAN THE PLAN NAMES, and the additions were found by INSPECTING A
+    BUILT IMAGE, not by reading. The plan names pip, ensurepip and the bundled npm tree.
+    node:22-slim also ships `corepack` (installs yarn and pnpm on demand) and a complete
+    `yarn v1.22.22` at /opt with two symlinks already on PATH; and python3-venv pulls
+    python3-pip-whl and python3-setuptools-whl, which are HOW `python3 -m venv` bootstraps a
+    working pip -- so removing ensurepip alone left the capability entirely intact and T15's claim
+    would have been false as shipped. Operator decision: remove all of them.
+    /var/lib/dpkg/status IS KEPT ON PURPOSE. Condition 3 says "no binary", not "no database", and
+    SF-6's SBOM attestation reads it. The removal script ASSERTS its retention, so a future
+    broadening of the list cannot take it out silently.
+    THE REMOVAL SCRIPT ASSERTS ITS OWN END STATE AND EXITS 3 IF IT IS UNTRUE, because a path that
+    moves between base-image versions turns an `rm -rf` into a silent no-op -- the same
+    silent-in-the-permissive-direction shape SF-3's Codex pass found twice. It checks 13 binaries
+    off PATH, the direct npm-cli.js/npx-cli.js/corepack.js paths, /usr/share/python-wheels, and
+    that `import ensurepip` and `python3 -m pip` both FAIL.
+    ALL THREE IMAGES BUILT AND VERIFIED INDEPENDENTLY of the script's own claim. Present at their
+    pins: node v22.23.2, Python 3.11.2, go1.23.4, git 2.39.5, claude 2.1.260, codex-cli 0.152.1,
+    agy 1.1.26. Absent: apt, apt-get, dpkg, dpkg-query, npm, npx, corepack, yarn, yarnpkg, pip,
+    pip3 -- and the four direct paths. dpkg database retained (146/146/149 packages). THE RISK
+    THAT MATTERED WAS CHECKED: `claude --version` and `codex --version` still work after their own
+    installer was deleted from under them.
+    THE BUILD CACHE PATH IS A DESIGN DECISION, not a detail. /build-cache is TOP-LEVEL rather than
+    /home/agent/.cache, because a named volume mounted INSIDE another volume (01.2 puts
+    /home/agent on the state volume) is created root-owned and would be unwritable by the agent it
+    exists for. Creating it in the image as agent:agent is what seeds that ownership onto a fresh
+    volume -- PROVED by writing to one as uid 1000. Edge Case 14 asks which volume T23 is asserted
+    against and the answer is recorded: the DEDICATED volume, never 01.2's state volume, which
+    would pass without the option existing at all.
+    THE HARNESS EXTENSION IS THE DISTINCTNESS CHECK, NOT THE MOUNT ENTRY. /build-cache travels
+    01.4's existing EXPECT_EXTRA_MOUNTS route, which alone would pass equally well if all three
+    agents shared one volume -- so the real assertion is new and lives after the per-agent loop,
+    because the property is a relationship BETWEEN agents that no per-agent check can see. PROBED
+    BOTH DIRECTIONS with a throwaway project, removed afterwards: three agents resolved to three
+    distinct volumes (positive), a synthetic shared volume failed the same logic (negative), and
+    cross-agent isolation was confirmed by writing a marker into claude's cache and failing to
+    find it in codex's.
+    BOTH EXISTING HARNESSES RE-RUN, this feature's standing obligation since SF-4:
+    verify-pod-topology.sh ALL CHECKS PASSED (including the new build-cache check and the mount-set
+    equality that proves the default profile is unaffected) and verify-egress-mediator.sh ALL
+    PHASES PASSED, both against the rebuilt images. lint-policy.sh exits 0 and all three committed
+    artifacts are still --check current. `oauth-mount --check` exits 4 and that is PRE-EXISTING,
+    attributed rather than assumed: no oauth-mount artifact has ever been committed, and SF-4
+    established that a missing artifact under --check exits 4 because absent is the limiting case
+    of different.
+    Codebase assessment still ABSENT; refresh skipped with a warning, as at SF-1..SF-4.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it

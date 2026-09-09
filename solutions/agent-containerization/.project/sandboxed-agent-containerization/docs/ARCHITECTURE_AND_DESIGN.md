@@ -250,7 +250,15 @@ solutions/agent-containerization/
 │   │                              #   selected by `target:` (01.2 Deviation 1). Four files became
 │   │                              #   one because the three agent stages share the base layer and
 │   │                              #   Compose selects the stage per service
-│   ├── .dockerignore              # agent build context guard
+│   ├── keyrings/debian-archive.gpg # committed trust anchor for the pinned snapshot repo; its
+│   │                              #   full fingerprint is asserted with gpgv at build (01.5 SF-5)
+│   ├── pack-plan.sh               # resolves a profile's pack set to a flat install plan; runs in
+│   │                              #   the `pack-plan` stage, the only place yq touches this build
+│   ├── pack-install.sh            # consumes that plan: pinned apt items + checksummed archives
+│   ├── apt-pinned.sh              # gpgv/fingerprint assertion, snapshot-only sources, verified
+│   │                              #   .deb download; shared by agent-base (git) and agent-packs
+│   ├── remove-package-managers.sh # R7.19 conditions 3-4, run LAST in every agent stage, and it
+│   │                              #   ASSERTS its own end state rather than trusting the rm
 │   ├── entrypoint.sh              # idempotent home seed from /opt/agent-home-skel, the R4.5
 │   │                              #   config.toml merge, then the start-time bootstrap-auth pass
 │   ├── bootstrap-auth.sh          # per-agent AUTH_MODE dispatcher (01.4 SF-2), incl. the :ro
@@ -268,11 +276,13 @@ solutions/agent-containerization/
 ├── profiles/
 │   ├── default.yaml               # project mount + state volumes only; every optional mount off
 │   └── <use-case>.yaml            # (not yet built — 01.5) packs, mounts, AUTH_MODE, OS packages
-├── packs/                         # (not yet built — Feature 01.5)
-│   ├── aws-cli/pack.yaml          # egress entries, pinned OS packages, mounts
-│   ├── terraform/pack.yaml
-│   ├── kubernetes/pack.yaml
-│   └── language-runtimes/pack.yaml
+├── packs/
+│   ├── README.md                  # manifest schema; the no-runtime-egress decision; the checksum
+│   │                              #   residual (01.5 Deviation 13) and what the removals cost
+│   ├── language-runtimes/pack.yaml # BUILT (01.5 SF-1). Node, Python, Go; build-time only
+│   ├── aws-cli/pack.yaml          # (not yet built — 02.3)
+│   ├── terraform/pack.yaml        # (not yet built — 02.3)
+│   └── kubernetes/pack.yaml       # (not yet built — 03.3)
 ├── policy/
 │   ├── allowlist.base.yaml        # seeded per D17, cross-validated, never vendor-copied (R5.8)
 │   ├── denylist.base.yaml         # metadata endpoint, RFC1918, link-local, loopback (R5.6)
@@ -289,9 +299,19 @@ solutions/agent-containerization/
 │   │                              #   (the operator-facing denial pages, one per control)
 │   └── identity/                  # CA and per-agent cert issuance (R8.8). No private key committed
 │
+│   # NOTE (01.5 SF-5, Deviation 11): THE AGENT BUILD CONTEXT IS NOW THE SOLUTION ROOT, not
+│   # ./images. The agent images resolve their own package set from profiles/ and packs/, which
+│   # sit outside images/, and a build stage can only read its own context; a .dockerignore
+│   # selects WITHIN a context and cannot admit a path outside one. Both builds therefore share
+│   # one context and one guard -- the solution-root .dockerignore -- and `images/.dockerignore`
+│   # was DELETED rather than left inert, because Docker resolves .dockerignore at the context
+│   # root and a file under images/ now governs nothing. The note below is kept for its reasoning
+│   # and its premise is superseded: bootstrap-auth.sh still ships at images/bootstrap-auth.sh,
+│   # now for the copy-to-volume reason alone rather than for the context reason as well.
+│   #
 │   # NOTE (01.4 SF-2): `bootstrap-auth.sh` was listed here in an earlier revision of this tree.
-│   # It ships at `images/bootstrap-auth.sh` instead. The build context for the agent images is
-│   # ./images, so a file under scripts/ cannot be COPY'd into the image, and the copy-to-volume
+│   # It ships at `images/bootstrap-auth.sh` instead. The build context for the agent images was
+│   # ./images, so a file under scripts/ could not be COPY'd into the image, and the copy-to-volume
 │   # it performs must run inside the container where both the :ro source and the state volume
 │   # are mounted. 01.2 set the same precedent with `images/entrypoint.sh`. See the Feature 01.4
 │   # plan, Deviation 1 — which also records that the per-agent image directories this tree once

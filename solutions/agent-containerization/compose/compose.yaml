@@ -185,12 +185,18 @@ services:
   claude:
     <<: *hardened
     build:
-      context: ../images
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: images/Dockerfile
       target: claude
       args:
         CLAUDE_VERSION: ${CLAUDE_VERSION}
         CLAUDE_SOURCE: ${CLAUDE_SOURCE}
+        PROFILE: ${PROFILE:-default}
+        SNAPSHOT_URL: ${SNAPSHOT_URL}
+        SNAPSHOT_SUITE: ${SNAPSHOT_SUITE}
+        SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
+        GIT_VERSION: ${GIT_VERSION}
+        GIT_SHA256: ${GIT_SHA256}
     image: sandboxed-agent/claude:local
     networks:
       - claude-net
@@ -228,12 +234,18 @@ services:
   codex:
     <<: *hardened
     build:
-      context: ../images
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: images/Dockerfile
       target: codex
       args:
         CODEX_VERSION: ${CODEX_VERSION}
         CODEX_SOURCE: ${CODEX_SOURCE}
+        PROFILE: ${PROFILE:-default}
+        SNAPSHOT_URL: ${SNAPSHOT_URL}
+        SNAPSHOT_SUITE: ${SNAPSHOT_SUITE}
+        SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
+        GIT_VERSION: ${GIT_VERSION}
+        GIT_SHA256: ${GIT_SHA256}
     image: sandboxed-agent/codex:local
     networks:
       - codex-net
@@ -261,13 +273,19 @@ services:
   agy:
     <<: *hardened
     build:
-      context: ../images
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: images/Dockerfile
       target: agy
       args:
         AGY_VERSION: ${AGY_VERSION}
         AGY_URL: ${AGY_URL}
         AGY_SHA512: ${AGY_SHA512}
+        PROFILE: ${PROFILE:-default}
+        SNAPSHOT_URL: ${SNAPSHOT_URL}
+        SNAPSHOT_SUITE: ${SNAPSHOT_SUITE}
+        SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
+        GIT_VERSION: ${GIT_VERSION}
+        GIT_SHA256: ${GIT_SHA256}
     image: sandboxed-agent/agy:local
     networks:
       - agy-net
