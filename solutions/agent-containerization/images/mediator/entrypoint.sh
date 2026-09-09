@@ -172,7 +172,7 @@ done
   || fail "MEDIATOR_AGENT_NETWORKS is unset -- expected '<agent>=<addr>/<prefix>,...' (compose.yaml, egress-mediator). Refusing to serve DNS without knowing which network is which agent."
 
 [ -f "$RESOLVED_POLICY" ] \
-  || fail "resolved policy $RESOLVED_POLICY not found (profile '$MEDIATOR_PROFILE'). It is COMPILED into the image by the Dockerfile's compile stage (01.5 SF-4), from the inputs policy/resolved/${MEDIATOR_PROFILE}.yaml records -- a profile with no committed artifact is not shipped. Add it, refresh with scripts/compile-policy-build.sh, and rebuild."
+  || fail "resolved policy $RESOLVED_POLICY not found (profile '$MEDIATOR_PROFILE'). It is COMPILED into the image by the Dockerfile's compile stage (01.5 SF-4), from the inputs policy/resolved/${MEDIATOR_PROFILE}.yaml records -- a profile with no committed artifact is not shipped. Compile it once with 'bash scripts/compile-policy.sh --profile ${MEDIATOR_PROFILE}', commit the artifact, and rebuild -- scripts/compile-policy-build.sh refreshes existing artifacts and will not bootstrap a new one."
 
 # ================================================ stage 1 of the self-check (T17)
 # Unconditional, fatal, and BEFORE any listener binds. A corrupt or unparseable

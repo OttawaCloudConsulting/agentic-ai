@@ -1226,6 +1226,19 @@ versus compile stage (two `yq` versions, two platforms) and now two `bash` versi
   byte-for-byte, which also demonstrates they remain genuinely reproducible; with the base
   allowlist removed, `default` fails rather than being carried. SF-7 Phase A should assert the
   build log names exactly the two carried-through artifacts and no more.
+- **The hole this leaves, stated rather than left to be found.** The build's drift gate is
+  *trivially satisfied* for the two carried-through artifacts: they are compared against the copy
+  they were made from. Nothing automatic enforces their currency -- `verify-egress-mediator.sh`
+  does not invoke the compiler and `lint-policy.sh` does not run `--check`. Nothing enforced it
+  before SF-4 either, but before SF-4 nothing *claimed* the build enforced drift. **SF-7 Phase C
+  must run `--check` on both fixture artifacts explicitly**, with their `.test` bases, since that
+  is the only place their drift can be caught.
+- **Contract 5's image-contents sentence is now stale for the runtime stage.** It says "the
+  mediator image copies `policy/`, `profiles/`, `packs/` and `mediator/config/`". After SF-4 only
+  the *compile* stage sees `profiles/` and `packs/`; the runtime stage carries the compiled policy
+  and `mediator/config/` and nothing else. That is a narrowing, not a widening -- but SF-7 Phase
+  A's assertion against the built image must be written to the narrower truth or it will fail on
+  a correct image.
 
 ### Deviation 10: the drift gate is a separate stage from the artifact-extraction target
 - **What changed:** the mediator Dockerfile has five stages — `base`, `compile`, `artifact`,

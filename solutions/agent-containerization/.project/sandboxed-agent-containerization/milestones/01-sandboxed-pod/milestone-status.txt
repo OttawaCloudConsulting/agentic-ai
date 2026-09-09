@@ -392,6 +392,25 @@
     to "did the policy actually change?"; compiled_at now records when the policy last CHANGED.
     (2) /etc/mediator/policy no longer contains policy/resolved/README.md, because the copy is now
     the compile stage's *.yaml output rather than the whole directory. No consumer reads it.
+    A BASH 3.2 DEFECT FOUND AFTER THE FIRST COMMIT, same class as the one commit 38ef066 measured
+    for SF-3, and found by RUNNING /bin/bash rather than by reading: scripts/compile-policy-build.sh
+    expanded "${BUILD_ARGS[@]}" under set -u, which bash 3.2.57 -- the /bin/bash on this host --
+    kills with "unbound variable" whenever the array is empty, i.e. whenever compose/pins.env is
+    absent. Latent while pins.env exists, fatal on a fresh clone that has not made one. Fixed with
+    the ${arr[@]+"${arr[@]}"} idiom and re-probed both ways under /bin/bash. The absent-pins run is
+    also a free proof that the Dockerfile's ARG defaults agree with pins.env: same byte output.
+    TWO MESSAGES THAT PROMISED SOMETHING THE WRAPPER CANNOT DO, corrected in the same pass. `emit`
+    enumerates policy/resolved/*.yaml, so compile-policy-build.sh REFRESHES existing artifacts and
+    cannot bootstrap a new profile's first one -- entrypoint.sh's not-found message said otherwise,
+    and the wrapper's header now states the limit. An error message that lies is a defect here.
+    21 PROBES total after the follow-up (17 plus 4 under /bin/bash 3.2).
+    TWO OBLIGATIONS RECORDED ON DEVIATION 9 FOR SF-7, because SF-4 narrows what was true before it.
+    (1) Fixture drift is now host-side --check ONLY: the build's gate compares the carried-through
+    artifacts against the copy they were made from, so it is trivially satisfied, and neither
+    harness nor lint-policy runs --check on them. SF-7 Phase C must, with their .test bases.
+    (2) Contract 5's "the mediator image copies policy/, profiles/, packs/" is stale for the
+    RUNTIME stage -- only the compile stage sees profiles/ and packs/ now. A narrowing, but Phase
+    A's image-contents assertion must be written to it or it fails on a correct image.
     Codebase assessment still ABSENT; refresh skipped with a warning, as at SF-1..SF-3.
     NOT DONE, and deliberately: no Codex adversarial pass on SF-4 yet. SF-2 and SF-3 each had one
     at operator request after their commits, and the same is available here.

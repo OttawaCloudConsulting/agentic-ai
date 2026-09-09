@@ -26,6 +26,11 @@
 #
 # The refreshed artifact is a REVIEWED change (R5.14, SC-6): this script writes it and
 # prints the diff, and committing it is deliberately still the operator's act.
+#
+# LIMIT: this REFRESHES artifacts that already exist. The compile stage enumerates
+# policy/resolved/*.yaml, so a profile with no committed artifact yet is not compiled
+# here -- bootstrap it once with `bash scripts/compile-policy.sh --profile <name>`,
+# commit it, and every refresh after that comes through this script.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -59,7 +64,7 @@ docker build \
   -f images/mediator/Dockerfile \
   --target artifact \
   --output "type=local,dest=$STAGE" \
-  "${BUILD_ARGS[@]}" \
+  ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} \
   . >&2
 
 shopt -s nullglob
