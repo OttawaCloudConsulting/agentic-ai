@@ -434,8 +434,12 @@ reviewed commit:
 # 1. Push the branch. The workflow builds and publishes agent-base.
 git push
 
-# 2. Read the digest off the run summary.
-gh run view --workflow=agent-sandbox-image.yml --log | grep AGENT_BASE_DIGEST=
+# 2. Read the digest from the run. `gh run view` takes a run ID, not --workflow,
+#    so the ID comes from `gh run list`. The -o form avoids matching the traced
+#    echo line, which carries ANSI escapes.
+gh run view "$(gh run list --workflow=agent-sandbox-image.yml --limit 1 \
+      --json databaseId --jq '.[0].databaseId')" --log \
+  | grep -o 'AGENT_BASE_DIGEST=sha256:[0-9a-f]\{64\}'
 
 # 3. Edit compose/pins.env, review the diff, commit it.
 $EDITOR compose/pins.env

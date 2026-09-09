@@ -132,7 +132,17 @@ jobs:
         working-directory: ${{ env.SOLUTION_DIR }}
         run: |
           set -euo pipefail
-          for a in SNAPSHOT_URL SNAPSHOT_SUITE SNAPSHOT_FINGERPRINT GIT_VERSION GIT_SHA256; do
+          # AGENT_BASE_DIGEST is in this list even though the `agent-base` stage does not
+          # consume it, and that is not belt-and-braces. Since SF-6b the `agent-packs` stage
+          # reads `FROM ghcr.io/...@${AGENT_BASE_DIGEST}`, and BuildKit PARSES every stage's
+          # FROM before it prunes the ones the target cannot reach -- only image-config
+          # RESOLUTION is reachability-gated. So an unset value fails `--target agent-base`
+          # at parse time with "invalid reference format", even though that stage is the one
+          # being built and has nothing to do with the digest. Verified by running the exact
+          # CI invocation locally with the variable unset: it failed; with it set, it builds.
+          # The ARG still gets NO DEFAULT -- that is Edge Case 11's contract and the reason
+          # an unset digest must never resolve to a tag.
+          for a in SNAPSHOT_URL SNAPSHOT_SUITE SNAPSHOT_FINGERPRINT GIT_VERSION GIT_SHA256 AGENT_BASE_DIGEST; do
             v="$(sed -n "s/^[[:space:]]*${a}=//p" compose/pins.env | tail -n 1)"
             v="${v%\"}"; v="${v#\"}"; v="${v%\'}"; v="${v#\'}"
             [ -n "$v" ] || { echo "compose/pins.env does not define ${a}" >&2; exit 1; }
@@ -182,6 +192,7 @@ jobs:
             SNAPSHOT_FINGERPRINT=${{ env.SNAPSHOT_FINGERPRINT }}
             GIT_VERSION=${{ env.GIT_VERSION }}
             GIT_SHA256=${{ env.GIT_SHA256 }}
+            AGENT_BASE_DIGEST=${{ env.AGENT_BASE_DIGEST }}
 
       # The digest is this job's actual product. It goes to the run summary because the
       # operator has to COPY it into compose/pins.env by hand -- a deliberate, reviewed

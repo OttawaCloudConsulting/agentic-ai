@@ -380,8 +380,15 @@ became unreachable from a local build: `verify-pod-topology.sh`'s volume-upgrade
 `agent-packs`. The general rule the tree should hold to is that **a build argument only has effect
 in a stage that is still built locally**, and the narrower one is that a test-only affordance has
 no business in the CI-published supply-chain artifact in the first place. Verified after the move:
-the built agent images' first 17 layers are byte-for-byte the published base's, with 6 layers
-added on top.
+the built agent images' first 17 layers are byte-for-byte the published base's, with 7 layers
+added on top (re-measured after the move -- the relocated `RUN` adds one).
+
+A third consequence, found the same way and worth the same generalisation: since BuildKit parses
+every stage's `FROM` before it prunes unreachable ones, and only *resolution* is
+reachability-gated, `--target agent-base` also fails when `AGENT_BASE_DIGEST` is unset -- even
+though that stage never reads it. The CI publish job therefore passes the digest to a build that
+does not consume it. **Pruning happens after parsing**, so a defaultless ARG in any `FROM`
+constrains every target in the file, not just the reachable ones.
 
 ## Deployment & Operations
 
