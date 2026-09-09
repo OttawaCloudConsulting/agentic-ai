@@ -3,7 +3,16 @@
 **Artifact:** .project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md
 **Status:** [x] Approved
 **Reviewer(s):** cturner@ottawacloudconsulting.com
-**Date:** 2026-09-04
+**Date:** 2026-09-04 (original approval) · 2026-09-09 (deviation-consolidation refresh)
+
+> **Two records, not one.** Everything below the header down to the Refresh section is the
+> original Gate 2 approval, preserved unchanged. The Refresh section records the 2026-09-09
+> `/design` deviation-consolidation pass.
+>
+> **Date note.** `progress.txt` carried `Approved: 2026-09-07` against this file's 2026-09-04.
+> The 09-07 date was the architecture refresh that consolidated the 01.2 and 01.3 deviations,
+> not a re-approval. The operator ruled 09-07 authoritative on 2026-09-09; this file keeps
+> 2026-09-04 as the date of the original approval, which is what it records.
 
 ## Checklist
 
@@ -52,3 +61,77 @@ Recorded at approval, so the basis of this gate is not lost:
 - **Deferred to build, not resolved here:** Q1, Q9, Open Decision 3, the Antigravity ToS owner, and
   six items flagged UNVERIFIED — of which `agy`'s `HTTPS_PROXY` support is the one that can
   invalidate the design for a single agent on day one.
+
+---
+
+## Refresh — 2026-09-09 (deviation consolidation)
+
+**Trigger:** `/design refresh`, to consolidate accumulated architectural deviations and clear the
+two Open Items that Feature 01.4's measurements resolved.
+
+**Scan result.** 43 deviations across the five Milestone 01 feature plans — 01.1: 0, 01.2: 3,
+01.3: 11, 01.4: 9, 01.5: 20. Each was checked against the architecture document itself rather
+than against the plan's own status field, because the plans do not record consolidation; only
+`milestone-status.txt` does, and it was not complete.
+
+| Bucket | Count | Disposition |
+|---|---|---|
+| Already consolidated | 20 | 01.2 all three, 01.3 all eleven (both on 2026-09-07), 01.4-D1 (the file tree already carries a NOTE citing it), 01.5-D10/D11/D14/D15/D17. 01.4-D9 is closed by 01.5-D2 |
+| Consolidated by this pass | 18 | 01.4-D2, D3, D4, D5 · 01.5-D1, D2, D3, D4, D5, D6, D7, D8, D9, D12, D13, D16, D19, D20 |
+| Left in the feature plans | 4 | 01.4-D6, D7, D8 and 01.5-D18 — test-harness internals that touch none of the six architecture sections. Operator decision 2026-09-09 |
+
+**Where the 18 landed.** D2 (agent-network `ip_range`), D8 (the seven-cell `AUTH_MODE` matrix and
+the T24 amendment) and D10 (packs declare egress and OS packages only; `git` in `agent-base`;
+base-image-forced pack versions) in Design Decisions. Networks, tool packs and the policy compiler
+in Component Inventory. `compose/overrides/`, `profiles/`, `packs/` and `scripts/` in File
+Organization. Entry point, build sequence, startup self-checks and reproducibility in Deployment &
+Operations. Identity-as-built, the apt-closure residual and the adversarial-pass findings in
+Security Considerations.
+
+**Two Open Items cleared, both from Feature 01.4 measurements.**
+
+- *Refresh-token rotation semantics* — resolved at 01.4 SF-3. Both providers roll the refresh
+  token, cross-validated against mediator audit lines. `claude`'s `refreshTokenExpiresAt` is not
+  extended by a refresh; `codex` triggers on the access token's own JWT `exp` and does not verify
+  that JWT's signature locally.
+- *Per-session refresh-token revocation* — resolved at 01.4 SF-5, **negatively**. A superseded
+  refresh token replayed successfully against the same account, so rotation is not a revocation
+  mechanism. Measured for **OpenAI**; **Anthropic was not replayed**. The asymmetry is carried
+  verbatim into the document rather than generalised.
+
+### Refresh Checklist
+
+- [x] Every deviation scanned was classified, and its classification checked against the document rather than the plan
+- [x] Decision count unchanged at 22 (D1–D21 plus D13a) — no decision row was added or removed
+- [x] The document lints clean under the repository markdownlint configuration
+- [x] The two cleared Open Items carry their measurement asymmetry rather than a bare "Resolved"
+- [x] [Auto] Confirm the identity rewrite. The operator elected to describe network-derived identity for `codex` and `agy` as the built mechanism in Security Considerations. `REQUIREMENTS.md` R8.8 is unamended and a strict reading does not accept it. The rewrite records that disagreement — sourced to Codex finding F2 in the Feature 01.3 Gate 4 review, which recorded it as "recorded, not fixed here", and to `docs/records/r8-8-identity-mechanism-gap-escalation.md` — and assigns resolution to Feature 01.6 rather than settling it
+- [x] [Auto] Confirm four consistency corrections made outside the deviation set, all of which contradicted already-consolidated material: the build sequence said native sandboxes are enabled (D14 was amended to disabled at the 01.2 build); it said "Run T1–T20" (the register runs to T45); step 0 said the Docker Sandboxes assessment was "Not done" (Open Items records it attempted and incomplete); and the packs tree had the AWS CLI and Kubernetes milestone assignments transposed
+- [x] [Auto] Confirm the Observability correction. The section asserted "Four artifacts, produced by default, exported by default", which is not true today — the agent action log is Feature 02.1, the SBOM exists only for the CI-published base image, and the per-export disable is T36 in Milestone 02. It is not a deviation, but `prd.md` was corrected on the same point earlier the same day, so leaving it would have made the two documents disagree. **Operator decision 2026-09-09: fix it in this pass, out of deviation scope.** A per-artifact build-status table now follows the target-state sentence
+
+### Refresh Comments
+
+All refresh items resolved 2026-09-09. The architecture document was approved without revision.
+
+Recorded at approval, so the basis of this refresh is not lost:
+
+- **Two claims in the identity rewrite were authored before being sourced, and were corrected
+  before approval.** The first draft asserted that network-derived identity is "what the egress
+  audit log records today and it is sufficient for attribution", and that Milestone 03's brokering
+  is restricted to cryptographically bound identities. The first is now sourced to D12's line
+  format, which carries an `identity_source` field alongside `agent`; the second is attributed to
+  `prd.md`, where the Gate 3 milestone revision records it — it is not a decision row. A probe
+  count (53 probes, 0 failures) was likewise attributed to the adversarial pass as a whole and now
+  sits with Deviation 8, which is what it verified.
+- **The identity rewrite takes a position the register does not yet accept.** The operator elected
+  to describe network-derived identity for `codex` and `agy` as the built mechanism. R8.8 remains
+  unamended. The document records the disagreement and assigns resolution to Feature 01.6; it does
+  not settle it, and nothing here should be read as an amendment to R8.8.
+- **Four deviations were deliberately left in the feature plans** — 01.4-D6, D7, D8 and 01.5-D18.
+  All four are test-harness internals touching none of the six architecture sections. 01.4-D8 is
+  the one worth naming: a credential leaked in cleartext through the harness's *input* path
+  because `references/.env_keys` was sourced rather than parsed. The harness now parses it. The
+  consequence that outlives the harness — revoking the one-year `CLAUDE_CODE_OAUTH_TOKEN` — is
+  recorded in the Open Items table and in the Gate 1 refresh record, and remains outstanding.
+- **Decision count unchanged at 22.** Every consolidation amended an existing row or an existing
+  section; no decision was added, renumbered or removed.

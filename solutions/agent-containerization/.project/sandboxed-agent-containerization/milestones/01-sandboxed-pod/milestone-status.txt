@@ -938,8 +938,24 @@
     passing is a regression check and not a formality. 20 architectural deviations recorded
     across the feature; /design refresh is worth running to consolidate them.
 
-[ ] Feature 01.6: Per-agent workload identity
-    Plan: (not yet planned)
+[~] Feature 01.6: Per-agent workload identity
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/per-agent-workload-identity.md
+    Sub-features: 0/4 complete
     Notes: Created 2026-09-04 by /milestone revision -- split out of 01.3. Closes R8.8 with the
     strongest identity form each agent's client supports; carries T34 and the Milestone 03
     brokering gate. Ordered after 01.3; may land before or after 01.4 and 01.5.
+    Planned 2026-09-09, Gate 4 approved. Four sub-features. Decisions taken at plan time: required-mode
+    clientca= on the claude front listener only (the DELAYED_AUTH gap 01.3 handed over is closed by
+    design, not fixed -- per-agent listeners give optional mode no consumer); the M03 brokering gate is
+    listener+mtls ALONE, so claude only, even on a positive SF-1; identity_source is rendered from a new
+    profile field client_auth in the same renderer pass as clientca=, per listener. A first-draft defect
+    was caught and fixed before approval: annotating idsrc on the front layer never reaches the verdict
+    line, because the front->inner cache_peer hop is a new master transaction -- which is why agent and
+    layer are already re-derived per layer. Header propagation was rejected as agent-forgeable; the
+    mechanism taken is topological (inner binds 127.0.0.1, cache_peer_access admits only that agent's
+    front). Named regression surface: verify-egress-mediator.sh:105 hardcodes identity_source ==
+    "listener" on EVERY verdict assertion, and :341-343 is a placeholder pass 01.3 wrote to be inverted
+    here. client_auth is required-not-defaulted, so all four profiles carrying a listeners: block and
+    both resolved artifacts move in one commit or compile-policy-build.sh refuses the image build
+    (R5.14). verify-auth-state.sh is excluded from the Test Command -- its Phase D costs the operator
+    their host codex login -- and is run once by hand at the end of SF-2 instead.

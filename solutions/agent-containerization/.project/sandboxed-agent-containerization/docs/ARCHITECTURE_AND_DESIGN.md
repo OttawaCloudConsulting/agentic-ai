@@ -38,15 +38,15 @@ framing is carried verbatim from the options analysis and is the honest summary 
 | # | Decision | Rationale | Tradeoff | Alternatives Considered |
 |---|----------|-----------|----------|-------------------------|
 | D1 | **Adopt Option 2** — Compose pod, agent containers on internal networks, single egress mediator | Only option evaluating FQDN rules correctly at L7 (R5.5); only enforcement point that can be *extended* to per-agent identity, operator hold, rate limiting and an MCP gateway (R15.2); yields a self-owned destination audit trail outside the agent's reach (R9.1) | Worst recovery-to-known-good of the three options: persistent volumes, hand-built mediator state and a self-owned log mean a contaminated environment is slower and less certain to rebuild than a destroyed microVM. Accepted, mitigated by D16 | **Option 1 (Docker Sandboxes `sbx`)** — hours not days, microVM boundary, UDP/ICMP blocked outright; rejected as durable answer: Antigravity unsupported, closed-source, macOS/Windows-only, vendor on the traffic path (R14.1 unmet), policy engine expresses network only and cannot be extended. Retained as the *discovery seeding* tool (D17). **Option 3 (per-agent microVM)** — strongest boundary; rejected as overkill: container escape is not in the threat model, 1–2 weeks, Apple `container` has no Compose equivalent. Revisit only if A3 (trusted-ish repos) or the multi-tenancy non-goal changes |
-| D2 | **One internal network per agent** (`claude-net`, `codex-net`, `agy-net`, each `internal: true`), mediator multi-homed onto all three plus the external network | `internal: true` removes the default route but Docker bridge networks allow unrestricted container-to-container traffic on the same bridge. A shared `agents-net` gives *zero* cross-agent isolation while appearing to isolate. Containers on separate bridge networks cannot reach each other by name or IP | Three networks to declare and maintain instead of one; the mediator must be attached to each | **Single `agents-net`** — rejected, this was a red-team Critical finding against the pre-revision design. **Single network with ICC disabled** via `driver_opts` (`com.docker.network.bridge.enable_icc`) — the mechanism exists but the exact key name is **UNVERIFIED**; per-agent networks need no such confirmation, which is why they are the primary form |
+| D2 | **One internal network per agent** (`claude-net`, `codex-net`, `agy-net`, each `internal: true`), mediator multi-homed onto all three plus the external network. **Amended at the 01.5 SF-7b build (2026-09-08): each agent network additionally declares an `ip_range` (`172.31.{10,20,30}.128/25`) inside its `/24`.** Without it Docker's dynamic allocation offers `.2` — the mediator's own static address — first, and because no `depends_on` orders the four services, `up --build` failed 3 of 3 with `failed to set up container networking: Address already in use`. Measured, then proved clean 3 of 3 (01.5 Deviation 19) | `internal: true` removes the default route but Docker bridge networks allow unrestricted container-to-container traffic on the same bridge. A shared `agents-net` gives *zero* cross-agent isolation while appearing to isolate. Containers on separate bridge networks cannot reach each other by name or IP | Three networks to declare and maintain instead of one; the mediator must be attached to each | **Single `agents-net`** — rejected, this was a red-team Critical finding against the pre-revision design. **Single network with ICC disabled** via `driver_opts` (`com.docker.network.bridge.enable_icc`) — the mechanism exists but the exact key name is **UNVERIFIED**; per-agent networks need no such confirmation, which is why they are the primary form |
 | D3 | **The mediator owns DNS.** Agent networks have no route to port 53 on the internet | R5.4. Filtering UDP/53 by destination is insufficient — both vendor reference firewalls do exactly that and both are documented as exfiltration-capable over DNS. Owning the resolver makes DNS tunnelling structurally impossible rather than filtered | The mediator becomes a hard dependency for name resolution; its failure is a full outage rather than a degraded one. **Amended at the 01.3 SF-5 build (2026-09-05): the pod resolver is TWO daemons, not one.** `dnsdist` 1.9.16 holds all of the policy — per-agent exact-match allowlist selected by the arriving subnet, QTYPE restricted to A/AAAA, non-canonical QNAMEs refused, everything else REFUSED and forwarded nowhere, every decision audited — and `unbound` sits behind it on loopback as the re-originating stage, because dnsdist proxies the client's packet and criterion 4 requires a fresh query with the client's EDNS options dropped. Tested, not assumed: unbound alone fails three of the six properties (`local-zone` is subtree-scoped, so "this name and nothing below it" has no expression; it has no QTYPE policy; it forwards a mixed-case QNAME verbatim). See `docs/records/resolver-verification.md` | **Filter UDP/53 by destination** — rejected, this is the documented hole. **Allow a public resolver** — rejected, same hole |
 | D4 | **TLS is spliced, never terminated**, for all three agents at first release. Destination validated at CONNECT via SNI; connection passed through undecrypted | R5.15. Required for Antigravity on ToS grounds (R5.13, D9); consistency avoids two trust models side by side; removes CA generation, distribution, rotation and per-agent trust-store config from a build that never scoped it | **No content-level DLP anywhere in the architecture.** The channels carrying 100% of prompt and completion content are inspected for hostname and byte count only. Remote MCP tool invocations to allowlisted hosts cannot be inspected or logged. Accepted; destination narrowing plus audit is the residual control. **Amended at the 01.3 build:** splice is intact — no destination TLS is terminated anywhere — but the AGENT-to-mediator hop is now TLS for `claude` and `agy` (criterion 6, SF-3), which is a second, unrelated TLS relationship and is why T28's pass text was amended to name the *destination* chain. `codex`'s hop stays plaintext because it rejects an `https://`-scheme proxy URL at parse time, and its single listener nevertheless carries a **bumping** certificate: Squid loads no signing context on a peeking port without `tls-cert=`, parses cleanly, and then declines to bump — the SNI control would enforce nothing. That certificate is never presented on an allowed path and `codex` never validates it (01.3 Deviation 5) | **TLS MITM for Claude Code and Codex, splice for `agy`** — rejected: runs two trust models, adds unscoped CA work, and buys URL-path granularity the requirements do not ask for. The mediator is positioned so termination can be added later without redesign (R15.2); R5.12 records the CA mechanisms (`NODE_EXTRA_CA_CERTS`, `CODEX_CA_CERTIFICATE`, `AWS_CA_BUNDLE`) against that later phase |
 | D5 | **Egress policy is three independent controls in order**: (1) default-deny allowlist of domains and CIDRs evaluated at CONNECT/SNI; (2) post-resolution CIDR denylist; (3) per-agent rate and concurrency limits | R5.2/R5.3/R5.5/R5.7. An allowlist alone breaks on CDN IP rotation and DNS rebinding, which an `ipset` snapshot taken at container start cannot catch. Rate limiting is the only control that bounds a runaway loop against the model API — a cost-exhaustion failure that generates *only allowlisted traffic* and is therefore invisible to controls 1 and 2 | Three evaluation stages per connection; the rate limiter needs per-agent identity to be meaningful (D6). **Amended at the 01.3 build, three ways.** (1) Control 3 ships **two of its three ceilings**: Squid 6.13 has no per-client connection-rate directive at all, so `connections_per_minute` was dropped from the schema rather than left to enforce nothing — `max_concurrent` and `bytes_per_second` are enforced, and the compiler now refuses an artifact that declares the third (Deviation 4). (2) Control 1 gained an **FQDN deny** (`deny_fqdns`), closing an R5.1 MUST that 01.1's approved contract had explicitly denied the need for. (3) **The order within control 1 is itself a control:** the per-agent allowlist gate is evaluated before the post-resolution address deny, because a `dst` ACL forces the mediator to RESOLVE the CONNECT host — an attacker-chosen name would otherwise be resolved through the mediator's own upstream, on no audit line, before being refused | **Allowlist only** — rejected, R5.7 requires the post-resolution check. **Denylist only** — rejected by R5.2: exfiltration succeeds to any host not on the list |
 | D6 | **Per-agent workload identity (mTLS) at the mediator is a hard precondition for any credential brokering**, not a later enhancement | R8.8, promoted to MUST at Gate 1. A mediator that injects an upstream credential because "a request arrived from the pod network" hands *every* agent *every* brokered credential — a textbook confused deputy, and because the mediator is also the policy decision point the resulting audit lines look legitimate. Brokering without caller identity is worse than no brokering | Identity issuance, rotation and lifecycle are real work inside the M1 estimate, not adjacent to it. Until it exists, brokering is mutually exclusive with a shared agent network and only one agent may be brokered per pod | **Broker on network origin** — rejected, the confused-deputy pattern above (red-team Critical finding). **Defer brokering entirely** — viable but forfeits R6.5 Model B, which Gate 1 selected |
 | D7 | **One state volume per agent; no shared volume, no shared build cache** | R4.3, R2.5, R2.10. Claude Code cannot read Codex's `auth.json` — a filesystem property, and with D2 a network property too. A cache shared across agents is a cross-agent write channel | Duplicated package/build caches cost disk and rebuild time | **Shared cache volume** — permitted by R2.10 only as a recorded accepted risk with blast radius stated. Not taken; the default is per-agent (`off` in the PRD configuration table) |
-| D8 | **`AUTH_MODE` is per agent**, one of `apikey` \| `oauth-interactive` \| `oauth-token` \| `oauth-mount`, defaulting to the safest mode each agent supports | R4.12. The agents are not symmetric: Claude Code's credential is macOS-Keychain-resident and not portable to a Linux container; Codex's `auth.json` is plain JSON and mountable; `agy` has no working OAuth env-var path (upstream issue open) | Four code paths in the entrypoint instead of one | **API key everywhere** — rejected, Claude Code and Codex subscription auth is OAuth. **OAuth everywhere** — rejected, `agy` takes `apikey` by decision D9 |
+| D8 | **`AUTH_MODE` is per agent**, defaulting to the safest mode each agent supports. **Amended at the 01.4 build (2026-09-07): the four modes are not uniformly available — the matrix is seven supported cells, not twelve.** `claude`: `apikey` \| `oauth-interactive` \| `oauth-token`. `codex`: `apikey` \| `oauth-interactive` \| `oauth-mount`, where the interactive cell requires `--device-auth` because plain `codex login` strands on an in-container callback port the host browser cannot reach. `agy`: `apikey` only (D9). An unsupported agent/mode pair and an unset `AUTH_MODE` both fail closed at exit 2. T24's pass criterion was amended in the same build to "no browser inside the container", replacing "no interactive terminal" | R4.12. The agents are not symmetric: Claude Code's credential is macOS-Keychain-resident and not portable to a Linux container; Codex's `auth.json` is plain JSON and mountable; `agy` has no working OAuth env-var path (upstream issue open) | Four code paths in the entrypoint instead of one | **API key everywhere** — rejected, Claude Code and Codex subscription auth is OAuth. **OAuth everywhere** — rejected, `agy` takes `apikey` by decision D9 |
 | D9 | **Antigravity authenticates by `GEMINI_API_KEY` only.** No Antigravity OAuth credential enters any container. TLS interception of `agy` traffic is permanently barred | Open Decision 2, settled at Gate 1 (R14.3). Google's Additional Terms §6 prohibits "using third party software, tools, or services to access the Service"; Google has suspended paid accounts without warning over it, and staff declined to clarify the boundary. The API-key route leaves the OAuth relationship entirely rather than proxying it | Routes to the public Gemini API on the operator's own billing rather than the Antigravity account quota — the accepted cost. **The route itself is UNVERIFIED**: the official install page documents it, a June 2026 maintainer statement says Gemini API keys are not supported. Must be tested against the pinned `agy` version; fallback is Antigravity OAuth with splice-only and no proxy tooling, which leaves the ToS question open rather than sidestepped. Requires `"modelProvider": "gemini"` in settings **and** the env var — the variable alone is a documented no-op | **Antigravity OAuth + splice** — the fallback, not the default. **Antigravity OAuth + MITM** — permanently barred (R5.13): arguably within the clause actually enforced against |
-| D10 | **The use-case profile drives the image build as well as the run.** OS packages are declared per pack, version-pinned, from a declared repository, installed at build time only. The agent process cannot invoke a package manager at runtime | R7.18/R7.19. This is what keeps R7.7 (checksum/signature verification, no `curl \| bash`), R7.16 and SC-8 (identical clean rebuild) satisfiable once packs may add OS packages | A profile change that touches packages is a rebuild, not a restart. Each profile pins to a distinct image digest, so "the image" is per-profile rather than universal | **Runtime `apt install` from a pack manifest** — rejected: defeats SC-8's reproducibility and R7.7's verification simultaneously, and hands a compromised agent a package manager |
+| D10 | **The use-case profile drives the image build as well as the run.** OS packages are declared per pack, version-pinned, from a declared repository, installed at build time only. The agent process cannot invoke a package manager at runtime. **Amended at the 01.5 build (2026-09-07/08), in three ways.** (1) A pack declares egress, OS packages and nothing else: `mounts`, `env` and `credentials` are validated and then **refused at exit 3**, naming a different landing point for each, because the resolved-policy schema has no field for them and a silently dropped declaration is indistinguishable from a correctly refused one (Deviation 5). (2) `git` is installed in the `agent-base` stage rather than supplied by a pack — a deliberate departure from the composition model this decision describes, because R2.9's host-gitconfig mount and its scrub script are *profile*-level features and are inert without a `git` binary, so a profile could enable them, pass every gate, and still mount a file nothing reads (Deviation 2). (3) A pack's declared version may be forced by the base image: `language-runtimes` declares node 22.23.2, the version `node:22-slim` ships, because installing the originally specified 20.18.1 alongside would leave two runtimes on `PATH` (Deviation 1) | R7.18/R7.19. This is what keeps R7.7 (checksum/signature verification, no `curl \| bash`), R7.16 and SC-8 (identical clean rebuild) satisfiable once packs may add OS packages | A profile change that touches packages is a rebuild, not a restart. Each profile pins to a distinct image digest, so "the image" is per-profile rather than universal | **Runtime `apt install` from a pack manifest** — rejected: defeats SC-8's reproducibility and R7.7's verification simultaneously, and hands a compromised agent a package manager |
 | D11 | **Recording and export are separate concerns.** A profile may disable an *export*; it cannot disable the underlying *recording* | R9.9 against R9.1/R9.7. The recording path is wired to the mediator and the audit sink, not to the profile's export toggles, so there is no profile setting that can switch recording off. Any disabled export is explicit and recorded | An operator who disables an export still pays the cost of recording | **One toggle for both** — rejected: makes R9.1's mandatory blocked-attempt logging profile-defeatable, and the blocked attempt is the detection signal |
 | D12 | **The audit log is written inside the mediator or shipped directly off-host — never to a volume an agent container can reach** | R9.1/R9.7 require recording outside the blast radius. Five Eyes L658: "Isolate agents into enclaves with no write access to logs." A log the agent can edit is not evidence | A mediator-local log shares the mediator's fate; off-host shipping adds a destination that must itself be allowlisted and governed. **Given a concrete form by 01.3 SF-7:** one JSON object per line, per connection attempt, allow and deny alike, carrying `agent`, `identity_source`, destination, resolved address, verdict, and — on a denial — the refusing control, a reason token and the policy path an operator edits. `identity_source` reads `listener` on every line at this milestone and says so, so a network-derived attribution is never later read as a cryptographic one (01.6 extends the enumeration). Non-verdict lines carry an `event` key and no `verdict` key, which is what lets a consumer select on `verdict` and see only verdicts. Two consequences worth naming: a bumping listener logs the CONNECT acceptance separately from the outcome, so the acceptance is emitted as an event rather than as an allow; and the mediator warms its own cascade at start (Deviation 10), which puts one such event per fronted agent on the trail under that agent's listener | **Shared log volume mounted into each agent** — rejected outright, puts the evidence inside the blast radius |
 | D13 | **AWS access uses Model B (brokered short-lived credentials), gated on D6.** Model C is prohibited | R6.5, R6.5.1. A container-resident SSO token entitled to the operator's permission sets gives a compromised agent organisation-wide access regardless of which config file is mounted. Model B is independently corroborated by the Five Eyes static-credential position — but only if the broker knows *which* agent is calling, which is D6 | Model B cannot be enabled until R8.8 is satisfied. Q1 (which accounts and services) and Q9 (whether a dedicated Identity Center principal can be created) are both open and both sit inside M1 | **Model A** (scoped SSO token for a *dedicated* Identity Center identity, R6.5.2) — the register rates it "acceptable, the simplest model that is actually bounded", but it is **not a fallback for a negative Q9**: R6.5.2 requires a dedicated Identity Center user or group just as Model B requires a principal to broker from. See the Q9 note below. **Model C** (operator's own identity, trimmed config) — prohibited by R6.5.1: "the appearance of scoping without the substance" |
@@ -68,13 +68,13 @@ framing is carried verbatim from the options analysis and is the honest summary 
 | **`codex` container** | Runs OpenAI Codex CLI non-interactively (`codex exec`, R3.2). Pinned, auto-update disabled. `features.network_proxy` **off by default** (D14 as amended); bubblewrap nesting **disabled** — it needs `SYS_ADMIN` + `seccomp=unconfined`, violating R1.4 (R3.8) | Attached to `codex-net` only. Mounts: project dir, `codex-state` volume. Requires `cli_auth_credentials_store = "file"` under `oauth-mount`. **Egress needs `Upgrade` permitted on TCP/443** — Codex defaults to WebSocket transport and silently degrades otherwise (R5.9). Client cert for mTLS (D6) — **target state, Feature 01.6** |
 | **`agy` container** | Runs Google Antigravity via the `agy` CLI non-interactively (R3.3). GUI explicitly not containerized (R3.4). `--sandbox` **off by default** (D14 as amended) | Attached to `agy-net` only. Mounts: project dir, `agy-state` volume. Env: `GEMINI_API_KEY` **and** `"modelProvider": "gemini"` in settings (D9 — env var alone is a documented no-op). **Exit status is read from the JSON `status` field, not the exit code** — `agy` soft-denies unapproved tools and still exits 0 (R3.6). Client cert for mTLS (D6) — **target state, Feature 01.6** |
 | **`egress-mediator` container** | The single enforcement point and the only path to the internet (R1.2). Five roles in one process boundary: L7 CONNECT/SNI policy evaluation, authoritative DNS for the pod, audit writer, mTLS terminator for agent identity, and (gated on D6) upstream credential broker. **Implementation selected and pinned at 01.3 SF-1: Squid 6.13 (`squid-openssl`), with `dnsdist` 1.9.16 and `unbound` 1.22.0 as the two-daemon resolver (D3) and a small `bash` audit writer.** `iron-proxy` was not taken. Every property the design rests on was verified against exactly these builds, which is why the versions and the base-image digest are pinned together — see `docs/records/mediator-selection.md` | Multi-homed onto `claude-net`, `codex-net`, `agy-net` and the external network. Exposes **exactly two ports to each agent network** — the proxy listener (3128) and the resolver (53, UDP and TCP) — and no management or metrics port (see [Mediator hardening](#mediator-hardening) below). **The proxy is five listeners, not three (01.3 Deviation 1):** Squid cannot both terminate the agent-to-mediator TLS hop and peek at the client's ClientHello on one port, so each TLS-fronted agent gets a front listener on its own network plus a peeking inner listener on **loopback inside the container**, and `codex`'s single plaintext listener does both. The inner listeners are not reachable from any agent network, which is what keeps the cascade inside criterion 1's "exactly {proxy, resolver}" enumeration; the acceptance harness asserts it by port sweep from each agent network. Reads the resolved egress policy; writes the audit stream to the sink. Broker secrets and the listener certificates injected at runtime through Compose `secrets:`, never baked into the image and never on an agent-reachable volume. **The CA private key is not injected at all — 01.3 SF-3 narrows issuance to an offline operator script and keeps the key on the operator host** |
-| **`claude-net` / `codex-net` / `agy-net`** | Per-agent isolation segments, `internal: true` — no default route, no DNS path to the internet (D2, D3) | Each carries exactly one agent container plus the mediator |
+| **`claude-net` / `codex-net` / `agy-net`** | Per-agent isolation segments, `internal: true` — no default route, no DNS path to the internet (D2, D3) | Each carries exactly one agent container plus the mediator. Each declares an `ip_range` inside its subnet so IPAM cannot allocate the mediator's static address to a starting agent (01.5 Deviation 19) |
 | **External network** (`egress-net`) | The mediator's only route out | Mediator only. No agent container is ever attached. **Declared but not a live Docker resource until 01.3 SF-4 attached the mediator to it** (01.2 Deviation 3, now closed): 01.2 could declare the network but nothing joined it, so its properties were unasserted for one feature |
 | **Per-agent state volumes** (`claude-state`, `codex-state`, `agy-state`) | Persist agent authentication and session history across container restart and image rebuild (R4.1, SC-4). One per agent, never shared (R4.3, D7) | Mounted into exactly one agent container each. Excluded from backups (R8.7). Hold long-lived refresh tokens — the accepted risk of R4.16 |
 | **Project mount** | The working directory — the only host directory mounted by default (R2.1). `:ro` where the agent only reviews (R2.7) | Bind mount, declared in the profile. Symlinks cannot escape the mount root (R2.6) |
 | **Use-case profile** | Version-controlled declaration of tool packs, mounts, `AUTH_MODE` per agent, OS packages and export toggles (R2.2, R7). Nothing is passed ad hoc on the command line | Input to both the policy compiler and the image build (D10). The unit SC-6 is measured against |
-| **Tool packs** (AWS CLI, Terraform, Kubernetes, language runtimes) | Composable capability units. Each declares its own egress entries, its OS packages (pinned, from a declared repository) and its mounts | Consumed by the policy compiler and the image build. Adding a pack must not require hand-editing the security policy (SC-6) |
-| **Policy compiler** | Composes the resolved egress policy from the profile plus its enabled packs, and emits it as a reviewable artifact. This is the mechanism that makes SC-6 true rather than aspirational | Reads profile + pack manifests; writes the resolved egress policy artifact consumed by the mediator. Startup self-check aborts on a corrupt policy (T17) — and it is **the same script** the mediator calls in `--validate` mode at start, so "valid" cannot mean two different things at the two ends. `--allowlist`/`--denylist` select alternate bases, which is how the acceptance harness compiles a test-scoped artifact without putting fixture hostnames into the discovery-derived allowlist (01.3 Deviation 11); every artifact records the bases it was built from |
+| **Tool packs** | Composable capability units. Each declares its own egress entries and its OS packages (pinned, from a declared repository). **A pack does not declare mounts, environment variables or credentials — all three are refused at exit 3 (01.5 Deviation 5).** Only `language-runtimes` is built (01.5 SF-1); Terraform, Kubernetes and GitHub CLI arrive at 02.3 and AWS CLI at 03.3 | Consumed by the policy compiler and the image build. Adding a pack must not require hand-editing the security policy (SC-6) |
+| **Policy compiler** | Composes the resolved egress policy from the profile plus its enabled packs, and emits it as a reviewable artifact. This is the mechanism that makes SC-6 true rather than aspirational. Emits every list `LC_ALL=C` sorted and deduplicated, because the drift gate is a byte comparison and an emitter whose output depends on input order makes that check fire on identical policy (01.5 Deviation 7). Exit codes are contractual: 1 invocation error, 2 validation failure, 3 refusal, 4 drift (01.5 Deviation 4). It also carries the project-mount containment gate, compared lexically rather than through `realpath` so it behaves identically on the host and in the compile stage (01.5 Deviation 3, SC-3) | Reads profile + pack manifests; writes the resolved egress policy artifact consumed by the mediator. Startup self-check aborts on a corrupt policy (T17) — and it is **the same script** the mediator calls in `--validate` mode at start, so "valid" cannot mean two different things at the two ends. `--allowlist`/`--denylist` select alternate bases, which is how the acceptance harness compiles a test-scoped artifact without putting fixture hostnames into the discovery-derived allowlist (01.3 Deviation 11); every artifact records the bases it was built from |
 | **Image build pipeline** (GitHub Actions → GHCR) | Builds the **base image** in CI and publishes it to GitHub Packages, emitting digest and SBOM (D21). Per-profile images layer packs and pinned OS packages on that base at build time only (R7.18/R7.19, D10). Source branch is the working branch during the project, `main` after completion | Defined in `.github/workflows/`. Reads the profile and pack manifests. Publishes to GHCR; consumers pin by **digest, never by tag** (R10.2). The digest plus SBOM is the artifact that makes SC-8 checkable rather than asserted |
 | **Agent action recorder** | Ships each agent's native session transcript off-container in real time to the audit sink, append-only: Claude Code JSONL session files, Codex session logs, `agy` JSON output. This is the component that carries R9.7; there is no interception of tool calls anywhere in the architecture (D20) | Reads the transcript path on each agent's state volume via the container logging driver or a sidecar tail. Writes to the audit sink only — never back to any agent-reachable path |
 | **Audit sink** | Holds the egress log and the agent action log outside every agent's blast radius (D12). Correlatable by session ID and timestamp (R9.8) | Written by the mediator (egress) and by the agent-action recorder. Never a volume shared with an agent container |
@@ -247,7 +247,15 @@ solutions/agent-containerization/
 │
 ├── compose/
 │   ├── compose.yaml               # networks (3× internal + external), mediator, 3 agent services
-│   └── overrides/<profile>.yaml   # profile-selected override — the R12.9 entry point
+│   └── overrides/                 # profile-selected overrides — the R12.9 entry point
+│       ├── <profile>.yaml
+│       ├── oauth-mount.bootstrap.yaml # :ro credential mount + AUTH_MODE. Publishes NO port
+│       ├── codex-callback.yaml    #   127.0.0.1:1455 forward, kept a SEPARATE fragment: a
+│       │                          #   fragment layers whole or not at all, so publishing here
+│       │                          #   would open a host port on the one invocation that is NOT
+│       │                          #   an interactive login (01.4 Deviation 4, R2.8)
+│       ├── build-cache.yaml       #   per-agent /build-cache, default off (R2.10)
+│       └── host-gitconfig.yaml    #   :ro scrubbed gitconfig, default off (R2.9)
 ├── images/
 │   ├── Dockerfile                 # ONE multi-stage build. agent-base is DEFINED here and built
 │   │                              #   only by CI (--target agent-base); the agent stages consume
@@ -283,14 +291,19 @@ solutions/agent-containerization/
 │                                  #   mawk emits nothing from a FIFO whose writer is still open)
 ├── profiles/
 │   ├── default.yaml               # project mount + state volumes only; every optional mount off
-│   └── <use-case>.yaml            # (not yet built — 01.5) packs, mounts, AUTH_MODE, OS packages
+│   ├── oauth-mount.yaml           # carries the accepted_risk record the bootstrap checks for
+│   │                              #   (01.4 Deviation 5) — the profile does not exist inside the
+│   │                              #   container, so the record travels with the material
+│   ├── test-fixtures.yaml         # harness fixture profile (01.3/01.5)
+│   ├── test-selfcheck.yaml        # startup self-check profile
+│   └── <use-case>.yaml            # (not yet built — 02.3) packs, mounts, AUTH_MODE, OS packages
 ├── packs/
 │   ├── README.md                  # manifest schema; the no-runtime-egress decision; the checksum
 │   │                              #   residual (01.5 Deviation 13) and what the removals cost
 │   ├── language-runtimes/pack.yaml # BUILT (01.5 SF-1). Node, Python, Go; build-time only
-│   ├── aws-cli/pack.yaml          # (not yet built — 02.3)
 │   ├── terraform/pack.yaml        # (not yet built — 02.3)
-│   └── kubernetes/pack.yaml       # (not yet built — 03.3)
+│   ├── kubernetes/pack.yaml       # (not yet built — 02.3)
+│   └── aws-cli/pack.yaml          # (not yet built — 03.3)
 ├── policy/
 │   ├── allowlist.base.yaml        # seeded per D17, cross-validated, never vendor-copied (R5.8)
 │   ├── denylist.base.yaml         # metadata endpoint, RFC1918, link-local, loopback (R5.6)
@@ -327,6 +340,10 @@ solutions/agent-containerization/
 │   # multi-stage `images/Dockerfile` with `target:` selection.
 ├── scripts/                       # bash, `set -euo pipefail`, invoked as `bash script.sh`
 │   ├── compile-policy.sh          # profile + packs → policy/resolved/
+│   ├── compile-policy-build.sh    # host wrapper: regenerates the artifacts THROUGH the mediator
+│   │                              #   build (01.5 SF-4), which is why the drift gate cannot live
+│   │                              #   in the emitting stage — it would fail on the only occasion
+│   │                              #   the wrapper is ever run (01.5 Deviation 10)
 │   ├── build.sh                   # per-profile image build (01.5 SF-6, SC-8). Drives the SAME
 │   │                              #   Compose files as the entry point, tags the agent images
 │   │                              #   :<profile>, records image IDs to .build-scratch/build/.
@@ -335,6 +352,10 @@ solutions/agent-containerization/
 │   ├── scrub-gitconfig.sh         # HOST-side pre-mount git-config scrub (01.4 SF-1, R2.9/T22).
 │   │                              #   Writes compose/generated/gitconfig.d/; the operator's own
 │   │                              #   ~/.gitconfig is never mounted into any container
+│   ├── stage-oauth-mount.sh       # HOST-side oauth-mount staging (01.4 Deviation 5): validates
+│   │                              #   the five accepted_risk fields, refuses a rw source and a
+│   │                              #   Keychain-backed host install, strips OPENAI_API_KEY as a
+│   │                              #   test-validity control, writes compose/generated/oauth-src/
 │   ├── validate-boundary.sh       # (not yet built — M2) runs the adversarial matrix (R12.8)
 │   ├── lint-policy.sh             # feature test command (01.1); policy/*.yaml well-formedness only
 │   ├── issue-identity.sh          # OFFLINE CA + listener certificates (01.3 SF-3). Runs on the
@@ -342,7 +363,9 @@ solutions/agent-containerization/
 │   ├── verify-agent-clients.sh    # 01.1 SF-2's client-capability probe
 │   └── install-deps.sh            # host dependency check/install (docker, openssl, curl, jq, yq, sbx); macOS + Linux (01.1)
 ├── tests/
-│   ├── acceptance/                # T1–T20 plus the extension proposed below
+│   ├── acceptance/                # T1–T45. verify-pod-topology.sh (01.2), verify-egress-
+│   │                              #   mediator.sh (01.3), verify-auth-state.sh (01.4, 56
+│   │                              #   assertions across phases A–E)
 │   │   ├── verify-pod-topology.sh       # 01.2's test command
 │   │   └── verify-egress-mediator.sh    # 01.3's test command: phases A–G, 77 assertions
 │   └── fixtures/                  # destinations the harness OWNS: a controlled authoritative DNS
@@ -394,8 +417,18 @@ constrains every target in the file, not just the reachable ones.
 
 ### Entry point
 
-`docker compose` with a profile-selected override file (R12.9). No wrapper CLI is built — the
-operator sees exactly what runs. Onboarding documentation covers the compose invocation directly
+`docker compose up --build --force-recreate` with a profile-selected override file (R12.9). No
+wrapper CLI is built — the operator sees exactly what runs.
+
+**Both flags are load-bearing, and `--force-recreate` was added unconditionally at the 01.5 SF-7b
+build (Deviation 20).** SF-4 fixed the stale *image*; this fixes the stale *container*. Measured:
+after editing `profiles/default.yaml` and refreshing the artifact, `up --build` exited 0 and the
+mediator image ID changed, but Compose reported the container `Running` rather than recreated —
+and the mediator went on serving `compiled_from.packs: 1` against a committed artifact of `0`.
+SC-6, R12.1 and D10 are halves of one requirement, so the amendment is unconditional rather than
+confined to the refresh procedure. The cost is stated in `README.md`: in-flight proxy and DNS
+connections break, startup checks re-run, `/run` and `/tmp` are dropped and container IDs rotate;
+named volumes and the audit volume are preserved — checked, not assumed. Onboarding documentation covers the compose invocation directly
 plus first-run authentication for all three agents and AWS SSO (R12.6).
 
 ### Build and bring-up sequence
@@ -404,8 +437,10 @@ This is the ratified sequence. Steps 0–2 are prerequisites to building the pod
 preliminaries.
 
 0. **Assess Docker Sandboxes as a service provider** (R14.1) — what its proxy observes, retention
-   period for intercepted traffic, deletion and breach-notification terms. **Not done.** Until it
-   is, step 1 runs constrained.
+   period for intercepted traffic, deletion and breach-notification terms. **Attempted and
+   incomplete (01.1 SF-1): Docker's own documentation neither confirms nor denies that the `sbx`
+   proxy decrypts traffic, and publishes no retention, deletion or breach-notification terms.**
+   Step 1 therefore runs constrained unconditionally, on whichever reading is correct.
 1. **Discovery run, not a production session.** Stand up Option 1 under its `locked-down` mode
    plus a minimal seed allowlist and widen only on observed failure. Not `balanced`, which starts
    at maximum permitted access and would run the agents at their widest policy against real code —
@@ -416,11 +451,13 @@ preliminaries.
    Cross-validate against a second source (agent verbose logging, or `tcpdump` on the mediator
    during a shadow run). Provisional until both agree (D17).
 3. **Build Option 2** with that policy, satisfying both preconditions: per-agent workload identity
-   (R8.8, D6) and per-agent network isolation (D2). Native agent sandboxes enabled inside as
-   defence in depth (D14).
+   (R8.8, D6) and per-agent network isolation (D2). Native agent sandboxes **disabled by default**
+   inside the container (D14 as amended at the 01.2 build: bubblewrap cannot create or use a
+   nested namespace under D15's hardened posture, and any seccomp exception broad enough to
+   permit nesting is itself an R1.4 violation).
 4. **Test the boundary adversarially before any real work** (R12.8, D16). Everything before this
    validates that the allowlist is *sufficient*; nothing yet validates that the boundary is
-   *effective*. Run T1–T20 and at minimum the six R12.8 scenarios. Record which injection sources
+   *effective*. Run T1–T45 and at minimum the six R12.8 scenarios. Record which injection sources
    from the threat model are exercised and which are not — on the current design the stdio MCP
    vector is not, because it never crosses the enforcement point.
 5. Re-evaluate Option 3 only if the threat model changes.
@@ -433,6 +470,18 @@ preliminaries.
 Four artifacts, produced by default, exported by default (R9.9, D11): the egress audit log, the
 agent action log, the resolved egress policy, and the image digest plus SBOM. Recording is
 mandatory and not profile-disableable; only export is.
+
+**That is the target state. As of Feature 01.5 two of the four are complete** — stated here so an
+absent artifact is not mistaken for a produced one.
+
+| Artifact | Status as built |
+|---|---|
+| Egress audit log | **Produced** (01.3). One JSON object per line on a volume mounted into the mediator alone. Residual: raw-socket egress attempts are invisible to it — recorded, not fixed |
+| Agent action log | **Not built.** Feature 02.1 |
+| Resolved egress policy | **Produced** (01.5). Four artifacts under `policy/resolved/`, emitted by a build stage behind the fail-on-drift gate |
+| Image digest + SBOM | **Partial.** Digest and SPDX SBOM exist for the CI-published base image only; a local agent build records an image ID and no SBOM, because the buildx `docker` driver rejects attestation. Provenance verification (T45) is Feature 02.4 |
+
+The per-export disable mechanism D11 describes is itself unbuilt — it is T36, in Milestone 02.
 
 Denials are surfaced to the operator with a clear message naming the blocked destination (R9.3,
 R12.2), so a legitimate policy gap is distinguishable from an attack. Detection is **pull-based
@@ -470,6 +519,14 @@ enforcement path before it reports itself up (R9.5, T17):
   policy they borrow. Skippable **only** through an explicit `startup_check.offline: true`, which
   is recorded on the audit trail at every start.
 
+**Agent bootstrap is deliberately not fatal at start.** `bootstrap-auth.sh --at-start` warns on
+stderr and exits 0 when a credential is absent, reserving exit 3 for explicit invocation; an unset
+or unsupported `AUTH_MODE` still exits 2 in both passes, and `oauth-mount` on an emptied volume
+still exits 3 in both. The flat reading would make `docker compose up` fail on a fresh volume
+under the default profile — all three agents exit non-zero — taking the pre-existing 01.2 topology
+harness down with it, and this feature's own composite test command requires that harness.
+Operator decision at the 01.4 build (Deviation 2): warn, do not block.
+
 ### Reproducibility
 
 The base image is built and published to GitHub Packages by GitHub Actions and consumed by
@@ -480,7 +537,20 @@ SBOM is emitted and where provenance attestation becomes practical (R10.7).
 
 The environment is defined entirely in version-controlled files with no manual setup steps
 (R10.1). Base image, agent versions and pack contents are pinned to versions or digests (R10.2);
-auto-updaters are disabled so a pinned build stays pinned (R10.3). The image builds without
+auto-updaters are disabled so a pinned build stays pinned (R10.3).
+
+Three mechanisms carry that pinning in practice, all settled at the 01.5 build. The pack set
+invalidates the image cache by **content** — the `pack-plan` stage's `COPY packs/ profiles/` is
+keyed on tree content — rather than through a `PACK_SET_HASH` build argument, which had no
+producer: Compose interpolates build arguments only from the environment and `--env-file`, and a
+hand-maintained hash that is never recomputed is exactly the stale-cache failure such an argument
+exists to prevent (Deviation 12). `MEDIATOR_PROFILE` tracks `AGENT_PROFILE` in `compose.yaml`, so
+one variable selects both the agents' pack set and the mediator's enforced policy; before that,
+`AGENT_PROFILE=oauth-mount docker compose up --build` built agent images for one profile's pack
+set while enforcing another's policy, with no surface reporting the mismatch (Deviation 16). And
+**a build argument only has effect in a stage that is still built locally**: once the agent stages
+consume the published base `FROM ghcr.io/...@sha256:<digest>`, BuildKit skips the unreferenced
+local `agent-base` stage, so a `--build-arg` aimed at it reaches nothing (Deviation 17). The image builds without
 network access outside the declared build allowlist (R10.4). A documented update path re-verifies
 the policy after each agent version bump, because agent egress requirements change between
 releases (R10.6).
@@ -519,9 +589,26 @@ granting `NET_ADMIN` to a container so it can firewall itself.
 
 ### Authentication and access control
 
-Per-agent `AUTH_MODE` (D8) with per-agent state volumes (D7). Mutual TLS gives each agent a
-distinct workload identity at the mediator (D6) — the precondition for both credential brokering
-and audit attribution. AWS uses brokered short-lived credentials (Model B, D13); Model C is
+Per-agent `AUTH_MODE` (D8) with per-agent state volumes (D7). **Amended at the 01.3 and 01.4
+builds: identity is not uniform, because mutual TLS is not available to every agent.** `claude`
+presents a client certificate (`CLAUDE_CODE_CLIENT_CERT`/`_KEY`, confirmed at 01.1 SF-2). `codex`
+cannot — it rejects an `https://`-scheme proxy URL at parse time, before any TLS attempt — and
+`agy` reaches the TLS `CertificateRequest` stage with no certificate to offer. For those two,
+identity as built is **network-derived**: each sits alone on its own `internal: true` segment
+(D2), so the arriving network names the agent. The audit record carries this explicitly: D12's
+line format includes an `identity_source` field alongside `agent`, so a reader can tell which of
+the two mechanisms named a given entry. Network-derived identity is **not** sufficient for
+credential brokering, and D6's precondition is unchanged. `prd.md` records the consequence at the
+Gate 3 milestone revision: Milestone 03's credential brokering is restricted to cryptographically
+bound identities only.
+
+`REQUIREMENTS.md` R8.8 is unamended and still reads "each agent instance is issued a distinct
+workload identity", which a strict reading of network-derived identity does not satisfy. The
+disagreement is recorded rather than resolved: Codex finding F2 at the Feature 01.3 Gate 4 review
+raised it and it was closed as "recorded, not fixed here", and the escalation is written up in
+`docs/records/r8-8-identity-mechanism-gap-escalation.md`. **Feature 01.6 owns the resolution**
+and inherits the CA and issuance lifecycle narrowed at 01.3 SF-3; it does not create a second
+one. AWS uses brokered short-lived credentials (Model B, D13); Model C is
 prohibited outright (R6.5.1).
 
 Host credential stores are never mounted except under a recorded per-agent decision naming the
@@ -542,12 +629,39 @@ Each is a decision with its consequence stated, not an open item.
 |---|---|---|
 | `oauth-mount` from a second config directory on the operator's **own** provider account puts the whole account in the blast radius, with all-or-nothing revocation | R4.17 | R4.13/R4.14/R4.15 constrain the shape. Alternative modes remain available per agent. **Deliberate asymmetry with R6.5.1**, which prohibits the structurally identical Model C for AWS — differs by decision, not oversight |
 | No content-level DLP anywhere in the architecture | R5.15 | TLS is spliced, so the mediator sees destinations, not payloads. Positioned to add termination later without redesign (R15.2). R5.13 keeps Antigravity permanently exempt on ToS grounds |
-| Long-lived refresh tokens persist on state volumes; a one-year Claude Code token is available | R4.16 | Per-agent volumes (R4.3), secret handling (R4.7), tested revocation (R8.5, R13.1), backup exclusion (R8.7). Review trigger: brokered agent credentials becoming available from any provider |
+| Long-lived refresh tokens persist on state volumes; a one-year Claude Code token is available | R4.16 | Per-agent volumes (R4.3), secret handling (R4.7), tested revocation (R8.5, R13.1), backup exclusion (R8.7). **Measured at 01.4 SF-5: rotation is not a revocation mechanism** — a superseded refresh token replayed successfully against the same account, so only explicit provider revocation ends a captured one (OpenAI measured; Anthropic not replayed). Review trigger: brokered agent credentials becoming available from any provider |
 | Exfiltration through legitimately allowlisted destinations cannot be prevented | Non-Goal | Structural. An agent allowed to reach GitHub can push to GitHub. Narrowed allowlist plus audit bounds and detects it; nothing eliminates it |
 | Prompt injection itself is not mitigated | Non-Goal (R15.1) | No component inspects agent input. The architecture bounds consequences rather than preventing the injection. R15.2 keeps the seam for a later tool-call mediation layer |
 | **`codex` cannot distinguish a policy gap from an attack in-band.** Its listener peeks, so every refusal reaches it as a terminated connection with no body | R9.3 | The audit record — which Interface Contract 6 already makes the authoritative half — names the destination, the control and the reason. `claude` and `agy` still get the 403 body on pre-CONNECT verdicts. Closing it would mean giving `codex` a non-bumping front listener, which is the cascade its plaintext hop exists to avoid, and would still produce no body once the peek stage runs |
 | **Control 3 ships two of its three ceilings.** Concurrency and byte rate are enforced; connection *rate* is not | D5, R5.x | Squid 6.13 has no per-client connection-rate directive at all. The alternatives were an external helper process inside the enforcement point or a policy key that silently enforces nothing; the field was dropped and the compiler now refuses an artifact that declares it, so the gap is visible rather than assumed away |
+| **The declared-checksum guarantee covers three packages, not the installed set.** `apt-get install --no-install-recommends python3 python3-venv git` resolves to **40** packages; the manifest declares 3 with `sha256` values | R7.3, D10 | The transitive closure installs under a pinned snapshot repository whose `InRelease` signature and full key fingerprint are asserted at build (`VALIDSIG B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8`, the fingerprint `profiles/default.yaml` pins), so closure integrity rests on the signature rather than on per-package hashes. `jq` moved into this category at 01.5 SF-5. Recorded as a residual against R7.3 in `packs/README.md` (01.5 Deviation 13) |
 | Recovery to known-good is the weakest of the three options | D1, R13.3 | Accepted in exchange for L7 FQDN correctness, extensibility and a self-owned audit trail. Mitigated by the discard-and-rebootstrap path (D16) |
+
+### What the 01.5 adversarial pass changed
+
+The policy compiler was put through an external adversarial review (Codex, 2026-09-08). Seven
+findings, all seven reproduced before being fixed. Two belong here because they change what the
+compiler is trusted for.
+
+- **A regression the feature itself introduced.** The accumulator encodes each entry as
+  `fqdn|port|upgrade|source`. Base-supplied `port` and `upgrade` values were not shape-checked, so
+  a base allowlist entry whose `port` was a block scalar emitted a second, well-formed, **allowed
+  destination the base allowlist never contained** — and compile exited 0 with the artifact
+  validating. Recorded as a rule: introducing an internal encoding retroactively makes every value
+  that flows into it security-relevant. A second finding ran the same direction —
+  `egress_exclusions` written as a map made every exclusion lapse, including R10.3's auto-updater
+  exclusion. Verification for this deviation: 12 new probes on top of the original 41 — 53 in
+  total, 0 failures — with emitter output byte-identical before and after.
+- **Provenance could select its own code path.** The compile stage copies a committed artifact
+  through unchanged when the bases it names are absent, which is how harness fixtures survive a
+  `.dockerignore` that deliberately excludes them. In the first version the artifact's own
+  `compiled_from` line chose that branch, so one spoofed provenance line sent the shipped profile
+  down the copy path and the image enforced the tampered policy — reproduced end to end. The
+  predicate is now a code constant. The residual is stated rather than closed: drift is trivially
+  satisfied for a carried artifact, so `--check` must be run on both fixture artifacts explicitly
+  (01.5 Deviations 8 and 9).
+
+All three resolved artifacts remain `--check` current after the pass.
 
 ### Controls this architecture does not provide
 
@@ -676,7 +790,7 @@ downstream, named here so it is not discovered late.
 | **Whether `agy` can run under `sbx` at all** | **Resolved (01.1 SF-3, 2026-09-04) — yes.** No first-class `sbx` template exists for `agy` (only `gemini`, a different tool), but `agy` installs and executes successfully inside a generic `sbx` `shell` sandbox — not structurally barred, only lacking a template. See `docs/records/egress-discovery.md` | Was the plan's worst-case edge case (verbose-log-only fallback for `agy`); did not materialize — `agy`'s allowlist entries are fully cross-validated via a real `sbx` capture, same as `codex` | Recorded, 01.1 SF-3 |
 | **`sbx` first-party kits can bypass the operator's own network policy** | **New finding (01.1 SF-3, 2026-09-04).** `sbx`'s `claude-code-docker` template bakes in a non-removable allow rule for 6 Anthropic-family hosts regardless of the global `deny-all` policy; the generic `shell` template does the same for `openrouter.ai` (a non-approved 4th provider). `codex-docker` carries no such rule. See `docs/records/egress-discovery.md` | Limits `sbx` as a *discovery* tool: it can confirm a host is used, but cannot prove a kit-covered host is unneeded, since it is never actually blocked-and-observed. Does not affect 01.3's own mediator (a separate, custom-built component) | 01.3 design awareness |
 | **`sbx` first-party templates bundle their own agent version, independent of operator pins** | **New finding (01.1 SF-3, 2026-09-04).** `claude-code-docker` and `codex-docker` shipped `2.1.246`/`0.149.1` against SF-2's pins of `2.1.260`/`0.152.1`. No template flag selects a version; re-pinning in place worked (`claude install <version>`; `npm install -g @openai/codex@<version>`) but is a manual step per capture. See `docs/records/egress-discovery.md`, "Correction" | If `sbx` is ever considered as a *runtime* substrate (not just a discovery tool), R10.6's version-pin requirement needs an explicit re-pinning step per template refresh — the template will otherwise drift silently | 01.2/01.3 design awareness, if `sbx` is ever proposed as more than a discovery tool |
-| **Per-session refresh-token revocation, per provider** | UNVERIFIED | Whether a second config directory on the same account is meaningfully separable. Until confirmed it is not — which is what makes R4.17 an accepted risk rather than a mitigation | Build |
-| **Refresh-token rotation semantics, per provider** | UNVERIFIED | The failure most likely to make a host-credential mount unworkable in daily use regardless of security posture. Belongs in the test plan | Build |
+| **Per-session refresh-token revocation, per provider** | **Resolved (01.4 SF-5, 2026-09-07) — negatively, which is the answer that matters.** A superseded refresh token was replayed against the same account minutes after the legitimate client had refreshed past it, and it **worked**: parent `51ffa144` refreshed to `f0952196` on one run and to `1ffe309a` on the next. A refresh in one client does **not** invalidate another client's copy. Measured for **OpenAI**; **Anthropic was not replayed**, by operator decision. Rotation is therefore not a revocation mechanism — a refresh token captured from a state volume stays valid until the provider is told to revoke it | A second config directory on the same account is **not** meaningfully separable, which is exactly what keeps R4.17 an accepted risk rather than a mitigation — this row anticipated it, and the measurement confirms it. Outstanding: the one-year `CLAUDE_CODE_OAUTH_TOKEN` minted for the R4.16 cell is still to be revoked | Recorded, 01.4 SF-5 |
+| **Refresh-token rotation semantics, per provider** | **Resolved (01.4 SF-3, 2026-09-07) — measured, not assumed.** Both providers **roll** the refresh token on refresh: `claude`'s `refreshToken` and `codex`'s `tokens.refresh_token` both changed, each cross-validated against a mediator audit line for the refresh endpoint. Two asymmetries follow. `claude`'s `refreshTokenExpiresAt` is **not** extended by a refresh — the same absolute instant before and after — so the family expires roughly 28 days after the original login however often it refreshes. `codex`'s refresh trigger is the access token's own 10-day JWT `exp`, not the `last_refresh` field (backdating that, and the `id_token` exp, was inert), and `codex` does not verify that JWT's signature locally | Nothing further. `oauth-mount` is confirmed a one-shot bootstrap. Recorded in `docs/records/agent-verification.md` and `docs/records/credential-inventory.md` | Recorded, 01.4 SF-3 |
 | **CIS Docker Benchmark 1.8.0 Container Runtime section** | Not extracted | A per-recommendation applicability table against R1 | Documentation |
 | **`README.md` drift** | **Resolved (01.3, 2026-09-07).** The "Out of Scope" section was corrected as the features landed; the bring-up now carries all three listener certificates and the R12.2 denial-troubleshooting section | Nothing | Recorded, 01.3 |
