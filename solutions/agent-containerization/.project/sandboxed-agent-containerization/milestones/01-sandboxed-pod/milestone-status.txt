@@ -534,12 +534,42 @@
     find it in codex's.
     BOTH EXISTING HARNESSES RE-RUN, this feature's standing obligation since SF-4:
     verify-pod-topology.sh ALL CHECKS PASSED (including the new build-cache check and the mount-set
-    equality that proves the default profile is unaffected) and verify-egress-mediator.sh ALL
-    PHASES PASSED, both against the rebuilt images. lint-policy.sh exits 0 and all three committed
+    equality that proves the default profile is unaffected) and verify-egress-mediator.sh 77/77,
+    0 failures, ALL PHASES PASSED, both against the rebuilt images. The 77 was OBSERVED here, not
+    inherited from SF-4's record: the first run's captured output held only its last 22 lines, so
+    the harness was re-run with full capture rather than have the count asserted from memory. lint-policy.sh exits 0 and all three committed
     artifacts are still --check current. `oauth-mount --check` exits 4 and that is PRE-EXISTING,
     attributed rather than assumed: no oauth-mount artifact has ever been committed, and SF-4
     established that a missing artifact under --check exits 4 because absent is the limiting case
     of different.
+    THE PER-PROFILE IMAGE IS A SEAM WITH NO CALLER YET, recorded rather than implied. The agent
+    build takes a PROFILE build arg (D10's per-profile image) and compose interpolates it from
+    AGENT_PROFILE, defaulting to `default`. NOTHING SETS IT: no override fragment passes a profile
+    to the agent build, so layering compose/overrides/oauth-mount.bootstrap.yaml builds agent
+    images for the DEFAULT profile's pack set. That is harmless exactly because SF-3's operator
+    decision gave both shipped profiles identical pack sets, and it would stop being harmless the
+    moment a profile selected different packs. SF-6's scripts/build.sh is the per-profile build
+    that drives the seam -- the Files-to-Modify table already puts per-profile image builds there.
+    The interpolation is AGENT_PROFILE and deliberately not PROFILE, which is a common shell
+    variable; a stray host value would otherwise select a pack set. The failure would at least be
+    LOUD -- pack-plan.sh refuses an unresolvable profile at exit 2 rather than compiling an empty
+    plan -- but a build that fails on the operator's ambient environment is still a bad seam.
+    ONE MORE PACKAGE RIDES THE SIGNED CHAIN RATHER THAN A MANIFEST HASH, and SF-5 is what moved
+    it: agy's `jq`. apt-pinned.sh makes the pinned snapshot the image's ONLY apt source, so jq now
+    comes from the snapshot instead of the rolling archive -- strictly more reproducible than
+    before, still not manifest-pinned. Three packages are hash-declared (python3, python3-venv,
+    git); jq and every transitive dependency are covered by the signature and the signed index.
+    Recorded on Deviation 13 so the count stays honest.
+    DEVIATION 11's IMPACT WAS CORRECTED AFTER REVIEW, before the sub-feature closed. Its first
+    draft said SF-7 Phase A "covers both build contexts rather than one" -- but the whole point of
+    the deviation is that there is now ONE context, shared, and it legitimately contains
+    images/mediator/, mediator/config/, policy/ and scripts/compile-policy.sh because the mediator
+    build needs them. None is a secret and the trailing-deny block still keeps mediator/identity/
+    and references/ out, but Contract 5's "the agent images never copy policy/, mediator/ or any
+    identity path" is no longer separable at the context level and must be asserted against the
+    built IMAGE -- which is what Contract 5 already says Phase A does. The tempting wrong reading,
+    written down because it was TRUE before this deviation and is FALSE after it: "the context no
+    longer contains control-plane paths, so the agent images cannot have them."
     Codebase assessment still ABSENT; refresh skipped with a warning, as at SF-1..SF-4.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the

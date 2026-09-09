@@ -191,7 +191,14 @@ services:
       args:
         CLAUDE_VERSION: ${CLAUDE_VERSION}
         CLAUDE_SOURCE: ${CLAUDE_SOURCE}
-        PROFILE: ${PROFILE:-default}
+        # Which profile's pack set this image is built with (D10, 01.5 SF-5). Interpolated
+        # from AGENT_PROFILE and NOT from PROFILE: `PROFILE` is a common shell variable and a
+        # stray value in the operator's environment would silently select a different pack set
+        # here. The Dockerfile's ARG keeps its own name. NOTHING SETS THIS TODAY -- the two
+        # shipped profiles select identical pack sets by operator decision at SF-3, so the
+        # default is correct for both; SF-6's scripts/build.sh is the per-profile build that
+        # drives it.
+        PROFILE: ${AGENT_PROFILE:-default}
         SNAPSHOT_URL: ${SNAPSHOT_URL}
         SNAPSHOT_SUITE: ${SNAPSHOT_SUITE}
         SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
@@ -240,7 +247,14 @@ services:
       args:
         CODEX_VERSION: ${CODEX_VERSION}
         CODEX_SOURCE: ${CODEX_SOURCE}
-        PROFILE: ${PROFILE:-default}
+        # Which profile's pack set this image is built with (D10, 01.5 SF-5). Interpolated
+        # from AGENT_PROFILE and NOT from PROFILE: `PROFILE` is a common shell variable and a
+        # stray value in the operator's environment would silently select a different pack set
+        # here. The Dockerfile's ARG keeps its own name. NOTHING SETS THIS TODAY -- the two
+        # shipped profiles select identical pack sets by operator decision at SF-3, so the
+        # default is correct for both; SF-6's scripts/build.sh is the per-profile build that
+        # drives it.
+        PROFILE: ${AGENT_PROFILE:-default}
         SNAPSHOT_URL: ${SNAPSHOT_URL}
         SNAPSHOT_SUITE: ${SNAPSHOT_SUITE}
         SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
@@ -280,7 +294,14 @@ services:
         AGY_VERSION: ${AGY_VERSION}
         AGY_URL: ${AGY_URL}
         AGY_SHA512: ${AGY_SHA512}
-        PROFILE: ${PROFILE:-default}
+        # Which profile's pack set this image is built with (D10, 01.5 SF-5). Interpolated
+        # from AGENT_PROFILE and NOT from PROFILE: `PROFILE` is a common shell variable and a
+        # stray value in the operator's environment would silently select a different pack set
+        # here. The Dockerfile's ARG keeps its own name. NOTHING SETS THIS TODAY -- the two
+        # shipped profiles select identical pack sets by operator decision at SF-3, so the
+        # default is correct for both; SF-6's scripts/build.sh is the per-profile build that
+        # drives it.
+        PROFILE: ${AGENT_PROFILE:-default}
         SNAPSHOT_URL: ${SNAPSHOT_URL}
         SNAPSHOT_SUITE: ${SNAPSHOT_SUITE}
         SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}

@@ -1304,7 +1304,23 @@ versus compile stage (two `yq` versions, two platforms) and now two `bash` versi
   `mediator/identity/ca/mediator-ca.key` and `references/` are absent -- covers both build
   contexts rather than one. The root `.dockerignore`'s own comment ("`images/.dockerignore`
   governs the AGENT builds ... both files are needed") is now false and is corrected in the same
-  commit. `!images` sits above the trailing-deny block, so `mediator/identity` and `references`
+  commit.
+
+  **A correction to the sentence above, and an obligation it creates for SF-7.** There are no
+  longer *two* contexts for Phase A to cover -- there is ONE, shared by both builds, and that
+  changes what Phase A can prove. The single context legitimately contains `images/mediator/`,
+  `mediator/config/`, `policy/` and `scripts/compile-policy.sh` alongside `packs/` and
+  `profiles/`, because the mediator build needs them; none is a secret, and the trailing-deny
+  block still keeps `mediator/identity/` and `references/` out. So Contract 5's rule -- "the agent
+  images copy `packs/` and `profiles/` ... and **never** `policy/`, `mediator/` or any identity
+  path" -- is no longer separable at the context level and **must be asserted against the built
+  IMAGE**, which is what Contract 5 already says Phase A does ("SF-7 Phase A asserts that against
+  the built images, not against the Dockerfiles"). The division of labour for SF-7 Phase A is
+  therefore: the CONTEXT assertion (the CA private key and `references/` are absent) is now one
+  assertion covering both builds rather than two, and the IMAGE assertion is what discriminates
+  agent from mediator. Written down because the obvious reading -- "the context no longer contains
+  control-plane paths, so the agent images cannot have them" -- was true before this deviation and
+  is false after it. `!images` sits above the trailing-deny block, so `mediator/identity` and `references`
   stay denied. SF-6's `scripts/build.sh` and CI job must use the root context for agent builds as
   well as for the mediator, which is one context for the whole solution rather than two.
 
@@ -1356,3 +1372,12 @@ versus compile stage (two `yq` versions, two platforms) and now two `bash` versi
   stays true as written. If a future pack needs closure-level pinning, the mechanism is a
   `.deb`-level lockfile, which is a manifest-schema change and therefore SF-1's, not an install-
   step change.
+
+  **`jq` is a fourth package in this category, and it moved into it at SF-5.** The `agy` stage
+  installs `jq` for `agy-run.sh`'s status-field gating (01.2), and it is declared by no manifest
+  and carries no recorded hash. Before SF-5 it came from the rolling `deb.debian.org` archive;
+  `images/apt-pinned.sh` makes the pinned snapshot the image's ONLY apt source, so `jq` now comes
+  from the snapshot and rides exactly the chain described above -- strictly more reproducible than
+  it was, and still not manifest-pinned. Named here so the count is honest: three packages are
+  hash-declared (`python3`, `python3-venv`, `git`) and everything else in the image, `jq`
+  included, is covered by the signature and the signed index.
