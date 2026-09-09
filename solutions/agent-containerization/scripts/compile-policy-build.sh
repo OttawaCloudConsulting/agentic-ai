@@ -36,7 +36,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-[[ "${1:-}" != "-h" && "${1:-}" != "--help" ]] || { sed -n '2,28p' "${BASH_SOURCE[0]}"; exit 0; }
+# The help text is the header comment, found by shape rather than by a line range: a range
+# silently stops matching the moment the header grows, which is exactly what happened when
+# the LIMIT paragraph was added below line 28 and never appeared in --help.
+[[ "${1:-}" != "-h" && "${1:-}" != "--help" ]] || { awk 'NR>1 && /^#/ {print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0; }
 [[ $# -eq 0 ]] || { echo "compile-policy-build: unknown argument: $1" >&2; exit 1; }
 
 command -v docker >/dev/null 2>&1 \
@@ -45,12 +48,20 @@ command -v docker >/dev/null 2>&1 \
 # The same pins Compose passes, so the refresh runs against the image the pod runs.
 # Absent, the Dockerfile's own ARG defaults apply and are the same values -- which is
 # what keeps a bare `docker build` reproducible.
+# pins.env is READ AS DATA, never sourced. It was sourced here at first (`set -a; . file`),
+# which made a Compose data file executable shell during a policy refresh -- appending a line
+# to it ran that line on the host (Codex adversarial pass, 2026-09-08, finding 2). Compose
+# itself parses --env-file as KEY=VALUE, so sourcing was never the format's own contract;
+# this reads the four keys the same way Compose would.
 BUILD_ARGS=()
 if [[ -f compose/pins.env ]]; then
-  # shellcheck disable=SC1091
-  set -a; . compose/pins.env; set +a
   for a in MEDIATOR_BASE_DIGEST YQ_VERSION YQ_SHA256_ARM64 YQ_SHA256_AMD64; do
-    [[ -z "${!a:-}" ]] || BUILD_ARGS+=(--build-arg "$a=${!a}")
+    # Last assignment wins, matching Compose. Surrounding quotes are stripped because the
+    # env-file format allows them and a literal quote in a digest would fail the build in a
+    # way that named the wrong thing.
+    v="$(sed -n "s/^[[:space:]]*${a}=//p" compose/pins.env | tail -n 1)"
+    v="${v%\"}"; v="${v#\"}"; v="${v%\'}"; v="${v#\'}"
+    [[ -z "$v" ]] || BUILD_ARGS+=(--build-arg "$a=$v")
   done
 fi
 

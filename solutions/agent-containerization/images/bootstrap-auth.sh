@@ -174,9 +174,10 @@ check_auth_endpoints() {
   for fqdn in $(auth_endpoints_for "$AGENT"); do
     if ! probe_endpoint "$fqdn"; then
       die 4 "provider endpoint '$fqdn' is refused by the mediator, so ($AGENT, $MODE) cannot \
-complete. Add it to policy/allowlist.base.yaml, then: bash scripts/compile-policy.sh && \
-docker compose build egress-mediator. NOTE: an allowlist edit is inert until BOTH run -- the \
-mediator reads its policy from its own image layer. The audit line for this attempt is the \
+complete. Add it to policy/allowlist.base.yaml, then: bash scripts/compile-policy-build.sh \
+(review the diff and commit policy/resolved/) && docker compose build egress-mediator. NOTE: \
+an allowlist edit is inert until BOTH run -- the mediator reads its policy from its own image \
+layer, and since 01.5 SF-4 the build REFUSES an artifact that does not match its inputs. The audit line for this attempt is the \
 authoritative denial record."
     fi
   done

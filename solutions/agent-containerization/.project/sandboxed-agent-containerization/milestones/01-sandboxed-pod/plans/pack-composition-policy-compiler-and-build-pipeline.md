@@ -1226,6 +1226,19 @@ versus compile stage (two `yq` versions, two platforms) and now two `bash` versi
   byte-for-byte, which also demonstrates they remain genuinely reproducible; with the base
   allowlist removed, `default` fails rather than being carried. SF-7 Phase A should assert the
   build log names exactly the two carried-through artifacts and no more.
+- **The predicate is a CODE CONSTANT, and the first version's was not** (Codex adversarial pass,
+  finding 1, HIGH). `emit` originally decided carry-through from the artifact's own
+  `compiled_from.allowlist`, testing only that the declared path was missing and ended in
+  `.test.yaml`. That let the artifact choose its own branch: adding one spoofed provenance line to
+  a hand-edited `policy/resolved/default.yaml` sent the **shipped** profile down the copy path, and
+  the drift gate then compared the copy against the file it was copied from and passed.
+  Reproduced end to end before fixing — `docker build` succeeded and the image enforced the
+  tampered policy, which is precisely the edit this gate exists to catch, and precisely what the
+  bullet above claimed was impossible. The predicate cannot live in the file the gate protects, so
+  the carried-through profile set, and both fixture base paths, are now constants in
+  `compile-stage.sh`; the artifact must additionally agree with them and name its own profile.
+  A carried artifact is also run through `--validate`, the same check the mediator makes at stage
+  1, since nothing else looks at one.
 - **The hole this leaves, stated rather than left to be found.** The build's drift gate is
   *trivially satisfied* for the two carried-through artifacts: they are compared against the copy
   they were made from. Nothing automatic enforces their currency -- `verify-egress-mediator.sh`

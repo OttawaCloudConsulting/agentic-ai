@@ -411,9 +411,40 @@
     (2) Contract 5's "the mediator image copies policy/, profiles/, packs/" is stale for the
     RUNTIME stage -- only the compile stage sees profiles/ and packs/ now. A narrowing, but Phase
     A's image-contents assertion must be written to it or it fails on a correct image.
+    CODEX ADVERSARIAL PASS ON SF-4, 2026-09-08, at operator request after the two SF-4 commits,
+    following SF-2's and SF-3's precedent. FIVE findings, ALL FIVE reproduced independently before
+    being accepted (Codex ran sandboxed with no Docker socket, so its two build-dependent
+    directions were re-probed here against real builds) and ALL FIVE FIXED.
+    THE HIGH FINDING DEFEATS THE WHOLE SUB-FEATURE, and it is SF-3's lesson a third time: a value
+    that was safe as data became security-relevant the moment it was made a BRANCH PREDICATE.
+    emit decided carry-through from the artifact's OWN compiled_from.allowlist -- missing, and
+    ending in .test.yaml. So the artifact chose its own branch. ONE spoofed provenance line added
+    to a hand-edited policy/resolved/default.yaml sent the SHIPPED profile down the copy path, and
+    the drift gate then compared the copy against the file it was copied from and PASSED. Proved
+    end to end before fixing: `docker build` exited 0 and `docker run` showed the tampered
+    `provisional: false` in /etc/mediator/policy/default.yaml. That is exactly the edit the gate
+    exists to catch, and exactly what Deviation 9's own text claimed was impossible. Fixed by
+    moving the predicate out of the file the gate protects: the carried-through profile set and
+    both fixture base paths are now CONSTANTS in compile-stage.sh, the artifact must agree with
+    them AND name its own profile in compiled_from.profile, and a carried artifact is run through
+    --validate (the mediator's own stage-1 check) since nothing else looks at one.
+    THE MEDIUM: scripts/compile-policy-build.sh SOURCED compose/pins.env (`set -a; . file`), making
+    a Compose data file executable shell during a policy refresh -- appending a line to it ran that
+    line on the host, reproduced. Compose parses --env-file as KEY=VALUE and never as shell, so
+    sourcing was never the format's contract; the four keys are now read with sed.
+    The three LOW: `drift` on an empty output directory exited 2 rather than Contract 6's 4 (an
+    empty emit against committed artifacts is the most complete drift there is) -- fixed with
+    nullglob so the second loop reports it; --help printed a hardcoded line range that stopped
+    before the LIMIT paragraph commit 2c837cf had just added, so the help was already stale on
+    arrival -- now found by shape, not by line number; and images/bootstrap-auth.sh's exit-4
+    remediation still sent operators to the direct compiler rather than the one-emitter refresh.
+    NONE DECLINED, matching SF-3's pass (7 of 7 fixed) rather than SF-2's (6 of 11).
+    9 NEW PROBES from the reproductions, run with the originals: 30 probes, 0 failures. Two REAL
+    builds re-run as controls -- the spoofed-provenance attack now fails at exit 2 naming the
+    profile, and plain content drift still fails at exit 4 -- plus a clean rebuild, lint 0, all
+    three artifacts --check current, verify-egress-mediator.sh 77/77 ALL PHASES PASSED and
+    verify-pod-topology.sh ALL CHECKS PASSED against the rebuilt image.
     Codebase assessment still ABSENT; refresh skipped with a warning, as at SF-1..SF-3.
-    NOT DONE, and deliberately: no Codex adversarial pass on SF-4 yet. SF-2 and SF-3 each had one
-    at operator request after their commits, and the same is available here.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it

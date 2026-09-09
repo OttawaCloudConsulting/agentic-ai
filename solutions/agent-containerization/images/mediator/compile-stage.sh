@@ -26,6 +26,23 @@
 # tested without a build.
 set -euo pipefail
 
+# The carry-through set, and the reason it is a CONSTANT here rather than something read
+# out of the artifact (Codex adversarial pass, 2026-09-08, finding 1 -- HIGH).
+#
+# The first version of `emit` decided carry-through from the artifact's OWN
+# `compiled_from.allowlist`: any artifact whose declared base was missing and ended in
+# `.test.yaml` was copied through. That let the artifact choose its own branch. Adding one
+# spoofed provenance line to a hand-edited policy/resolved/default.yaml sent the SHIPPED
+# profile down the copy path, and the drift gate then compared the copy against the file it
+# was copied from and passed -- reproduced end to end: `docker build` succeeded and the image
+# enforced the tampered policy. The gate exists to catch exactly that edit.
+#
+# So the predicate must not live in the file the gate is protecting. These three constants
+# are code: changing them is a change to a reviewed script, not to a generated artifact.
+CARRY_PROFILES=" test-fixtures test-selfcheck "
+CARRY_ALLOW="policy/allowlist.test.yaml"
+CARRY_DENY="policy/denylist.test.yaml"
+
 usage() { echo "usage: compile-stage.sh emit <src> <out> | drift <out> <committed>" >&2; exit 1; }
 fail()  { echo "compile-stage: FAIL: $*" >&2; exit 2; }
 note()  { echo "compile-stage: $*" >&2; }
@@ -58,7 +75,7 @@ note()  { echo "compile-stage: $*" >&2; }
 # day and they are compiled automatically, with no edit here.
 # ------------------------------------------------------------------------------------
 emit() {
-  local src="$1" out="$2"
+  local src="$1" out="$2" declared_profile
   [[ -d "$src/policy/resolved" ]] || fail "$src/policy/resolved is not in the build context"
   [[ -x "$src/scripts/compile-policy.sh" || -f "$src/scripts/compile-policy.sh" ]] \
     || fail "$src/scripts/compile-policy.sh is not in the build context"
@@ -91,15 +108,23 @@ emit() {
       # laid-out inputs (Edge Case 17, obligation 2).
       ( cd "$src" && bash scripts/compile-policy.sh "${flags[@]}" )
     else
-      case "$allow" in
-        *.test.yaml)
-          note "carrying $profile through: $allow is a harness fixture and is not in the build context (SF-4 Deviation 9)"
-          cp "$f" "$out/$profile.yaml"
-          ;;
-        *)
-          fail "$f declares $allow, which is not in the build context. A shipped artifact must be COMPILED by this stage, never copied -- check the .dockerignore allowlist."
-          ;;
-      esac
+      # Carry-through needs ALL FOUR to hold, and only the first is outside the artifact's
+      # control -- which is the point. The other three are cheap agreement checks that make
+      # a half-tampered fixture fail loudly rather than ship.
+      declared_profile="$(yq eval '.compiled_from.profile' "$f")"
+      if [[ "$CARRY_PROFILES" == *" $profile "* \
+         && "$allow" == "$CARRY_ALLOW" \
+         && "$deny"  == "$CARRY_DENY" \
+         && "$declared_profile" == "profiles/$profile.yaml" ]]; then
+        note "carrying $profile through: its bases are the harness fixtures, deliberately outside this build context (SF-4 Deviation 9)"
+        cp "$f" "$out/$profile.yaml"
+        # Validated with the SAME validator the mediator runs at stage 1, because nothing else
+        # looks at a carried artifact: uncompiled AND unchecked would ship whatever the file
+        # happens to contain. This catches a malformed one at build rather than at start.
+        ( cd "$src" && bash scripts/compile-policy.sh --validate "$out/$profile.yaml" ) >/dev/null
+      else
+        fail "$f declares $allow / $deny, which are not in the build context, and '$profile' is not one of the carried-through harness artifacts (${CARRY_PROFILES# }). A shipped artifact must be COMPILED by this stage, never copied -- check the .dockerignore allowlist, and do not hand-edit compiled_from."
+      fi
     fi
     chmod 0644 "$out/$profile.yaml"
   done
@@ -125,8 +150,12 @@ emit() {
 drift() {
   local out="$1" committed="$2" rc=0 f profile
 
+  # nullglob, so an empty output directory is reported as DRIFT by the second loop below
+  # rather than dying in the first one. Emitting nothing while artifacts are committed is the
+  # most complete drift there is, and Contract 6 gives drift exit 4, not the usage code.
+  shopt -s nullglob
+
   for f in "$out"/*.yaml; do
-    [[ -e "$f" ]] || fail "$out holds no emitted artifact"
     profile="$(basename "$f" .yaml)"
     if [[ ! -f "$committed/$profile.yaml" ]]; then
       echo "compile-stage: DRIFT: $profile was emitted but policy/resolved/$profile.yaml is not committed." >&2
@@ -141,7 +170,6 @@ drift() {
   done
 
   for f in "$committed"/*.yaml; do
-    [[ -e "$f" ]] || continue
     profile="$(basename "$f" .yaml)"
     [[ -f "$out/$profile.yaml" ]] || {
       echo "compile-stage: DRIFT: policy/resolved/$profile.yaml is committed but this build emitted nothing for it." >&2
