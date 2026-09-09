@@ -301,6 +301,37 @@
     than assumed unaffected: 77/77, all phases passed.
     packs/README.md carried the same contradiction as SF-3's prose (it listed mounts, env and
     credentials among what the compiler reads) and was corrected in the same commit.
+    CODEX ADVERSARIAL PASS ON SF-3, 2026-09-08, run at operator request after the two SF-3
+    commits. SEVEN findings, ALL SEVEN confirmed by reproduction and ALL SEVEN FIXED -- none
+    declined, unlike SF-2's pass (6 of 11 fixed) and Edge Case 17's. Deviation 8 records it.
+    THE SHARPEST FINDING IS A REGRESSION SF-3 ITSELF INTRODUCED. The composition accumulator
+    encodes entries as fqdn|port|upgrade|source, one per line. Pack-supplied ports and upgrade
+    values were shape-checked before append; BASE-supplied ones were not, because that branch
+    predates the encoding. A base entry whose port is the block scalar "443|false\nevil.example.com
+    |443" emitted a SECOND, WELL-FORMED, ALLOWED destination the base allowlist never contained --
+    exit 0, and validate_resolved accepted the artifact. Reproduced before fixing, re-run after.
+    Generalises: introducing an internal encoding retroactively makes every value flowing into it
+    security-relevant, including values that were safe under the previous representation.
+    SECOND SILENT-IN-THE-PERMISSIVE-DIRECTION FINDING: egress_exclusions written as a MAP makes
+    yq iterate the map's values, so every exclusion lapses -- including the R10.3 auto-updater
+    exclusion default.yaml carries. It did fail, 400 lines later, with "startup_check.offline must
+    be true or false, found 'null'", naming neither field nor cause. Now shape-checked at itself,
+    with agent/fqdn/reason each required and agent checked against the base allowlist's agent set.
+    The other five: the exclusion comparison was not case-folded although SF-3 had begun folding
+    allow entries (an uppercase profile fqdn silently excluded nothing); the three deferred-surface
+    refusals ran BEFORE the R7.6 gate so a pack tripping both was told to fix the wrong thing --
+    and the note above claimed an ordering the code did not have, now made true; validate_resolved
+    checked the provenance block by RENDERED TEXT so `name: null` passed PACK_RE, now tag-checked
+    with YAML-ambiguous pack names refused at the producer; `exclusions` was sorted without -u,
+    contradicting Deviation 7's own claim; and the collision-source lookup built an ERE from a key
+    containing a pipe, making it an alternation, now an awk field comparison.
+    12 NEW PROBES written from Codex's reproductions, run with the original 41: 53 PROBES, 0
+    FAILURES. Emitter output is BYTE-IDENTICAL before and after all seven fixes, so no committed
+    artifact moves; all three stay --check current, oauth-mount compiles, lint-policy exits 0, the
+    mediator image was REBUILT and its stage-1 --validate still accepts the populated artifact, and
+    Edge Case 17's host/image byte-identity still holds. Two of the twelve initially failed for
+    PROBE defects, not code defects -- a splice that truncated the profile at egress_exclusions,
+    and a sequencing error leaving the wrong pack selected -- both fixed rather than accepted.
     Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
     CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
     prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it

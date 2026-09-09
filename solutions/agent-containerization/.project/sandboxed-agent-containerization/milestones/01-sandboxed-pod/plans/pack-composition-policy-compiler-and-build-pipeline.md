@@ -1138,3 +1138,52 @@ GitHub CLI packs are 02.3 and 03.3; this feature ships the mechanism and one ref
   was added, dropped or altered. The mediator image was rebuilt and its stage-1 `--validate`
   accepts the populated artifact, and `tests/acceptance/verify-egress-mediator.sh` was re-run
   against the reordered artifact rather than assumed unaffected.
+
+### Deviation 8: the SF-3 Codex adversarial pass, and the base-allowlist regression it found
+
+Recorded here rather than folded into Deviations 5-7, because one of the seven findings is a
+**regression SF-3 itself introduced into a path it did not set out to touch**, and that is worth a
+record of its own. Pass run 2026-09-08, after the SF-3 commits, following 01.3's and SF-2's
+precedent. Seven findings, **all seven confirmed by reproduction and all seven fixed** -- none
+declined, which is itself a departure from SF-2's pass (6 of 11) and from Edge Case 17's (1 of 1).
+
+**The regression, and why it is one.** The composition accumulator encodes each entry as
+`fqdn|port|upgrade|source`, one per line. Pack-supplied ports and `upgrade` values were shape-checked
+before being appended; **base-supplied ones were not**, because that branch predates the encoding
+and previously interpolated its values straight into an emitted line. A base allowlist entry whose
+`port` is the block scalar `443|false\nevil.example.com|443` therefore did not merely emit one
+malformed entry -- it emitted a second, **well-formed, allowed destination the base allowlist never
+contained**, the compile exited 0, and `validate_resolved` accepted the artifact. Reproduced before
+fixing and re-run after. The lesson generalises past this bug: **introducing an internal encoding
+retroactively makes every value that flows into it security-relevant**, including values that were
+safe under the previous representation.
+
+**The second silent-in-the-permissive-direction finding.** A profile writing `egress_exclusions` as
+a map rather than a list makes `.egress_exclusions[]` iterate the map's VALUES, so the per-entry
+select matches nothing and **every exclusion lapses** -- including the R10.3 auto-updater exclusion
+`profiles/default.yaml` carries. The compile did fail, but 400 lines later and with
+`startup_check.offline must be true or false, found 'null'`, naming neither the field nor the cause.
+The field is now shape-checked at itself, with its entries' `agent`, `fqdn` and `reason` each
+required and `agent` checked against the base allowlist's agent set.
+
+**The remaining five.** (3) The exclusion comparison was not case-folded although SF-3 had begun
+case-folding allow entries, so an uppercase `fqdn:` in a profile silently stopped excluding
+anything. (4) The three deferred-surface refusals ran inside the pack resolution loop, which
+precedes the R7.6 gate, so a pack tripping both was told to fix the wrong thing -- and the
+milestone record claimed an ordering the code did not have; the refusals moved into their own loop
+after the gate. (5) `validate_resolved` checked the provenance block's fields by their RENDERED
+text, and `name: null` renders as "null", which `PACK_RE` matches -- tags are now checked, and a
+pack name that is a YAML boolean, null or all-digit literal is refused at the producer so the
+artifact can never carry one. (6) `exclusions` was sorted without `-u`, contradicting Deviation 7's
+own claim. (7) The collision-source lookup built an ERE from a key containing a pipe and escaped
+only the dots, making it an alternation; replaced with an awk field comparison.
+
+**Verification.** 12 new probes written from Codex's own reproductions, run alongside the original
+41: **53 probes, 0 failures**, all throwaway artifacts removed. Emitter output is byte-identical
+before and after all seven fixes, so no committed artifact moves; all three remain `--check`
+current; `oauth-mount` compiles; `lint-policy.sh` exits 0; the mediator image was rebuilt and its
+stage-1 `--validate` still accepts the populated artifact; and the host/image byte-identity
+established for Edge Case 17 still holds. Two of the twelve new probes initially failed for
+**probe** defects rather than code defects -- a profile splice that truncated the file at
+`egress_exclusions`, and a sequencing error that left the wrong pack selected -- both fixed and
+re-run rather than accepted as passes.

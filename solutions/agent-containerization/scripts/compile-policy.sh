@@ -205,6 +205,15 @@ validate_resolved() {
   pn="$(yq eval '.compiled_from.packs | length' "$f")"
   for ((i = 0; i < pn; i++)); do
     local pname ppath psha
+    # The TAG, not the rendering. `name: null` renders as the four characters "null", which
+    # PACK_RE matches quite happily -- so a provenance entry carrying YAML's null passes a check
+    # written against printed text. The same failure shape the SF-2 pass found four times.
+    local pfield ptag
+    for pfield in name path sha256; do
+      ptag="$(yq eval ".compiled_from.packs[$i].$pfield | tag" "$f" 2>/dev/null || echo '(unreadable)')"
+      [[ "$ptag" == "!!str" ]] \
+        || invalid "$f: compiled_from.packs[$i].$pfield must be a string (found $ptag)"
+    done
     pname="$(yq eval ".compiled_from.packs[$i].name" "$f")"
     ppath="$(yq eval ".compiled_from.packs[$i].path" "$f")"
     psha="$(yq eval ".compiled_from.packs[$i].sha256" "$f")"
@@ -383,6 +392,31 @@ else
   invalid "$REL_PROFILE: authorization declares neither 'classify' nor 'waiver'; exactly one is required (R12.7)"
 fi
 
+# ---- egress_exclusions: shape, before anything reads it -------------------------------------
+# A profile that writes this as a MAP instead of a list is the worst case in the file, because it
+# fails SILENTLY in the direction that grants access: `.egress_exclusions[]` iterates a map's
+# VALUES, the per-entry select matches nothing, and every exclusion lapses -- including the R10.3
+# auto-updater exclusion the default profile carries. The compile then dies much later with
+# "startup_check.offline must be true or false, found 'null'", which names neither the field nor
+# the cause. Optional, because a profile may legitimately exclude nothing; shape-checked whenever
+# present. Found by the Codex adversarial pass, 2026-09-08.
+if [[ "$(yq eval 'has("egress_exclusions")' "$PROFILE_FILE")" == "true" ]]; then
+  require_tag "$PROFILE_FILE" '.egress_exclusions' '!!seq' \
+    "$REL_PROFILE: field 'egress_exclusions' must be a list of {agent, fqdn, reason} entries"
+  EXC_N="$(yq eval '.egress_exclusions | length' "$PROFILE_FILE")"
+  for ((i = 0; i < EXC_N; i++)); do
+    require_tag "$PROFILE_FILE" ".egress_exclusions[$i]" '!!map' \
+      "$REL_PROFILE: egress_exclusions[$i] must be a map with agent, fqdn and reason"
+    for EK in agent fqdn reason; do
+      scalar_nonblank "$PROFILE_FILE" ".egress_exclusions[$i].$EK" >/dev/null \
+        || invalid "$REL_PROFILE: egress_exclusions[$i].$EK is missing, empty or not a scalar. An exclusion withdraws a destination the base allowlist grants, so all three -- who, what and why -- are required (criterion 12, R10.3)"
+    done
+    EXC_A="$(yq eval ".egress_exclusions[$i].agent" "$PROFILE_FILE")"
+    grep -Fxq "$EXC_A" <<< "$ALLOW_AGENTS" \
+      || invalid "$REL_PROFILE: egress_exclusions[$i].agent '$EXC_A' is not an agent the base allowlist keys. An exclusion naming an agent that does not exist withdraws nothing and reads as though it did"
+  done
+fi
+
 # ---- packs: every selected name must resolve to a manifest --------------------------------
 # The tag, not the length: `yq '.packs | length'` returns 0 for a missing key, for `packs: ""`
 # and for `packs: {}` alike, so a length test reads three malformed shapes as a zero-pack profile
@@ -400,6 +434,16 @@ for ((i = 0; i < PACKS_LEN; i++)); do
   # be the SAME shape, or a name this accepts emits an artifact its own validator rejects.
   [[ "$PN" =~ $PACK_RE ]] \
     || invalid "$REL_PROFILE: packs[$i] '$PN' is not a valid pack name (lowercase letters, digits and hyphens); it is resolved as a directory under packs/"
+  # A name YAML reads as something other than a string. The emitter writes pack names UNQUOTED
+  # into compiled_from.packs, so a pack directory called `null`, `true`, `no` or `0755` would
+  # round-trip out of the artifact as a null, a boolean or an integer -- and PACK_RE, which
+  # matches the RENDERED text, would accept it again on the way back in. Refused at the producer
+  # so the artifact can never carry one. Found by the Codex adversarial pass, 2026-09-08.
+  case "$PN" in
+    null|true|false|yes|no|on|off|y|n) invalid "$REL_PROFILE: packs[$i] '$PN' is a YAML boolean or null literal and cannot be used as a pack name; it would not survive a round trip through the resolved artifact" ;;
+  esac
+  [[ ! "$PN" =~ ^[0-9]+$ ]] \
+    || invalid "$REL_PROFILE: packs[$i] '$PN' is all digits and would round-trip out of the resolved artifact as an integer; give the pack a name YAML reads as a string"
   [[ -f "$REPO_ROOT/packs/$PN/pack.yaml" ]] \
     || invalid "$REL_PROFILE: packs[$i] '$PN' does not resolve to packs/$PN/pack.yaml"
   yq eval '.' "$REPO_ROOT/packs/$PN/pack.yaml" >/dev/null 2>&1 \
@@ -478,27 +522,6 @@ for ((i = 0; i < PACKS_LEN; i++)); do
     esac
   done
 
-  # ---- the three surfaces with no consumer yet ----------------------------------------------
-  # Interface Contract 3 fixes the resolved schema and names exactly two things packs populate:
-  # compiled_from.packs, and the per-agent allow_fqdns/allow_cidrs. There is no resolved-policy
-  # field for a pack mount, environment variable or credential, and SF-3's own prose saying it
-  # composes them is what Contract 3 overrides (recorded as a deviation). They are REFUSED rather
-  # than ignored, for the reason the mount-key gate above exists: a declared requirement that is
-  # silently dropped is indistinguishable from one that was honoured.
-  #
-  # The landing points differ and are named separately rather than blanket-assigned to SF-5:
-  #   mounts       SF-5, which builds the per-agent build cache and extends the mount-set assertion
-  #   env          no contract exists yet
-  #   credentials  no contract exists yet -- and R8 bars baking a secret into an image, so the
-  #                delivery mechanism cannot be a build argument and is not a resolved-policy field
-  [[ "$PM_N" == "0" ]] \
-    || refuse "$REL_PF declares $PM_N mount(s), and the resolved policy schema (01.3 Interface Contract 1) has no field for one. Pack-supplied mounts land at 01.5 SF-5, with the per-agent build cache and the mount-set assertion that verifies them; until then a declared mount would be dropped silently"
-  EV_N="$(yq eval '.env | length' "$PF")"
-  [[ "$EV_N" == "0" ]] \
-    || refuse "$REL_PF declares $EV_N environment variable(s), and the resolved policy schema has no field for one. No contract delivers a pack-supplied environment variable yet; the existing per-variable mechanisms are hand-authored Compose fragments (compose/overrides/), and extending one to pack content is a decision no sub-feature of 01.5 currently owns"
-  CR_N="$(yq eval '.credentials | length' "$PF")"
-  [[ "$CR_N" == "0" ]] \
-    || refuse "$REL_PF declares $CR_N credential(s), and the resolved policy schema has no field for one. R8 bars baking a secret into an image, so a build argument is not the mechanism either; a pack-supplied credential needs an explicit delivery contract that does not exist yet"
 done
 
 # ---- R7.18: package_repository, required only where packs are selected ---------------------
@@ -626,6 +649,38 @@ for ((i = 0; i < PACKS_LEN; i++)); do
     ((RT_N > 0)) \
       || refuse "packs/$PN/pack.yaml sets runtime_install: true but declares no egress.runtime entries. Runtime installation without registry egress cannot work, so this records a widening the resolved policy does not carry -- declare the registries or set runtime_install: false"
   fi
+done
+
+
+# ---- the three surfaces with no consumer yet, AFTER the R7.6 gate ---------------------------
+# Ordering is load-bearing and was WRONG when first written: these refusals lived in the pack
+# resolution loop, which runs BEFORE the R7.6 gate, so a pack declaring both runtime egress with
+# runtime_install: false AND an `env` entry was refused with the env message. Both refuse and both
+# fail closed, but the operator was told the wrong thing to fix, and the milestone record claimed
+# an ordering the code did not have. Found by the Codex adversarial pass, 2026-09-08.
+for ((i = 0; i < PACKS_LEN; i++)); do
+  PN="${PACK_NAMES[$i]}"; PF="${PACK_FILES[$i]}"; REL_PF="packs/$PN/pack.yaml"
+  PM_N="$(yq eval '.mounts | length' "$PF")"
+  # Interface Contract 3 fixes the resolved schema and names exactly two things packs populate:
+  # compiled_from.packs, and the per-agent allow_fqdns/allow_cidrs. There is no resolved-policy
+  # field for a pack mount, environment variable or credential, and SF-3's own prose saying it
+  # composes them is what Contract 3 overrides (recorded as a deviation). They are REFUSED rather
+  # than ignored, for the reason the mount-key gate above exists: a declared requirement that is
+  # silently dropped is indistinguishable from one that was honoured.
+  #
+  # The landing points differ and are named separately rather than blanket-assigned to SF-5:
+  #   mounts       SF-5, which builds the per-agent build cache and extends the mount-set assertion
+  #   env          no contract exists yet
+  #   credentials  no contract exists yet -- and R8 bars baking a secret into an image, so the
+  #                delivery mechanism cannot be a build argument and is not a resolved-policy field
+  [[ "$PM_N" == "0" ]] \
+    || refuse "$REL_PF declares $PM_N mount(s), and the resolved policy schema (01.3 Interface Contract 1) has no field for one. Pack-supplied mounts land at 01.5 SF-5, with the per-agent build cache and the mount-set assertion that verifies them; until then a declared mount would be dropped silently"
+  EV_N="$(yq eval '.env | length' "$PF")"
+  [[ "$EV_N" == "0" ]] \
+    || refuse "$REL_PF declares $EV_N environment variable(s), and the resolved policy schema has no field for one. No contract delivers a pack-supplied environment variable yet; the existing per-variable mechanisms are hand-authored Compose fragments (compose/overrides/), and extending one to pack content is a decision no sub-feature of 01.5 currently owns"
+  CR_N="$(yq eval '.credentials | length' "$PF")"
+  [[ "$CR_N" == "0" ]] \
+    || refuse "$REL_PF declares $CR_N credential(s), and the resolved policy schema has no field for one. R8 bars baking a secret into an image, so a build argument is not the mechanism either; a pack-supplied credential needs an explicit delivery contract that does not exist yet"
 done
 
 # ---- GATE (SC-3, R5.14) -- project-mount containment ----------------------------------------
@@ -787,6 +842,17 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
         || invalid "$REL_ALLOWLIST: agents.${agent}.allow_fqdns[$i].fqdn '$FQDN' is a wildcard; the pod resolver matches exactly and a wildcard would reopen DNS exfiltration (R5.4)"
       [[ "${#FQDN}" -le 253 && "$FQDN" =~ $FQDN_RE ]] \
         || invalid "$REL_ALLOWLIST: agents.${agent}.allow_fqdns[$i].fqdn '$FQDN' is not a valid hostname; it would be interpolated into the mediator's Lua policy (01.3 SF-5)"
+      # PORT and UPGRADE are shape-checked HERE, before they enter the accumulator, and not only
+      # in validate_resolved on the way out. The accumulator is pipe-delimited and newline-
+      # separated, so a base `port` carrying either character does not merely emit a malformed
+      # entry -- it emits an EXTRA, well-formed one. A port of "443|false\nevil.example.com|443"
+      # yielded a second allowed destination the base allowlist never contained, and the artifact
+      # then validated. The pack-supplied branch below already checked both; the base branch,
+      # which predates SF-3's encoding, did not. Found by the Codex adversarial pass, 2026-09-08.
+      [[ "$PORT" =~ ^[0-9]+$ ]] \
+        || invalid "$REL_ALLOWLIST: agents.${agent}.allow_fqdns[$i].port must be an integer, found '$PORT'"
+      [[ "$UPGRADE" == "true" || "$UPGRADE" == "false" ]] \
+        || invalid "$REL_ALLOWLIST: agents.${agent}.allow_fqdns[$i].upgrade must be true or false, found '$UPGRADE'"
       ENTRIES+="$(lower "$FQDN")|${PORT}|${UPGRADE}|${REL_ALLOWLIST}"$'\n'
     done
 
@@ -828,7 +894,11 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
     while IFS= read -r line; do
       [[ -n "$line" ]] || continue
       EF="${line%%|*}"
-      EX_REASON="$(yq eval ".egress_exclusions[] | select(.agent == \"${agent}\" and .fqdn == \"${EF}\") | .reason // \"null\"" "$PROFILE_FILE")"
+      # The allow entry was case-folded on the way into the accumulator, so the exclusion has to
+      # be folded too or an uppercase `fqdn:` in the profile silently stops excluding anything.
+      # DNS is case-insensitive; a comparison that is not would let a profile believe it had
+      # withdrawn a destination it had not. Found by the Codex adversarial pass, 2026-09-08.
+      EX_REASON="$(yq eval ".egress_exclusions[] | select(.agent == \"${agent}\" and (.fqdn | downcase) == \"${EF}\") | .reason // \"null\"" "$PROFILE_FILE")"
       [[ -z "$EX_REASON" || "$EX_REASON" == "null" ]] || continue
       KEPT+="${line}"$'\n'
     done <<< "$ENTRIES"
@@ -852,9 +922,13 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
       if [[ -n "$DUPES" ]]; then
         while IFS= read -r dk; do
           [[ -n "$dk" ]] || continue
-          # ANCHORED: an unanchored match would let `xapi.example.com|443` contribute its source to
-          # `api.example.com|443`'s message. The refusal itself is unaffected; the source list is not.
-          SRCS="$(grep -F -- "${dk}|" <<< "${ENTRIES%$'\n'}" | grep -E "^${dk//./\\.}\\|" | cut -d'|' -f3,4 | LC_ALL=C sort -u | tr '\n' ' ')"
+          # PREFIX match on the first two fields, done with awk rather than a regex. The previous
+          # attempt built an ERE from the key and escaped only the dots -- but the key itself
+          # contains a pipe, so `^api.example.com|443\|` was an ALTERNATION and matched anything
+          # containing `443|`. An unanchored grep -F has the converse problem: `xapi.example.com`
+          # contains `api.example.com`. Neither breaks the refusal; both mislead the operator
+          # about which sources collided. Found by the Codex adversarial pass, 2026-09-08.
+          SRCS="$(awk -F'|' -v k="$dk" '$1 "|" $2 == k {print $3 "|" $4}' <<< "${ENTRIES%$'\n'}" | LC_ALL=C sort -u | tr '\n' ' ')"
           refuse "agents.${agent}: conflicting R5.9 upgrade metadata for the same resolved destination ${dk%%|*} port ${dk##*|}. Sources (upgrade|origin): ${SRCS}-- one destination carries one record. Reconcile the base allowlist entry and the pack manifest rather than letting either silently overwrite the other"
         done <<< "$DUPES"
       fi
@@ -949,7 +1023,7 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
       ER="$(tr '\n' ' ' <<< "$ER" | sed -e 's/  */ /g' -e 's/ *$//')"
       EXL+="  - {agent: ${EA}, fqdn: ${EF}, reason: \"${ER}\"}"$'\n'
     done
-    LC_ALL=C sort <<< "${EXL%$'\n'}"
+    LC_ALL=C sort -u <<< "${EXL%$'\n'}"
   fi
 
   echo ""
