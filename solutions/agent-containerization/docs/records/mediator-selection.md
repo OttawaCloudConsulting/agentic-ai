@@ -59,7 +59,7 @@ hard on unknown directives, rather than against on-image documentation.
 
 | # | Property | Verdict |
 |---|---|---|
-| P1 | Client-certificate verification available per listener, subject reachable by policy and log | **PASS** (required-mode). **Optional-mode (`DELAYED_AUTH`) FAILED** — a gap handed to 01.6 |
+| P1 | Client-certificate verification available per listener, subject reachable by policy and log | **PASS** (required-mode). **Optional-mode (`DELAYED_AUTH`) FAILED** — handed to 01.6, and **closed there 2026-09-09 by design, not by fix**: the mechanism has no consumer in this pod (see P1 below) |
 | P2 | Post-resolution deny on the address actually connected to | **PASS** |
 | P3 | Per-client concurrency, connection-rate and byte-rate ceilings | **PARTIAL** — concurrency PASS, byte rate PASS, **connection rate has no native mechanism** |
 | P4 | Agent identity on every access-log line, allow and deny alike, derived from the listener | **PASS**, with a cascade caveat (see P7) |
@@ -329,6 +329,28 @@ Parse was clean; the failure is at runtime. **Recorded as an open gap for 01.6**
 feature depends on it. 01.6 must resolve it before it can offer per-listener optional verification,
 and if it cannot, 01.6's choice narrows to required-mode on the `claude` listener only.
 
+> **Gap closed 2026-09-09 (Feature 01.6 SF-1, Decision 1) — closed by design, not by fix.**
+> The `DELAYED_AUTH` runtime failure above is **not** resolved, and 01.6 does not chase it. Optional
+> mode exists to let one listener serve both a cert-bearing and a cert-less client. **That case does
+> not occur in this pod.** D2 gives every agent its own listener on its own `internal: true` network,
+> so the `claude` front listener serves exactly one client and that client can present a certificate
+> (criterion 5); the `agy` listener stays server-auth-only and the `codex` listener stays plain HTTP
+> CONNECT, and neither needs optional mode either. The mechanism has **no consumer**, so chasing a
+> Squid runtime bug to enable it is work with no requirement behind it.
+>
+> 01.6 therefore ships `clientca=` in **required** mode on the `claude` **front** `https_port` alone,
+> which is the configuration measured PASS above. The two named consequences are accepted rather than
+> mitigated: a cert-less client is refused at the TLS handshake and produces **no audit line at all**
+> (01.6 SF-4 records this in `mediator/identity/README.md` and in the R12.2 troubleshooting section
+> of `README.md`, because silence there is a diagnostic signal rather than an absence of one), and
+> required mode is safe only because the listener has a single client — it would be unsafe on a
+> shared one.
+>
+> The paragraph above's fallback — *"if it cannot, 01.6's choice narrows to required-mode on the
+> `claude` listener only"* — is the outcome, reached by choice rather than by defeat. If a future
+> feature ever needs one listener to serve both a cert-bearing and a cert-less client, this gap
+> reopens and must be re-measured on the Squid build in force then.
+
 ### P8 — per-client policy selection from a proxy credential: PASS
 
 `auth_param basic program /usr/lib/squid/basic_fake_auth` with `acl u_claude proxy_auth claudeuser`
@@ -504,6 +526,6 @@ reasons to prefer the fallback:
 | P5: no client-visible 403 body; denial surface is log-and-operator-only | SF-7, and a plan decision on criterion 5 |
 | Cannot log to `/dev/stdout` as `proxy`; `error_directory` composition | SF-4 |
 | `cache_peer` cold start | SF-7 (self-check warms), SF-8 (not a control result) |
-| `clientca=` is required-mode by default; `DELAYED_AUTH` did not work | **01.6** |
-| Proxy-credential policy selection works on the plain transport | **01.6** |
+| `clientca=` is required-mode by default; `DELAYED_AUTH` did not work | **01.6** — closed 2026-09-09 by design, not by fix (see P1 above); required mode on the `claude` front listener alone |
+| Proxy-credential policy selection works on the plain transport | **01.6** — agent half measured 2026-09-09, positive for both `codex` and `agy` (`docs/records/agent-verification.md`, criterion 1). `https_port` **with** `proxy_auth` remains unmeasured on this Squid build and is 01.6 SF-3's to verify before `agy` is flipped |
 | Pin package version **and** base image digest | SF-4 |

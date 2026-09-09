@@ -555,3 +555,140 @@ and nothing about normal use retires the stolen copy. Explicit revocation at the
 `docs/records/credential-inventory.md` states this in its blast-radius column.
 
 **R4.17 is now closed for OpenAI and still open for Anthropic**, rather than open for both.
+
+---
+
+## Proxy-credential capability — 01.6 SF-1 (criterion 1)
+
+**Question:** will `codex` or `agy` send a **proxy credential** to the mediator's listener? This is
+the one unknown 01.6 was planned around. Criterion 5 above measured that neither can present a
+client *certificate*; R8.8 still requires each agent to carry a distinct identity used to
+authenticate to the enforcement point, and a proxy credential is the only remaining mechanism their
+clients might support. 01.3 SF-1 already measured the **mediator** half (P8: Squid keys policy off
+`proxy_auth` on a plain `http_port`, `docs/records/mediator-selection.md`). This is the **agent**
+half.
+
+Two credential-supply forms were planned as separate cells: a `Proxy-Authorization` header, and
+userinfo in the proxy URL. They do not stay separate at the agent boundary — see *The two forms are
+one mechanism* below.
+
+**Date:** 2026-09-09. **Versions:** `@openai/codex@0.152.1` (pinned, `codex-cli 0.152.1`);
+`agy 1.1.26` (unpinnable — installed from the live `antigravity.google/cli/install.sh` manifest with
+no version flag, per the 01.1 SF-2 finding, so this result is true of the version served on this
+date). Docker Engine 28.3.2, Docker Desktop for macOS 26, Apple silicon.
+
+### Method
+
+`scripts/verify-agent-clients.sh` gained two listeners on its Go CONNECT fixture, alongside the
+shipped `-plain :18080` and `-tls :18443`:
+
+| Flag | Transport | Client cert | Credential |
+|---|---|---|---|
+| `-plainauth :18081` | plain HTTP CONNECT | n/a | required — `Proxy-Authorization: Basic` |
+| `-tlsauth :18444` | TLS CONNECT | **`NoClientCert`** | required — `Proxy-Authorization: Basic` |
+
+`NoClientCert` on the TLS credential listener is the design choice the cell turns on. The shipped
+`-tls :18443` listener is `RequireAndVerifyClientCert`, where `agy` dies at `CertificateRequest`
+(criterion 5) and the credential question is never put to it. Absent a credential the fixture
+answers `407` with `Proxy-Authenticate: Basic realm="sf2"`.
+
+Every accepted TCP connection is logged before any request is read, and every CONNECT is logged with
+the presented username (never the password) and a sequence number. This is what separates *the
+client rejected the proxy URL and never dialled* from *the client dialled, was challenged, and gave
+up* — and it is what makes the preemptive-versus-reactive reading below evidence rather than
+inference. Credentials are `sf2codex:sf2pass` / `sf2agy:sf2pass`: throwaway, non-secret, and
+deliberately alphanumeric so a negative could not be a percent-encoding artefact.
+
+Matrix: `codex` on the plain transport only — criterion 5 already measured that it rejects an
+`https://` proxy URL at parse time, and that cell is inherited rather than re-run. `agy` on TLS
+(its real hop to the mediator) **and** on plain, which separates "does no proxy auth at all" from
+"does no proxy auth over a TLS proxy hop".
+
+### Results
+
+| Agent | Result | Mechanism | Evidence |
+|---|---|---|---|
+| codex | **Yes** — plain transport, credential from proxy-URL userinfo, sent **preemptively** | `HTTPS_PROXY=http://sf2codex:sf2pass@fixture:18081`. codex constructs `Proxy-Authorization: Basic` itself; there is no separate configuration knob (see below). | 15 authenticated tunnels. First CONNECT on the connection already carries it — no 407 precedes it: `seq=1..3 mode=plain-auth outcome=tcp-accepted`, then `seq=4 mode=plain-auth target=chatgpt.com:443 pauth=user=sf2codex outcome=tunnel-established`, `seq=5 target=api.openai.com:443 pauth=user=sf2codex outcome=tunnel-established`. The probe reached the OpenAI API through the hop: its only failure was `You have no credits remaining` — an API-level answer from `api.openai.com`, i.e. downstream of the proxy, not a proxy refusal. |
+| codex | **No other source.** Without userinfo it is challenged and never recovers. | — | 20 × `pauth=absent outcome=407-challenged` and no authenticated CONNECT on that cell. Client-side: `URL error: Proxy connection failed: HTTP CONNECT failed with status 407, url: wss://api.openai.com/v1/responses`, through 5 WebSocket reconnects and the HTTPS fallback. It surfaces the 407 accurately and has nothing to answer it with. |
+| agy | **Yes** — **TLS** transport, credential from proxy-URL userinfo, sent **preemptively** | `HTTPS_PROXY=https://sf2agy:sf2pass@fixture:18444`, `SSL_CERT_FILE=/pki/ca.crt`. This is the transport shape `agy`'s real hop to the mediator uses. | 10 authenticated tunnels, zero TLS handshake errors. `seq=71,72 mode=tls-auth outcome=tcp-accepted`, then `seq=73 mode=tls-auth target=antigravity-unleash.goog:443 pauth=user=sf2agy outcome=tunnel-established`, `seq=79 target=generativelanguage.googleapis.com:443 pauth=user=sf2agy outcome=tunnel-established`. Probe output: `OK`, exit 0 — a genuine Gemini response returned through a credential-authenticated TLS proxy hop. |
+| agy | **Yes** — plain transport too | `HTTPS_PROXY=http://sf2agy:sf2pass@fixture:18081` | 9 authenticated tunnels; probe output `OK`, exit 0. The capability is not conditional on the proxy hop's transport. |
+| agy | **No other source.** Without userinfo it is challenged and fails. | — | 9 × `mode=tls-auth pauth=absent outcome=407-challenged`; probe output `Error: Agent execution terminated due to error.`, exit 1. |
+
+Zero `rejected-user` lines across the run: neither client sent a malformed or wrong credential. The
+mechanism is exact, not approximate.
+
+### The two forms are one mechanism
+
+The plan treated `Proxy-Authorization`-header and userinfo-in-URL as two cells. At the agent boundary
+they collapse into one, and this is the finding, not a shortfall in the measurement:
+
+- **Neither client exposes a knob for supplying a proxy credential directly.** `codex --help` has no
+  proxy-auth flag (the only `auth` matches are `logout`, `doctor` and `--remote-auth-token-env`, all
+  unrelated to proxying). `agy --help` matched nothing for `proxy` or `auth` at all.
+- **Both construct the header themselves, from the URL.** A `Proxy-Authorization` string is present
+  in the `@openai/codex` package and in the `agy` binary — consistent with each generating the
+  header — and the fixture observed exactly that header arriving whenever, and only whenever,
+  userinfo was in the proxy URL.
+- **Caveat on the binary strings, stated so the evidence is not read wider than it is.** The `agy`
+  binary also contains `proxy_auth`, `proxy_auth_realm` and `proxy_pass`. Those are *nginx*
+  directive names, so that string set is most likely a vendored corpus rather than `agy`'s own proxy
+  code. The behavioural evidence above is what the finding rests on; the strings are corroborating
+  at best.
+
+**Consequence:** the credential's delivery surface for both agents is the **proxy URL**, and the
+`Proxy-Authorization` header is a derived artefact of it, not an independent configuration point.
+01.6 Interface Contract 5's "Proxy URL" row is therefore the row that changes for both agents, and
+no header-injection mechanism needs to be built or specified.
+
+### Two fixture defects found and fixed, because they each produced a convincing wrong answer
+
+Both are recorded rather than quietly repaired: each one's symptom read as an agent finding, and a
+future run would have reproduced the misreading.
+
+1. **An expired throwaway CA silently confounded every TLS cell.** The fixture CA is reused across
+   runs but issued `-days 2`, behind a `if [[ ! -f "$PKI/ca.crt" ]]` guard. A CA generated on
+   2026-09-04 was still on disk on 2026-09-09, three days expired. Both TLS cells failed with
+   client-side `remote error: tls: bad certificate` — which reads exactly like *agy refuses the
+   proxy's certificate*, and is not that. Fixed: the guard now regenerates when the CA is absent,
+   unreadable, or not valid for the next hour (`openssl x509 -checkend 3600`).
+2. **Go's `ServeTLS` advertises `h2` over ALPN, and a CONNECT proxy has no HTTP/2 story.** With a
+   valid CA the handshake succeeded and `agy` negotiated `h2`, then wrote an HTTP/1.1 `CONNECT`,
+   which Go's HTTP/2 server rejected: `http2: server: error reading preface from client: bogus
+   greeting "CONNECT generativelangua"`. The credential question was again never reached, and the
+   symptom read as an `agy` defect. Fixed: `NextProtos: []string{"http/1.1"}` on the credential TLS
+   listener. The final run has zero `bogus greeting` and zero handshake errors.
+
+The shipped `-tls :18443` mTLS listener carries the same Go ALPN default and was **not** changed —
+criterion 5's recorded result there is a handshake-level failure (`tls: client didn't provide a
+certificate`), which precedes any HTTP/2 preface and is therefore unaffected by it. Changing that
+listener would alter the conditions under which an already-published cell was measured.
+
+### Consequence for R8.8
+
+**Positive for both agents** — the branch 01.6's plan specified but could not assume. Each of the
+three agents can now carry a distinct, per-agent, revocable identity token presented to the
+mediator:
+
+| Agent | Identity form | `identity_source` |
+|---|---|---|
+| claude | mTLS client certificate (criterion 5) | `listener+mtls` |
+| codex | proxy credential, plain transport, via proxy-URL userinfo | `listener+proxy_auth` |
+| agy | proxy credential, TLS transport, via proxy-URL userinfo | `listener+proxy_auth` |
+
+R8.8 closes with a presentable credential for all three rather than with network-derived attribution
+for two, and 01.6 SF-3 takes its **positive** branch for both `codex` and `agy`: `client_auth:
+proxy_auth`, `basic_ncsa_auth` against an htpasswd secret held by the mediator alone, and a
+per-agent credential delivered to each agent through its proxy URL.
+
+**One mediator-side question stays open and SF-3 owns it.** P8 was measured on a plain `http_port`.
+`agy`'s hop is TLS, so `https_port` **with** `proxy_auth` is unmeasured on Squid
+`squid-openssl 6.13-2+deb13u2`. This record establishes the *agent* will send a credential over a
+TLS proxy hop; it does not establish that this Squid build will consume one on an `https_port`.
+SF-3 verifies the mediator side before `agy`'s profile is flipped.
+
+**Decision 4 is unchanged and is not softened by this result.** A basic proxy credential is a bearer
+secret: readable in the agent's own environment and `/proc`, and on `codex-net` it crosses the proxy
+hop in the clear because that hop is plain HTTP by construction. An agent that can read its own
+credential can present it. The Milestone 03 credential-brokering gate stays `listener+mtls` alone —
+which on this evidence still means `claude` only. The positive here buys a stronger audit line and a
+revocable per-agent token; it does not buy passage through D6's precondition.

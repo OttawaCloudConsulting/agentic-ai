@@ -940,7 +940,7 @@
 
 [~] Feature 01.6: Per-agent workload identity
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/per-agent-workload-identity.md
-    Sub-features: 0/4 complete
+    Sub-features: 1/4 complete
     Notes: Created 2026-09-04 by /milestone revision -- split out of 01.3. Closes R8.8 with the
     strongest identity form each agent's client supports; carries T34 and the Milestone 03
     brokering gate. Ordered after 01.3; may land before or after 01.4 and 01.5.
@@ -959,3 +959,15 @@
     both resolved artifacts move in one commit or compile-policy-build.sh refuses the image build
     (R5.14). verify-auth-state.sh is excluded from the Test Command -- its Phase D costs the operator
     their host codex login -- and is run once by hand at the end of SF-2 instead.
+    SF-1 complete 2026-09-09: criterion 1 is POSITIVE for BOTH codex and agy -- each sends a proxy
+    credential from proxy-URL userinfo, preemptively, codex on the plain transport and agy on TLS
+    (and on plain). SF-3 therefore takes its positive branch for both agents, and the
+    identity_source enumeration ships all three values. The header form and the userinfo form
+    collapse into one mechanism: neither client exposes a credential knob, both construct
+    Proxy-Authorization from the URL, so IC5's Proxy URL row is the only agent-side surface that
+    changes. Two fixture defects were found and fixed en route, each of which produced a convincing
+    wrong answer (an expired reused throwaway CA behind a generate-if-absent guard; Go ServeTLS
+    advertising h2 over ALPN to a CONNECT proxy) -- both recorded. Decision 4 is unchanged: the M03
+    brokering gate stays listener+mtls alone, so claude only. One mediator-side question is handed
+    to SF-3: P8 measured proxy_auth on a plain http_port, and https_port with proxy_auth is still
+    unmeasured on this Squid build, so agy's mediator side is verified before its profile flips.

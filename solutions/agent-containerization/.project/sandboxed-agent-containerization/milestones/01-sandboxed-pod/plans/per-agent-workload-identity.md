@@ -338,7 +338,7 @@ Each is amended in the sub-feature that causes the break, not in a cleanup pass 
 
 ## Sub-Features
 
-- [ ] **SF-1: Proxy-credential capability verification for `codex` and `agy`** — The one remaining
+- [x] **SF-1: Proxy-credential capability verification for `codex` and `agy`** — The one remaining
   unknown, answered before anything is built on it. Extends `scripts/verify-agent-clients.sh`: its Go
   CONNECT fixture (`:55-165`) today exposes only `-plain :18080` and `-tls :18443` with
   `RequireAndVerifyClientCert`, and has **no `Proxy-Authorization` handling at all** — no header
