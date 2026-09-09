@@ -769,6 +769,28 @@
     verify-pod-topology.sh 61 PASS 0 FAIL ALL CHECKS PASSED, verify-egress-mediator.sh 77 PASS
     0 FAIL ALL PHASES PASSED with the extended packs/ pattern firing. Codebase assessment still
     ABSENT; refresh skipped with a warning, as at SF-1..SF-6.
+    SF-7a REVIEW PASS, same day, before reporting. ONE REAL DEFECT, and it is the
+    silent-in-the-permissive-direction shape this feature's Codex passes found four times --
+    this time in the HARNESS rather than in what it tests. Phase A's image-contents searches ran
+    `docker run --entrypoint sh` with no --user, and ALL FOUR IMAGES DECLARE A NON-ROOT USER
+    (the agents `agent`, the mediator `13:13`), so `find /` ran unprivileged: Permission denied
+    on every root-only directory went to the 2>/dev/null, and the trailing `exit 0` forced
+    success. A control-plane file under a 0700 path was INVISIBLE and the assertion passed.
+    REPRODUCED BEFORE FIXING rather than inferred from the USER field: a planted
+    /root/hidden/allowlist.base.yaml was found as root and NOT found as `agent`, in the same
+    container. Fixed with --user 0 on all three invocations. The general point is recorded in
+    the script: inspecting an IMAGE's contents is not the same question as what the RUNTIME user
+    can reach, and only the first is being asked in Phase A. Re-run after the fix: still 72 PASS
+    0 FAIL -- the assertions were true all along, they were simply not proving it.
+    TWO ACCURACY CORRECTIONS in the same pass, because this project records counts as evidence.
+    (1) The probe-count attribution said "SF-2, SF-3, SF-4 and SF-5 ran 35, 41, 30 and 21". The
+    35 and 41 are the PRE-Codex-pass counts (58 and 53 after), 21 is SF-4's INTERMEDIATE count
+    (30 after its pass), and SF-5 recorded no total at all -- so the sentence gave SF-4's old
+    number to SF-5. Now 58, 53 and 30, with SF-5's absence stated. (2) C6's `docker build
+    --target drift` passes only MEDIATOR_BASE_DIGEST, so YQ_VERSION and YQ_SHA256_* fall to the
+    Dockerfile's ARG defaults. SF-4 measured those defaults as agreeing with pins.env, so this
+    builds the same emitter the pod does today; the dependency is now recorded in the script
+    rather than left to be discovered if they diverge.
     HISTORICAL, SF-6a: THE PUSH WAS THE BLOCKER FOR SF-6b. Nothing in SF-6a has been exercised by a CI run: the
     ubuntu-24.04-arm runner label, the GHCR push, the attestation emission and the arm64 build
     are all unverified until this branch is pushed. Resume: push, read AGENT_BASE_DIGEST off the

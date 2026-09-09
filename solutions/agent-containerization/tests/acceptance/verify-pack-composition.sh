@@ -11,10 +11,11 @@
 # the same silent-in-the-permissive-direction shape this feature's Codex passes found
 # three times.
 #
-# WHAT THIS REPLACES. SF-2, SF-3, SF-4 and SF-5 each probed their gates and then
-# REMOVED the probes -- 35, 41, 30 and 21 of them. This is where the surviving half
-# becomes permanent: every assertion below was a throwaway probe in one of those
-# sub-features, re-expressed so it runs on every invocation.
+# WHAT THIS REPLACES. SF-2, SF-3 and SF-4 each probed their gates and then REMOVED the
+# probes -- 58, 53 and 30 of them, counting the reproductions their Codex passes added.
+# SF-5 probed too and recorded no total. This is where the surviving half becomes
+# permanent: every assertion below was a throwaway probe in one of those sub-features,
+# re-expressed so it runs on every invocation.
 #
 # HOW THE NEGATIVE PROBES WORK, AND WHAT THEY TOUCH. The compiler resolves its inputs
 # relative to the repository root (`REPO_ROOT` from `BASH_SOURCE`), so a malformed
@@ -317,7 +318,15 @@ fi
 # This assertion is written to that shape; written to Contract 5's text it would fail on a
 # correct image.
 if docker image inspect sandboxed-agent/mediator:local >/dev/null 2>&1; then
-  med_policy="$(docker run --rm --entrypoint sh sandboxed-agent/mediator:local \
+  # `--user 0` ON EVERY ONE OF THESE, AND IT IS LOAD-BEARING. All four images declare a
+  # non-root USER (the agents `agent`, the mediator `13:13`), so an unprivileged `find /`
+  # gets Permission denied on every root-only directory, the errors go to 2>/dev/null and
+  # `exit 0` forces success -- a control-plane file under a 0700 path would be INVISIBLE and
+  # the assertion would pass. Reproduced before fixing: a planted
+  # /root/hidden/allowlist.base.yaml was found as root and not found as `agent`. Inspecting
+  # an image's contents is not the same question as what the runtime user can reach, and
+  # only the first one is being asked here.
+  med_policy="$(docker run --rm --user 0 --entrypoint sh sandboxed-agent/mediator:local \
                   -c 'ls -1 /etc/mediator/policy' 2>/dev/null | sort || true)"
   expected_policy="$(ls -1 policy/resolved/*.yaml | xargs -n1 basename | sort)"
   if [ "$med_policy" = "$expected_policy" ]; then
@@ -328,7 +337,7 @@ if docker image inspect sandboxed-agent/mediator:local >/dev/null 2>&1; then
     note "committed: $(echo "$expected_policy" | tr '\n' ' ')"
   fi
 
-  med_stray="$(docker run --rm --entrypoint sh sandboxed-agent/mediator:local -c '
+  med_stray="$(docker run --rm --user 0 --entrypoint sh sandboxed-agent/mediator:local -c '
       for p in /src /profiles /packs /etc/mediator/policy/README.md; do
         [ -e "$p" ] && echo "$p"
       done
@@ -357,7 +366,7 @@ for agent in claude codex agy; do
     fail "A: ${img} is not built -- run 'bash scripts/build.sh' first"
     continue
   fi
-  cp_found="$(docker run --rm --entrypoint sh "$img" -c '
+  cp_found="$(docker run --rm --user 0 --entrypoint sh "$img" -c '
       for p in /etc/mediator /src/policy /policy /profiles; do
         [ -e "$p" ] && echo "$p"
       done
@@ -640,6 +649,14 @@ expect 4 "does not exist" \
 # It is the one check that perturbs the committed file in place -- the drift stage reads
 # the copy in the BUILD CONTEXT and there is nowhere else to point it. The file was saved
 # before the run and is restored by the EXIT trap, so an interrupt mid-build still restores.
+#
+# ONLY MEDIATOR_BASE_DIGEST IS PASSED, and the dependency that creates is recorded rather
+# than left to be discovered: YQ_VERSION and YQ_SHA256_* fall through to the Dockerfile's
+# ARG defaults. SF-4 measured those defaults as agreeing with pins.env -- the absent-pins
+# run produced byte-identical output -- so this builds the same yq the Compose build does.
+# If they ever diverge, this check would exercise a different emitter than the pod does and
+# could not tell. Read with sed, never sourced: compose/pins.env is Compose data, and SF-4's
+# Codex pass found `set -a; . file` turning an appended line into shell on the host.
 cp "$COMMITTED_DEFAULT" "$SAVED_DEFAULT"
 DEFAULT_WAS_SAVED=1
 printf '\n# drift probe -- verify-pack-composition.sh\n' >> "$COMMITTED_DEFAULT"
