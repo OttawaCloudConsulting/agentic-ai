@@ -408,9 +408,42 @@ second architecture would mean inventing a pin nothing has verified.
 
 Branch builds are tagged by branch name and by full commit SHA; **nothing is tagged `latest`**, so
 there is no mutable tag for a consumer to drift onto. The published digest is reported in the run
-summary. Consuming it by digest — `AGENT_BASE_DIGEST` in `compose/pins.env` — lands with the next
-sub-feature; today the agent images still build their own base locally, and the workflow publishes
-without anything yet consuming it.
+summary, and `compose/pins.env` consumes it as `AGENT_BASE_DIGEST`.
+
+#### What a local build now pulls, and the first-publish bootstrap
+
+`images/Dockerfile`'s agent stages build `FROM ghcr.io/…/agent-sandbox-base@sha256:<digest>`. The
+`agent-base` stage is still in that file — it is the *definition* CI builds and publishes — but
+BuildKit skips a stage nothing references, so a local build **pulls the attested base rather than
+rebuilding it**. That is the point of D21: the image you run is the image CI built and attested,
+not a local re-derivation of it. The package is public, so no `docker login ghcr.io` is needed.
+
+`AGENT_BASE_DIGEST` has **no default**. Unset, the `FROM` expands to `…agent-sandbox-base@` and the
+build fails with `invalid reference format` rather than resolving to a mutable tag — the same
+discipline the agent pins use. Every build also prints
+`WARN: InvalidDefaultArgInFrom … results in empty or invalid base image name`; that is BuildKit
+describing the designed behaviour, not a defect, and it is documented at the `ARG` rather than
+suppressed, because `# check=skip=` is file-wide and would hide a future real one.
+
+**The bootstrap is a chicken-and-egg, and it is resolved by hand on purpose.** The `FROM` pins a
+digest that does not exist until the workflow has run once. So the first publish comes from the
+working branch, and its digest is copied from the run summary into `compose/pins.env` as a
+reviewed commit:
+
+```bash
+# 1. Push the branch. The workflow builds and publishes agent-base.
+git push
+
+# 2. Read the digest off the run summary.
+gh run view --workflow=agent-sandbox-image.yml --log | grep AGENT_BASE_DIGEST=
+
+# 3. Edit compose/pins.env, review the diff, commit it.
+$EDITOR compose/pins.env
+```
+
+Publishing is not automatic on every push in the sense that matters: the workflow runs, but nothing
+consumes the new image until a human moves the digest. A rebuild of the base does not change what
+the pod runs — only that committed line does.
 
 The workflow pins its actions by commit SHA rather than by tag. Every other supply-chain input
 here is pinned by digest or checksum, and `publish-base` holds `packages: write`: an action

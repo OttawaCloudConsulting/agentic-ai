@@ -147,7 +147,7 @@
 
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
-    Sub-features: 5/7 complete
+    Sub-features: 6/7 complete
     Build started 2026-09-07. Codebase assessment ABSENT (no .project/<slug>/docs/codebase-assessment.md);
     the refresh was skipped with a warning rather than blocking, per the /build spec.
     SF-1 complete 2026-09-07: packs/language-runtimes/pack.yaml, packs/README.md, and the pack-manifest
@@ -656,7 +656,43 @@
     handed to the operator rather than run here, and publish the GHCR package PUBLIC so the
     operator bootstrap needs no docker login (the repo is public; the base is Debian/Node + git
     and holds no secrets).
-    THE PUSH IS THE BLOCKER FOR SF-6b. Nothing in SF-6a has been exercised by a CI run: the
+    SF-6 COMPLETE 2026-09-09. SF-6b landed; the checklist item is [x] and the count is 6/7.
+    THE PUSH HAPPENED and the bootstrap is closed. Branch pushed (f305afc..bdabf72, 24 commits);
+    workflow run 34376295042 GREEN ON THE FIRST RUN, both jobs, no fixes -- publish-base 45s on
+    ubuntu-24.04-arm (the runner label resolved, which was the top first-run risk) and
+    policy-drift 16s on x86. AGENT_BASE_DIGEST=sha256:213d56ab12d0f4bb945f3a7f2b808c4e2b52fe18d
+    24d9624c23e59d09006f9b3, confirmed three independent ways (manifest export, both tag pushes,
+    the summary step) and NOT confused with the log's "SHA256 digest of uploaded artifact
+    f670aa..." which is the attestation artifact upload.
+    THE PACKAGE WAS ALREADY PUBLIC -- no action was needed for the visibility step. GitHub
+    inherited the public repository's visibility. Proved anonymously with a token from GHCR's
+    unauthenticated token endpoint: manifest fetch returns HTTP 200. So the operator bootstrap
+    needs no docker login, which is what the operator chose. The gh token has no packages scope
+    and it turned out not to matter.
+    R10.7 IS SATISFIED FOR THE PUBLISHED BASE, verified rather than asserted. The pinned index is
+    application/vnd.oci.image.index.v1+json over exactly ONE linux/arm64 image manifest plus one
+    attestation manifest, and that manifest's layers are https://spdx.dev/Document (4,165,960
+    bytes) and https://slsa.dev/provenance/v1 (119,577 bytes). Deviation 15's single-architecture
+    claim is the published shape, not a prediction.
+    D21 IS NOW LOAD-BEARING. images/Dockerfile's agent stages consume the base by digest, so
+    BuildKit skips the unreferenced local agent-base stage and a local build PULLS the attested
+    base. Proved by layer comparison: the built claude image's first 17 layers are byte-for-byte
+    the published base's 17, with 6 added on top. Negative control also run -- with
+    AGENT_BASE_DIGEST absent from the pins file the build fails at 'failed to parse stage name
+    "...agent-sandbox-base@": invalid reference format', exit 1, with no fallback to a tag.
+    Deviation 17: the SKEL_MARKER test hook moved from agent-base to agent-packs. It STOPPED
+    WORKING when the base went to the registry -- verify-pod-topology.sh's --build-arg reached a
+    stage BuildKit no longer builds and the run failed with new_file='' (the preserved half still
+    passing, which is what made the failure informative). Found by running the harness, not by
+    reading. The constraint it exposes outlives the fix: a build argument only has effect in a
+    stage that is still built locally. A test-only affordance also had no business in the
+    CI-published supply-chain artifact.
+    Re-verified after SF-6b: lint-policy.sh exit 0, verify-pod-topology.sh 61 PASS 0 FAIL ALL
+    CHECKS PASSED, verify-egress-mediator.sh 77 PASS 0 FAIL ALL PHASES PASSED, and both the
+    default and the zero-pack test-fixtures profiles building clean through scripts/build.sh.
+    SF-7 (acceptance harness) is the only sub-feature left; the feature's Test Command cannot run
+    until it exists, so 01.5 stays [~].
+    HISTORICAL, SF-6a: THE PUSH WAS THE BLOCKER FOR SF-6b. Nothing in SF-6a has been exercised by a CI run: the
     ubuntu-24.04-arm runner label, the GHCR push, the attestation emission and the arm64 build
     are all unverified until this branch is pushed. Resume: push, read AGENT_BASE_DIGEST off the
     run summary, set the package public, then /build SF6 again.

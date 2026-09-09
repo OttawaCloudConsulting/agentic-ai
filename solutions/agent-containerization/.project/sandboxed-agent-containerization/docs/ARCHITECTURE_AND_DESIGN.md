@@ -249,7 +249,12 @@ solutions/agent-containerization/
 │   ├── compose.yaml               # networks (3× internal + external), mediator, 3 agent services
 │   └── overrides/<profile>.yaml   # profile-selected override — the R12.9 entry point
 ├── images/
-│   ├── Dockerfile                 # ONE multi-stage build: agent-base + claude + codex + agy,
+│   ├── Dockerfile                 # ONE multi-stage build. agent-base is DEFINED here and built
+│   │                              #   only by CI (--target agent-base); the agent stages consume
+│   │                              #   it FROM ghcr.io/...@sha256:$AGENT_BASE_DIGEST, so a LOCAL
+│   │                              #   build pulls the attested base rather than rebuilding it
+│   │                              #   (01.5 SF-6b, D21, R10.2). BuildKit skips the unreferenced
+│   │                              #   local stage. Stages: agent-base + claude + codex + agy,
 │   │                              #   selected by `target:` (01.2 Deviation 1). Four files became
 │   │                              #   one because the three agent stages share the base layer and
 │   │                              #   Compose selects the stage per service
@@ -366,6 +371,17 @@ carries a single `GIT_SHA256` — the arm64 one, matching R11.1/A1's Docker Desk
 silicon. An amd64 runner fails at that checksum comparison. Publishing a second architecture
 therefore needs a second verified pin, not a runner change, and D21's "the base image" is
 consequently single-architecture for as long as A1 holds.
+
+**D21 is now load-bearing rather than aspirational, and one consequence was found by testing.**
+Since 01.5 SF-6b the agent stages consume the published base by digest, so BuildKit no longer
+builds `agent-base` locally at all. Anything driven by a build argument declared in that stage
+became unreachable from a local build: `verify-pod-topology.sh`'s volume-upgrade check passes
+`--build-arg SKEL_MARKER=...`, and it silently reached nothing until the hook was moved down into
+`agent-packs`. The general rule the tree should hold to is that **a build argument only has effect
+in a stage that is still built locally**, and the narrower one is that a test-only affordance has
+no business in the CI-published supply-chain artifact in the first place. Verified after the move:
+the built agent images' first 17 layers are byte-for-byte the published base's, with 6 layers
+added on top.
 
 ## Deployment & Operations
 

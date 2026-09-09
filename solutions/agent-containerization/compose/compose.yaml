@@ -221,6 +221,11 @@ services:
         SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
         GIT_VERSION: ${GIT_VERSION}
         GIT_SHA256: ${GIT_SHA256}
+        # The CI-published base, by digest (01.5 SF-6b, D21, R10.2). NO `:-` fallback:
+        # an unset value must fail the build, not resolve to something. Compose warns and
+        # substitutes empty, and images/Dockerfile's FROM then dies on `...@`, which is
+        # the intended end state -- pins.env is where the value lives.
+        AGENT_BASE_DIGEST: ${AGENT_BASE_DIGEST}
     image: sandboxed-agent/claude:local
     networks:
       - claude-net
@@ -277,6 +282,11 @@ services:
         SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
         GIT_VERSION: ${GIT_VERSION}
         GIT_SHA256: ${GIT_SHA256}
+        # The CI-published base, by digest (01.5 SF-6b, D21, R10.2). NO `:-` fallback:
+        # an unset value must fail the build, not resolve to something. Compose warns and
+        # substitutes empty, and images/Dockerfile's FROM then dies on `...@`, which is
+        # the intended end state -- pins.env is where the value lives.
+        AGENT_BASE_DIGEST: ${AGENT_BASE_DIGEST}
     image: sandboxed-agent/codex:local
     networks:
       - codex-net
@@ -324,6 +334,11 @@ services:
         SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
         GIT_VERSION: ${GIT_VERSION}
         GIT_SHA256: ${GIT_SHA256}
+        # The CI-published base, by digest (01.5 SF-6b, D21, R10.2). NO `:-` fallback:
+        # an unset value must fail the build, not resolve to something. Compose warns and
+        # substitutes empty, and images/Dockerfile's FROM then dies on `...@`, which is
+        # the intended end state -- pins.env is where the value lives.
+        AGENT_BASE_DIGEST: ${AGENT_BASE_DIGEST}
     image: sandboxed-agent/agy:local
     networks:
       - agy-net

@@ -306,7 +306,7 @@ the SF-1..SF-5 / SF-6 boundary.
   assertion — this is its **fourth** extension, after 01.3's `/run/secrets` and 01.4's
   `/run/oauth-src` and `/run/gitconfig`.
 
-- [ ] **SF-6: GitHub Actions base-image publish, per-profile build artifacts, and the CI drift job**
+- [x] **SF-6: GitHub Actions base-image publish, per-profile build artifacts, and the CI drift job**
   -- Create `.github/workflows/agent-sandbox-image.yml` at the **repository root** — this
   repository's first workflow. Build `images/agent-base`, publish to GHCR with an SBOM via buildx
   attestation, and tag branch builds so nothing consumes them by default. Pin the three agent
@@ -1452,3 +1452,24 @@ versus compile stage (two `yq` versions, two platforms) and now two `bash` versi
   resolves `default` and the harness override resolves `test-selfcheck`. SF-7's Phase D, which
   changes a profile's pack set and re-runs the documented command, now exercises one selector rather
   than two.
+
+### Deviation 17: the `SKEL_MARKER` test hook moves from `agent-base` to `agent-packs`
+
+- **What changed:** `images/Dockerfile`'s volume-upgrade test hook -- `ARG SKEL_MARKER` and the
+  `RUN` that writes `/opt/agent-home-skel/.upgrade-marker` -- moved out of the `agent-base` stage
+  and into `agent-packs`.
+- **Originally planned:** 01.2 SF-4 put the hook in `agent-base`, and nothing in this plan
+  contemplated moving it. SF-6's bullet describes pinning the base, not editing what is in it.
+- **Why necessary:** It stopped working, and the harness caught it. Once the agent stages consume
+  the base `FROM ghcr.io/...@sha256:<digest>`, BuildKit skips the unreferenced local `agent-base`
+  stage, so `verify-pod-topology.sh`'s `--build-arg SKEL_MARKER=upgraded-01.2-sf4` reached nothing:
+  the run failed with `volume upgrade: new_file='' preserved='agent-owned'`. The preserved half
+  passed, which is what makes the failure informative rather than ambiguous -- the volume logic was
+  fine and only the hook was unreachable. The second reason points the same way and would justify
+  the move on its own: `agent-base` is the CI-published, attested supply-chain artifact, and a
+  test-only affordance does not belong in an image whose purpose is to be consumed by digest.
+- **Impact:** The general constraint this exposes is worth more than the fix: **a build argument
+  only has effect in a stage that is still built locally.** Any future `--build-arg` aimed at
+  `agent-base` behaviour is inert from a local build and must go through CI or move down a stage.
+  `agent-packs` is shared by all three agents, so the hook keeps the property it needed. The next
+  base publish drops the (inert) hook from the published image.

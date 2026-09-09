@@ -18,6 +18,25 @@
 # only step in the agent build that parses YAML; it emits plain text and the install
 # stage consumes that. Same split, and the same reason, as the mediator Dockerfile's
 # `compile` versus `runtime`.
+# The GHCR-published agent-base, consumed BY DIGEST (D21, R10.2, 01.5 SF-6b).
+#
+# Declared here, above the first FROM, because only a global ARG is in scope in a FROM
+# line. IT HAS NO DEFAULT, DELIBERATELY -- the same discipline 01.2 applies to the agent
+# pins. Unset, this expands to `...@` and the build dies on an invalid reference instead
+# of resolving to a mutable tag, which is the failure mode R10.2 exists to prevent. The
+# value lives in compose/pins.env and is a REVIEWED edit: a human copies it from the
+# workflow run summary (Edge Case 11's bootstrap).
+#
+# EVERY BUILD PRINTS A LINT WARNING ABOUT THIS, and it is expected:
+#   WARN: InvalidDefaultArgInFrom: Default value for ARG
+#   ghcr.io/...agent-sandbox-base@${AGENT_BASE_DIGEST} results in empty or invalid
+#   base image name (line 176)
+# BuildKit is describing the designed behaviour, not a defect -- an empty value MUST
+# produce an invalid reference. It is not suppressed with `# check=skip=`, because that
+# directive is file-wide and would also hide a future FROM where the same warning is a
+# real one.
+ARG AGENT_BASE_DIGEST
+
 FROM node:22-slim AS pack-plan
 
 ARG YQ_VERSION=v4.47.2
@@ -122,17 +141,6 @@ RUN mkdir -p /build-cache && chown agent:agent /build-cache
 # on every start, idempotently.
 RUN mkdir -p /opt/agent-home-skel && chown -R agent:agent /opt/agent-home-skel
 
-# Test-only hook for the volume-upgrade smoke check (Edge Case 8): empty by
-# default, so it changes nothing about a normal build. When set, adds one
-# file to the skeleton so the test can rebuild with a "changed default" and
-# assert it appears in an existing volume without disturbing agent-owned
-# files already there.
-ARG SKEL_MARKER=""
-RUN if [ -n "$SKEL_MARKER" ]; then \
-      echo "$SKEL_MARKER" > /opt/agent-home-skel/.upgrade-marker \
-      && chown agent:agent /opt/agent-home-skel/.upgrade-marker; \
-    fi
-
 COPY --chmod=0755 images/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # The AUTH_MODE dispatcher (01.4 SF-2, Interface Contract 2). Lives here rather than under
@@ -152,11 +160,41 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 # agent-packs -- profile-DEPENDENT. The layer where the profile's pack OS packages and
 # archives are installed, build time only (R7.18). Every agent stage passes through it,
 # so nothing below depends on which packs were selected.
-FROM agent-base AS agent-packs
+# NOT `FROM agent-base` -- from the PUBLISHED base, by digest.
+#
+# The `agent-base` stage above is still the definition of that image and is what CI
+# builds and pushes (`--target agent-base`); it is simply no longer what the agent stages
+# consume. BuildKit skips a stage nothing references, so a local build PULLS the attested
+# base rather than rebuilding it, which is the whole point of D21: the image an operator
+# runs is the image CI built, attested and published, not a local re-derivation of it.
+#
+# The repository is hardcoded rather than built from an ARG. It must agree with the
+# workflow's `env.IMAGE`, and it is a supply-chain anchor: a value a caller could pass
+# would let `--build-arg` redirect the base image of every agent in the pod.
+FROM ghcr.io/ottawacloudconsulting/agentic-ai/agent-sandbox-base@${AGENT_BASE_DIGEST} AS agent-packs
 
 COPY --from=pack-plan /out /tmp/pack-plan
 RUN bash /usr/local/bin/pack-install /tmp/pack-plan /usr/local/share/keyrings/debian-archive.gpg \
     && rm -rf /tmp/pack-plan
+
+# Test-only hook for the volume-upgrade smoke check (Edge Case 8): empty by default, so
+# it changes nothing about a normal build. When set, adds one file to the home skeleton so
+# the test can rebuild with a "changed default" and assert it appears in an existing volume
+# without disturbing agent-owned files already there.
+#
+# MOVED OUT OF agent-base AT 01.5 SF-6b, for two reasons that point the same way. It stopped
+# WORKING there: agent-base is now pulled from GHCR by digest, BuildKit skips a stage nothing
+# references, and a local `--build-arg SKEL_MARKER=...` therefore reached nothing --
+# verify-pod-topology.sh failed with new_file='' the first time it ran against the pinned
+# base. And it should not have been there anyway: agent-base is the CI-published
+# supply-chain artifact, and a test-only affordance does not belong in an image whose whole
+# purpose is to be attested and consumed by digest. agent-packs is built locally and is
+# shared by all three agents, which is the property the hook needs.
+ARG SKEL_MARKER=""
+RUN if [ -n "$SKEL_MARKER" ]; then \
+      echo "$SKEL_MARKER" > /opt/agent-home-skel/.upgrade-marker \
+      && chown agent:agent /opt/agent-home-skel/.upgrade-marker; \
+    fi
 
 # The Go toolchain the pack installs lands at /usr/local/go. An ENV belongs to the
 # image, not to the install script. Harmless when no pack supplies Go: the directory
