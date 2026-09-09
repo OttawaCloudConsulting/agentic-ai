@@ -147,7 +147,7 @@
 
 [~] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
-    Sub-features: 6/7 complete
+    Sub-features: 7/7 complete
     Build started 2026-09-07. Codebase assessment ABSENT (no .project/<slug>/docs/codebase-assessment.md);
     the refresh was skipped with a warning rather than blocking, per the /build spec.
     SF-1 complete 2026-09-07: packs/language-runtimes/pack.yaml, packs/README.md, and the pack-manifest
@@ -860,6 +860,74 @@
     the RFC 6761 special-use-TLD warning the Gate 2 refresh assigns here. Sub-feature count
     unchanged. Three checklist items need the operator: the test command's scope, the exit-code
     change against existing callers, and the .dockerignore allowlist extension.
+    SF-7b COMPLETE 2026-09-09. Phases D-H; the checklist item is [x] and the count is 7/7.
+    verify-pack-composition.sh: 109 PASS 0 FAIL, ALL PHASES PASSED.
+    EXECUTION ORDER IS NOT LETTER ORDER, and that is mechanism. F, G and H need a pod running
+    the LOADED profile; D and E then REMOVE the pack and rebuild, which is the only way to
+    observe R7.5's no-residue property on the profile that actually carries the pack. Running
+    D/E first would leave the pod unloaded and force a third bring-up. Order: up, F, G, H, D, E,
+    restore.
+    TWO REAL DEFECTS IN THE DOCUMENTED ENTRY POINT, both found by Phase D being the FIRST THING
+    IN THIS PROJECT'S HISTORY TO RUN IT. The two sibling harnesses sidestep `up` entirely --
+    verify-pod-topology.sh uses `compose run -d` per agent, verify-egress-mediator.sh starts the
+    mediator by name -- so a command that had been amended twice (01.3, and SF-4's `--build`)
+    had never once been executed. The general point outlives both fixes: A DOCUMENTED COMMAND
+    THAT NO TEST RUNS IS NOT A TESTED COMMAND.
+    DEFECT 1, DEVIATION 19: `up --build` failed 3 OF 3 with "failed to set up container
+    networking: Address already in use". Measured, not inferred: the mediator declares
+    ipv4_address 172.31.{10,20,30}.2 and there is no depends_on, so `up` starts all four
+    services in parallel and Docker's IPAM offers .2 -- the mediator's own address -- to
+    whichever agent asks first. The agents' command is `<agent> --version`, so they exit almost
+    at once and a SEQUENTIAL bring-up succeeds purely on timing, which is exactly why every
+    earlier harness passed. Fixed with an ip_range reserving the low half of each subnet; the
+    /24 stays because the listener certificates' iPAddress SANs are written against it. 3/3
+    failing before, 3/3 clean after.
+    DEFECT 2, DEVIATION 20, AND IT IS THE SECURITY-RELEVANT ONE: `up --build` rebuilds the
+    mediator image and then reports the container `Running`. The pod goes on enforcing the
+    policy compiled into the PREVIOUS image. Measured: image ID CHANGED, container not
+    recreated, live compiled_from.packs still 1 against a committed artifact of 0 -- an operator
+    edits policy, recompiles, runs the documented command, sees success, and the old allowlist
+    is still in force. Same failure SF-4's amendment named, one layer up: SF-4 fixed the stale
+    IMAGE, this fixes the stale CONTAINER.
+    REFERRED TO CODEX BY THE OPERATOR and the verdict taken, following SF-3's and Edge Case 17's
+    precedent. Codex was asked to CHALLENGE the diagnosis rather than pick from the menu.
+    Verdict: amend the entry point to `up --build --force-recreate`, UNCONDITIONALLY rather than
+    only inside the refresh procedure -- scoping it to the refresh would re-create the
+    "hidden second step" failure SF-4 had already removed. It ruled out mounting or reloading
+    the policy as a different and larger design (the repo compiles in a build stage behind a
+    drift gate on purpose), and ruled out a mediator-only recreate as too narrow, because a
+    pack-set change must also shed the AGENTS' package residue -- which is what Phase E asserts.
+    It also checked the cost: named state and audit volumes survive recreation; what is lost is
+    in-flight connections and transient /run and /tmp state, now stated in the README.
+    THREE THINGS THE HARNESS HAD TO LEARN ABOUT THE POD, none of them deviations. (1) The agents
+    do not stay up -- their command is `<agent> --version` -- so every live-agent assertion runs
+    in a `compose run -d ... sleep` container, the pattern both siblings already use. (2) Those
+    containers are RECYCLED after Phase D's rebuild; without that, Phase E's residue check would
+    inspect the OLD image and report no change, a false PASS in the permissive direction.
+    (3) `set -e` killed the first run silently on a command substitution whose last command was
+    a non-matching `grep -q && echo` -- no FAIL line, exit 1, which is the worst shape a harness
+    failure can have.
+    THREE PROBE DEFECTS, NOT CODE DEFECTS, each fixed rather than accepted -- the same
+    bookkeeping SF-3's and SF-5's passes recorded. The snapshot-URL assertion compared raw
+    strings where images/pack-install.sh:50 compares `${APT_URL%/}`, so it failed on a CORRECT
+    pair; the T15 residual asserted verdict `denied` where the mediator emits `deny`; and
+    SF-7a's wildcard probe named the wrong reader. All three were caught only because `expect`
+    asserts the MESSAGE as well as the exit code.
+    WHAT PHASE E PROVES, and it is Deviation 18's mechanism: with COMPILED_AT fixed, the loaded
+    and unloaded compiles of the SAME profile against the SAME bases are byte-identical outside
+    compiled_from, and compiled_from.packs is the only thing that moved (1 to 0). The residue
+    half is asserted on the container rebuilt from the profile with the pack REMOVED -- go,
+    python3 and /usr/local/go gone, node and git still present because they come from
+    agent-base and not from the pack. A mount delta is deliberately NOT asserted: Deviation 5
+    refuses pack-supplied mounts, so it cannot exist.
+    SF-2's RE-HOMED OBLIGATION IS DISCHARGED IN PHASE G: the project mount that actually exists,
+    read off `docker inspect` on a running container, with every bind source resolved through
+    the filesystem and required to be neither the solution root, nor inside it, nor an ancestor
+    of it. That is the SYMLINK half the compiler's lexical gate cannot reach and that SF-2's
+    Codex pass explicitly left to SF-7.
+    T23's WRITE half is new here: verify-pod-topology.sh checks that the build caches are
+    DISTINCT; this writes a marker into claude's cache as the agent user (which must SUCCEED --
+    the image seeds agent:agent ownership) and requires it to be absent from codex's.
 
 [ ] Feature 01.6: Per-agent workload identity
     Plan: (not yet planned)

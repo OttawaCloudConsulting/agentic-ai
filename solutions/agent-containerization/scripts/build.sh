@@ -110,6 +110,9 @@ echo "build: recorded ${RECORD}"
 echo "build: the agent images are also tagged :${PROFILE}, so a second profile's build does not"
 echo "build: silently replace this one's -- Compose's own :local tag is reused by every profile."
 echo
+# `--force-recreate` is on the printed line for the same reason `--build` is on the README's
+# entry point: the resolved policy is baked into the mediator image, so a rebuilt image that
+# does not replace the running container leaves the previous policy in force (01.5 SF-7b).
 # AGENT_PROFILE now selects the mediator's runtime profile as well as the agents' pack
 # set (compose.yaml, 01.5 SF-6), so the run command carries the same variable this build
 # used. Printing it is not decoration: the pairing is the thing that was previously
@@ -123,9 +126,9 @@ echo "build:   AGENT_PROFILE=${PROFILE} docker compose --env-file compose/pins.e
 # Printing overrides/default.yaml for every profile would print a command that layers the
 # WRONG override -- a run line that is wrong is worse than one that says it does not know.
 if [[ -f "compose/overrides/${PROFILE}.yaml" ]]; then
-  echo "build:     -f compose/compose.yaml -f compose/overrides/${PROFILE}.yaml up -d"
+  echo "build:     -f compose/compose.yaml -f compose/overrides/${PROFILE}.yaml up -d --force-recreate"
 else
-  echo "build:     -f compose/compose.yaml <-f the fragments this profile needs> up -d"
+  echo "build:     -f compose/compose.yaml <-f the fragments this profile needs> up -d --force-recreate"
   echo "build: (no compose/overrides/${PROFILE}.yaml -- this profile layers no same-named"
   echo "build:  override; see README for which fragments apply)"
 fi

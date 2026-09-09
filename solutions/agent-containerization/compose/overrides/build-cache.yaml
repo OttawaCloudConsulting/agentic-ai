@@ -5,7 +5,7 @@
 #
 #   docker compose -f compose/compose.yaml \
 #                  -f compose/overrides/default.yaml \
-#                  -f compose/overrides/build-cache.yaml up --build
+#                  -f compose/overrides/build-cache.yaml up --build --force-recreate
 #
 # ONE VOLUME PER AGENT, AND NO WAY TO SPELL A SHARED ONE. R2.10's real content is that a
 # build cache must not become a cross-agent write channel: whatever one agent writes into

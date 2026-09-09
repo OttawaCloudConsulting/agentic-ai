@@ -11,21 +11,38 @@ networks:
   # an iPAddress SAN for exactly the address below. Change one of these and the
   # matching certificate must be re-issued against the new address
   # (`bash scripts/issue-identity.sh listener <agent> --ip <addr>`).
+  #
+  # `ip_range` RESERVES THE MEDIATOR'S ADDRESS, and it is what makes the documented
+  # entry point work at all (01.5 SF-7b, Deviation 19). Without it, dynamic assignment
+  # starts at .2 -- the very address the mediator declares -- so a plain
+  # `docker compose up` fails with "failed to set up container networking: Address
+  # already in use" whenever an agent is still alive when the mediator claims its
+  # address. The agents' command is `<agent> --version`, so they exit almost at once
+  # and a SEQUENTIAL bring-up succeeds by luck of timing; a parallel one, which is what
+  # `up` does, failed 3 times out of 3. Restricting dynamic allocation to .128/25 leaves
+  # the whole .2-.127 span, the mediator's address included, unreachable by IPAM.
+  #
+  # The subnet stays /24 because the listener certificates' iPAddress SANs and the
+  # agents' `dns:` keys are written against it; ip_range narrows only what Docker hands
+  # out on its own, and the mediator's explicit ipv4_address is unaffected by it.
   claude-net:
     internal: true
     ipam:
       config:
         - subnet: 172.31.10.0/24
+          ip_range: 172.31.10.128/25
   codex-net:
     internal: true
     ipam:
       config:
         - subnet: 172.31.20.0/24
+          ip_range: 172.31.20.128/25
   agy-net:
     internal: true
     ipam:
       config:
         - subnet: 172.31.30.0/24
+          ip_range: 172.31.30.128/25
   # Compose-managed bridge, internal:false (NOT Compose `external:`). No agent
   # container attaches to this network -- the mediator is its only member, which
   # is what makes the mediator the pod's single route out (R1.2, D1). 01.2 recorded

@@ -315,10 +315,11 @@ the SF-1..SF-5 / SF-6 boundary.
   profile image's digest and emitting its SBOM (R9.9, Edge Case 19). Add the CI job that fails on
   resolved-policy drift. Document the first-publish bootstrap (Edge Case 11).
 
-- [ ] **SF-7: Acceptance harness** -- **SPLIT. SF-7a complete 2026-09-09 (phases A-C); SF-7b
-  outstanding (phases D-H), so this item stays `[ ]`.** The bullet says "phases A-G" and the Test
-  Strategy says "Eight phases" and tabulates A-H; the bullet's own T-list includes T31, which is
-  Phase H. Eight is the count that is built to. -- `tests/acceptance/verify-pack-composition.sh`, phases A-H
+- [x] **SF-7: Acceptance harness** -- **SPLIT and COMPLETE. SF-7a 2026-09-09 (phases A-C);
+  SF-7b 2026-09-09 (phases D-H). 109 PASS 0 FAIL, ALL PHASES PASSED.** The bullet says "phases
+  A-G" and the Test Strategy says "Eight phases" and tabulates A-H; the bullet's own T-list
+  includes T31, which is Phase H. Eight is the count that was built to.
+  -- `tests/acceptance/verify-pack-composition.sh`, phases A-H
   covering T14, T15, T21, T23, T27, T31 and T33, following the harness conventions all four siblings
   share: test-scoped Compose project name, `down -v` teardown, assertions against `docker inspect`
   on running containers rather than against the Compose YAML, and no third-party service as a test
@@ -1521,3 +1522,64 @@ versus compile stage (two `yq` versions, two platforms) and now two `bash` versi
   question R7.5 asks. One more line of the row is moot rather than wrong: "package set and mounts
   change" -- Deviation 5 refuses pack-supplied mounts, so only the package set can change, and a
   mount delta is not asserted because it cannot exist. Both phases are SF-7b's; SF-7a builds A-C.
+
+### Deviation 19: the agent networks reserve the mediator's address, because the documented entry point did not work
+
+- **What changed:** `compose/compose.yaml`'s three agent networks gained an `ip_range`
+  (`172.31.{10,20,30}.128/25`) alongside their existing `/24` subnet, so Docker's dynamic
+  allocation cannot hand out the addresses the mediator declares statically.
+- **Originally planned:** Nothing in this feature contemplated touching the pod's network
+  definitions. SF-7 is an acceptance harness, and Contract 5's Compose seam is about build
+  contexts, not IPAM.
+- **Why necessary:** The documented start command did not work, and Phase D is the first thing
+  in this project's history to run it. `docker compose ... up --build` failed **3 times out of
+  3** with `failed to set up container networking: Address already in use`. The mechanism was
+  measured, not inferred: the mediator declares `ipv4_address: 172.31.{10,20,30}.2` on the three
+  agent networks and there is no `depends_on`, so `up` starts all four services in parallel;
+  Docker's IPAM allocates from the bottom of each `/24`, and `.2` — the mediator's own address —
+  is the first address it offers. The agents' command is `<agent> --version`, so they exit almost
+  immediately and a **sequential** bring-up succeeds purely on timing, which is why every earlier
+  harness passed: `verify-pod-topology.sh` uses `compose run -d` per agent and
+  `verify-egress-mediator.sh` starts the mediator by name. Neither has ever run `up`.
+- **Impact:** `ip_range` restricts only what Docker allocates on its own; the subnet stays `/24`
+  because the listener certificates' `iPAddress` SANs and the agents' `dns:` keys are written
+  against it, and the mediator's explicit `ipv4_address` is unaffected. Proved in both
+  directions: 3/3 failures before the change, 3/3 clean bring-ups after. The general point is
+  worth more than the fix — **a documented command that no test runs is not a tested command.**
+  This one had been amended twice (01.3, and SF-4's `--build`) without ever being executed.
+
+### Deviation 20: the documented entry point gains `--force-recreate`
+
+- **What changed:** The start command in `README.md`, the example in
+  `compose/overrides/build-cache.yaml` and the run line `scripts/build.sh` prints all become
+  `up --build --force-recreate`.
+- **Originally planned:** SF-4 amended this entry point to `up --build` and treated that as
+  closing the stale-policy question. Nothing in this feature contemplated a second amendment,
+  and SF-7 is an acceptance harness rather than a change to how the pod is started.
+- **Why necessary:** `up --build` rebuilds the mediator image and then leaves the running
+  container alone. Measured: after editing `profiles/default.yaml` and refreshing through
+  `scripts/compile-policy-build.sh`, the command exited 0, the mediator image ID **changed**,
+  Compose reported the container `Running` rather than recreated, and the mediator went on
+  serving `compiled_from.packs: 1` against a committed artifact of `0`. The operator sees a
+  successful build and the pod enforces the previous allowlist. That is the same failure SF-4's
+  amendment named — "a cached image reuses the policy compiled into it, so a profile switch
+  would appear to work while the pod enforced the previous policy" — one layer up: SF-4 fixed
+  the stale **image**, this fixes the stale **container**. The two flags are halves of one
+  requirement (SC-6, R12.1, D10) and neither is sufficient alone.
+- **Referred to Codex and the verdict taken**, following SF-3's and Edge Case 17's precedent for
+  a decision this feature does not own. Codex was asked to challenge the diagnosis rather than
+  pick from the menu, and specifically to rule on whether `--force-recreate` masks a different
+  root cause. Verdict: amend the entry point, **unconditionally** rather than only inside the
+  policy-refresh procedure — scoping it to the refresh re-creates the "operator must know a
+  hidden second step" failure SF-4 had already removed one layer down. Two alternatives were
+  examined and rejected on mechanism: mounting the policy or teaching the mediator to reload it
+  is a different and larger design (the repository deliberately compiles in a build stage behind
+  a drift gate, and `policy/resolved/README.md` ties runtime policy to that gate), and a
+  mediator-only recreate is too narrow because a pack-set change must also shed the agents'
+  package residue (D10, R7.5), which is exactly what Phase E asserts.
+- **Impact:** Recreation preserves the named per-agent state volumes and the mediator's audit
+  volume — checked, not assumed. What it does cost is operational and is now stated in the
+  README: in-flight proxy and DNS connections are broken, fresh startup-check audit events are
+  emitted, anything under `/run` or `/tmp` is dropped, and container IDs rotate. The build cache
+  is not invalidated. Phase D's NEGATIVE direction is unaffected: a stale committed artifact
+  fails at the build stage, before any container is recreated.

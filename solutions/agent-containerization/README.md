@@ -13,11 +13,20 @@ profile) has produced a runnable pod. **This pod is not for real work yet** — 
 
 ```
 docker compose --env-file compose/pins.env \
-  -f compose/compose.yaml -f compose/overrides/default.yaml up --build
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
 ```
 
 This is the only entry point — no wrapper script. `--env-file` is required: Compose interpolates
 version pins from it into the image builds, and without it the build fails.
+
+`--build` and `--force-recreate` are both load-bearing, and each fixes one half of the same
+failure: **the pod enforcing policy that is no longer the policy on disk.** The resolved egress
+allowlist is compiled by a build stage and baked into the mediator image, so a cached image
+reuses the policy compiled into it (`--build`), and a container that is not recreated keeps
+running the previous image even after a new one is built (`--force-recreate`). Without either,
+a policy change appears to succeed while the mediator continues to enforce the old allowlist.
+Recreation preserves the named state and audit volumes; it does drop in-flight proxy
+connections and anything under `/run` or `/tmp`.
 
 **`--build` is required, not a convenience** (Feature 01.5 SF-4). The mediator's egress policy is
 compiled by a *build stage*, so a run that reuses a cached image also reuses the policy that was
