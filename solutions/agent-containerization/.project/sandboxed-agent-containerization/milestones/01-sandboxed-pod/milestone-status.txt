@@ -1,5 +1,5 @@
 # Milestone 01: Sandboxed Pod
-# Status: [~] in progress  6 features, 4 complete
+# Status: [~] in progress  6 features, 5 complete
 
 ## Features
 
@@ -145,7 +145,7 @@
     operator: the test command's relationship to the two existing harnesses, the throwaway provider
     accounts T24 needs, and confirmation that the OAuth endpoint allowlist addition stays 01.4's.
 
-[~] Feature 01.5: Pack composition, policy compiler and build pipeline
+[x] Feature 01.5: Pack composition, policy compiler and build pipeline
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
     Sub-features: 7/7 complete
     Build started 2026-09-07. Codebase assessment ABSENT (no .project/<slug>/docs/codebase-assessment.md);
@@ -928,6 +928,15 @@
     T23's WRITE half is new here: verify-pod-topology.sh checks that the build caches are
     DISTINCT; this writes a marker into claude's cache as the agent user (which must SUCCEED --
     the image seeds agent:agent ownership) and requires it to be absent from codex's.
+    FEATURE COMPLETE 2026-09-09. The composite Test Command ran for the FIRST time -- it could
+    not run before SF-7 existed -- and passed end to end, exit 0:
+      verify-pack-composition.sh   109 PASS 0 FAIL  ALL PHASES PASSED
+      verify-pod-topology.sh        61 PASS 0 FAIL  ALL CHECKS PASSED
+      verify-egress-mediator.sh     77 PASS 0 FAIL  ALL PHASES PASSED
+    247 assertions, 0 failures. lint-policy.sh exit 0. The two pre-existing harnesses were the
+    ones at risk -- SF-7b changed compose/compose.yaml, which both of them drive -- so their
+    passing is a regression check and not a formality. 20 architectural deviations recorded
+    across the feature; /design refresh is worth running to consolidate them.
 
 [ ] Feature 01.6: Per-agent workload identity
     Plan: (not yet planned)
