@@ -940,7 +940,7 @@
 
 [~] Feature 01.6: Per-agent workload identity
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/per-agent-workload-identity.md
-    Sub-features: 1/4 complete
+    Sub-features: 2/4 complete
     Notes: Created 2026-09-04 by /milestone revision -- split out of 01.3. Closes R8.8 with the
     strongest identity form each agent's client supports; carries T34 and the Milestone 03
     brokering gate. Ordered after 01.3; may land before or after 01.4 and 01.5.
@@ -971,3 +971,22 @@
     brokering gate stays listener+mtls alone, so claude only. One mediator-side question is handed
     to SF-3: P8 measured proxy_auth on a plain http_port, and https_port with proxy_auth is still
     unmeasured on this Squid build, so agy's mediator side is verified before its profile flips.
+    SF-2 complete 2026-09-09, built whole rather than split. Client-certificate enforcement is LIVE for
+    claude and verified against a running mediator before commit: a cert-less client is refused with
+    "tlsv13 alert certificate required", a certificate-bearing one is accepted, a claude verdict line
+    reads identity_source: listener+mtls, and T34's literal case (a same-CA CN=codex certificate on
+    claude's listener) returns 403 with the ERR_MEDIATOR_IDENTITY page and an audit line carrying
+    control=identity, reason=subject_mismatch, identity_source=listener -- the last-wins annotation
+    override confirmed on a real line. FOUR deviations recorded, all operator-confirmed. Deviation 1 is
+    the consequential one: the cascade warm-up cannot traverse an mtls front (the mediator holds no
+    client key and cache_peer_access admits only that agent's real front), so it is SKIPPED for claude
+    and claude's first request after a mediator start may be answered 500 and retried; the three
+    alternatives were rejected on identity grounds and the reasoning is in the code. Deviation 2
+    corrects the plan: a cert-less refusal is not literally silent -- it emits one anonymous
+    proxy_internal event -- so the harness asserts no VERDICT line, and SF-4's docs must say the same.
+    Deviation 3: three resolved artifacts, not two, and the two test-scoped ones are carried through the
+    image build rather than recompiled by it, so they need a host recompile in the same commit.
+    Deviation 4: a sixth pre-existing assertion broke (the control-plane mount check flags */mediator*
+    and *.key, which the client secret trips). Test Command NOT yet run -- it is the feature-completion
+    gate and SF-3 and SF-4 are outstanding. verify-auth-state.sh is the operator's to run by hand at
+    this point, per the plan: it costs the host codex login and is excluded from the Test Command.

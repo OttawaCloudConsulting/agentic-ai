@@ -32,6 +32,15 @@ FIXTURE_COLLECTOR=172.31.40.20
 FIXTURE_NEIGHBOUR=172.31.40.21
 
 CA=mediator/identity/ca/mediator-ca.crt
+# 01.6 SF-2: claude's front listener requires a client certificate, so every probe that has to
+# reach it now presents one. The pair is the OPERATOR's, issued into mediator/identity/clients/
+# -- not a fixture. A fixture pair would not chain to the mediator CA and the probe would be
+# testing the refusal path while claiming to test the working one.
+CLIENT_CRT=mediator/identity/clients/claude-client.crt
+CLIENT_KEY=mediator/identity/clients/claude-client.key
+# The agents whose listener declares client_auth: mtls under policy/resolved/test-fixtures.yaml.
+# Read here rather than hardcoded three times below.
+MTLS_AGENTS=" claude "
 TLS_DIR="tests/fixtures/tls"
 MED_IMAGE=sandboxed-agent/mediator:local
 
@@ -72,6 +81,35 @@ probe_ca() { # <agent> <bash script>   -- same, with the mediator CA mounted for
   docker run --rm --network "${PROJECT}_${1}-net" -v "$ROOT/$CA:/tmp/ca.crt:ro" \
     --entrypoint bash "$MED_IMAGE" -c "$2" 2>&1
 }
+# 01.6 SF-2. The fourth probe variant: the CA for verifying the hop AND the agent's own client
+# key pair for authenticating to it. It keeps `-verify_return_error` and adds no insecure-TLS
+# bypass, for the reason 01.3 gave -- a bypass makes the one check that catches a mis-issued
+# listener certificate pass unconditionally, and enabling client authentication is no reason to
+# stop checking the server's half.
+probe_client() { # <agent> <bash script>
+  docker run --rm --network "${PROJECT}_${1}-net" \
+    -v "$ROOT/$CA:/tmp/ca.crt:ro" \
+    -v "$ROOT/$CLIENT_CRT:/tmp/client.crt:ro" \
+    -v "$ROOT/$CLIENT_KEY:/tmp/client.key:ro" \
+    --entrypoint bash "$MED_IMAGE" -c "$2" 2>&1
+}
+# Which helper reaches this agent's front listener with the credential its policy requires.
+# One place, so a listener that starts or stops authenticating changes one line rather than
+# five call sites.
+probe_hop() { # <agent> <bash script>
+  case "$MTLS_AGENTS" in
+    *" $1 "*) probe_client "$1" "$2" ;;
+    *)        probe_ca     "$1" "$2" ;;
+  esac
+}
+# The `openssl s_client` flags that present the client certificate, empty for an agent whose
+# listener does not ask for one.
+client_flags() { # <agent>
+  case "$MTLS_AGENTS" in
+    *" $1 "*) printf -- '-cert /tmp/client.crt -key /tmp/client.key' ;;
+    *)        printf '' ;;
+  esac
+}
 
 audit() { med cat /var/log/mediator/egress-audit.log 2>/dev/null; }
 dns_audit() { med cat /var/log/mediator/dns-audit.log 2>/dev/null; }
@@ -84,8 +122,19 @@ last_verdict() { # <dest_host>
   audit | jq -c --arg h "$1" 'select(.verdict != null and .dest_host == $h)' | tail -1
 }
 
-assert_verdict() { # <label> <dest_host> <verdict> [control] [reason]
-  local label="$1" host="$2" want="$3" ctl="${4:-}" rsn="${5:-}" line got ok=1
+# The attribution strength an audit line SHOULD carry, derived from the line's own agent. Not a
+# literal any more (01.6 SF-2): `claude`'s listener verifies a client certificate, so its verdict
+# lines read `listener+mtls`, and a harness that went on expecting `listener` everywhere would
+# fail on every claude assertion in this file.
+expected_idsrc() { # <agent>
+  case "$MTLS_AGENTS" in
+    *" $1 "*) printf 'listener+mtls' ;;
+    *)        printf 'listener' ;;
+  esac
+}
+
+assert_verdict() { # <label> <dest_host> <verdict> [control] [reason] [identity_source override]
+  local label="$1" host="$2" want="$3" ctl="${4:-}" rsn="${5:-}" idsrc_want="${6:-}" line got ok=1
   line="$(last_verdict "$host")"
   if [ -z "$line" ]; then fail "$label -- no audit line for $host"; return; fi
   got="$(printf '%s' "$line" | jq -r '.verdict')"
@@ -98,9 +147,16 @@ assert_verdict() { # <label> <dest_host> <verdict> [control] [reason]
     got="$(printf '%s' "$line" | jq -r '.reason')"
     [ "$got" = "$rsn" ] || { note "reason=$got, expected $rsn"; ok=0; }
   fi
-  # R9.1: identity and timestamp on every line, blocked attempts included.
-  printf '%s' "$line" | jq -e '.agent != null and .ts != null and .identity_source == "listener"' >/dev/null \
-    || { note "line carries no agent/ts/identity_source: $line"; ok=0; }
+  # R9.1: identity and timestamp on every line, blocked attempts included -- and, since 01.6,
+  # the STRENGTH of that identity. The expected value is derived from the line's own agent
+  # unless the caller names one: the T34 refusal is a claude line that must read `listener`,
+  # because no certificate was accepted on it.
+  local line_agent
+  line_agent="$(printf '%s' "$line" | jq -r '.agent // ""')"
+  [ -n "$idsrc_want" ] || idsrc_want="$(expected_idsrc "$line_agent")"
+  printf '%s' "$line" | jq -e --arg i "$idsrc_want" \
+    '.agent != null and .ts != null and .identity_source == $i' >/dev/null \
+    || { note "line carries no agent/ts, or identity_source is not '$idsrc_want': $line"; ok=0; }
   [ "$ok" -eq 1 ] && pass "$label" || { fail "$label"; note "$line"; }
 }
 
@@ -113,12 +169,22 @@ for tool in docker jq; do
   command -v "$tool" >/dev/null 2>&1 || { echo "FAIL: $tool is required"; exit 1; }
 done
 
-[ -f "$CA" ] || {
-  echo "FAIL: $CA is missing. Issue the trust material first (mediator/identity/README.md):"
+# The client key pair is listed alongside the CA and for the same reason: compose.yaml declares
+# it as a secret with a `file:` source, so every compose invocation below fails on its absence
+# and the daemon's error names a path rather than the step that was skipped.
+_missing=""
+for _f in "$CA" "$CLIENT_CRT" "$CLIENT_KEY"; do
+  [ -f "$_f" ] || _missing="${_missing} ${_f}"
+done
+[ -z "$_missing" ] || {
+  echo "FAIL: trust material is missing:"
+  printf '  %s\n' $_missing
+  echo "  Issue it first (mediator/identity/README.md):"
   echo "    bash scripts/issue-identity.sh ca"
   echo "    bash scripts/issue-identity.sh listener claude --ip $MED_CLAUDE"
   echo "    bash scripts/issue-identity.sh listener codex  --ip $MED_CODEX"
   echo "    bash scripts/issue-identity.sh listener agy    --ip $MED_AGY"
+  echo "    bash scripts/issue-identity.sh client   claude"
   exit 1
 }
 
@@ -284,6 +350,12 @@ for agent in "${AGENTS[@]}"; do
       # (Interface Contract 3) -- it is what anchors their proxy hop. It is not control plane:
       # it is a public key, it arrives read-only as a Compose secret, and codex does not get it.
       */mediator-ca.crt) : ;;
+      # 01.6 SF-2. An agent's OWN client key pair, mounted into that agent alone as a Compose
+      # secret. It trips two patterns below -- it lives under mediator/ and it ends in .key --
+      # and it is neither: it is this agent's workload identity, read-only, and holding it is
+      # the whole point. The exception is scoped to the agent's own pair by name, so claude
+      # mounting agy's would still be caught, and so would any other key under mediator/.
+      */clients/"${agent}"-client.crt|*/clients/"${agent}"-client.key) : ;;
       */agent-containerization|*/agent-containerization/policy*|*/agent-containerization/mediator*|*/agent-containerization/profiles*|*/agent-containerization/packs*|*.key)
         cp_bad="${cp_bad}${agent}: ${s}"$'\n' ;;
     esac
@@ -304,15 +376,16 @@ phase "B -- proxy-hop transport and T28"
 # certificate's iPAddress SAN is the whole of what SF-3 had to get right.
 for agent in claude agy; do
   case "$agent" in claude) addr=$MED_CLAUDE ;; agy) addr=$MED_AGY ;; esac
-  out="$(probe_ca "$agent" "printf 'Q\n' | timeout 15 openssl s_client -brief -verify_return_error \
-        -CAfile /tmp/ca.crt -connect $addr:3128 2>&1")"
+  cflags="$(client_flags "$agent")"
+  out="$(probe_hop "$agent" "printf 'Q\n' | timeout 15 openssl s_client -brief -verify_return_error \
+        $cflags -CAfile /tmp/ca.crt -connect $addr:3128 2>&1")"
   if printf '%s' "$out" | grep -q "Verification: OK"; then
     pass "$agent-net: proxy hop completes TLS and the chain verifies against the mediator CA"
   else
     fail "$agent-net: proxy-hop TLS did not verify"; note "$(printf '%s' "$out" | tail -3)"
   fi
-  san="$(probe_ca "$agent" "printf 'Q\n' | timeout 15 openssl s_client -showcerts -verify_return_error \
-        -CAfile /tmp/ca.crt -connect $addr:3128 2>/dev/null \
+  san="$(probe_hop "$agent" "printf 'Q\n' | timeout 15 openssl s_client -showcerts -verify_return_error \
+        $cflags -CAfile /tmp/ca.crt -connect $addr:3128 2>/dev/null \
         | openssl x509 -noout -ext subjectAltName 2>/dev/null")"
   if printf '%s' "$san" | grep -qF "IP Address:$addr"; then
     pass "$agent-net: listener certificate carries an iPAddress SAN for $addr"
@@ -337,10 +410,92 @@ printf '%s' "$out" | grep -q "200" \
   && pass "codex-net: the listener accepts a plain HTTP CONNECT" \
   || { fail "codex-net: plain CONNECT was not accepted"; note "$out"; }
 
-# Client-certificate verification is OFF at this feature -- every probe above presented no
-# certificate and was accepted. 01.6 inverts this for the listeners whose agent can present one,
-# and asserting it here is what makes that inversion visible when it lands.
-pass "client-certificate verification is off on all three listeners (no probe presented one)"
+# ---------------------------------------------------------------- 01.6 SF-2: the inversion
+# 01.3 left an unconditional `pass` here with no probe behind it, and said why: "01.6 inverts
+# this for the listeners whose agent can present one, and asserting it here is what makes that
+# inversion visible when it lands." This is that inversion, and it is the single assertion that
+# proves client-certificate verification is actually ON rather than merely configured.
+#
+# The refusal is measured by OUTCOME, not by an openssl transcript. Server-certificate
+# verification succeeds before the server's `certificate required` alert arrives, so
+# "Verification: OK" is present on a refused connection too and grepping for its absence would
+# pass on a listener that verifies nothing.
+_before="$(audit | jq -c 'select(.verdict != null)' | wc -l | tr -d ' ')"
+out="$(probe_ca "claude" "printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+  | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
+      -connect $MED_CLAUDE:3128 2>&1 | head -20")"
+if printf '%s' "$out" | grep -q "200"; then
+  fail "claude-net: a CERT-LESS client reached the front listener and its CONNECT was accepted"
+  note "$out"
+else
+  pass "claude-net: a cert-less client is refused at the front listener (client_auth: mtls)"
+fi
+
+# Edge case 2, and it is a property rather than an absence of evidence: `clientca=` is
+# required-at-handshake, so the connection dies before Squid has a REQUEST to log. An operator
+# debugging "claude gets nothing" finds silence where a denial would be, which looks identical
+# to an agent that made no request at all. The populated surface is the mediator's own
+# cache_log at $AUDIT_DIR/squid-cache.log.
+#
+# MEASURED AT THE SF-2 BUILD, and it corrects the feature plan: the refusal is not literally
+# silent. Squid logs the aborted connection as one of its own internal transactions --
+# `{"event":"proxy_internal","detail":"error:transaction-end-before-headers"}` -- which carries
+# no agent, no destination, no verdict and no identity_source, because there were no request
+# headers to derive any of them from. So the assertion is that no VERDICT line appears and that
+# nothing on the trail names the destination: the trail says nothing ABOUT the attempt, which is
+# the operator-facing property, rather than emitting no bytes.
+sleep 1
+_after="$(audit | jq -c 'select(.verdict != null)' | wc -l | tr -d ' ')"
+if [ "$_before" = "$_after" ]; then
+  pass "the cert-less refusal produced NO verdict line -- it is refused at the handshake (edge case 2)"
+else
+  fail "the cert-less refusal produced $(( _after - _before )) verdict line(s); it is supposed to die before squid has a request to log"
+  note "$(audit | tail -2)"
+fi
+
+# The enforcement is PER LISTENER and did not leak onto the other two. Both of these listeners
+# declare `client_auth: none`, and their agents have nothing to present: 01.1 SF-2 measured that
+# codex never reaches a TLS listener and that agy stops at the CertificateRequest stage.
+out="$(probe_ca "agy" "printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+  | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
+      -connect $MED_AGY:3128 2>/dev/null | head -5")"
+printf '%s' "$out" | grep -q "200" \
+  && pass "agy-net: a credential-less client is still accepted (client_auth: none)" \
+  || { fail "agy-net: a credential-less client was refused; the mtls flip leaked off claude's listener"; note "$out"; }
+
+out="$(probe "codex" "exec 3<>/dev/tcp/$MED_CODEX/3128
+  printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: allowed.fixture.lab:443\r\n\r\n' >&3
+  timeout 5 head -n 1 <&3; true")"
+printf '%s' "$out" | grep -q "200" \
+  && pass "codex-net: a credential-less client is still accepted (client_auth: none)" \
+  || { fail "codex-net: a credential-less client was refused; the mtls flip leaked off claude's listener"; note "$out"; }
+
+# The working path, with the certificate. Proves the enabled verification did not break what it
+# is protecting -- a listener that refuses everything would pass every assertion above.
+out="$(probe_client "claude" "printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+  | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
+      -cert /tmp/client.crt -key /tmp/client.key -connect $MED_CLAUDE:3128 2>/dev/null | head -5")"
+printf '%s' "$out" | grep -q "200" \
+  && pass "claude-net: a client presenting its own certificate is accepted" \
+  || { fail "claude-net: the certificate-bearing client was refused"; note "$out"; }
+
+# Criterion 3's positive half, and edge case 4's. A claude VERDICT line must read
+# `identity_source: listener+mtls`, which is also what proves the 14th logformat field survived
+# the render: a field APPENDED rather than inserted at position 2 would be absorbed by the
+# writer's trailing `extra` variable and discarded with no error at all, so it is asserted on a
+# real line rather than trusted from the template.
+#
+# A refusal is used rather than an allow, and that is forced rather than chosen: `openssl
+# s_client` has no way to speak TLS to a proxy, so a claude probe sends its CONNECT into the
+# terminated hop and never sends a ClientHello -- which produces a front tunnel line the writer
+# drops and an inner `connect_accepted` event carrying no verdict. A pre-CONNECT refusal is
+# decided at the front and IS a verdict line. `assert_verdict` derives the expected value from
+# the line's own agent, so this call also exercises that derivation.
+probe_client "claude" "printf 'CONNECT collector3.example.com:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+  | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
+      -cert /tmp/client.crt -key /tmp/client.key -connect $MED_CLAUDE:3128 2>/dev/null | head -5" >/dev/null 2>&1
+assert_verdict "criterion 3: a claude verdict line reads identity_source: listener+mtls" \
+  collector3.example.com deny allowlist host_not_allowlisted
 
 # Each listener serves ITS OWN agent's policy, not a union. `claude-only.fixture.lab` is
 # allowlisted for claude and for nobody else.
@@ -357,9 +512,9 @@ printf '%s' "$out" | grep -q "403" \
   && pass "agy is refused a host allowlisted only for claude (403 at the front)" \
   || { fail "agy was not refused a claude-only host"; note "$out"; }
 
-out="$(probe_ca "claude" "printf 'CONNECT claude-only.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+out="$(probe_client "claude" "printf 'CONNECT claude-only.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
   | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
-      -connect $MED_CLAUDE:3128 2>/dev/null | head -5")"
+      -cert /tmp/client.crt -key /tmp/client.key -connect $MED_CLAUDE:3128 2>/dev/null | head -5")"
 printf '%s' "$out" | grep -q "200" \
   && pass "claude passes the allowlist gate for its own host" \
   || { fail "claude was refused its own allowlisted host"; note "$out"; }
@@ -386,9 +541,9 @@ phase "C -- controls"
 # requires a 403 body for a post-peek denial, and nothing uses an insecure-TLS bypass to get one.
 
 # --- pre-CONNECT verdict on a NON-BUMPING front: the 403 names the destination (R9.3, R12.2)
-out="$(probe_ca "claude" "printf 'CONNECT collector.example.com:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+out="$(probe_client "claude" "printf 'CONNECT collector.example.com:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
   | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
-      -connect $MED_CLAUDE:3128 2>/dev/null | head -30")"
+      -cert /tmp/client.crt -key /tmp/client.key -connect $MED_CLAUDE:3128 2>/dev/null | head -30")"
 if printf '%s' "$out" | grep -q "403" \
    && printf '%s' "$out" | grep -q "collector.example.com:443" \
    && printf '%s' "$out" | grep -q "egress denied"; then
@@ -440,9 +595,9 @@ assert_verdict "T6: a non-allowlisted name at THE SAME address is refused" \
 # --- R5.1's FQDN deny, which is empty in every shipped profile. The name is allowlisted for
 # claude, so this proves deny-wins rather than default-deny, and it resolves to the address an
 # allowed name also uses, so it cannot be an address deny in disguise.
-probe_ca "claude" "printf 'CONNECT denied-by-fqdn.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+probe_client "claude" "printf 'CONNECT denied-by-fqdn.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
   | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
-      -connect $MED_CLAUDE:3128 2>/dev/null | head -5" >/dev/null 2>&1
+      -cert /tmp/client.crt -key /tmp/client.key -connect $MED_CLAUDE:3128 2>/dev/null | head -5" >/dev/null 2>&1
 assert_verdict "R5.1: an allowlisted name on deny_fqdns is refused -- deny wins" \
   denied-by-fqdn.fixture.lab deny denylist fqdn_on_denylist
 

@@ -156,8 +156,8 @@ for _page in "$TMPL_DIR"/errors/ERR_MEDIATOR_*; do
     || fail "cannot render the denial page $(basename "$_page") into $ERROR_DIR"
   _pages=$(( _pages + 1 ))
 done
-[ "$_pages" -eq 4 ] \
-  || fail "expected 4 ERR_MEDIATOR_* denial pages in $TMPL_DIR/errors, rendered $_pages. proxy.conf.tmpl binds one deny_info to each control; a missing page makes that control's refusal fall back to Squid's generic page and lose the destination, the policy path and the remediation."
+[ "$_pages" -eq 5 ] \
+  || fail "expected 5 ERR_MEDIATOR_* denial pages in $TMPL_DIR/errors, rendered $_pages. proxy.conf.tmpl binds one deny_info to each control; a missing page makes that control's refusal fall back to Squid's generic page and lose the destination, the policy path and the remediation."
 
 
 # =============================================================== resolver render
@@ -251,6 +251,8 @@ ALLOW_RULE_NAMES=""
 P_LISTENERS=""
 P_LISTENER_ACLS=""
 P_IDENTITY_RULES=""
+P_IDENTITY_ENFORCE="" # the subject-to-listener binding denies, rendered AHEAD of every rule
+                      # that can forward to a peer (01.6 SF-2, Decision 3)
 P_PEERS=""
 P_AGENT_ACLS=""
 P_GATE_RULES=""
@@ -270,6 +272,10 @@ P_DELAY_N=0
 # Loopback ports for the inner (peeking) listeners of the TLS-fronted agents. They
 # all share 127.0.0.1, so unlike the front listeners they cannot share a port.
 P_INNER_PORT=3200
+# The CA that client certificates are verified against, and it is the SAME file the listener
+# certificates chain to -- one CA, one trust anchor, no second lifecycle (01.3 SF-3). Only the
+# PUBLIC certificate is here; the CA private key never enters this container.
+CLIENT_CA="/run/secrets/mediator-ca.crt"
 
 IFS=',' read -r -a _agent_specs <<< "$MEDIATOR_AGENT_NETWORKS"
 for spec in "${_agent_specs[@]}"; do
@@ -316,6 +322,42 @@ for spec in "${_agent_specs[@]}"; do
   # compiler already refuses them if they disagree; `tls` is read here.
   ltls="$(yq eval ".agents.${agent}.listener.tls" "$RESOLVED_POLICY")"
   lport="$(yq eval ".agents.${agent}.listener.port // .agents.${agent}.listener_port" "$RESOLVED_POLICY")"
+
+  # This listener's client-authentication mode, and the identity a presented credential must
+  # carry (01.6 SF-2, Decisions 2 and 5). Both come from the artifact: putting "this agent must
+  # authenticate" in the renderer would put a policy decision where the compiler cannot validate
+  # it, the resolved policy does not show it and lint-policy.sh cannot check it.
+  #
+  # Refused at the boundary rather than defaulted. An unknown value silently treated as `none`
+  # is a listener that stopped authenticating because of a typo -- and the audit line would go
+  # on reading `listener`, which is true and therefore not a signal.
+  lauth="$(yq eval ".agents.${agent}.listener.client_auth" "$RESOLVED_POLICY")"
+  case "$lauth" in
+    mtls|proxy_auth|none) : ;;
+    *) fail "$RESOLVED_POLICY: agents.${agent}.listener.client_auth is '$lauth'. Expected one of mtls, proxy_auth or none. It is required, not defaulted: recompile the artifact from a profile that declares it (scripts/compile-policy-build.sh)." ;;
+  esac
+  # `proxy_auth` has no renderer behind it at this sub-feature. It is refused rather than
+  # rendered as `none`, because a listener whose policy says it authenticates and whose
+  # configuration does not is the exact disagreement `identity_source` exists to expose.
+  [ "$lauth" != "proxy_auth" ] \
+    || fail "$RESOLVED_POLICY: agents.${agent}.listener.client_auth is 'proxy_auth', which this mediator does not yet render (01.6 SF-3). Refusing to start rather than enforcing less than the policy declares."
+
+  # The certificate subject the binding rule matches, taken from `identity` -- the same token
+  # scripts/issue-identity.sh puts in the certificate and the same token the audit line's
+  # `agent` field carries. One identity across issuance, policy, enforcement and audit.
+  lidentity="$(yq eval ".agents.${agent}.identity" "$RESOLVED_POLICY")"
+  [ -n "$lidentity" ] && [ "$lidentity" != "null" ] \
+    || fail "$RESOLVED_POLICY: agents.${agent} carries no 'identity' value; it is the client certificate subject the binding rule matches (01.6 Decision 2)."
+  # It becomes a squid.conf ACL term. Validated here for the same reason a hostname is.
+  [[ "$lidentity" =~ $AGENT_RE ]] \
+    || fail "$RESOLVED_POLICY: agents.${agent}.identity '$lidentity' is not a bare identifier. It is interpolated into squid.conf as an \`acl ... user_cert CN\` term."
+
+  if [ "$lauth" = "mtls" ]; then
+    [ "$ltls" = "true" ] \
+      || fail "$RESOLVED_POLICY: agents.${agent}.listener.client_auth is 'mtls' but tls is '$ltls'. Squid cannot request a client certificate on a listener that does not speak TLS."
+    [ -r "$CLIENT_CA" ] \
+      || fail "agent '${agent}' declares client_auth: mtls but $CLIENT_CA is not readable. Client certificates are verified against the mediator CA, which arrives as a Compose secret (compose.yaml). Only the public certificate: the CA key stays on the operator host."
+  fi
   [[ "$lport" =~ ^[0-9]+$ ]] && [ "$lport" -ge 1 ] && [ "$lport" -le 65535 ] \
     || fail "$RESOLVED_POLICY: agents.${agent} has no usable listener port (found '$lport')"
 
@@ -348,7 +390,16 @@ for spec in "${_agent_specs[@]}"; do
     key="/run/secrets/${agent}-listener.key"
     [ -r "$crt" ] && [ -r "$key" ] \
       || fail "agent '${agent}' has a TLS proxy hop but $crt / $key is not readable. The listener key pair arrives as a Compose secret (compose.yaml) and is issued by scripts/issue-identity.sh with an iPAddress SAN for ${addr}."
-    P_LISTENERS="${P_LISTENERS}https_port ${addr}:${lport} name=${agent} tls-cert=${crt} tls-key=${key}"$'\n'
+    # `clientca=` AND `tls-cafile=`, both naming the same CA file, on the FRONT listener only.
+    # Both because that is the line P1 measured as passing a client certificate end to end
+    # (docs/records/mediator-selection.md) -- assuming `clientca=` alone suffices would be
+    # assuming a property nothing verified. It is required-at-handshake, so it goes here and
+    # NOWHERE else: the inner bump listener below and the self-check shadows further down have
+    # Squid's own cascade hop and the startup probe as their clients, neither of which holds a
+    # certificate, and a `clientca=` there refuses the mediator's own traffic at the handshake.
+    _clientca=""
+    [ "$lauth" != "mtls" ] || _clientca=" clientca=${CLIENT_CA} tls-cafile=${CLIENT_CA}"
+    P_LISTENERS="${P_LISTENERS}https_port ${addr}:${lport} name=${agent} tls-cert=${crt} tls-key=${key}${_clientca}"$'\n'
     P_LISTENERS="${P_LISTENERS}http_port 127.0.0.1:${inner} name=${agent}in ssl-bump generate-host-certificates=off tls-cert=${crt} tls-key=${key}"$'\n'
     # `standby=1` keeps one idle connection to the peer open. Not tuning: Squid probes its
     # parents at start, marks them DEAD before its own inner listeners are accepting, and
@@ -451,6 +502,59 @@ for spec in "${_agent_specs[@]}"; do
   P_IDENTITY_RULES="${P_IDENTITY_RULES}acl tag_${agent} annotate_transaction agent=${agent}"$'\n'
   P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent}_real tag_${agent} !all"$'\n'
 
+  # ------------------------------------------------ the attribution-strength annotation
+  # `idsrc` states how strongly this line's `agent` value is attributed, and it is rendered
+  # from the SAME `client_auth` field, in the SAME pass, that renders the enforcement above.
+  # That coupling is the whole argument: the annotation cannot say a listener authenticates
+  # when the listener does not, because one field produced both.
+  #
+  # It could not be derived in the audit writer from the `agent` field instead -- that is
+  # uncoupled from enforcement and would read `listener+mtls` on the T34 refusal line itself.
+  # It could not be annotated once at the front and carried inward either: the front-to-inner
+  # hop goes through `cache_peer`, which is a NEW master transaction, which is why `agent` and
+  # `layer` are already re-derived per layer rather than propagated. A request header would
+  # cross the hop but the agent can set that header, so the inner layer would be trusting a
+  # claim it cannot verify.
+  if [ "$lauth" = "mtls" ]; then
+    # The subject this listener's agent must present, and the two ports it is derived on.
+    # These ACL names are defined HERE rather than reusing `p_${agent}_frontreal` from the
+    # peers block: that block renders at @PEERS@, which is AFTER @IDENTITY_RULES@, and Squid
+    # fatals on a forward reference to an undefined ACL.
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}acl cert_${agent}      user_cert CN ${lidentity}"$'\n'
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}acl p_${agent}_frontid myportname ${agent}"$'\n'
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}acl p_${agent}_innerid myportname ${agent}in"$'\n'
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}acl idsrc_${agent}_mtls  annotate_transaction idsrc=listener+mtls"$'\n'
+    # FRONT: per request, gated on the subject actually matching. A wrong-subject connection
+    # matches no term here and is refused by the binding rule below, which sets `listener`.
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent}_frontid cert_${agent} idsrc_${agent}_mtls !all"$'\n'
+    # INNER: per listener, and sound rather than merely convenient. The inner binds 127.0.0.1
+    # only, no agent network can reach it, and `cache_peer_access ${agent}peer` admits only
+    # this agent's own front -- which under required-mode `clientca=` necessarily presented a
+    # certificate this CA issued. The `_innerid` name is the REAL inner alone: the self-check
+    # shadow shares this agent's policy but not its identity.
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent}_innerid idsrc_${agent}_mtls !all"$'\n'
+
+    # The binding refusal itself (T34's literal case), accumulated for the marker that renders
+    # ahead of every forwarding rule. `!cert_${agent}` is "presented a CA-issued certificate
+    # whose subject is not this listener's agent" -- a cert-less client never reaches an ACL at
+    # all, because `clientca=` refuses it during the handshake.
+    #
+    # `idsrc=listener` on this line OVERRIDES the front annotation above:
+    # `annotate_transaction key=value` REPLACES where `key+=value` appends, so last-wins is the
+    # documented behaviour. A refusal must never be recorded as a cryptographically attributed
+    # connection -- nothing was accepted.
+    #
+    # `ctl_identity` is LAST, because `deny_info` keys on the last ACL of the matched line.
+    P_IDENTITY_ENFORCE="${P_IDENTITY_ENFORCE}acl idsrc_${agent}_plain annotate_transaction idsrc=listener"$'\n'
+    P_IDENTITY_ENFORCE="${P_IDENTITY_ENFORCE}http_access deny p_${agent}_frontid !cert_${agent} idsrc_${agent}_plain rsn_subject ctl_identity"$'\n'
+  else
+    # Network-derived, and final for this agent at this feature. The value is emitted rather
+    # than left unset so an audit line always states its own attribution strength -- an absent
+    # field reads as "unknown", which is a different claim from "network-derived".
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}acl idsrc_${agent} annotate_transaction idsrc=listener"$'\n'
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent}_real idsrc_${agent} !all"$'\n'
+  fi
+
   P_DELAY_N=$(( P_DELAY_N + 1 ))
   P_DELAY_POOLS="${P_DELAY_POOLS}delay_class ${P_DELAY_N} 1"$'\n'
   P_DELAY_POOLS="${P_DELAY_POOLS}delay_parameters ${P_DELAY_N} ${bps}/${bps}"$'\n'
@@ -520,10 +624,35 @@ for spec in "${_agent_specs[@]}"; do
 
   # One allowlisted destination per FRONTED agent, for the cascade warm-up after squid binds.
   # A fronted agent only: a single-listener agent has no peer and nothing to warm.
-  if [ "$ltls" = "true" ] && [ "$count" -gt 0 ]; then
+  #
+  # NOT an mtls agent, and this is a deliberate loss rather than an oversight (01.6 SF-2).
+  # The warm-up reaches its target THROUGH that agent's front listener, because
+  # `cache_peer_access <agent>peer allow p_<agent>_frontreal` admits nothing else -- and under
+  # required-mode `clientca=` a cert-less connection from this container is refused during the
+  # handshake. Left in, it would spend its whole retry budget failing at every start and then
+  # warn. The three alternatives were considered and each costs more than it buys:
+  #
+  #   * a loopback warm port admitted to the same peer -- its own inner line would then read
+  #     `idsrc=listener+mtls` with no certificate verified anywhere on the path, which is the
+  #     false attribution `identity_source` exists to prevent, and it would break the argument
+  #     that the inner is only reachable through an authenticating front;
+  #   * mounting the agent's client key here -- the private key whose sole possession the
+  #     Milestone 03 brokering gate rests on would then exist in two containers;
+  #   * warming through the inner directly -- a request that does not need the peer does not
+  #     revive it, which is the finding the warm-up was built on in the first place.
+  #
+  # The residual is stated where an operator meets it: this agent's FIRST request after a
+  # mediator start may be answered 500 with no peer to forward to, and is retried. It is on the
+  # audit trail as a front line with http_status 500, not as a policy refusal.
+  if [ "$ltls" = "true" ] && [ "$lauth" != "mtls" ] && [ "$count" -gt 0 ]; then
     _wh="$(set -- $agent_hosts; echo "$1")"
     _wp="$(set -- $agent_ports; echo "$1")"
     P_WARM_TARGETS="${P_WARM_TARGETS}${agent}|${addr}|${lport}|${_wh}|${_wp} "
+  elif [ "$ltls" = "true" ] && [ "$lauth" = "mtls" ]; then
+    # Said out loud at every start. An operator who sees a 500 on this agent's first request
+    # after a restart should find the reason in this container's own log rather than having to
+    # infer it from an absence.
+    note "cascade: ${agent}'s peer is NOT warmed -- its listener requires a client certificate and this container holds none. Its first request after this start may be answered 500 and retried."
   fi
 
   # Control 1a's gate: the UNION of this agent's names and ports, matched on the
@@ -583,6 +712,14 @@ P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny inner_layer tag_inner !all
 P_IDENTITY_RULES="${P_IDENTITY_RULES}acl p_selfcheck   myportname ${P_SELFCHECK_NAMES}"$'\n'
 P_IDENTITY_RULES="${P_IDENTITY_RULES}acl tag_selfcheck annotate_transaction agent=selfcheck"$'\n'
 P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_selfcheck tag_selfcheck !all"$'\n'
+# The shadow listeners' own attribution, and it must be `listener` even when the agent they
+# mirror authenticates: stage 2's probe holds no client certificate, and the shadow front is a
+# plain loopback `http_port` with no `clientca=` for exactly that reason. Rendered AFTER the
+# per-agent rules above, and last-wins ordering is what makes it an override -- although the
+# `_real` port sets already exclude `selfcheck*`, so this is belt and braces rather than the
+# only guard. Decision 3's second ordering constraint.
+P_IDENTITY_RULES="${P_IDENTITY_RULES}acl idsrc_selfcheck annotate_transaction idsrc=listener"$'\n'
+P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_selfcheck idsrc_selfcheck !all"$'\n'
 
 # One audit call and one pool decision for the union of the per-agent rules, rather
 # than a matching pair per agent: the verdict is the same on every allowed path, and
@@ -661,7 +798,8 @@ render() { # <template> <output>
   LISTENERS="$LISTENERS" DNS_AUDIT_LOG="$DNS_AUDIT_LOG" \
   REORIGIN_PORT="$REORIGIN_PORT" FORWARD_ADDRS="$FORWARD_ADDRS" \
   P_LISTENERS="$P_LISTENERS" P_LISTENER_ACLS="$P_LISTENER_ACLS" \
-  P_IDENTITY_RULES="$P_IDENTITY_RULES" P_PEERS="$P_PEERS" \
+  P_IDENTITY_RULES="$P_IDENTITY_RULES" P_IDENTITY_ENFORCE="$P_IDENTITY_ENFORCE" \
+  P_PEERS="$P_PEERS" \
   P_DENY_ACLS="$P_DENY_ACLS" P_AGENT_ACLS="$P_AGENT_ACLS" \
   P_GATE_RULES="$P_GATE_RULES" P_DENY_RULES="$P_DENY_RULES" \
   P_MAXCONN_RULES="$P_MAXCONN_RULES" P_FRONT_ALLOW="$P_FRONT_ALLOW" \
@@ -681,6 +819,7 @@ render() { # <template> <output>
     /^@PROXY_LISTENERS@$/    { emit("P_LISTENERS");       next }
     /^@LISTENER_ACLS@$/      { emit("P_LISTENER_ACLS");   next }
     /^@IDENTITY_RULES@$/     { emit("P_IDENTITY_RULES");  next }
+    /^@IDENTITY_ENFORCE@$/   { emit("P_IDENTITY_ENFORCE"); next }
     /^@PEERS@$/              { emit("P_PEERS");           next }
     /^@DENY_ACLS@$/          { emit("P_DENY_ACLS");       next }
     /^@AGENT_ACLS@$/         { emit("P_AGENT_ACLS");      next }

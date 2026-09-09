@@ -98,6 +98,19 @@ secrets:
     file: ../mediator/identity/listeners/agy-listener.crt
   agy-listener.key:
     file: ../mediator/identity/listeners/agy-listener.key
+  # 01.6 SF-2 -- claude's WORKLOAD IDENTITY, and the only client key pair in this file. It is
+  # scoped to the `claude` service alone below; no other agent and NOT the mediator, which
+  # verifies it against the CA certificate it already holds and needs no private key to do so.
+  # Issued by `bash scripts/issue-identity.sh client claude` with subject CN=claude -- the
+  # resolved policy's `identity` value, which the mediator's binding rule matches.
+  #
+  # There is no codex or agy counterpart: 01.1 SF-2 measured that codex never reaches a TLS
+  # listener and that agy has nothing to offer at the CertificateRequest stage, so their
+  # listeners declare `client_auth: none` and their identity is network-derived.
+  claude-client.crt:
+    file: ../mediator/identity/clients/claude-client.crt
+  claude-client.key:
+    file: ../mediator/identity/clients/claude-client.key
 
 x-hardened: &hardened
   user: "1000:1000"
@@ -272,8 +285,21 @@ services:
       # oauth-interactive the safest mode claude supports; bootstrap-auth exits 2 if this
       # is unset, so an empty value fails rather than falling back.
       AUTH_MODE: ${CLAUDE_AUTH_MODE:-oauth-interactive}
+      # 01.6 Interface Contract 5 -- the client certificate this agent presents on the proxy
+      # hop. Measured at 01.1 SF-2 against claude 2.1.260: these two variables are the
+      # documented and confirmed mechanism, and claude is the only one of the three agents that
+      # completes a client-certificate handshake against a proxy listener.
+      #
+      # The mediator's front listener requires one (`client_auth: mtls`), and required means
+      # required-at-handshake: without these the connection dies before Squid has a request to
+      # log, so the audit trail is SILENT rather than carrying a denial. The diagnostic surface
+      # that is populated is the mediator's own cache_log.
+      CLAUDE_CODE_CLIENT_CERT: /run/secrets/claude-client.crt
+      CLAUDE_CODE_CLIENT_KEY: /run/secrets/claude-client.key
     secrets:
       - mediator-ca.crt
+      - claude-client.crt
+      - claude-client.key
     volumes:
       - claude-state:/home/agent
 

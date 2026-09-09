@@ -354,7 +354,7 @@ Each is amended in the sub-feature that causes the break, not in a cleanup pass 
   No product code. Note the preflight: the script requires `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and
   `GOOGLE_API_KEY` and exits 64 without them. Depends on nothing in this feature.
 
-- [ ] **SF-2: Client-certificate issuance, required-mode verification and the T34 binding refusal for
+- [x] **SF-2: Client-certificate issuance, required-mode verification and the T34 binding refusal for
   `claude`** — The cryptographic path end to end, for the one agent that can carry it. Adds a
   `client` mode to `scripts/issue-identity.sh` (a fifth `case` arm alongside `ca`, `listener`,
   `status` and the bare-word renewal): subject `CN=<agent>` taken from the resolved policy's
@@ -804,4 +804,86 @@ once by the operator at the end of SF-2 rather than left unrun.
 
 ## Architectural Deviations
 
-(none)
+### Deviation 1: the cascade warm-up is skipped for an `mtls` agent, and its first request after a start may be answered 500
+- **What changed:** `images/mediator/entrypoint.sh` excludes any agent whose `client_auth` is
+  `mtls` from `P_WARM_TARGETS`, and notes the exclusion and its consequence at every start. On
+  today's artifact that is `claude`. The other fronted agent is warmed as before.
+- **Originally planned:** Nothing in the plan touched the warm-up. Decision 1 mentions only the
+  inner and self-check listeners as the places `clientca=` must not appear, and Interface
+  Contract 3 assumes Deviation 10's `connect_accepted` warm-up events keep being produced.
+- **Why necessary:** `warm_cascade` reaches its target through that agent's **front**
+  `https_port` — `cache_peer_access <agent>peer allow p_<agent>_frontreal` admits nothing else —
+  and it connects from inside the mediator, which holds no client key. Under required-mode
+  `clientca=` that handshake is refused, so the warm-up would spend its full retry budget
+  (20 attempts × 3.5s) failing at every start and then warn. The three alternatives each cost
+  more than they buy, and the reasoning is in the code at the exclusion: a loopback warm port
+  admitted to the same peer would put `idsrc=listener+mtls` on an inner line with no certificate
+  verified anywhere on the path — the exact false attribution criterion 3 exists to prevent, and
+  it would also break Decision 3's argument that the inner is reachable only through an
+  authenticating front; mounting the agent's client key into the mediator would put the private
+  key the Milestone 03 brokering gate rests on into two containers; and warming through the
+  inner directly does not revive a peer, which is the finding the warm-up was built on.
+- **Impact:** `claude`'s first request after a mediator start may be answered 500 with no peer to
+  forward to, and is retried by the client. It is visible on the audit trail as a front line with
+  `http_status: 500` and `verdict: allow` — not a policy refusal. Observed at this build that all
+  three peers were REVIVED about a second after start when `agy`'s warm-up ran, so the 500 did
+  not materialise in that run; the residual is real but not certain, and is stated as "may". SF-4
+  documents it in `README.md`'s R12.2 troubleshooting section alongside edge case 2. Milestone
+  02.2's adversarial acceptance inherits it. Any future agent flipped to `client_auth: mtls`
+  inherits it too, which is why the exclusion is on the field rather than on the agent name.
+
+### Deviation 2: a cert-less refusal is not literally silent on the audit trail
+- **What changed:** The harness asserts that a cert-less connection to the `claude` front
+  produces no **verdict** line, not that it produces no line. The measured behaviour is one
+  `{"event":"proxy_internal","detail":"error:transaction-end-before-headers"}` — Squid logging
+  its own aborted transaction — carrying no `agent`, no `dest_host`, no `verdict` and no
+  `identity_source`, because there were no request headers to derive any of them from.
+- **Originally planned:** Edge case 2 and the Test Strategy both state "a cert-less refusal
+  produces no audit line at all" and "**Cert-less connection produces no audit line at all**".
+- **Why necessary:** Measured at the SF-2 build against the pinned Squid. The plan's claim is
+  false as written; the property it was reaching for — the trail says nothing that identifies the
+  attempt — is true and is what is now asserted. An assertion written to the plan's wording would
+  have failed on a correct mediator.
+- **Impact:** The operator-facing conclusion is unchanged: an operator debugging "claude gets
+  nothing" still finds no denial and must read `$AUDIT_DIR/squid-cache.log`. SF-4's
+  `mediator/identity/README.md` and `README.md` R12.2 text must say "no verdict line, and one
+  anonymous `proxy_internal` event" rather than "no line". `docs/records/workload-identity.md`
+  inherits the corrected statement.
+
+### Deviation 3: three resolved artifacts change, not two, and two of them are recompiled on the host
+- **What changed:** `policy/resolved/test-selfcheck.yaml` is regenerated alongside
+  `default.yaml` and `test-fixtures.yaml`. `default.yaml` came through
+  `scripts/compile-policy-build.sh` (the single emitter); the two test-scoped artifacts were
+  recompiled on the host with `--allowlist policy/allowlist.test.yaml --denylist
+  policy/denylist.test.yaml`, per `policy/resolved/README.md`.
+- **Originally planned:** Files to Create/Modify lists `policy/resolved/default.yaml` and
+  `policy/resolved/test-fixtures.yaml` only, and Decision 8 item 5 says "both regenerated
+  resolved artifacts".
+- **Why necessary:** Three artifacts are committed and all three are compiled from a profile
+  carrying a `listeners:` block, so a required `client_auth` key invalidates all three. The
+  build stage cannot regenerate the two test-scoped ones: their declared bases are deliberately
+  outside the mediator's build context, so `compile-stage.sh` CARRIES THEM THROUGH (01.5 SF-4
+  Deviation 9) and the drift gate then compares each copy against the file it was copied from.
+  Their staleness is therefore invisible to the build and had to be fixed by hand.
+- **Impact:** None on the shipped enforcement path. It is a standing property worth naming: a
+  schema change to the compiler is gated by the build for `default` only, and the two harness
+  artifacts need a host recompile in the same commit or the harnesses run on a policy the
+  mediator would refuse to load. `profiles/oauth-mount.yaml` also gained the key and has no
+  committed artifact, so nothing regenerates for it.
+
+### Deviation 4: a sixth pre-existing assertion breaks, not five
+- **What changed:** `tests/acceptance/verify-egress-mediator.sh`'s control-plane mount check
+  gains one exception, scoped by name to the agent's own pair:
+  `*/clients/"${agent}"-client.crt|*/clients/"${agent}"-client.key`.
+- **Originally planned:** Decision 8 enumerates five shipped assertions that break, "all four
+  found on disk" plus the build gate. The control-plane mount check is not among them.
+- **Why necessary:** That check walks every agent's `.Mounts[].Source` and flags anything
+  matching `*/agent-containerization/mediator*` or `*.key`. A Compose `file:` secret is a bind
+  mount, so `claude-client.key` with source `mediator/identity/clients/claude-client.key` trips
+  both patterns. An agent's own workload identity is not control plane — it is read-only, it is
+  what the agent authenticates with, and holding it is the point.
+- **Impact:** The exception is deliberately narrow rather than a `*/clients/*` wildcard: `claude`
+  mounting `agy`'s key would still be caught, and so would any other key under `mediator/`. SF-3
+  must extend it in the same shape if a positive SF-1 branch delivers a per-agent credential
+  file, and SF-4's structural T34 case rests on the same "one agent, one identity" property this
+  exception is scoped to.

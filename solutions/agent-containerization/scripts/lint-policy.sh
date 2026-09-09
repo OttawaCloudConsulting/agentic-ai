@@ -17,6 +17,7 @@ ALLOWLIST="$POLICY_DIR/allowlist.base.yaml"
 DENYLIST="$POLICY_DIR/denylist.base.yaml"
 RECORDS_DIR="$REPO_ROOT/docs/records"
 PACKS_DIR="$REPO_ROOT/packs"
+PROFILES_DIR="$REPO_ROOT/profiles"
 
 fail() { echo "lint-policy: FAIL: $*" >&2; exit 1; }
 
@@ -59,6 +60,52 @@ done <<< "$AGENTS"
 # --- the pins: reference resolves to the SF-2 record ---
 PINS_REF="$(yq eval '.pins' "$ALLOWLIST")"
 [[ -f "$RECORDS_DIR/$PINS_REF" ]] || fail "pins: '$PINS_REF' does not resolve under $RECORDS_DIR"
+
+# --------------------------------------------------------------------------------------------
+# Profile listener schema -- profiles/*.yaml (01.6 Interface Contract 2)
+#
+# WELL-FORMEDNESS ONLY, in this script's established sense: the key is present and its value is
+# one this compiler and this renderer know. It is checked here as well as in compile-policy.sh so
+# the error arrives BEFORE a build -- `client_auth` is required-not-defaulted and four profiles
+# declare a `listeners:` block, so a key added to one of them fails the other three's compile,
+# and the mediator image build refuses an artifact that drifted from its profile (R5.14). A lint
+# failure names the file and the field; a build failure names a digest.
+# --------------------------------------------------------------------------------------------
+lint_profile_listeners() {
+  local f="$1" rel="${1#$REPO_ROOT/}"
+  yq eval '.' "$f" >/dev/null 2>&1 || fail "$rel does not parse as YAML"
+
+  # A profile need not declare listeners at all -- only the ones the mediator is compiled from
+  # do. An absent block is not this check's business; a MALFORMED one is.
+  [[ "$(yq eval 'has("listeners")' "$f")" == "true" ]] || return 0
+
+  local agents agent
+  agents="$(yq eval '.listeners | keys | .[]' "$f")"
+  while IFS= read -r agent; do
+    [[ -n "$agent" ]] || continue
+    # has(), not `// "null"`: the same trap 01.3 documented for `tls` and 01.5 for
+    # `needs_write_access` -- yq's alternative operator reports a legitimate `false` as absent.
+    [[ "$(yq eval ".listeners.${agent} | has(\"client_auth\")" "$f")" == "true" ]] \
+      || fail "$rel: listeners.${agent}.client_auth is missing. It is required, not defaulted: a listener that silently stops requesting a client certificate because a key was dropped is the failure this field exists to make visible."
+    local mode tls
+    mode="$(yq eval ".listeners.${agent}.client_auth" "$f")"
+    case "$mode" in
+      mtls|proxy_auth|none) : ;;
+      *) fail "$rel: listeners.${agent}.client_auth must be one of mtls, proxy_auth or none, found '$mode'" ;;
+    esac
+    tls="$(yq eval ".listeners.${agent}.tls" "$f")"
+    [[ "$mode" != "mtls" || "$tls" == "true" ]] \
+      || fail "$rel: listeners.${agent}.client_auth is 'mtls' but tls is '$tls'. Squid cannot request a client certificate on a listener that does not speak TLS, and the rendered mediator would refuse that agent at the handshake -- with no audit line, because the connection dies before there is a request to log."
+  done <<< "$agents"
+
+  echo "lint-policy: $rel declares a well-formed listeners block"
+}
+
+if [[ -d "$PROFILES_DIR" ]]; then
+  while IFS= read -r profile; do
+    lint_profile_listeners "$profile"
+  done < <(find "$PROFILES_DIR" -mindepth 1 -maxdepth 1 -name '*.yaml' | sort)
+fi
 
 # --------------------------------------------------------------------------------------------
 # Pack manifests -- packs/<name>/pack.yaml (01.5 Interface Contract 1)

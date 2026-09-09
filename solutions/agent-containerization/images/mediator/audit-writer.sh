@@ -36,13 +36,25 @@
 # Field order is fixed by `logformat mediator_raw` in mediator/config/proxy.conf.tmpl.
 # The two files are ONE contract, and a short line is reported rather than dropped.
 #
-#   1 ts (ISO 8601, UTC, ms)        8 squid status (%Ss)
-#   2 agent note                    9 bytes_out (%>st, agent -> destination)
-#   3 layer note (front|inner)     10 bytes_in  (%<st, destination -> agent)
-#   4 control note                 11 SNI (%#ssl::>sni)
-#   5 reason note                  12 method (%#>rm)
-#   6 authority (%#ru)             13 resolved address (%<a)
-#   7 HTTP status (%>Hs)
+#   1 ts (ISO 8601, UTC, ms)        8 HTTP status (%>Hs)
+#   2 idsrc note                    9 squid status (%Ss)
+#   3 agent note                   10 bytes_out (%>st, agent -> destination)
+#   4 layer note (front|inner)     11 bytes_in  (%<st, destination -> agent)
+#   5 control note                 12 SNI (%#ssl::>sni)
+#   6 reason note                  13 method (%#>rm)
+#   7 authority (%#ru)             14 resolved address (%<a)
+#
+# `idsrc` (01.6 SF-2) is field 2 -- INSERTED, not appended. Appending it would land its value
+# in the trailing `extra` variable of the `read` below and be discarded in silence: the
+# short-line guard tests an empty `$server`, which an appended field leaves populated. It
+# states the STRENGTH of the attribution `agent` carries, and it is rendered from the same
+# policy field, in the same renderer pass, that renders the enforcement -- so the line cannot
+# claim a listener authenticated when it did not.
+#
+#   listener            network-derived: the arriving `internal: true` network named the agent
+#   listener+mtls       ... and a client certificate whose subject equals this listener's agent
+#                       was verified against the mediator CA
+#   listener+proxy_auth ... and a proxy credential bound to this agent was accepted
 #
 # Argument 1 is the policy source the denial record names (Contract 6).
 set -uo pipefail
@@ -59,13 +71,13 @@ jstr() { local v="$1"; v="${v//\\/\\\\}"; v="${v//\"/\\\"}"; printf '"%s"' "$v";
 jnull() { case "$1" in ''|'-') printf 'null' ;; *) jstr "$1" ;; esac; }
 jnum() { case "$1" in ''|*[!0-9]*) printf '0' ;; *) printf '%s' "$1" ;; esac; }
 
-while IFS=' ' read -r ts agent layer control reason authority status squid bout bin sni method server extra; do
+while IFS=' ' read -r ts agent idsrc layer control reason authority status squid bout bin sni method server extra; do
   [ -n "${ts:-}" ] || continue
   if [ -z "${server:-}" ]; then
     # Not silently dropped: a short line means `logformat mediator_raw` and this
     # writer have diverged, and a broken audit trail is an incident rather than a
     # nuisance.
-    printf '{"event":"audit_writer_error","detail":"unparseable line from squid","line":%s}\n' "$(jstr "$ts $agent $layer")"
+    printf '{"event":"audit_writer_error","detail":"unparseable line from squid","line":%s}\n' "$(jstr "$ts $agent $idsrc $layer")"
     continue
   fi
 
@@ -77,6 +89,9 @@ while IFS=' ' read -r ts agent layer control reason authority status squid bout 
   # can reason about. They are emitted as events, which carry no `verdict` key.
   case "$authority" in
     error:*)
+      # No `identity_source`: these are Squid's own internal transactions, with no client
+      # connection behind them at all. A field naming the strength of an attribution that was
+      # never made would be worse than its absence.
       printf '{"ts":%s,"event":"proxy_internal","detail":%s}\n' "$(jstr "$ts")" "$(jstr "$authority")"
       continue ;;
   esac
@@ -95,8 +110,8 @@ while IFS=' ' read -r ts agent layer control reason authority status squid bout 
   # opens CONNECTs and never sends a ClientHello, which is exactly the destination
   # probing R9.1 wants visible. It carries no `verdict` key, so nothing can misparse it.
   if [ "$squid" = "NONE_NONE" ] && [ "$status" = "200" ]; then
-    printf '{"ts":%s,"event":"connect_accepted","agent":%s,"layer":%s,"dest_host":%s,"dest_port":%s,"sni":%s}\n' \
-      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$layer")" "$(jnull "${authority%:*}")" \
+    printf '{"ts":%s,"event":"connect_accepted","agent":%s,"identity_source":%s,"layer":%s,"dest_host":%s,"dest_port":%s,"sni":%s}\n' \
+      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$idsrc")" "$(jnull "$layer")" "$(jnull "${authority%:*}")" \
       "$(jnum "${authority##*:}")" "$(jnull "$sni")"
     continue
   fi
@@ -141,8 +156,8 @@ while IFS=' ' read -r ts agent layer control reason authority status squid bout 
   if [ "$verdict" = "deny" ]; then
     # Contract 6: the record names the refusing control, the reason and the policy
     # source. `bytes_*` are omitted -- nothing was carried.
-    printf '{"ts":%s,"agent":%s,"layer":%s,"identity_source":"listener","dest_host":%s,"dest_port":%s,"resolved_ip":%s,"verdict":"deny","control":%s,"reason":%s,"policy":%s,"sni":%s,"method":%s,"http_status":%s,"squid":%s}\n' \
-      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$layer")" "$(jnull "$host")" "$port" "$(jnull "$server")" \
+    printf '{"ts":%s,"agent":%s,"identity_source":%s,"layer":%s,"dest_host":%s,"dest_port":%s,"resolved_ip":%s,"verdict":"deny","control":%s,"reason":%s,"policy":%s,"sni":%s,"method":%s,"http_status":%s,"squid":%s}\n' \
+      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$idsrc")" "$(jnull "$layer")" "$(jnull "$host")" "$port" "$(jnull "$server")" \
       "$(jnull "$control")" "$(jnull "$reason")" "$(jstr "$POLICY")" "$(jnull "$sni")" \
       "$(jnull "$method")" "$(jnum "$status")" "$(jnull "$squid")"
   else
@@ -150,8 +165,8 @@ while IFS=' ' read -r ts agent layer control reason authority status squid bout 
     # front whose peer was still cold answers 500, which is not a refusal by policy
     # and so is not a deny -- but a line saying only "allow" would report it as a
     # connection that worked.
-    printf '{"ts":%s,"agent":%s,"layer":%s,"identity_source":"listener","dest_host":%s,"dest_port":%s,"resolved_ip":%s,"verdict":"allow","control":null,"bytes_out":%s,"bytes_in":%s,"sni":%s,"method":%s,"http_status":%s,"squid":%s}\n' \
-      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$layer")" "$(jnull "$host")" "$port" "$(jnull "$server")" \
+    printf '{"ts":%s,"agent":%s,"identity_source":%s,"layer":%s,"dest_host":%s,"dest_port":%s,"resolved_ip":%s,"verdict":"allow","control":null,"bytes_out":%s,"bytes_in":%s,"sni":%s,"method":%s,"http_status":%s,"squid":%s}\n' \
+      "$(jstr "$ts")" "$(jnull "$agent")" "$(jnull "$idsrc")" "$(jnull "$layer")" "$(jnull "$host")" "$port" "$(jnull "$server")" \
       "$(jnum "$bout")" "$(jnum "$bin")" "$(jnull "$sni")" "$(jnull "$method")" "$(jnum "$status")" "$(jnull "$squid")"
   fi
 done

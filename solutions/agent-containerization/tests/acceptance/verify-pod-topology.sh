@@ -62,7 +62,9 @@ check_trust_material() {
            mediator/identity/listeners/claude-listener.crt \
            mediator/identity/listeners/claude-listener.key \
            mediator/identity/listeners/agy-listener.crt \
-           mediator/identity/listeners/agy-listener.key; do
+           mediator/identity/listeners/agy-listener.key \
+           mediator/identity/clients/claude-client.crt \
+           mediator/identity/clients/claude-client.key; do
     [ -f "$f" ] || missing+=("$f")
   done
   if [ "${#missing[@]}" -eq 0 ]; then
@@ -75,6 +77,8 @@ check_trust_material() {
   echo "    bash scripts/issue-identity.sh ca"
   echo "    bash scripts/issue-identity.sh listener claude --ip 172.31.10.2"
   echo "    bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2"
+  echo "    bash scripts/issue-identity.sh listener codex  --ip 172.31.20.2"
+  echo "    bash scripts/issue-identity.sh client   claude"
   exit 1
 }
 
@@ -262,10 +266,14 @@ for agent in "${AGENTS[@]}"; do
   # and `agy` as a Compose secret, and deliberately NOT into `codex`, which opens no
   # TLS to the mediator and has nothing to validate. A single expected set would now
   # fail on all three: on two for missing the secret, on codex for having it.
-  # 01.6 extends this again when per-agent client certificates land.
+  # 01.6 SF-2 extends it a THIRD time, and asymmetrically again: `claude` alone mounts a client
+  # key pair, because it is the only agent whose listener declares `client_auth: mtls`. `agy`
+  # keeps the CA and nothing more -- it anchors the proxy hop and presents nothing -- and
+  # `codex` keeps neither. A single expected set would now fail on all three.
   case "$agent" in
-    claude|agy) expected_list="/home/agent /run/secrets/mediator-ca.crt /workspace" ;;
-    codex)      expected_list="/home/agent /workspace" ;;
+    claude) expected_list="/home/agent /run/secrets/claude-client.crt /run/secrets/claude-client.key /run/secrets/mediator-ca.crt /workspace" ;;
+    agy)    expected_list="/home/agent /run/secrets/mediator-ca.crt /workspace" ;;
+    codex)  expected_list="/home/agent /workspace" ;;
   esac
 
   # 01.4 SF-1: the two OPTIONAL mounts that feature introduced -- /run/gitconfig
@@ -387,6 +395,25 @@ for agent in "${AGENTS[@]}"; do
       [ -z "$got" ] || { echo "  codex carries $var=$got; it has no TLS hop to the mediator"; env_ok=0; }
     done
   fi
+  # Check 4b-ii (01.6 Interface Contract 5): the client-certificate variables, and their
+  # ABSENCE where the agent has no client certificate. Asserted both ways for the reason the
+  # trust variables are: a variable pointing at a secret an agent does not mount is a
+  # handshake failure whose symptom names neither the variable nor the mount.
+  case "$agent" in
+    claude)
+      for pair in "CLAUDE_CODE_CLIENT_CERT=/run/secrets/claude-client.crt" \
+                  "CLAUDE_CODE_CLIENT_KEY=/run/secrets/claude-client.key"; do
+        var="${pair%%=*}"; want="${pair#*=}"
+        got="$(docker exec "$cid" printenv "$var" 2>/dev/null || true)"
+        [ "$got" = "$want" ] || { echo "  $var=$got, expected $want"; env_ok=0; }
+      done ;;
+    codex|agy)
+      for var in CLAUDE_CODE_CLIENT_CERT CLAUDE_CODE_CLIENT_KEY; do
+        got="$(docker exec "$cid" printenv "$var" 2>/dev/null || true)"
+        [ -z "$got" ] || { echo "  $agent carries $var=$got; its listener declares client_auth: none"; env_ok=0; }
+      done ;;
+  esac
+
   [ "$env_ok" -eq 1 ] && pass "$agent: proxy env matches Interface Contract 2 ($expected_proxy)" \
                       || fail "$agent: proxy env does not match Interface Contract 2"
 

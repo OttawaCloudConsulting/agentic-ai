@@ -129,10 +129,22 @@ limits:                         # R1.10, applied per agent container
 # `https://`-scheme proxy URL at URL-parse time and must be given plain HTTP CONNECT, while
 # `claude` and `agy` both reach an `https://` listener. `scheme` and `tls` are two spellings of
 # one fact and the compiler refuses them if they disagree.
+#
+# `client_auth` (01.6 SF-2) is the listener's authentication mode, and it is PROFILE DATA rather
+# than renderer code: the mediator renders `clientca=` from this field, refuses to start on a
+# value it does not know, and derives the audit line's `identity_source` from the same field in
+# the same pass -- so the annotation cannot say a listener authenticates when it does not. It is
+# required, not defaulted; an absent key is a compile error. `mtls` demands `tls: true`.
+#
+# Only `claude` carries a client certificate: 01.1 SF-2 measured that `codex` rejects an
+# `https://`-scheme proxy URL at parse time and never reaches a TLS listener, and that `agy`
+# reaches the CertificateRequest stage with nothing to offer. Their identity stays
+# network-derived at this feature -- exactly one agent container per `internal: true` network --
+# and 01.6 SF-3 revisits it on SF-1's proxy-credential result.
 listeners:
-  claude: {scheme: https, tls: true,  port: 3128}
-  codex:  {scheme: http,  tls: false, port: 3128}
-  agy:    {scheme: https, tls: true,  port: 3128}
+  claude: {scheme: https, tls: true,  port: 3128, client_auth: mtls}
+  codex:  {scheme: http,  tls: false, port: 3128, client_auth: none}
+  agy:    {scheme: https, tls: true,  port: 3128, client_auth: none}
 
 # D5's third control, per agent. PROPOSALS for confirmation, not measurements -- sized to sit
 # comfortably above an interactive agent session and well below a runaway loop. No traffic has

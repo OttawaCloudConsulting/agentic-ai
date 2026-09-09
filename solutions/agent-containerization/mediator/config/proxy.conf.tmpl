@@ -58,12 +58,22 @@ forwarded_for delete
 # compose.yaml's `ipam` blocks, the agents' `dns:` literals, dnsdist's `addLocal`
 # calls and the listener certificates' iPAddress SANs.
 #
-# Client-certificate verification is OFF on every listener at this feature: no
-# `clientca=` appears below. That is what "configured off" means here rather than a
-# disabled flag -- SF-1's P1 found `clientca=` is required-at-handshake by default,
-# so a listener carrying it would refuse `agy`, which has no certificate to present.
-# 01.6 adds `clientca=` (and resolves P1's DELAYED_AUTH gap) on the listeners whose
-# agent can present one.
+# Client-certificate verification is per listener and comes from POLICY, not from this
+# template: `clientca=` and `tls-cafile=` are rendered onto a FRONT `https_port` when that
+# agent's resolved `listener.client_auth` is `mtls` (01.6 SF-2, Decision 5). On today's
+# artifact that is `claude` alone -- 01.1 SF-2 measured that `codex` never reaches a TLS
+# listener and that `agy` has nothing to offer at the CertificateRequest stage.
+#
+# It is REQUIRED-at-handshake, which SF-1's P1 measured and P1's DELAYED_AUTH half could not
+# make optional. That is safe here only because D2 gives every agent its own listener: the
+# `claude` front serves exactly one client and that client holds a certificate. It is why
+# `clientca=` never appears on an INNER bump listener (whose client is Squid's own cascade
+# hop) or on a self-check shadow (whose client is the startup probe) -- either would refuse
+# the mediator's own traffic at the handshake, and the symptom would be a self-check failure
+# at every start rather than anything naming identity.
+#
+# A cert-less refusal therefore produces NO AUDIT LINE AT ALL: the connection dies before
+# Squid has a request to log. The wrong-subject refusal below is the one that is logged.
 @PROXY_LISTENERS@
 
 # ------------------------------------------------------- listener identity ACLs
@@ -119,6 +129,11 @@ acl ctl_method    annotate_transaction control=method
 acl ctl_allowlist annotate_transaction control=allowlist
 acl ctl_denylist  annotate_transaction control=denylist
 acl ctl_ratelimit annotate_transaction control=ratelimit
+# `identity` is a FIFTH control value (01.6 SF-2). It names the subject-to-listener binding
+# refusal -- a certificate valid under the mediator CA whose subject is not this listener's
+# agent -- which is T34's literal case. It refuses on its own terms and would otherwise be
+# logged as `allowlist` or as nothing at all.
+acl ctl_identity  annotate_transaction control=identity
 
 # The reason is a TOKEN, not a sentence: annotation values cannot carry spaces, and
 # a machine-read audit trail is better served by a closed vocabulary anyway. The
@@ -131,6 +146,7 @@ acl rsn_sni     annotate_transaction reason=sni_does_not_match_connect_host
 acl rsn_fqdn    annotate_transaction reason=fqdn_on_denylist
 acl rsn_cidr    annotate_transaction reason=resolved_address_on_denylist
 acl rsn_maxconn annotate_transaction reason=concurrency_ceiling_exceeded
+acl rsn_subject annotate_transaction reason=subject_mismatch
 
 # The client half of Interface Contract 6, and it is BEST EFFORT by construction:
 # these pages are only reachable for a verdict reached BEFORE the CONNECT is
@@ -141,6 +157,10 @@ deny_info ERR_MEDIATOR_METHOD    ctl_method
 deny_info ERR_MEDIATOR_ALLOWLIST ctl_allowlist
 deny_info ERR_MEDIATOR_DENYLIST  ctl_denylist
 deny_info ERR_MEDIATOR_RATELIMIT ctl_ratelimit
+# The identity refusal is decided BEFORE the CONNECT is accepted -- it is an `http_access`
+# deny on the front listener -- so it takes Interface Contract 6's 403-with-body path in
+# full, the same route ERR_MEDIATOR_METHOD takes.
+deny_info ERR_MEDIATOR_IDENTITY  ctl_identity
 
 @DENY_ACLS@
 
@@ -159,6 +179,22 @@ deny_info ERR_MEDIATOR_RATELIMIT ctl_ratelimit
 # exfiltration channel criterion 4 exists to close, reopened one layer up. Putting
 # the per-agent `dstdomain` gate first means a name that is not on that agent's
 # allowlist is refused before anything resolves it.
+
+# Control 0 -- the subject-to-listener binding, on the FRONT layer of an mtls agent, and it
+# is FIRST for two reasons (01.6 SF-2, Decision 3's first ordering constraint).
+#
+# `cache_peer_access` is evaluated after `http_access`. A certificate whose subject is not
+# this listener's agent, reaching an allow rule first, would be forwarded to the peer -- and
+# the INNER listener would then annotate `idsrc=listener+mtls` on a connection its front
+# should have refused, which is exactly the false attribution `identity_source` exists to
+# prevent. So the deny is rendered ahead of every rule that can forward.
+#
+# Ahead of the method deny as well, so a non-CONNECT request carrying a wrong-subject
+# certificate is still refused AS an identity failure and still annotates `idsrc=listener`,
+# rather than being logged with no attribution strength at all.
+#
+# This marker renders EMPTY under a profile with no `client_auth: mtls` listener.
+@IDENTITY_ENFORCE@
 
 # CONNECT only. Every other method is refused (criterion 3): a plain `GET
 # http://host/` through this proxy would arrive as an absolute-URI request that the
@@ -234,12 +270,20 @@ http_access deny all rsn_sni ctl_allowlist
 # The field ORDER is a contract with the writer; the writer asserts the count. Change
 # either alone and the trail breaks silently.
 #
-# `%note{agent}` carries the network-derived identity annotated at the listener, on
-# allow and deny alike. `%note{layer}` is what lets the writer discard a fronted
-# agent's FRONT allow line: the front reports its tunnel to the peer (200,
-# TCP_TUNNEL) while the inner reports the real verdict, so a front line read alone
-# says a denied connection succeeded. Front DENIES are kept -- control 3's
-# concurrency ceiling is enforced there and nowhere else.
-logformat mediator_raw %{%Y-%m-%dT%H:%M:%S}tg.%03tuZ %#{agent}note %#{layer}note %#{control}note %#{reason}note %#ru %>Hs %Ss %>st %<st %#ssl::>sni %#>rm %<a
+# `%note{agent}` carries the identity annotated at the listener, on allow and deny alike.
+# `%note{layer}` is what lets the writer discard a fronted agent's FRONT allow line: the
+# front reports its tunnel to the peer (200, TCP_TUNNEL) while the inner reports the real
+# verdict, so a front line read alone says a denied connection succeeded. Front DENIES are
+# kept -- control 3's concurrency ceiling is enforced there and nowhere else.
+#
+# `%note{idsrc}` is the 14th field (01.6 SF-2) and it states the STRENGTH of the attribution
+# `agent` carries: `listener` for network-derived, `listener+mtls` where a client certificate
+# whose subject equals this listener's agent was verified, `listener+proxy_auth` where a
+# per-agent proxy credential was accepted. It is INSERTED AT POSITION 2, not appended, and
+# that is load-bearing rather than cosmetic: the writer's `read` ends in a trailing `extra`
+# variable, so a field appended at the end would be absorbed into it and discarded with no
+# error at all -- the short-line guard tests an empty `$server`, which would still be
+# populated. The field order here and the `read` list in audit-writer.sh are ONE contract.
+logformat mediator_raw %{%Y-%m-%dT%H:%M:%S}tg.%03tuZ %#{agent}note %#{idsrc}note %#{layer}note %#{control}note %#{reason}note %#ru %>Hs %Ss %>st %<st %#ssl::>sni %#>rm %<a
 access_log stdio:@AUDIT_RAW@ mediator_raw
 error_directory @ERROR_DIR@

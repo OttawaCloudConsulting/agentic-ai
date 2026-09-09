@@ -280,6 +280,17 @@ validate_resolved() {
     if [[ "$scheme" == "https" && "$tls" != "true" ]] || [[ "$scheme" == "http" && "$tls" != "false" ]]; then
       invalid "$f: agents.${agent}.listener scheme '$scheme' contradicts tls '$tls'"
     fi
+    # 01.6 SF-2. Checked HERE as well as on the profile side because this validator is what the
+    # mediator's startup self-check runs against the artifact it is about to enforce (stage 1,
+    # T17) -- an artifact compiled before this key existed would otherwise render a listener with
+    # no client authentication and an audit line that could not say so.
+    local client_auth; client_auth="$(yq eval ".agents.${agent}.listener.client_auth" "$f")"
+    case "$client_auth" in
+      mtls|proxy_auth|none) : ;;
+      *) invalid "$f: agents.${agent}.listener.client_auth must be one of mtls, proxy_auth or none, found '$client_auth'. It is required, not defaulted: recompile from a profile that declares it." ;;
+    esac
+    [[ "$client_auth" != "mtls" || "$tls" == "true" ]] \
+      || invalid "$f: agents.${agent}.listener.client_auth is 'mtls' but tls is '$tls'. A client certificate can only be requested on a TLS listener."
 
     local fq_n j
     fq_n="$(yq eval ".agents.${agent}.allow_fqdns | length" "$f")"
@@ -809,13 +820,29 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
       || invalid "$REL_ALLOWLIST: agent key '$agent' is not a valid identifier; it becomes a Lua variable name in the mediator's policy"
     # has(), not `// "null"`: `tls: false` is the codex listener's correct value and yq's
     # alternative operator would report it as absent.
-    for k in scheme tls port; do
+    #
+    # `client_auth` (01.6 SF-2) is REQUIRED, not defaulted. An absent key is a compile error
+    # rather than a silent `none`, because a listener that quietly stops requesting a client
+    # certificate because a key was dropped is precisely the failure the field exists to make
+    # visible. The cost is stated rather than discovered: a required key added to one profile
+    # fails every other profile's compile, and four profiles declare a `listeners:` block.
+    for k in scheme tls port client_auth; do
       [[ "$(yq eval ".listeners.${agent} | has(\"$k\")" "$PROFILE_FILE")" == "true" ]] \
         || invalid "$REL_PROFILE has no listeners.${agent}.${k}"
     done
     LISTENER_SCHEME="$(yq eval ".listeners.${agent}.scheme" "$PROFILE_FILE")"
     LISTENER_TLS="$(yq eval ".listeners.${agent}.tls" "$PROFILE_FILE")"
     LISTENER_PORT="$(yq eval ".listeners.${agent}.port" "$PROFILE_FILE")"
+    LISTENER_CLIENT_AUTH="$(yq eval ".listeners.${agent}.client_auth" "$PROFILE_FILE")"
+    case "$LISTENER_CLIENT_AUTH" in
+      mtls|proxy_auth|none) : ;;
+      *) invalid "$REL_PROFILE: listeners.${agent}.client_auth must be one of mtls, proxy_auth or none, found '$LISTENER_CLIENT_AUTH'" ;;
+    esac
+    # Squid cannot request a client certificate on a listener that does not speak TLS, so this
+    # combination compiles to a mediator that refuses its own agent at the handshake -- with no
+    # audit line, because the connection dies before there is a request to log.
+    [[ "$LISTENER_CLIENT_AUTH" != "mtls" || "$LISTENER_TLS" == "true" ]] \
+      || invalid "$REL_PROFILE: listeners.${agent}.client_auth is 'mtls' but tls is '$LISTENER_TLS'. A client certificate can only be requested on a TLS listener."
 
     for k in max_concurrent bytes_per_second; do
       [[ "$(yq eval ".rate_limits.${agent} | has(\"$k\")" "$PROFILE_FILE")" == "true" ]] \
@@ -825,7 +852,7 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
     echo "  ${agent}:"
     echo "    identity: ${agent}"
     echo "    listener_port: ${LISTENER_PORT}"
-    echo "    listener: {scheme: ${LISTENER_SCHEME}, tls: ${LISTENER_TLS}, port: ${LISTENER_PORT}}"
+    echo "    listener: {scheme: ${LISTENER_SCHEME}, tls: ${LISTENER_TLS}, port: ${LISTENER_PORT}, client_auth: ${LISTENER_CLIENT_AUTH}}"
     # ---- composition, per agent (01.5 SF-3) -------------------------------------------------
     # Base entries and every selected pack's runtime entries are collected into ONE set, keyed
     # per agent and never flattened across agents (the composition model's first property: 01.1
