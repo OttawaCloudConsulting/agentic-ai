@@ -448,79 +448,90 @@ note "The evidence above IS the finding; no privilege-change line needs recordin
 # ---------------------------------------------------------------------------
 # Phase E -- exports and T36 (02.1 SF-4, R9.9, D11, Decision 7)
 #
-# Four scratch-compiled variants of `default`, one toggle false at a time (Decision
-# 7), each brought up as its OWN small stack -- egress-mediator, claude-recorder and
-# one `claude` session -- under compose/overrides/test-exports.yaml, which mounts the
-# variant over the mediator's baked policy path and the recorders' `configs:` source.
-# `default`'s own stage 1/2 startup self-check is the "traffic" that populates the
-# egress trail; a synthetic transcript append (Phase A's idiom) populates the action
-# trail. Per variant: recording continues on both trails, the disabled channel is
-# absent (relay toggles) or the MANIFEST says so (file toggles), the other channels
-# are unaffected, and `export_config` names exactly the disabled toggle false.
+# Four scratch-compiled variants of `default`, one toggle false at a time (Decision 7).
+# Deviation from the original SF-4 design (recorded, surfaced running the SF-5 completion
+# gate): each variant is applied to the harness's OWN project ($PROJECT), by force-recreating
+# egress-mediator and claude-recorder with compose/overrides/test-exports.yaml layered on top,
+# rather than bringing up a SECOND project. A second project collides on network creation --
+# claude-net/codex-net/agy-net always carry fixed subnets (pinned for the listener certs'
+# SANs, T34), so a second project's `up` fails at network creation while this harness's own
+# project still holds them. Reusing $PROJECT sidesteps that with no change to compose.yaml.
+# `default`'s own stage 1/2 startup self-check is the "traffic" that populates the egress
+# trail; a synthetic transcript append on the ALREADY-RUNNING ${PROJECT}-claude container
+# (Phase A's idiom) populates the action trail. Per variant: recording continues on both
+# trails, the disabled channel is absent (relay toggles) or the MANIFEST says so (file
+# toggles), the other channels are unaffected, and `export_config` names exactly the
+# disabled toggle false.
 # ---------------------------------------------------------------------------
 phase "E -- exports and T36"
 
 mkdir -p .build-scratch/t36
 EXPORT_TOGGLES="egress_audit_log agent_action_log resolved_policy image_digest_sbom"
+E_TS_DIR="/home/agent/.claude/projects/-t36"
+aexec claude mkdir -p "$E_TS_DIR"
 
 for toggle in $EXPORT_TOGGLES; do
   VARIANT_SRC=".build-scratch/t36/${toggle}-profile.yaml"
   VARIANT=".build-scratch/t36/variant.yaml"
-  sed "s/^  ${toggle}: true\$/  ${toggle}: false/" profiles/default.yaml > "$VARIANT_SRC"
-  if bash scripts/compile-policy.sh --profile default --profile-file "$VARIANT_SRC" --out "$VARIANT" >/dev/null 2>&1; then
-    pass "E ($toggle): compiled a 'default' variant with ${toggle}=false"
+  # Compiled from test-fixtures (startup_check.offline: true), not default -- default's
+  # self-check dials a real destination (api.anthropic.com), which this harness's other
+  # phases never require and which a network-restricted host/CI runner cannot satisfy from
+  # inside a container. T36 only exercises the export toggles, which test-fixtures carries
+  # identically to default (Interface Contract 4's four keys, same shape either profile).
+  sed "s/^  ${toggle}: true\$/  ${toggle}: false/" profiles/test-fixtures.yaml > "$VARIANT_SRC"
+  if bash scripts/compile-policy.sh --profile test-fixtures --profile-file "$VARIANT_SRC" --out "$VARIANT" >/dev/null 2>&1; then
+    pass "E ($toggle): compiled a 'test-fixtures' variant with ${toggle}=false"
   else
     fail "E ($toggle): could not compile the variant"; rm -f "$VARIANT_SRC"; continue
   fi
   rm -f "$VARIANT_SRC"
 
-  EPROJECT="sf9-t36-${toggle}-$$"
-  ECOMPOSE=(docker compose --env-file compose/pins.env
-            -f compose/compose.yaml -f compose/overrides/default.yaml
-            -f compose/overrides/test-exports.yaml -p "$EPROJECT")
-  ecleanup() {
-    docker rm -f "${EPROJECT}-claude" >/dev/null 2>&1 || true
-    "${ECOMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
-  }
+  EXPORTS_COMPOSE=("${COMPOSE[@]}" -f compose/overrides/test-exports.yaml)
 
-  if ! "${ECOMPOSE[@]}" up -d egress-mediator claude-recorder >/dev/null 2>&1; then
-    fail "E ($toggle): stack bring-up"; ecleanup; continue
+  if ! "${EXPORTS_COMPOSE[@]}" up -d --force-recreate egress-mediator claude-recorder >/dev/null 2>&1; then
+    fail "E ($toggle): stack recreate with the variant"; continue
   fi
 
   eup=0
   for _ in $(seq 1 60); do
-    docker exec "${EPROJECT}-egress-mediator-1" true >/dev/null 2>&1 && { eup=1; break; }
+    med true >/dev/null 2>&1 && { eup=1; break; }
     sleep 1
   done
   if [ "$eup" -ne 1 ]; then
-    fail "E ($toggle): mediator never came up"; ecleanup; continue
+    fail "E ($toggle): mediator never came back up on the variant"; continue
   fi
 
   # Recording continues on the egress trail (D11): the mediator's own startup
-  # self-check writes stage 1/2 events whatever the export toggles say.
-  egress_lines="$(docker exec "${EPROJECT}-egress-mediator-1" sh -c 'wc -l < /var/log/mediator/egress-audit.log' 2>/dev/null || echo 0)"
+  # self-check writes stage 1/2 events whatever the export toggles say. The mediator
+  # container was just force-recreated, so this log is fresh for this toggle alone.
+  egress_lines="$(med sh -c 'wc -l < /var/log/mediator/egress-audit.log' 2>/dev/null || echo 0)"
   [ "${egress_lines:-0}" -gt 0 ] \
     && pass "E ($toggle): the egress trail gained lines (self-check) -- recording continues" \
     || fail "E ($toggle): the egress trail is empty"
 
-  # Recording continues on the action trail: one synthetic tool-call append.
-  CID_UNUSED="$("${ECOMPOSE[@]}" run -d --name "${EPROJECT}-claude" --rm claude sleep 60)"
-  E_SESSION="e4e4e4e4-0000-4000-8000-e4e4e4e4e4e4"
+  # Recording continues on the action trail: one synthetic tool-call append on the
+  # long-lived ${PROJECT}-claude container (started at preflight), read by the
+  # just-recreated claude-recorder.
+  E_SESSION="e4e4e4e4-0000-4000-8000-${toggle:0:4}e4e4"
   E_MARK="sf4-t36-${toggle}"
-  docker exec "${EPROJECT}-claude" mkdir -p /home/agent/.claude/projects/-scratch
-  docker exec "${EPROJECT}-claude" sh -c \
-    "printf '%s\n' '{\"type\":\"tool_call\",\"sessionId\":\"$E_SESSION\",\"name\":\"$E_MARK\"}' >> /home/agent/.claude/projects/-scratch/$E_SESSION.jsonl"
-  wait_until 5 sh -c "docker exec ${EPROJECT}-claude-recorder-1 sh -c \"grep -q ${E_MARK} /var/log/actions/action-audit.log\""
-  action_lines="$(docker exec "${EPROJECT}-claude-recorder-1" sh -c 'wc -l < /var/log/actions/action-audit.log' 2>/dev/null || echo 0)"
+  aexec claude sh -c \
+    "printf '%s\n' '{\"type\":\"tool_call\",\"sessionId\":\"$E_SESSION\",\"name\":\"$E_MARK\"}' >> $E_TS_DIR/$E_SESSION.jsonl"
+  wait_until 5 sh -c "docker exec ${PROJECT}-claude-recorder-1 sh -c \"grep -q ${E_MARK} /var/log/actions/action-audit.log\""
+  action_lines="$(rexec claude sh -c 'wc -l < /var/log/actions/action-audit.log' 2>/dev/null || echo 0)"
   [ "${action_lines:-0}" -gt 0 ] \
     && pass "E ($toggle): the action trail gained lines -- recording continues" \
     || fail "E ($toggle): the action trail is empty"
 
-  mlog="$("${ECOMPOSE[@]}" logs egress-mediator 2>/dev/null)"
-  rlog="$("${ECOMPOSE[@]}" logs claude-recorder 2>/dev/null)"
+  # `docker compose logs` reads the daemon's own log-driver file, which lags a beat behind
+  # the container's actual stdout write under back-to-back force-recreates -- the FILE reads
+  # above (egress_lines, action_lines) are synchronous and already proved the content exists;
+  # give the stdout copy a moment to catch up before asserting on it too.
+  sleep 2
+  mlog="$("${COMPOSE[@]}" logs egress-mediator 2>/dev/null)"
+  rlog="$("${COMPOSE[@]}" logs claude-recorder 2>/dev/null)"
   case "$toggle" in
     egress_audit_log)
-      printf '%s' "$mlog" | grep -q '"stage":1' \
+      printf '%s' "$mlog" | grep -q '"event":"startup_check"' \
         && fail "E ($toggle): the egress-audit.log/dns-audit.log relay is present, though disabled" \
         || pass "E ($toggle): the egress-audit.log/dns-audit.log relay is absent, as disabled"
       printf '%s' "$rlog" | grep -q "$E_MARK" \
@@ -531,12 +542,12 @@ for toggle in $EXPORT_TOGGLES; do
       printf '%s' "$rlog" | grep -q "$E_MARK" \
         && fail "E ($toggle): the agent_action_log relay is present, though disabled" \
         || pass "E ($toggle): the agent_action_log relay is absent, as disabled"
-      printf '%s' "$mlog" | grep -q '"stage":1' \
+      printf '%s' "$mlog" | grep -q '"event":"startup_check"' \
         && pass "E ($toggle): the egress-audit.log/dns-audit.log relay is unaffected (still present)" \
         || fail "E ($toggle): the egress-audit.log/dns-audit.log relay unexpectedly stopped"
       ;;
     resolved_policy|image_digest_sbom)
-      printf '%s' "$mlog" | grep -q '"stage":1' \
+      printf '%s' "$mlog" | grep -q '"event":"startup_check"' \
         && pass "E ($toggle): the egress-audit.log relay is unaffected (a file export, not a relay)" \
         || fail "E ($toggle): the egress-audit.log relay unexpectedly stopped"
       printf '%s' "$rlog" | grep -q "$E_MARK" \
@@ -545,7 +556,7 @@ for toggle in $EXPORT_TOGGLES; do
       ;;
   esac
 
-  ec="$(docker exec "${EPROJECT}-egress-mediator-1" sh -c 'grep export_config /var/log/mediator/egress-audit.log | tail -1' 2>/dev/null)"
+  ec="$(med sh -c 'grep export_config /var/log/mediator/egress-audit.log | tail -1' 2>/dev/null)"
   if printf '%s' "$ec" | jq -e --arg t "$toggle" '.exports[$t] == false' >/dev/null 2>&1; then
     pass "E ($toggle): export_config names ${toggle} false"
   else
@@ -568,10 +579,15 @@ for toggle in $EXPORT_TOGGLES; do
         || fail "E ($toggle): MANIFEST does not record '${toggle} disabled' (got '${manifest_line}')" ;;
     *) note "E ($toggle): not a file export -- MANIFEST check not applicable" ;;
   esac
-
-  ecleanup
 done
 rm -rf .build-scratch/t36
+
+# Restore egress-mediator and claude-recorder to the plain (non-variant) definition before
+# Phase F, which needs the real test-fixtures policy and all four exports enabled again.
+"${COMPOSE[@]}" up -d --force-recreate egress-mediator claude-recorder >/dev/null 2>&1
+for _ in $(seq 1 60); do med true >/dev/null 2>&1 && break; sleep 1; done
+med true >/dev/null 2>&1 && pass "E: egress-mediator and claude-recorder restored to the plain profile for Phase F" \
+                          || fail "E: could not restore the plain stack after the T36 loop"
 
 # ---------------------------------------------------------------------------
 # Phase F -- R8.6 credential-value scan and redaction (02.1 SF-5, Decision 8)
@@ -609,7 +625,9 @@ if wait_until 5 sh -c "docker exec ${PROJECT}-codex-recorder-1 sh -c \"grep -q $
     if printf '%s' "$rlog_codex" | grep "$codex_mark" | grep -q "$CODEX_PASS"; then
       fail "F1 (codex): the literal password reached the agent_action_log relay, unredacted"
     else
-      redacted_line="$(printf '%s' "$rlog_codex" | grep "$codex_mark" | tail -1)"
+      # `docker compose logs` prefixes each line with "<service>-1  | " -- strip everything
+      # before the JSON object so jq sees a parseable line, not the compose-log prefix.
+      redacted_line="$(printf '%s' "$rlog_codex" | grep "$codex_mark" | tail -1 | grep -o '{.*}')"
       if printf '%s' "$redacted_line" | grep -q '<redacted' \
          && printf '%s' "$redacted_line" | jq -e '.redacted >= 1' >/dev/null 2>&1; then
         pass "F1 (codex): the relay redacts the password and carries a redacted count"
@@ -658,7 +676,7 @@ if wait_until 5 sh -c "docker exec ${PROJECT}-claude-recorder-1 sh -c \"grep -q 
     && pass "F3 (claude): the sink is faithful -- the synthetic key is present, unredacted" \
     || fail "F3 (claude): the synthetic key is missing from the sink"
   rlog_claude="$("${COMPOSE[@]}" logs claude-recorder 2>/dev/null)"
-  redacted_line="$(printf '%s' "$rlog_claude" | grep "$claude_mark" | tail -1)"
+  redacted_line="$(printf '%s' "$rlog_claude" | grep "$claude_mark" | tail -1 | grep -o '{.*}')"
   if printf '%s' "$redacted_line" | grep -q "$fake_key"; then
     fail "F3 (claude): the sk-ant- prefixed key reached the relay unredacted"
   elif printf '%s' "$redacted_line" | grep -q '<redacted:sk-ant>' \
