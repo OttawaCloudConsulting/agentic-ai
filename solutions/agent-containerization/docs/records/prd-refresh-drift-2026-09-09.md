@@ -103,11 +103,17 @@ P3  progress.txt Gate 1 line still reads Approved: 2026-09-03 - to be bumped on
     re-approval of this refresh.
 P4  gate-3-review.md records a consistency check at "2/6 features complete"; now 5/6.
 
-## OUTSTANDING SECURITY ACTION (not a PRD edit)
+## SECURITY ACTION (not a PRD edit) -- RESOLVED 2026-09-10
 The CLAUDE_CODE_OAUTH_TOKEN minted for the R4.16 test cell is a one-year credential that
 additionally leaked in cleartext during the first run. Revocation was deferred until
 testing finished. Testing has finished (01.5 complete). This token should be revoked at
 the provider.
+
+RESOLVED 2026-09-10: revoked at the provider by the operator, surfaced during Feature 02.5
+planning. The operator reported the revocation; no replay test was run, so the revocation is
+recorded rather than measured. This was not a timed drill: Feature 02.5 (T26, row E4) mints and
+times its own drill token and carries this entry forward as a pre-drill revocation in
+docs/records/containment-drills.md (02.5 plan, Edge Case 1). The token value is not recorded.
 
 ## PROPOSED WRITE SET (skill /define Step 6 scope) — 3 files only
 1. prd.md - edits D1..D11 as approved
