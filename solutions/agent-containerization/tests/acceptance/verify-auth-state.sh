@@ -163,9 +163,15 @@ mount_set() { docker inspect "$1" | jq -r '[.[0].Mounts[] | .Destination] | sort
 expected_mounts() { # <agent> [extra destinations...]
   local agent="$1"; shift
   local list
+  # 01.6 SF-2 split `claude` off from `agy`. `claude`'s listener declares `client_auth: mtls`,
+  # so it alone mounts a client key pair as a Compose secret (Interface Contract 5); `agy`
+  # keeps the CA it anchors its proxy hop with and presents nothing; `codex` keeps neither.
+  # The same asymmetry verify-pod-topology.sh carries, and it lives in both files because
+  # each harness asserts EQUALITY against its own containers rather than sharing a constant.
   case "$agent" in
-    claude|agy) list="/home/agent /run/secrets/mediator-ca.crt /workspace" ;;
-    codex)      list="/home/agent /workspace" ;;
+    claude) list="/home/agent /run/secrets/claude-client.crt /run/secrets/claude-client.key /run/secrets/mediator-ca.crt /workspace" ;;
+    agy)    list="/home/agent /run/secrets/mediator-ca.crt /workspace" ;;
+    codex)  list="/home/agent /workspace" ;;
   esac
   # Word splitting is how the list becomes one path per line.
   # shellcheck disable=SC2086

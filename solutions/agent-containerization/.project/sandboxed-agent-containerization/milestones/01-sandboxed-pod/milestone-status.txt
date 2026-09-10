@@ -993,6 +993,17 @@
     any agent bind resolving inside the solution root, which mediator/identity/clients/ is. Seven
     shipped assertions broken in total, against Decision 8's five; the two extras share one root
     cause -- three harnesses each hold their own "is this mount control plane" predicate and
-    generated trust material under mediator/ trips all three. Test Command NOT yet run -- it is the feature-completion
+    generated trust material under mediator/ trips all three. Deviation 6, found by the operator
+    running verify-auth-state.sh by hand as the plan required: that harness holds its OWN mount-set
+    equality helper behind four call sites, and both claude call sites failed. Fixed the same way.
+    EIGHT shipped assertions broken against Decision 8's five. The find matters beyond the fix --
+    verify-auth-state.sh is excluded from the Test Command by design, so the completion gate would
+    have closed green with two latent failures in it; a cheap mount-set-only mode of that harness in
+    the composite is a /design refresh candidate. Everything else in that run passed on SF-2's
+    account: the full AUTH_MODE matrix (T24), claude's eight authentication cells, the git-config
+    scrub and both persistence phases. Its Phase D failure is NOT SF-2 -- "refresh token was already
+    used", the accepted_risk.rotation the harness banner warns about, meaning sf3_codex-state holds a
+    refresh token a previous Phase D already rolled; it needs a fresh host codex login and a reseed.
+    Test Command NOT yet run -- it is the feature-completion
     gate and SF-3 and SF-4 are outstanding. verify-auth-state.sh is the operator's to run by hand at
     this point, per the plan: it costs the host codex login and is excluded from the Test Command.

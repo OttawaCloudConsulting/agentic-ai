@@ -910,3 +910,28 @@ once by the operator at the end of SF-2 rather than left unrun.
   and generated trust material that legitimately lives under `mediator/` trips all three. A
   fourth agent-mounted secret would trip them again. Consolidating that predicate is a
   `/design` refresh item, not this feature's.
+
+### Deviation 6: mount-set equality breaks in `verify-auth-state.sh` too, which no assertion in the Test Command could have caught
+- **What changed:** `tests/acceptance/verify-auth-state.sh`'s `expected_mounts()` helper splits
+  `claude` off from `agy`, in the same shape `verify-pod-topology.sh` uses. It is one helper
+  behind four call sites, two of which assert against `claude` (Phase A's per-agent loop and
+  Phase C's `claude+gitconfig` invocation) and both of which failed.
+- **Originally planned:** Decision 8 item 4 anticipated mount-set equality breaking and named
+  `verify-pod-topology.sh` alone. The Test Command section names `verify-auth-state.sh` as
+  affected but only for the `claude` container's **environment**, and excludes it from the
+  composite because its Phase D costs the operator their host codex login.
+- **Why necessary:** That file holds its OWN mount-set equality assertion, independent of
+  `verify-pod-topology.sh` and not delegating to it. Mounting `claude-client.{crt,key}` breaks
+  it exactly as it broke the topology harness. Found by running the harness, which is the only
+  way it could have been found: it is excluded from the Test Command by design, so the
+  feature-completion gate would have closed green with two latent failures in a harness nobody
+  runs unattended.
+- **Impact:** This is the THIRD harness carrying its own copy of "what should this agent mount",
+  after `verify-pod-topology.sh` and `verify-pack-composition.sh` — the same duplication
+  Deviations 4 and 5 named, in its third spelling. It also exposes a standing gap worth naming
+  for the milestone rather than this feature: an assertion excluded from the Test Command is an
+  assertion the completion gate cannot protect, and `verify-auth-state.sh` is excluded for a
+  good reason that does not stop it from rotting. Carrying a cheap mount-set-only mode of that
+  harness into the composite is a `/design` refresh candidate. **`claude`'s eight passing
+  authentication cells and the whole AUTH_MODE matrix (T24) were unaffected by SF-2**, which is
+  what the run confirms beyond the two mount lines.
