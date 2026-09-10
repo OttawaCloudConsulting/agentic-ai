@@ -61,3 +61,8 @@ auth.json
 .credentials.json
 .claude.json
 compose/generated/oauth-src/
+
+# Pack credential staging (02.3 Decision 1). The operator stages a dedicated, scoped
+# credential file per profile/pack under here before `up`; it is never committed, the same
+# reasoning as compose/generated/oauth-src/ above.
+compose/generated/credentials/

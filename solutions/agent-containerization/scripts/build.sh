@@ -67,6 +67,15 @@ done
 
 command -v docker >/dev/null 2>&1 || { echo "build: docker is required" >&2; exit 1; }
 
+# Decision 3 -- the compose check runs here and in the Test Command, never inside
+# `docker compose up --build` itself (R12.9 bars a wrapper on that entry point; the
+# residual is stated in README.md and the record). A profile with no same-named override
+# has nothing to check: the two test profiles and any future no-override profile skip this
+# by construction, not by a flag.
+if [[ -f "compose/overrides/${PROFILE}.yaml" ]]; then
+  bash scripts/check-profile-compose.sh --profile "$PROFILE"
+fi
+
 COMPOSE=(docker compose --env-file compose/pins.env -f compose/compose.yaml)
 
 # Only the AGENT images vary by profile -- the pack set is theirs. The mediator image

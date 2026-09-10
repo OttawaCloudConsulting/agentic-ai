@@ -138,8 +138,57 @@ inject_proxy_credential() {
   echo "entrypoint: proxy credential spliced into the proxy URL as user '${userinfo%%:*}'" >&2
 }
 
+# 02.3 Decision 1 / Interface Contract 2. pack-plan.sh resolved the profile's selected
+# packs into two plain-text plan files, images/pack-install.sh installed them read-only
+# at /opt/agent-pack/{env,credentials}, and this is where each lands: env is exported
+# non-secret, a credential is mapped from the Compose `file:` secret Contract 3 declares.
+# Exported BEFORE the credential map, so a credential mapping always wins if a name ever
+# collided -- it cannot today, because compile-policy.sh refuses a duplicate at build
+# (Interface Contract 1), but the ordering costs nothing and removes one way a future
+# schema change could go wrong silently.
+export_pack_env() {
+  local f="/opt/agent-pack/env"
+  [ -f "$f" ] || return 0
+  while IFS=$'\t' read -r name value; do
+    [ -n "$name" ] || continue
+    export "$name=$value"
+  done < "$f"
+}
+
+# Each line is "pack-<pack>-<cred><TAB>env|path_env<TAB>VAR" (Interface Contract 2). The
+# secret's CONTENT is exported for `env` delivery (e.g. GH_TOKEN); its PATH is exported for
+# `path_env` delivery (e.g. KUBECONFIG), because a kubeconfig is a file some tools require
+# a path to, not a value they read from an environment variable's own content.
+#
+# A missing secret file is NOT covered by Compose's own refusal here -- Compose refuses
+# `up` on an absent `file:` SOURCE on the host, but that says nothing about a target this
+# container failed to see for some other reason (a secret mount race, an operator error in
+# a hand-authored override). This asserts presence a second time, at the point of use,
+# and fails closed rather than starting an agent silently missing a credential it declared
+# it needed.
+map_pack_credentials() {
+  local f="/opt/agent-pack/credentials"
+  [ -f "$f" ] || return 0
+  local secret form var path
+  while IFS=$'\t' read -r secret form var; do
+    [ -n "$secret" ] || continue
+    path="/run/secrets/${secret}"
+    if [ ! -r "$path" ]; then
+      echo "entrypoint: declared credential secret '${secret}' is absent at ${path} (pack env/credentials, Interface Contract 2)" >&2
+      exit 3
+    fi
+    case "$form" in
+      env)      export "$var=$(cat "$path")" ;;
+      path_env) export "$var=$path" ;;
+      *) echo "entrypoint: pack credential '${secret}' names unknown delivery form '${form}'" >&2; exit 3 ;;
+    esac
+  done < "$f"
+}
+
 seed_home
 ensure_codex_credentials_store
+export_pack_env
+map_pack_credentials
 # BEFORE bootstrap_auth, not after. The splice reads a secret and exports four variables; it
 # depends on nothing the seed or the R4.5 merge produce, so nothing is gained by running it later
 # -- and bootstrap-auth's endpoint probe reaches the network THROUGH THE PROXY (`curl` at

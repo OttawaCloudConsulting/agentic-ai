@@ -13,9 +13,20 @@ KEYRING="${2:?usage: pack-install.sh <plan-dir> <keyring>}"
 die() { echo "pack-install: $*" >&2; exit 2; }
 
 [ -f "$PLAN/repo.env" ] || die "no plan at $PLAN (expected repo.env)"
-for f in apt-items.txt archives.txt packs.txt; do
+for f in apt-items.txt archives.txt packs.txt pack-env.txt pack-credentials.txt; do
   [ -f "$PLAN/$f" ] || die "no plan at $PLAN (expected $f)"
 done
+
+# --- pack env / credentials (02.3 Decision 1, Interface Contract 2) --------------
+# Installed unconditionally, even for the zero-pack profile below -- an ABSENT file at
+# /opt/agent-pack/env would make the entrypoint's export step distinguish "no pack env"
+# from "the plan producer failed silently" by the file's mere existence, which is the
+# exact class of defect Deviation 13's sibling finding (SF-6a) exists to avoid. Root-owned
+# and read-only: this is image code on the read-only root filesystem, not agent-writable
+# state.
+mkdir -p /opt/agent-pack
+install -m 0444 -o root -g root "$PLAN/pack-env.txt" /opt/agent-pack/env
+install -m 0444 -o root -g root "$PLAN/pack-credentials.txt" /opt/agent-pack/credentials
 
 # --- the zero-pack profile installs nothing, and that is a COMPLETE plan ----------
 # profiles/test-fixtures.yaml and profiles/test-selfcheck.yaml select no packs, and the

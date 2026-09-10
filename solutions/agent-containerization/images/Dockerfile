@@ -85,8 +85,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY images/keyrings/debian-archive.gpg /usr/local/share/keyrings/debian-archive.gpg
 COPY --chmod=0755 images/apt-pinned.sh /usr/local/bin/apt-pinned
-COPY --chmod=0755 images/pack-install.sh /usr/local/bin/pack-install
 COPY --chmod=0755 images/remove-package-managers.sh /usr/local/bin/remove-package-managers
+
+# pack-install.sh is NOT copied here -- it MOVED to the agent-packs stage below (02.3
+# SF-2), the same move entrypoint.sh made at 01.6 SF-3 and for the identical reason: this
+# stage is published and pulled by digest (D21), so a copy here is baked into whatever
+# agent-base was last published rather than this repository's working tree. Leaving a
+# second, dead COPY here would build correctly and mislead the next reader into thinking
+# it is the one that runs.
 
 # `git`, in the BASE and not in a pack -- Deviation 2. R2.9's host_git_config mount and
 # scripts/scrub-gitconfig.sh are profile-level features built in 01.4, and they are inert
@@ -178,6 +184,17 @@ COPY --chmod=0755 images/bootstrap-auth.sh /usr/local/bin/bootstrap-auth
 # workflow's `env.IMAGE`, and it is a supply-chain anchor: a value a caller could pass
 # would let `--build-arg` redirect the base image of every agent in the pod.
 FROM ghcr.io/ottawacloudconsulting/agentic-ai/agent-sandbox-base@${AGENT_BASE_DIGEST} AS agent-packs
+
+# MOVED HERE FROM agent-base (02.3 SF-2), the same move entrypoint.sh made at 01.6 SF-3
+# and for the identical reason: agent-base is PUBLISHED and pulled by digest (D21);
+# BuildKit skips a stage nothing references, so a local edit to images/pack-install.sh
+# reached the copy baked into whatever agent-base was last published, not this
+# repository's working tree. Found by building: the /opt/agent-pack install step landed
+# in the script but never appeared in the image until this line moved here.
+# pack-install.sh is repository code that changes with the features that use it
+# (env/credential delivery, archive rules per pack) -- the same class of thing
+# entrypoint.sh is, and the same reasoning that moved it applies here.
+COPY --chmod=0755 images/pack-install.sh /usr/local/bin/pack-install
 
 COPY --from=pack-plan /out /tmp/pack-plan
 RUN bash /usr/local/bin/pack-install /tmp/pack-plan /usr/local/share/keyrings/debian-archive.gpg \

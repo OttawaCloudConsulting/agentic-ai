@@ -186,6 +186,84 @@ expect 2 "unrecognised top-level key 'cap_add'" \
   compile_probe
 rm -rf "$PROBE_PACK_DIR" "$PROBE_PROFILE"
 
+
+# ---------------------------------------------------------------------------
+# Phase B -- SF-2: pack env/credential delivery (entrypoint export + map,
+#            check-profile-compose.sh)
+# ---------------------------------------------------------------------------
+phase B "pack env/credential delivery -- entrypoint, check-profile-compose.sh"
+
+command -v docker >/dev/null 2>&1 || { echo "verify-tool-packs: docker is required for Phase B" >&2; exit 1; }
+grep -n '^AGENT_BASE_DIGEST=' compose/pins.env >/dev/null \
+  || { echo "verify-tool-packs: AGENT_BASE_DIGEST not found in compose/pins.env" >&2; exit 1; }
+AGENT_BASE_DIGEST="$(sed -n 's/^AGENT_BASE_DIGEST=//p' compose/pins.env | tail -n1)"
+
+B_TMP="$(mktemp -d)"
+B_CREDS_DIR="$B_TMP/credentials"
+B_IMAGE="verify-tool-packs-sf7-probe:agent-packs"
+mkdir -p "$B_CREDS_DIR/sf7-probe/sf7-probe"
+printf 'probe-secret-value' > "$B_CREDS_DIR/sf7-probe/sf7-probe/probe-cred"
+
+b_cleanup() {
+  docker rmi -f "$B_IMAGE" >/dev/null 2>&1 || true
+  rm -rf "$B_TMP"
+}
+trap 'cleanup; b_cleanup' EXIT
+
+make_probe_pack '.env = [{"name": "SF7_PROBE_ENV", "value": "probe-value", "reason": "Phase B probe"}] | .credentials = [{"name": "probe-cred", "delivery": {"env": "SF7_PROBE_CRED"}, "description": "d", "blast_radius": "b", "revocation": "r"}]'
+make_probe_profile '.packs = ["sf7-probe"]'
+
+expect 1 "no compose/overrides/sf7-probe.yaml" \
+  "B: check-profile-compose.sh refuses a profile with no same-named override" \
+  bash scripts/check-profile-compose.sh --profile sf7-probe
+
+expect 0 "ok -- secret set matches the manifests, no other drift from default" \
+  "B: check-profile-compose.sh accepts 'default' against itself" \
+  bash scripts/check-profile-compose.sh --profile default
+
+if docker build -f images/Dockerfile --target agent-packs \
+     --build-arg "AGENT_BASE_DIGEST=${AGENT_BASE_DIGEST}" --build-arg PROFILE=sf7-probe \
+     -t "$B_IMAGE" . > "$B_TMP/build.log" 2>&1; then
+  pass "B: agent-packs image builds for a profile carrying a pack env + credential"
+else
+  fail "B: agent-packs image failed to build for the probe profile"
+  tail -20 "$B_TMP/build.log" | sed 's/^/      /'
+fi
+
+# The variable is exported, and the credential's CONTENT lands in the delivery.env
+# variable -- from a secret this run mounts, never from the plan file itself (the
+# plan carries only the delivery FORM, never a value).
+OUT="$(docker run --rm -v "$B_CREDS_DIR/sf7-probe/sf7-probe/probe-cred:/run/secrets/pack-sf7-probe-probe-cred:ro" "$B_IMAGE" env 2>&1)" || true
+if grep -qF 'SF7_PROBE_ENV=probe-value' <<< "$OUT" && grep -qF 'SF7_PROBE_CRED=probe-secret-value' <<< "$OUT"; then
+  pass "B: the pack env variable and the mapped credential are present under the loading profile"
+else
+  fail "B: expected SF7_PROBE_ENV and SF7_PROBE_CRED in the container environment"
+  grep -E 'SF7_PROBE' <<< "$OUT" | sed 's/^/      found: /' || echo "      (neither found)"
+fi
+
+# The entrypoint asserts presence a second time, at the point of use: a declared
+# credential with no mounted secret refuses the start rather than running without it.
+RC=0
+NO_SECRET_OUT="$(docker run --rm "$B_IMAGE" env 2>&1)" || RC=$?
+if [ "$RC" -eq 3 ] && grep -qF "declared credential secret 'pack-sf7-probe-probe-cred' is absent" <<< "$NO_SECRET_OUT"; then
+  pass "B: starting the profile with the declared secret unmounted refuses at exit 3, naming the secret"
+else
+  fail "B: expected exit 3 naming the absent secret, got exit $RC"
+  printf '%s\n' "$NO_SECRET_OUT" | head -3 | sed 's/^/      /'
+fi
+
+# And under a profile that does not load the pack, neither name resolves at all --
+# the reference pack (`default`) carries no env and no credential, so this is the
+# `default` build already on disk, not a rebuild.
+DEFAULT_OUT="$(docker run --rm sandboxed-agent/claude:local env 2>&1)" || true
+if grep -qF 'SF7_PROBE_ENV' <<< "$DEFAULT_OUT" || grep -qF 'SF7_PROBE_CRED' <<< "$DEFAULT_OUT"; then
+  fail "B: SF7_PROBE_ENV/SF7_PROBE_CRED leaked into the default profile's image, which loads no pack declaring them"
+else
+  pass "B: neither name resolves under 'default', which does not load the probe pack"
+fi
+
+rm -rf "$PROBE_PACK_DIR" "$PROBE_PROFILE"
+
 echo
 echo "=== Results: $PASSED passed, $FAILED failed ==="
 [ "$FAILED" -eq 0 ]

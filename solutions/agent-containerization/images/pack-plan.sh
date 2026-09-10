@@ -15,10 +15,12 @@
 # in Contract 1 touches both.
 #
 # OUTPUT (all under $OUT, all plain text, one record per line, no YAML downstream):
-#   repo.env       APT_URL / APT_SUITE / APT_SIGNED_BY / APT_FINGERPRINT
-#   apt-items.txt  "<name> <version> <sha256>"
-#   archives.txt   "<name> <version> <url> <sha256>"
-#   packs.txt      "<name> <sha256-of-manifest>"   -- provenance, for the build log
+#   repo.env            APT_URL / APT_SUITE / APT_SIGNED_BY / APT_FINGERPRINT
+#   apt-items.txt       "<name> <version> <sha256>"
+#   archives.txt        "<name> <version> <url> <sha256>"
+#   packs.txt           "<name> <sha256-of-manifest>"   -- provenance, for the build log
+#   pack-env.txt         02.3 Interface Contract 2: "NAME<TAB>value"
+#   pack-credentials.txt 02.3 Interface Contract 2: "pack-<pack>-<cred><TAB>env|path_env<TAB>VAR"
 #
 # SF-3's LESSON IS APPLIED HERE DELIBERATELY. Every traversal is TAG-checked, not
 # text-checked. `yq` renders a missing key, an empty sequence and an empty map in ways
@@ -107,6 +109,8 @@ mkdir -p "$OUT"
 : > "$OUT/apt-items.txt"
 : > "$OUT/archives.txt"
 : > "$OUT/packs.txt"
+: > "$OUT/pack-env.txt"
+: > "$OUT/pack-credentials.txt"
 
 # --- the pack list -------------------------------------------------------------
 # Read FIRST, because whether a repository is required depends on it.
@@ -147,6 +151,8 @@ if [ "${#PACK_NAMES[@]}" -eq 0 ]; then
   : > "$OUT/apt-items.txt"
   : > "$OUT/archives.txt"
   : > "$OUT/packs.txt"
+  : > "$OUT/pack-env.txt"
+  : > "$OUT/pack-credentials.txt"
   echo "pack-plan: profile '$PROFILE' selects no packs; no package repository required"
   exit 0
 fi
@@ -203,6 +209,54 @@ for name in "${PACK_NAMES[@]+"${PACK_NAMES[@]}"}"; do
     || die "pack directory '$name' holds a manifest named '$mf_name'"
 
   printf '%s %s\n' "$name" "$(sha256sum "$MF" | cut -d' ' -f1)" >> "$OUT/packs.txt"
+
+  # --- env (02.3 Decision 1, Interface Contract 2) ------------------------------
+  # scripts/compile-policy.sh already refused a malformed manifest by the time this
+  # runs against the same tree, but this is the SECOND reader (Contract 5) and gets
+  # no credit for that -- a manifest could reach here through a path the compiler
+  # never saw. TAG-checked and TOKEN-checked for the same reason SF-3's lesson
+  # applies throughout this script: a value with an embedded newline would forge a
+  # second, unintended record in a tab-delimited plan file.
+  ev_tag="$(tag_of '.env' "$MF")"
+  if [ "$ev_tag" != '!!null' ]; then
+    [ "$ev_tag" = '!!seq' ] || die "env must be !!seq in $name, found $ev_tag"
+    n="$(yq -r '.env | length' "$MF")"
+    i=0
+    while [ "$i" -lt "$n" ]; do
+      p=".env[$i]"
+      require_tag "$p" "$MF" '!!map' "env[$i]"
+      en="$(require_token "$(require_scalar "$p.name"  "$MF" "env[$i].name")"  "env[$i].name in $name")"
+      ev="$(require_token "$(require_scalar "$p.value" "$MF" "env[$i].value")" "env[$i].value in $name")"
+      printf '%s\t%s\n' "$en" "$ev" >> "$OUT/pack-env.txt"
+      i=$((i + 1))
+    done
+  fi
+
+  # --- credentials (02.3 Decision 1, Interface Contract 2) ----------------------
+  # Never a value -- only the SHAPE of the delivery. The value is a secret and never
+  # rides this plan; the entrypoint reads it straight from /run/secrets at start.
+  cr_tag="$(tag_of '.credentials' "$MF")"
+  if [ "$cr_tag" != '!!null' ]; then
+    [ "$cr_tag" = '!!seq' ] || die "credentials must be !!seq in $name, found $cr_tag"
+    n="$(yq -r '.credentials | length' "$MF")"
+    i=0
+    while [ "$i" -lt "$n" ]; do
+      p=".credentials[$i]"
+      require_tag "$p" "$MF" '!!map' "credentials[$i]"
+      cn="$(require_token "$(require_scalar "$p.name" "$MF" "credentials[$i].name")" "credentials[$i].name in $name")"
+      has_env="$(tag_of "$p.delivery.env" "$MF")"
+      has_path_env="$(tag_of "$p.delivery.path_env" "$MF")"
+      if [ "$has_env" != '!!null' ]; then
+        dform="env"; dvar="$(require_token "$(require_scalar "$p.delivery.env" "$MF" "credentials[$i].delivery.env")" "credentials[$i].delivery.env in $name")"
+      elif [ "$has_path_env" != '!!null' ]; then
+        dform="path_env"; dvar="$(require_token "$(require_scalar "$p.delivery.path_env" "$MF" "credentials[$i].delivery.path_env")" "credentials[$i].delivery.path_env in $name")"
+      else
+        die "credentials[$i].delivery in $name must have exactly one of env or path_env"
+      fi
+      printf 'pack-%s-%s\t%s\t%s\n' "$name" "$cn" "$dform" "$dvar" >> "$OUT/pack-credentials.txt"
+      i=$((i + 1))
+    done
+  fi
 
   # --- apt items ---------------------------------------------------------------
   # Absent is legitimate (a pack may ship archives only); malformed is not.
