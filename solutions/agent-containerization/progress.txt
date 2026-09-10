@@ -8,7 +8,7 @@
 [-] Gate 0: Codebase Alignment  Skipped (greenfield)
 [-] Gate WB: Working Backwards  Skipped
 [x] Gate 1: Scope Review  Approved: 2026-09-09  prd.md
-[x] Gate 2: Design Review  Approved: 2026-09-09  .project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md
+[x] Gate 2: Design Review  Approved: 2026-09-10  .project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md
 [~] Gate 3: Milestone Review  In progress
 
 ## Milestones
