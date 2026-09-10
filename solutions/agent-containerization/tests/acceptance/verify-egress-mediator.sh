@@ -41,6 +41,17 @@ CLIENT_KEY=mediator/identity/clients/claude-client.key
 # The agents whose listener declares client_auth: mtls under policy/resolved/test-fixtures.yaml.
 # Read here rather than hardcoded three times below.
 MTLS_AGENTS=" claude "
+# 01.6 SF-3. The agents whose listener declares client_auth: proxy_auth -- the other identity
+# form, and the other half of what `expected_idsrc` and `probe_hop` now have to distinguish.
+# 01.3 had one case here, SF-2 made it two, and this makes it three; the derivations below are
+# what keep the count from becoming three hardcodings.
+PROXY_AUTH_AGENTS=" codex agy "
+# Each agent's own credential, on the host, as `<username>:<password>`. The probes present it
+# the way the agents do -- SF-1 measured that both clients construct `Proxy-Authorization: Basic`
+# themselves from userinfo in the proxy URL -- except that a raw `openssl`/`/dev/tcp` CONNECT has
+# no URL to put userinfo in, so these build the header directly. Same credential, same wire
+# bytes; the agents' own splice is asserted against a real container in verify-pod-topology.sh.
+CREDENTIAL_DIR=mediator/identity/credentials
 TLS_DIR="tests/fixtures/tls"
 MED_IMAGE=sandboxed-agent/mediator:local
 
@@ -102,6 +113,37 @@ probe_hop() { # <agent> <bash script>
     *)        probe_ca     "$1" "$2" ;;
   esac
 }
+# The `Proxy-Authorization: Basic ...` header line for an agent whose listener declares
+# `proxy_auth`, ready to interpolate into a CONNECT, and EMPTY for one whose listener does not.
+# `\r\n`-terminated so a caller concatenates it without knowing which case it got, and empty
+# expands to nothing rather than to a blank header line.
+#
+# One place, again: it is what makes "this listener requires a credential" a single fact the
+# probes read rather than a rule each of them re-implements.
+# The `openssl s_client` flags that authenticate to a `-proxy` hop, and empty for an agent whose
+# listener asks for nothing. `-proxy` builds its own CONNECT request, so `cred_header` below
+# cannot reach it; openssl carries `-proxy_user` / `-proxy_pass` for exactly this case, and
+# `pass:` is its literal-value password source.
+proxy_flags() { # <agent>
+  case "$PROXY_AUTH_AGENTS" in
+    *" $1 "*) : ;;
+    *) printf ''; return ;;
+  esac
+  local f="$CREDENTIAL_DIR/${1}.cred" userinfo
+  [ -r "$ROOT/$f" ] || { printf ''; return; }
+  userinfo="$(tr -d '\r\n' < "$ROOT/$f")"
+  printf -- '-proxy_user %s -proxy_pass pass:%s' "${userinfo%%:*}" "${userinfo#*:}"
+}
+cred_header() { # <agent>
+  case "$PROXY_AUTH_AGENTS" in
+    *" $1 "*) : ;;
+    *) printf ''; return ;;
+  esac
+  local f="$CREDENTIAL_DIR/${1}.cred" userinfo
+  [ -r "$ROOT/$f" ] || { printf ''; return; }
+  userinfo="$(tr -d '\r\n' < "$ROOT/$f")"
+  printf 'Proxy-Authorization: Basic %s\\r\\n' "$(printf '%s' "$userinfo" | openssl base64 -A)"
+}
 # The `openssl s_client` flags that present the client certificate, empty for an agent whose
 # listener does not ask for one.
 client_flags() { # <agent>
@@ -109,6 +151,38 @@ client_flags() { # <agent>
     *" $1 "*) printf -- '-cert /tmp/client.crt -key /tmp/client.key' ;;
     *)        printf '' ;;
   esac
+}
+
+# Computed once. `cred_header` shells out to `openssl` and reads a file; doing that inside every
+# probe string would put a subshell in the middle of a `printf` format an operator has to be able
+# to read when a probe misbehaves.
+CH_CODEX=""
+CH_AGY=""
+PF_CODEX=""
+PF_AGY=""
+
+# The FIRST request through an authenticating agent's front listener after a mediator start may
+# be answered 500, and that is a RECORDED residual rather than a flake (01.6 Deviation 1, widened
+# by SF-3 to `proxy_auth`): the mediator cannot warm that agent's cascade peer, because reaching
+# it goes through the agent's own front listener and this container holds neither a client key nor
+# a plaintext credential. Squid marks the peer DEAD at t=0 and revives it about a second later.
+#
+# So a working-path probe retries a 500, at most twice, and reports that it did. It does NOT
+# retry anything else: a 403, a 407 or a refusal is a result, and swallowing one would turn the
+# assertion into a tautology. `note` on every retry, so a peer that is permanently dead shows up
+# as three notes and a failure rather than as a slow pass.
+retry_cold_peer() { # <agent> <command...>
+  local agent="$1"; shift
+  local out attempt=1
+  while :; do
+    out="$("$@")"
+    printf '%s' "$out" | grep -q "500" || break
+    [ "$attempt" -lt 3 ] || break
+    note "$agent: attempt $attempt was answered 500 -- the cascade peer is cold on first use (Deviation 1). Retrying."
+    attempt=$(( attempt + 1 ))
+    sleep 2
+  done
+  printf '%s' "$out"
 }
 
 audit() { med cat /var/log/mediator/egress-audit.log 2>/dev/null; }
@@ -126,11 +200,16 @@ last_verdict() { # <dest_host>
 # literal any more (01.6 SF-2): `claude`'s listener verifies a client certificate, so its verdict
 # lines read `listener+mtls`, and a harness that went on expecting `listener` everywhere would
 # fail on every claude assertion in this file.
+# 01.6 SF-3 adds the third value. It is derived from the same two agent lists the probes use, so
+# a listener that changes identity form changes one constant here and not an assertion.
 expected_idsrc() { # <agent>
   case "$MTLS_AGENTS" in
-    *" $1 "*) printf 'listener+mtls' ;;
-    *)        printf 'listener' ;;
+    *" $1 "*) printf 'listener+mtls'; return ;;
   esac
+  case "$PROXY_AUTH_AGENTS" in
+    *" $1 "*) printf 'listener+proxy_auth'; return ;;
+  esac
+  printf 'listener'
 }
 
 assert_verdict() { # <label> <dest_host> <verdict> [control] [reason] [identity_source override]
@@ -173,7 +252,11 @@ done
 # it as a secret with a `file:` source, so every compose invocation below fails on its absence
 # and the daemon's error names a path rather than the step that was skipped.
 _missing=""
-for _f in "$CA" "$CLIENT_CRT" "$CLIENT_KEY"; do
+# The credential files join the list for the same reason the client pair did: they are `file:`
+# sources in compose.yaml, so `compose up` fails on a missing one and the symptom names a path
+# rather than the issuance step that was skipped.
+for _f in "$CA" "$CLIENT_CRT" "$CLIENT_KEY" \
+          "$CREDENTIAL_DIR/htpasswd" "$CREDENTIAL_DIR/codex.cred" "$CREDENTIAL_DIR/agy.cred"; do
   [ -f "$_f" ] || _missing="${_missing} ${_f}"
 done
 [ -z "$_missing" ] || {
@@ -184,7 +267,9 @@ done
   echo "    bash scripts/issue-identity.sh listener claude --ip $MED_CLAUDE"
   echo "    bash scripts/issue-identity.sh listener codex  --ip $MED_CODEX"
   echo "    bash scripts/issue-identity.sh listener agy    --ip $MED_AGY"
-  echo "    bash scripts/issue-identity.sh client   claude"
+  echo "    bash scripts/issue-identity.sh client     claude"
+  echo "    bash scripts/issue-identity.sh credential codex"
+  echo "    bash scripts/issue-identity.sh credential agy"
   exit 1
 }
 
@@ -230,6 +315,21 @@ fi
 # Phase A -- topology and posture
 # ---------------------------------------------------------------------------
 phase "A -- topology and posture"
+
+# 01.6 SF-3. Each proxy_auth agent's credential header, built once from the host file the Compose
+# secret is sourced from. Empty for an agent whose listener declares no credential, so every
+# interpolation below is unconditional and the shape of a probe does not depend on the policy.
+CH_CODEX="$(cred_header codex)"
+CH_AGY="$(cred_header agy)"
+PF_CODEX="$(proxy_flags codex)"
+PF_AGY="$(proxy_flags agy)"
+for _a in codex agy; do
+  case "$PROXY_AUTH_AGENTS" in *" $_a "*) : ;; *) continue ;; esac
+  eval "_h=\$CH_$(printf '%s' "$_a" | tr 'a-z' 'A-Z')"
+  [ -n "$_h" ] \
+    && pass "$_a: a proxy credential is on disk for the probes to present ($CREDENTIAL_DIR/$_a.cred)" \
+    || fail "$_a: its listener declares client_auth: proxy_auth but $CREDENTIAL_DIR/$_a.cred is missing -- issue it: bash scripts/issue-identity.sh credential $_a"
+done
 
 # 01.2's harness owns every per-agent assertion this phase would otherwise duplicate: mount-set
 # EQUALITY (amended by 01.3 SF-4 for the CA secret), the per-agent proxy environment of
@@ -356,6 +456,10 @@ for agent in "${AGENTS[@]}"; do
       # the whole point. The exception is scoped to the agent's own pair by name, so claude
       # mounting agy's would still be caught, and so would any other key under mediator/.
       */clients/"${agent}"-client.crt|*/clients/"${agent}"-client.key) : ;;
+      # 01.6 SF-3. The same exception for the proxy-credential form, and scoped the same way:
+      # this agent's OWN credential only. The htpasswd is the mediator's and is exempted for no
+      # agent, so an agent mounting the file every credential is verified against still fails.
+      */credentials/"${agent}".cred) : ;;
       */agent-containerization|*/agent-containerization/policy*|*/agent-containerization/mediator*|*/agent-containerization/profiles*|*/agent-containerization/packs*|*.key)
         cp_bad="${cp_bad}${agent}: ${s}"$'\n' ;;
     esac
@@ -403,8 +507,11 @@ if printf '%s' "$out" | grep -q "Verification: OK"; then
 else
   pass "codex-net: the listener does not speak TLS"
 fi
+# WITH the credential (01.6 SF-3): the listener now declares `client_auth: proxy_auth`, so a
+# bare CONNECT is answered 407 and this transport assertion would be measuring the challenge
+# rather than the transport. The credential-less case is asserted deliberately further down.
 out="$(probe "codex" "exec 3<>/dev/tcp/$MED_CODEX/3128
-  printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: allowed.fixture.lab:443\r\n\r\n' >&3
+  printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: allowed.fixture.lab:443\r\n${CH_CODEX}\r\n' >&3
   timeout 5 head -n 1 <&3; true")"
 printf '%s' "$out" | grep -q "200" \
   && pass "codex-net: the listener accepts a plain HTTP CONNECT" \
@@ -453,26 +560,61 @@ else
   note "$(audit | tail -2)"
 fi
 
-# The enforcement is PER LISTENER and did not leak onto the other two. Both of these listeners
-# declare `client_auth: none`, and their agents have nothing to present: 01.1 SF-2 measured that
-# codex never reaches a TLS listener and that agy stops at the CertificateRequest stage.
+# ------------------------------------------------------- 01.6 SF-3: the second inversion
+# SF-2 asserted that codex's and agy's listeners STILL ACCEPTED a credential-less client, because
+# their policy then declared `client_auth: none`. Their policy now declares `proxy_auth`, so these
+# two assertions invert -- the same way SF-2 inverted 01.3's placeholder, and for the same reason:
+# an assertion written against the old state is what makes the change visible when it lands.
+#
+# The refusal is 407, not 403, and that was MEASURED rather than assumed (P9,
+# docs/records/mediator-selection.md): a `proxy_auth` ACL that misses halts ACL evaluation on its
+# line, so Squid answers its own challenge and no `deny_info` page or `control=identity` verdict
+# is reachable on this path. The status is asserted literally, because 403-vs-407 is exactly the
+# difference between "policy refused this destination" and "this listener wants a credential".
 out="$(probe_ca "agy" "printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
   | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
       -connect $MED_AGY:3128 2>/dev/null | head -5")"
-printf '%s' "$out" | grep -q "200" \
-  && pass "agy-net: a credential-less client is still accepted (client_auth: none)" \
-  || { fail "agy-net: a credential-less client was refused; the mtls flip leaked off claude's listener"; note "$out"; }
+printf '%s' "$out" | grep -q "407" \
+  && pass "agy-net: a credential-less client is refused 407 at the front listener (client_auth: proxy_auth)" \
+  || { fail "agy-net: a credential-less client was not challenged; proxy-credential verification is not on"; note "$out"; }
 
 out="$(probe "codex" "exec 3<>/dev/tcp/$MED_CODEX/3128
   printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: allowed.fixture.lab:443\r\n\r\n' >&3
   timeout 5 head -n 1 <&3; true")"
+printf '%s' "$out" | grep -q "407" \
+  && pass "codex-net: a credential-less client is refused 407 at the listener (client_auth: proxy_auth)" \
+  || { fail "codex-net: a credential-less client was not challenged; proxy-credential verification is not on"; note "$out"; }
+
+# The working path WITH the credential, for both. The mirror of the claude assertion below: a
+# listener that refuses everything would pass both inversions above and enforce nothing useful.
+out="$(retry_cold_peer agy probe_ca "agy" "printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n${CH_AGY}\r\n' \
+  | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
+      -connect $MED_AGY:3128 2>/dev/null | head -5")"
 printf '%s' "$out" | grep -q "200" \
-  && pass "codex-net: a credential-less client is still accepted (client_auth: none)" \
-  || { fail "codex-net: a credential-less client was refused; the mtls flip leaked off claude's listener"; note "$out"; }
+  && pass "agy-net: a client presenting its own proxy credential is accepted over the TLS hop" \
+  || { fail "agy-net: the credential-bearing client was refused"; note "$out"; }
+
+out="$(probe "codex" "exec 3<>/dev/tcp/$MED_CODEX/3128
+  printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: allowed.fixture.lab:443\r\n${CH_CODEX}\r\n' >&3
+  timeout 5 head -n 1 <&3; true")"
+printf '%s' "$out" | grep -q "200" \
+  && pass "codex-net: a client presenting its own proxy credential is accepted over the plain hop" \
+  || { fail "codex-net: the credential-bearing client was refused"; note "$out"; }
+
+# The credential is BOUND to its agent, and this is T34's proxy-credential case at the listener:
+# agy's credential, presented on codex's listener, must be refused. Both listeners verify against
+# the SAME htpasswd -- one file, both usernames -- so nothing but the per-listener `proxy_auth`
+# ACL stands between them, which is precisely the binding this asserts.
+out="$(probe "codex" "exec 3<>/dev/tcp/$MED_CODEX/3128
+  printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: allowed.fixture.lab:443\r\n${CH_AGY}\r\n' >&3
+  timeout 5 head -n 1 <&3; true")"
+printf '%s' "$out" | grep -q "407" \
+  && pass "T34 (credential form): agy's credential is refused on codex's listener" \
+  || { fail "T34 (credential form): agy's credential was ACCEPTED on codex's listener"; note "$out"; }
 
 # The working path, with the certificate. Proves the enabled verification did not break what it
 # is protecting -- a listener that refuses everything would pass every assertion above.
-out="$(probe_client "claude" "printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+out="$(retry_cold_peer claude probe_client "claude" "printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
   | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
       -cert /tmp/client.crt -key /tmp/client.key -connect $MED_CLAUDE:3128 2>/dev/null | head -5")"
 printf '%s' "$out" | grep -q "200" \
@@ -500,12 +642,12 @@ assert_verdict "criterion 3: a claude verdict line reads identity_source: listen
 # Each listener serves ITS OWN agent's policy, not a union. `claude-only.fixture.lab` is
 # allowlisted for claude and for nobody else.
 out="$(probe "codex" "exec 3<>/dev/tcp/$MED_CODEX/3128
-  printf 'CONNECT claude-only.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' >&3
+  printf 'CONNECT claude-only.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n${CH_CODEX}\r\n' >&3
   timeout 5 head -c 400 <&3; true")"
 assert_verdict "codex is refused a host allowlisted only for claude" \
   claude-only.fixture.lab deny allowlist host_not_allowlisted
 
-out="$(probe_ca "agy" "printf 'CONNECT claude-only.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+out="$(probe_ca "agy" "printf 'CONNECT claude-only.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n${CH_AGY}\r\n' \
   | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
       -connect $MED_AGY:3128 2>/dev/null | head -20")"
 printf '%s' "$out" | grep -q "403" \
@@ -524,7 +666,7 @@ printf '%s' "$out" | grep -q "200" \
 # untouched, which is what makes the proxy hop's anchor and the destination's anchor different
 # facts. `-proxy` is codex's plaintext hop, so the probe reaches the fixture end to end.
 out="$(probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -showcerts \
-    -proxy $MED_CODEX:3128 -servername allowed.fixture.lab \
+    -proxy $MED_CODEX:3128 $PF_CODEX -servername allowed.fixture.lab \
     -connect allowed.fixture.lab:443 2>/dev/null | openssl x509 -noout -subject -issuer 2>/dev/null")"
 if printf '%s' "$out" | grep -q "CN=fixture.lab" && ! printf '%s' "$out" | grep -qi "mediator"; then
   pass "T28: the destination chain terminates at the origin's own certificate, not the mediator's"
@@ -556,7 +698,7 @@ assert_verdict "the same refusal is on the audit trail" \
 
 # --- the same refusal on codex's BUMPING listener: no body, by construction (Deviation 8)
 out="$(probe "codex" "exec 3<>/dev/tcp/$MED_CODEX/3128
-  printf 'CONNECT collector2.example.com:443 HTTP/1.1\r\nHost: h\r\n\r\n' >&3
+  printf 'CONNECT collector2.example.com:443 HTTP/1.1\r\nHost: h\r\n${CH_CODEX}\r\n' >&3
   timeout 5 head -c 400 <&3; true")"
 if printf '%s' "$out" | grep -q "egress denied"; then
   fail "codex received a denial body; its listener bumps and cannot deliver one"
@@ -568,7 +710,7 @@ assert_verdict "codex's refusal is on the audit trail, which is its only denial 
 
 # --- post-ClientHello verdict: prompt failure, verification ON, no body expected
 out="$(probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -brief \
-    -proxy $MED_CODEX:3128 -servername evil.example \
+    -proxy $MED_CODEX:3128 $PF_CODEX -servername evil.example \
     -connect allowed.fixture.lab:443 2>&1 | tail -4")"
 if printf '%s' "$out" | grep -q "egress denied"; then
   fail "a post-ClientHello refusal delivered an HTTP body"
@@ -583,11 +725,11 @@ else
 fi
 
 # --- T6: two names, ONE address. An address-level control cannot tell these apart.
-probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -brief -proxy $MED_CODEX:3128 \
+probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -brief -proxy $MED_CODEX:3128 $PF_CODEX \
   -servername allowed.fixture.lab -connect allowed.fixture.lab:443" >/dev/null 2>&1
 assert_verdict "T6: the allowlisted name at $FIXTURE_COLLECTOR succeeds" \
   allowed.fixture.lab allow
-probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -brief -proxy $MED_CODEX:3128 \
+probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -brief -proxy $MED_CODEX:3128 $PF_CODEX \
   -servername denied.fixture.lab -connect denied.fixture.lab:443" >/dev/null 2>&1
 assert_verdict "T6: a non-allowlisted name at THE SAME address is refused" \
   denied.fixture.lab deny allowlist host_not_allowlisted
@@ -602,18 +744,18 @@ assert_verdict "R5.1: an allowlisted name on deny_fqdns is refused -- deny wins"
   denied-by-fqdn.fixture.lab deny denylist fqdn_on_denylist
 
 # --- criterion 10: a /32 deny refuses its exact address and NOT the neighbouring one.
-probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -brief -proxy $MED_CODEX:3128 \
+probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -brief -proxy $MED_CODEX:3128 $PF_CODEX \
   -servername neighbour.fixture.lab -connect neighbour.fixture.lab:443" >/dev/null 2>&1
 assert_verdict "criterion 10: the /32-denied address ($FIXTURE_NEIGHBOUR) is refused post-resolution" \
   neighbour.fixture.lab deny denylist resolved_address_on_denylist
-probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -brief -proxy $MED_CODEX:3128 \
+probe "codex" "printf 'Q\n' | timeout 15 openssl s_client -brief -proxy $MED_CODEX:3128 $PF_CODEX \
   -servername allowed.fixture.lab -connect allowed.fixture.lab:443" >/dev/null 2>&1
 assert_verdict "criterion 10: its neighbour ($FIXTURE_COLLECTOR) still succeeds -- the mask is not over-wide" \
   allowed.fixture.lab allow
 
 # --- the link-local address, which is resolvable and would otherwise connect.
 probe "codex" "exec 3<>/dev/tcp/$MED_CODEX/3128
-  printf 'CONNECT 169.254.169.254:443 HTTP/1.1\r\nHost: h\r\n\r\n' >&3
+  printf 'CONNECT 169.254.169.254:443 HTTP/1.1\r\nHost: h\r\n${CH_CODEX}\r\n' >&3
   timeout 5 head -c 200 <&3; true" >/dev/null 2>&1
 assert_verdict "169.254.169.254 is refused" 169.254.169.254 deny
 
@@ -630,7 +772,7 @@ fi
 probe "codex" "
   for i in \$(seq 1 40); do
     ( exec 3<>/dev/tcp/$MED_CODEX/3128
-      printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' >&3
+      printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n${CH_CODEX}\r\n' >&3
       timeout 6 cat <&3 >/dev/null 2>&1 ) &
   done
   wait" >/dev/null 2>&1
@@ -643,7 +785,7 @@ fi
 # --- criterion 3's WebSocket transport. Under splice there is no flag to inspect, so it is
 # asserted by completing an upgrade through the tunnel.
 out="$(probe "codex" "printf 'GET /ws HTTP/1.1\r\nHost: upgrade.fixture.lab\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n' \
-  | timeout 15 openssl s_client -quiet -proxy $MED_CODEX:3128 -servername upgrade.fixture.lab \
+  | timeout 15 openssl s_client -quiet -proxy $MED_CODEX:3128 $PF_CODEX -servername upgrade.fixture.lab \
       -connect upgrade.fixture.lab:443 2>/dev/null | head -3")"
 printf '%s' "$out" | grep -q "101 Switching Protocols" \
   && pass "criterion 3: a WebSocket upgrade completes through the spliced tunnel" \

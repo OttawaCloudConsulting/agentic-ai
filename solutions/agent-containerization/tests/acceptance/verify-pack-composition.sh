@@ -119,7 +119,10 @@ for f in mediator/identity/ca/mediator-ca.crt \
          mediator/identity/listeners/agy-listener.crt \
          mediator/identity/listeners/agy-listener.key \
          mediator/identity/clients/claude-client.crt \
-         mediator/identity/clients/claude-client.key; do
+         mediator/identity/clients/claude-client.key \
+         mediator/identity/credentials/htpasswd \
+         mediator/identity/credentials/codex.cred \
+         mediator/identity/credentials/agy.cred; do
   [ -f "$f" ] || missing+=("$f")
 done
 if [ "${#missing[@]}" -ne 0 ]; then
@@ -986,6 +989,12 @@ for a in "${AGENTS[@]}"; do
     # it is the point. Scoped to the agent's OWN pair by name, so claude binding agy's would
     # still fail SC-3. verify-egress-mediator.sh carries the matching exception.
     case "$src" in */clients/"${a}"-client.crt|*/clients/"${a}"-client.key) continue ;; esac
+    # 01.6 SF-3: the same exception for the OTHER identity form. `codex` and `agy` each mount
+    # their own proxy credential, generated under mediator/identity/credentials/ for the same
+    # reason the CA and the client pair live under mediator/ -- git-ignored trust material with
+    # nowhere else to go. Scoped to the agent's OWN credential by name, so codex binding agy's
+    # still fails SC-3, and the htpasswd (the mediator's) is not exempted for any agent at all.
+    case "$src" in */credentials/"${a}".cred) continue ;; esac
     real="$(cd "$(dirname "$src")" 2>/dev/null && pwd -P)/$(basename "$src")" || real="$src"
     if [ "$real" = "$ROOT_REAL" ] || [ "${real}/" = "${ROOT_REAL}/" ]; then
       bad="${bad}${src} -> ${real} (IS the solution root)"$'\n'

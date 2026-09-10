@@ -377,7 +377,7 @@ Each is amended in the sub-feature that causes the break, not in a cleanup pass 
   the sizing note. Depends on SF-1 only for the DELAYED_AUTH disposal being on the record, not for
   its result.
 
-- [ ] **SF-3: The `codex`/`agy` identity path, on SF-1's result** — Conditional by design, both
+- [x] **SF-3: The `codex`/`agy` identity path, on SF-1's result** — Conditional by design, both
   branches specified. **Positive for an agent:** a per-agent proxy credential, `basic_ncsa_auth`
   against an htpasswd Compose secret mounted to the mediator alone, that agent's credential delivered
   to that agent alone, `client_auth: proxy_auth` in the profile, an `acl <name> proxy_auth` policy
@@ -935,3 +935,130 @@ once by the operator at the end of SF-2 rather than left unrun.
   harness into the composite is a `/design` refresh candidate. **`claude`'s eight passing
   authentication cells and the whole AUTH_MODE matrix (T24) were unaffected by SF-2**, which is
   what the run confirms beyond the two mount lines.
+
+### Deviation 7: a `proxy_auth` refusal is 407, never 403, so it takes no error-page route at all
+
+- **What changed:** A `client_auth: proxy_auth` listener renders **no** `deny_info` route, no
+  `ctl_identity` term and no error page. Its refusal is Squid's own `407 Proxy Authentication
+  Required` challenge. `mediator/config/errors/ERR_MEDIATOR_IDENTITY` stays in the tree and stays
+  the `mtls` subject-mismatch page; nothing was added beside it.
+- **Originally planned:** Interface Contract 3 gives the identity refusal a `control=identity`,
+  `reason=subject_mismatch` verdict line and its own error template on "IC6's 403-with-body path,
+  the route `ERR_MEDIATOR_METHOD` already takes", and Decision 7's positive branch describes the
+  proxy-credential path in the same terms as the certificate one.
+- **Why necessary:** Measured, not reasoned about. P9 (`docs/records/mediator-selection.md`, run
+  against the shipped mediator image at this build) put a credential-less, a wrong-username and a
+  wrong-password request to a plain `http_port` and to three `https_port`s, one of which carried a
+  `deny_info`-eligible ACL last. **Every one of the twelve cells returned 407.** A missed
+  `proxy_auth` ACL makes Squid answer its own challenge before any rule that could name an error
+  page is reached, so a 403 route here would be configuration that never executes.
+- **Impact:** The two refusal forms differ in kind on the audit trail and the harness asserts each
+  literally. `mtls`: 403, `control=identity`, `reason=subject_mismatch`, a body. `proxy_auth`: 407,
+  `control` and `reason` both null, no body. That difference is worth keeping rather than papering
+  over — 403 means "policy refused this destination", 407 means "this listener wants a credential",
+  and an operator reading the trail needs to be able to tell them apart. SF-4's
+  `docs/records/workload-identity.md` must state both shapes, and the R12.2 troubleshooting section
+  gains the 407 case alongside SF-2's silent-handshake one.
+
+### Deviation 8: the attribution annotation is baseline-then-upgrade, because the `mtls` idiom does not transpose
+
+- **What changed:** A `proxy_auth` listener renders an **unconditional** `idsrc=listener`
+  annotation on the agent's `_real` port set, then **overrides** it to `listener+proxy_auth` on a
+  separate rule gated on the credential ACL. The enforcement deny is rendered **bare** —
+  `http_access deny p_<agent>_frontid !cred_<agent>` — with no annotation or reason term after the
+  negated credential ACL.
+- **Originally planned:** Decision 3's table says the front annotates "per request, on SF-1's
+  branch: `listener+proxy_auth` gated on `proxy_auth`, else `listener`", and SF-2 built exactly
+  that shape for `mtls`: annotate the strong value on the match, override to the weak value on the
+  miss path, with `rsn_subject ctl_identity` trailing the same deny line.
+- **Why necessary:** That shape produces an audit line with **no attribution value at all**. P9
+  measured it directly: on the port carrying the transposed idiom, the 407 line logged `idsrc=-`.
+  A `proxy_auth` ACL that misses halts ACL evaluation on its line — Squid raises the
+  authentication requirement immediately — so every term after `!cred_<agent>` is unreachable,
+  annotations included. The same measurement showed the baseline-then-upgrade port logging
+  `idsrc=listener` on its 407s and `idsrc=listener+proxy_auth` on its 200, which is criterion 3's
+  requirement met. `annotate_transaction key=value` replaces rather than appends, so last-wins is
+  what makes the override an override — the same property SF-2's self-check override relies on.
+- **Impact:** Decision 3's soundness argument is unchanged and still holds: `idsrc` and the
+  enforcement come from the same `client_auth` field in the same renderer pass. What changes is
+  the rule shape, and the inner listener's per-listener annotation now rests on one extra step
+  worth naming — Squid does not forward `Proxy-Authorization` to a `cache_peer` parent, so the
+  inner cannot re-check the credential and trusts the front. It may, because the bare enforcement
+  deny refuses a credential-less request at that front *before* any rule that can forward. Remove
+  that deny and the inner annotation becomes false; it is not optional decoration.
+
+### Deviation 9: the cascade warm-up is skipped for a `proxy_auth` agent too, so `agy` joins `claude`
+
+- **What changed:** The warm-up gate widened from `client_auth != mtls` to `client_auth == none`.
+  `agy`'s cascade peer is no longer warmed, and the start-up notice names the credential rather
+  than the certificate. `codex` is unaffected — a single-listener agent has no cascade to warm.
+- **Originally planned:** SF-2's Deviation 1 scoped the skip to `mtls` alone.
+- **Why necessary:** The same argument, one credential form over. The warm-up reaches its target
+  through that agent's own front listener, because `cache_peer_access <agent>peer` admits nothing
+  else — and that listener now demands a credential the mediator cannot produce. The mediator holds
+  the **htpasswd**, which is hashes; it cannot construct a credential to answer its own 407 with.
+  The three alternatives SF-2 rejected are rejected again for the same reasons: a loopback warm
+  port admitted to the peer would log `idsrc=listener+proxy_auth` with nothing authenticated;
+  giving this container `agy`'s plaintext would put that agent's entire identity in a second
+  container; and warming through the inner directly does not revive the peer.
+- **Impact:** `agy`'s first request after a mediator start may be answered 500 and retried, exactly
+  as `claude`'s may. Observed at this build — the first credential-bearing `agy` probe returned 500
+  — so `verify-egress-mediator.sh` gained `retry_cold_peer`, which retries **only** a 500, at most
+  twice, and `note`s each retry. It retries nothing else: a 403 or a 407 is a result, and
+  swallowing one would make the assertion a tautology.
+
+### Deviation 10: the credential is delivered by the agent entrypoint, which moved out of the published base image
+
+- **What changed:** Two things, and the second is the consequential one. (1) The proxy credential
+  reaches its agent as a Compose secret holding `<username>:<password>`, which
+  `images/entrypoint.sh` splices into `HTTPS_PROXY`/`HTTP_PROXY` (and the lowercase pair) at start;
+  the URLs in `compose.yaml` stay credential-free, and so does `docker inspect`. (2) To make that
+  possible, `COPY images/entrypoint.sh` and the `ENTRYPOINT` instruction **moved from the
+  `agent-base` stage to `agent-packs`**.
+- **Originally planned:** Interface Contract 5's "Proxy URL" row reads
+  `http://<user>:<pass>@172.31.20.2:3128`, which reads most naturally as a literal in
+  `compose.yaml`. Nothing in the plan anticipated touching `images/Dockerfile` at all.
+- **Why necessary:** Found by building. SF-1 established that neither client exposes a knob for
+  supplying a proxy credential and that both construct `Proxy-Authorization` from the proxy URL
+  themselves, so the URL is the only surface — but a literal in `compose.yaml` puts a bearer secret
+  in a committed file, and compose interpolation would need a second `--env-file` threaded through
+  ~15 documented commands and three harnesses and would still land the credential in
+  `docker inspect`. The entrypoint was the better home. It then did not work: `agent-base` is
+  pulled from GHCR by digest (01.5 SF-6b, D21), BuildKit skips a stage nothing references, so the
+  edit reached nothing — all three agents rebuilt and `verify-pod-topology.sh` reported the splice
+  had not happened, because the image still carried the published copy. **SF-3 is the first change
+  to a base-image file since the digest pin landed**; the pin (2026-09-09) is newer than every
+  earlier edit to that file (last 2026-09-08), so no precedent existed. The move follows the one
+  that does exist: `SKEL_MARKER` moved out of `agent-base` into `agent-packs` at 01.5 SF-6b, for
+  this exact failure mode. **Operator-confirmed at the build.**
+- **Impact:** D21 is intact in what it protects — the base an operator runs is still the base CI
+  built and attested, and this stage already layers locally-derived content on it (pack-install,
+  the profile's packages, `SKEL_MARKER`). What changes is that the pod's start-up logic is now
+  repository-versioned rather than digest-pinned, which is the right ceremony for a 145-line shell
+  script and the wrong one for a supply-chain base. The entrypoint was **moved, not duplicated**:
+  a copy in both stages would leave the published one dead, the local one silently winning, and an
+  operator no way to tell which ran. The published base no longer carries an `ENTRYPOINT`, so it is
+  not independently runnable — nothing runs it directly, but CI's `--target agent-base` build now
+  produces an image that is a rootfs rather than a runnable one, and `README.md`'s
+  "What a local build now pulls" section should say so. **`images/bootstrap-auth.sh` was
+  deliberately left in `agent-base`** and carries the same latent property; it is not broken, so
+  moving it would be a change nothing asked for. A note at that `COPY` records the trap for the
+  next feature that needs to edit it.
+
+### Deviation 11: the credential secret carries the username as well as the password
+
+- **What changed:** `mediator/identity/credentials/<agent>.cred` holds `<username>:<password>` —
+  the whole userinfo string — and the entrypoint splices it in verbatim.
+- **Originally planned:** Decision 6 and Interface Contract 5 describe "each agent's own
+  credential" without saying what is in the file; the natural reading is the secret alone, with the
+  username derived at each end.
+- **Why necessary:** The username the mediator matches is the **resolved policy's `identity`**, and
+  the only token available inside an agent container that resembles it is the image-baked
+  `AGENT_NAME`. They are equal in every shipped profile and nothing keeps them equal — an agent
+  container cannot read the resolved policy, which is control plane it must not mount. Deriving the
+  username there would put a silent wrong-username 407 one profile edit away, on a path whose
+  failure mode is "this agent reaches nothing". Issuance writes it; delivery does not guess it, and
+  `issue-identity.sh` verifies the file's username against the policy each time it issues.
+- **Impact:** None outward. `rebuild_htpasswd` reads the username from the file rather than the
+  policy, so the two halves of one credential cannot disagree after a profile edit; `credential
+  <agent>` is what re-reconciles them and it checks the policy when it does.

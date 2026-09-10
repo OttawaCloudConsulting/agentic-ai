@@ -276,6 +276,16 @@ P_INNER_PORT=3200
 # certificates chain to -- one CA, one trust anchor, no second lifecycle (01.3 SF-3). Only the
 # PUBLIC certificate is here; the CA private key never enters this container.
 CLIENT_CA="/run/secrets/mediator-ca.crt"
+# The htpasswd proxy credentials are verified against (01.6 SF-3), held by the MEDIATOR ALONE.
+# It carries HASHES, never plaintext -- which is also why the cascade warm-up cannot authenticate
+# to a `proxy_auth` front listener any more than it can to an `mtls` one (see the warm-up block).
+CREDENTIALS="/run/secrets/mediator-credentials"
+# The agents whose listener declares `proxy_auth`, accumulated in the per-agent pass so the
+# `auth_param` block below is rendered only when something consumes it. An `auth_param basic`
+# with no `proxy_auth` ACL behind it is harmless but misleading in a rendered config an operator
+# reads to find out what authenticates.
+PROXY_AUTH_AGENTS=""
+P_AUTH_PARAM=""
 
 IFS=',' read -r -a _agent_specs <<< "$MEDIATOR_AGENT_NETWORKS"
 for spec in "${_agent_specs[@]}"; do
@@ -336,11 +346,16 @@ for spec in "${_agent_specs[@]}"; do
     mtls|proxy_auth|none) : ;;
     *) fail "$RESOLVED_POLICY: agents.${agent}.listener.client_auth is '$lauth'. Expected one of mtls, proxy_auth or none. It is required, not defaulted: recompile the artifact from a profile that declares it (scripts/compile-policy-build.sh)." ;;
   esac
-  # `proxy_auth` has no renderer behind it at this sub-feature. It is refused rather than
-  # rendered as `none`, because a listener whose policy says it authenticates and whose
-  # configuration does not is the exact disagreement `identity_source` exists to expose.
-  [ "$lauth" != "proxy_auth" ] \
-    || fail "$RESOLVED_POLICY: agents.${agent}.listener.client_auth is 'proxy_auth', which this mediator does not yet render (01.6 SF-3). Refusing to start rather than enforcing less than the policy declares."
+  # `proxy_auth` is rendered as of 01.6 SF-3. SF-2 refused it here rather than treating it as
+  # `none`, on the principle that a listener whose policy says it authenticates and whose
+  # configuration does not is the exact disagreement `identity_source` exists to expose. The
+  # refusal is replaced by the render, not relaxed: the credential file is required below, so an
+  # agent declaring `proxy_auth` with no htpasswd to verify against still refuses to start.
+  if [ "$lauth" = "proxy_auth" ]; then
+    [ -r "$CREDENTIALS" ] \
+      || fail "agent '${agent}' declares client_auth: proxy_auth but $CREDENTIALS is not readable. The htpasswd arrives as a Compose secret held by the MEDIATOR ALONE (compose.yaml) and is written by scripts/issue-identity.sh credential ${agent}. Refusing to start rather than serving that listener with no credential check."
+    PROXY_AUTH_AGENTS="${PROXY_AUTH_AGENTS} ${agent}"
+  fi
 
   # The certificate subject the binding rule matches, taken from `identity` -- the same token
   # scripts/issue-identity.sh puts in the certificate and the same token the audit line's
@@ -547,6 +562,53 @@ for spec in "${_agent_specs[@]}"; do
     # `ctl_identity` is LAST, because `deny_info` keys on the last ACL of the matched line.
     P_IDENTITY_ENFORCE="${P_IDENTITY_ENFORCE}acl idsrc_${agent}_plain annotate_transaction idsrc=listener"$'\n'
     P_IDENTITY_ENFORCE="${P_IDENTITY_ENFORCE}http_access deny p_${agent}_frontid !cert_${agent} idsrc_${agent}_plain rsn_subject ctl_identity"$'\n'
+  elif [ "$lauth" = "proxy_auth" ]; then
+    # ------------------------------------------------------ proxy credential (01.6 SF-3)
+    # The mtls block above is the shape this one is NOT, and the difference was measured rather
+    # than reasoned about (P9, docs/records/mediator-selection.md, at the SF-3 build):
+    #
+    #   * A `proxy_auth` ACL that MISSES halts ACL evaluation on its line -- Squid answers the
+    #     challenge immediately -- so any annotation placed AFTER `!cred_<agent>` on the same
+    #     line never runs. The measured symptom was `idsrc=-` on the 407, i.e. an audit line
+    #     stating no attribution strength at all. The mtls "override on the miss path" idiom
+    #     therefore does not transpose, and this block does not use it.
+    #   * The shape that works is BASELINE-THEN-UPGRADE: annotate the weak value on a line
+    #     carrying no `proxy_auth` term, so it always evaluates, then override it to the strong
+    #     value on a line gated on the credential. `annotate_transaction key=value` REPLACES
+    #     where `key+=value` appends, so last-wins is what makes the override an override.
+    #   * A refusal here is 407, never 403 -- on both transports and on every rule shape tried.
+    #     So there is no `deny_info` route and no error page for it: `ctl_identity` and
+    #     ERR_MEDIATOR_IDENTITY are the mtls path's, and are deliberately NOT rendered here.
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}acl cred_${agent}       proxy_auth ${lidentity}"$'\n'
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}acl p_${agent}_frontid  myportname ${agent}"$'\n'
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}acl idsrc_${agent}      annotate_transaction idsrc=listener"$'\n'
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}acl idsrc_${agent}_pa   annotate_transaction idsrc=listener+proxy_auth"$'\n'
+    # BASELINE, on the agent's real ports, both layers. Every line this agent produces states an
+    # attribution strength -- including the 407 that carries no credential.
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent}_real idsrc_${agent} !all"$'\n'
+    # UPGRADE at the front, per request, gated on the credential actually being accepted.
+    P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent}_frontid cred_${agent} idsrc_${agent}_pa !all"$'\n'
+    if [ "$ltls" = "true" ]; then
+      # INNER: per listener, and sound by the same topological argument the mtls inner rests on,
+      # with one extra step this listener needs. Squid does NOT forward `Proxy-Authorization` to
+      # a `cache_peer` parent, so the inner cannot re-check the credential and must trust the
+      # front. It may: the inner binds 127.0.0.1 only, `cache_peer_access ${agent}peer` admits
+      # only this agent's own real front, and the enforcement deny below refuses a
+      # credential-less request at that front BEFORE any rule that can forward -- so a
+      # connection reaching this listener necessarily presented an accepted credential.
+      P_IDENTITY_RULES="${P_IDENTITY_RULES}acl p_${agent}_innerid myportname ${agent}in"$'\n'
+      P_IDENTITY_RULES="${P_IDENTITY_RULES}http_access deny p_${agent}_innerid idsrc_${agent}_pa !all"$'\n'
+    fi
+
+    # The enforcement, and it is what makes the inner annotation above true rather than hopeful.
+    # Without it a credential-less request would fall through to the destination allow rules,
+    # be forwarded to the peer, and the inner would annotate `listener+proxy_auth` on a
+    # connection nothing authenticated -- the same false attribution Decision 3's first
+    # ordering constraint exists to prevent, one credential form over.
+    #
+    # Bare, with no annotation or reason term after the negated credential ACL: per the P9
+    # finding above, nothing after it would evaluate. Squid answers 407 with its own challenge.
+    P_IDENTITY_ENFORCE="${P_IDENTITY_ENFORCE}http_access deny p_${agent}_frontid !cred_${agent}"$'\n'
   else
     # Network-derived, and final for this agent at this feature. The value is emitted rather
     # than left unset so an audit line always states its own attribution strength -- an absent
@@ -644,15 +706,27 @@ for spec in "${_agent_specs[@]}"; do
   # The residual is stated where an operator meets it: this agent's FIRST request after a
   # mediator start may be answered 500 with no peer to forward to, and is retried. It is on the
   # audit trail as a front line with http_status 500, not as a policy refusal.
-  if [ "$ltls" = "true" ] && [ "$lauth" != "mtls" ] && [ "$count" -gt 0 ]; then
+  if [ "$ltls" = "true" ] && [ "$lauth" = "none" ] && [ "$count" -gt 0 ]; then
     _wh="$(set -- $agent_hosts; echo "$1")"
     _wp="$(set -- $agent_ports; echo "$1")"
     P_WARM_TARGETS="${P_WARM_TARGETS}${agent}|${addr}|${lport}|${_wh}|${_wp} "
-  elif [ "$ltls" = "true" ] && [ "$lauth" = "mtls" ]; then
+  elif [ "$ltls" = "true" ]; then
     # Said out loud at every start. An operator who sees a 500 on this agent's first request
     # after a restart should find the reason in this container's own log rather than having to
     # infer it from an absence.
-    note "cascade: ${agent}'s peer is NOT warmed -- its listener requires a client certificate and this container holds none. Its first request after this start may be answered 500 and retried."
+    #
+    # 01.6 SF-3 widened this from `mtls` to ANY authenticating listener, for the same reason and
+    # with the same three rejected alternatives. This container holds the htpasswd, which carries
+    # HASHES -- it cannot construct a credential to answer its own 407 with. Giving it an agent's
+    # plaintext would put that agent's whole identity in a second container and break the
+    # argument that the inner listener is only reachable through an authenticating front, which
+    # is exactly what the mtls case rejected mounting a client key for.
+    case "$lauth" in
+      mtls)       _why="requires a client certificate and this container holds none" ;;
+      proxy_auth) _why="requires a proxy credential and this container holds only the htpasswd hashes" ;;
+      *)          _why="requires client authentication this container cannot provide" ;;
+    esac
+    note "cascade: ${agent}'s peer is NOT warmed -- its listener ${_why}. Its first request after this start may be answered 500 and retried."
   fi
 
   # Control 1a's gate: the UNION of this agent's names and ports, matched on the
@@ -683,6 +757,28 @@ for spec in "${_agent_specs[@]}"; do
 done
 
 [ -n "$ACL_ENTRIES" ] || fail "MEDIATOR_AGENT_NETWORKS produced no agent networks"
+
+# --------------------------------------------------- the basic-auth scheme (01.6 SF-3)
+# Rendered only when at least one listener declares `proxy_auth`, and it MUST precede every
+# `acl <name> proxy_auth <user>` term: Squid needs a configured authentication scheme before an
+# ACL can reference one, so this marker sits ahead of @IDENTITY_RULES@ in the template.
+#
+# `basic_ncsa_auth`, not `basic_fake_auth`. The fake helper accepts ANY password and 01.3's
+# record already flags it as a fixture helper only; keying policy off a credential that is never
+# actually verified would make `identity_source: listener+proxy_auth` a claim about nothing. The
+# real helper's presence in this image, and that it accepts `openssl passwd -apr1` hashes -- glibc
+# crypt(3) has no bcrypt -- were both measured at the SF-3 build (P9).
+#
+# `credentialsttl` bounds how long an accepted credential stays cached in Squid. It is the reason
+# revocation is documented as "rebuild the htpasswd AND restart the mediator": rewriting the file
+# alone leaves an already-accepted credential working until the cache expires.
+if [ -n "$PROXY_AUTH_AGENTS" ]; then
+  P_AUTH_PARAM="${P_AUTH_PARAM}auth_param basic program /usr/lib/squid/basic_ncsa_auth ${CREDENTIALS}"$'\n'
+  P_AUTH_PARAM="${P_AUTH_PARAM}auth_param basic children 2"$'\n'
+  P_AUTH_PARAM="${P_AUTH_PARAM}auth_param basic realm agent-pod mediator"$'\n'
+  P_AUTH_PARAM="${P_AUTH_PARAM}auth_param basic credentialsttl 5 minutes"$'\n'
+  note "identity: proxy-credential verification is ON for:${PROXY_AUTH_AGENTS} (basic_ncsa_auth against ${CREDENTIALS})"
+fi
 
 # The shadow has to exist, or stage 2 has nothing to probe through and would either
 # be skipped silently or aimed at an agent's own listener -- which is the attribution
@@ -798,6 +894,7 @@ render() { # <template> <output>
   LISTENERS="$LISTENERS" DNS_AUDIT_LOG="$DNS_AUDIT_LOG" \
   REORIGIN_PORT="$REORIGIN_PORT" FORWARD_ADDRS="$FORWARD_ADDRS" \
   P_LISTENERS="$P_LISTENERS" P_LISTENER_ACLS="$P_LISTENER_ACLS" \
+  P_AUTH_PARAM="$P_AUTH_PARAM" \
   P_IDENTITY_RULES="$P_IDENTITY_RULES" P_IDENTITY_ENFORCE="$P_IDENTITY_ENFORCE" \
   P_PEERS="$P_PEERS" \
   P_DENY_ACLS="$P_DENY_ACLS" P_AGENT_ACLS="$P_AGENT_ACLS" \
@@ -817,6 +914,7 @@ render() { # <template> <output>
     /^@AGENT_ALLOW_RULES@$/  { emit("AGENT_ALLOW_RULES"); next }
     /^@FORWARD_ADDRS@$/      { emit("FORWARD_ADDRS");     next }
     /^@PROXY_LISTENERS@$/    { emit("P_LISTENERS");       next }
+    /^@AUTH_PARAM@$/         { emit("P_AUTH_PARAM");      next }
     /^@LISTENER_ACLS@$/      { emit("P_LISTENER_ACLS");   next }
     /^@IDENTITY_RULES@$/     { emit("P_IDENTITY_RULES");  next }
     /^@IDENTITY_ENFORCE@$/   { emit("P_IDENTITY_ENFORCE"); next }

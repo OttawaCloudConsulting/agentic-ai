@@ -57,21 +57,29 @@ limits:                         # R1.10, applied per agent container
 # `claude` and `agy` both reach an `https://` listener. `scheme` and `tls` are two spellings of
 # one fact and the compiler refuses them if they disagree.
 #
-# `client_auth` (01.6 SF-2) is the listener's authentication mode, and it is PROFILE DATA rather
-# than renderer code: the mediator renders `clientca=` from this field, refuses to start on a
-# value it does not know, and derives the audit line's `identity_source` from the same field in
-# the same pass -- so the annotation cannot say a listener authenticates when it does not. It is
-# required, not defaulted; an absent key is a compile error. `mtls` demands `tls: true`.
+# `client_auth` (01.6) is the listener's authentication mode, and it is PROFILE DATA rather
+# than renderer code: the mediator renders `clientca=` (mtls) or `auth_param basic` plus an
+# `acl <name> proxy_auth <identity>` (proxy_auth) from this field, refuses to start on a value it
+# does not know, and derives the audit line's `identity_source` from the same field in the same
+# pass -- so the annotation cannot say a listener authenticates when it does not. It is required,
+# not defaulted; an absent key is a compile error. `mtls` demands `tls: true`.
 #
-# Only `claude` carries a client certificate: 01.1 SF-2 measured that `codex` rejects an
-# `https://`-scheme proxy URL at parse time and never reaches a TLS listener, and that `agy`
-# reaches the CertificateRequest stage with nothing to offer. Their identity stays
-# network-derived at this feature -- exactly one agent container per `internal: true` network --
-# and 01.6 SF-3 revisits it on SF-1's proxy-credential result.
+# The form is the strongest each agent's client actually supports, and it is non-uniform because
+# the clients are. `claude` presents a client certificate. `codex` and `agy` cannot -- 01.1 SF-2
+# measured that `codex` rejects an `https://`-scheme proxy URL at parse time and never reaches a
+# TLS listener, and that `agy` reaches the CertificateRequest stage with nothing to offer -- but
+# 01.6 SF-1 measured that BOTH send a proxy credential, preemptively, from userinfo in their
+# proxy URL. So both carry `proxy_auth`.
+#
+# `proxy_auth` is a BEARER secret, not a cryptographic binding: readable in the agent's own
+# environment and `/proc`, and on `codex-net` it crosses the proxy hop in the clear because that
+# hop is plain HTTP by construction. It buys a revocable per-agent token and a stronger audit
+# line; it does NOT buy passage through the Milestone 03 credential-brokering gate, which stays
+# `listener+mtls` alone (01.6 Decision 4).
 listeners:
   claude: {scheme: https, tls: true,  port: 3128, client_auth: mtls}
-  codex:  {scheme: http,  tls: false, port: 3128, client_auth: none}
-  agy:    {scheme: https, tls: true,  port: 3128, client_auth: none}
+  codex:  {scheme: http,  tls: false, port: 3128, client_auth: proxy_auth}
+  agy:    {scheme: https, tls: true,  port: 3128, client_auth: proxy_auth}
 
 # D5's third control, per agent. PROPOSALS for confirmation, not measurements -- sized to sit
 # comfortably above an interactive agent session and well below a runaway loop. No traffic has

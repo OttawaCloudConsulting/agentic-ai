@@ -141,11 +141,19 @@ RUN mkdir -p /build-cache && chown agent:agent /build-cache
 # on every start, idempotently.
 RUN mkdir -p /opt/agent-home-skel && chown -R agent:agent /opt/agent-home-skel
 
-COPY --chmod=0755 images/entrypoint.sh /usr/local/bin/entrypoint.sh
+# The entrypoint's COPY and the ENTRYPOINT instruction are NOT here. They moved down to
+# agent-packs at 01.6 SF-3 -- see the note there. This stage still installs everything the
+# entrypoint depends on; it just no longer carries the entrypoint itself.
 
 # The AUTH_MODE dispatcher (01.4 SF-2, Interface Contract 2). Lives here rather than under
 # scripts/ because the copy-to-volume it performs must run inside the container -- see
 # this feature plan, Deviation 1.
+#
+# STILL IN THIS STAGE, and therefore still digest-pinned: nothing in 01.6 changes it, and moving
+# a file that is not broken would be a change nothing asked for. It carries the SAME latent
+# property the entrypoint had -- an edit to images/bootstrap-auth.sh does not reach a local build
+# until CI republishes this stage and compose/pins.env is repinned. Recorded rather than fixed
+# here; the next feature that needs to edit it will have to choose, with this note in front of it.
 COPY --chmod=0755 images/bootstrap-auth.sh /usr/local/bin/bootstrap-auth
 
 # AUTH_MODE is deliberately NOT declared with a value in any stage. Interface Contract 2:
@@ -153,8 +161,6 @@ COPY --chmod=0755 images/bootstrap-auth.sh /usr/local/bin/bootstrap-auth
 # pick an authentication mode on the operator's behalf, and could pick a less safe one than the
 # R4.12 default for that agent. Compose supplies it per agent from the profile's auth_mode block;
 # bootstrap-auth exits 2 when it is unset.
-
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # ==================================================================================
 # agent-packs -- profile-DEPENDENT. The layer where the profile's pack OS packages and
@@ -200,6 +206,26 @@ RUN if [ -n "$SKEL_MARKER" ]; then \
 # image, not to the install script. Harmless when no pack supplies Go: the directory
 # is simply absent from PATH lookups.
 ENV PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# The entrypoint, MOVED HERE FROM agent-base AT 01.6 SF-3, for the reason SKEL_MARKER moved at
+# 01.5 SF-6b and by the same evidence: agent-base is pulled from GHCR by digest, BuildKit skips a
+# stage nothing references, so an edit to images/entrypoint.sh reached nothing. Found by building
+# -- SF-3 added a credential splice to that file, rebuilt all three agents, and verify-pod-topology
+# reported the splice had not happened, because the image still carried the PUBLISHED copy.
+#
+# The alternative was a push, a CI publish and a repin of compose/pins.env for every edit to a
+# 145-line shell script. That is the right ceremony for the supply-chain base -- the OS packages,
+# the pinned toolchains, the attestation -- and the wrong ceremony for the pod's own start-up
+# logic, which is repository code that changes with the features that use it.
+#
+# D21 is not weakened by this. What D21 protects is that the BASE an operator runs is the base CI
+# built and attested, rather than a local re-derivation of it; that is still exactly true. This
+# stage already layers locally-derived content onto that attested base -- pack-install, the
+# profile's OS packages and archives, SKEL_MARKER. The entrypoint joins them. It is MOVED rather
+# than duplicated deliberately: a copy in both stages would leave the published one dead, the
+# local one silently winning, and an operator with no way to tell which was running.
+COPY --chmod=0755 images/entrypoint.sh /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # ---------------------------------------------------------------------------
 FROM agent-packs AS claude

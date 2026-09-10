@@ -168,10 +168,14 @@ expected_mounts() { # <agent> [extra destinations...]
   # keeps the CA it anchors its proxy hop with and presents nothing; `codex` keeps neither.
   # The same asymmetry verify-pod-topology.sh carries, and it lives in both files because
   # each harness asserts EQUALITY against its own containers rather than sharing a constant.
+  # 01.6 SF-3 extends it again, and to the two agents SF-2 did not touch: `codex` and `agy`
+  # now declare `client_auth: proxy_auth`, so each mounts its OWN proxy credential -- and only
+  # its own. The htpasswd those credentials are verified against goes to the MEDIATOR alone and
+  # appears in no agent's set, which is the property that keeps one agent from reading another's.
   case "$agent" in
     claude) list="/home/agent /run/secrets/claude-client.crt /run/secrets/claude-client.key /run/secrets/mediator-ca.crt /workspace" ;;
-    agy)    list="/home/agent /run/secrets/mediator-ca.crt /workspace" ;;
-    codex)  list="/home/agent /workspace" ;;
+    agy)    list="/home/agent /run/secrets/agy-proxy-credential /run/secrets/mediator-ca.crt /workspace" ;;
+    codex)  list="/home/agent /run/secrets/codex-proxy-credential /workspace" ;;
   esac
   # Word splitting is how the list becomes one path per line.
   # shellcheck disable=SC2086

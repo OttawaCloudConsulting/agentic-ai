@@ -17,6 +17,11 @@ references/.env_keys
 # read that file.
 mediator/identity/ca/
 mediator/identity/listeners/
+mediator/identity/clients/
+# 01.6 SF-3. Proxy credentials: per-agent PLAINTEXT and the htpasswd the mediator verifies
+# against. `*.key` and `*.pem` below do not cover these -- a `.cred` file is a bearer secret
+# with no extension anyone would guess, which is exactly why it gets its own line.
+mediator/identity/credentials/
 *.key
 *.pem
 

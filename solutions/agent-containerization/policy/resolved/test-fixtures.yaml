@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check --profile test-fixtures --allowlist policy/allowlist.test.yaml --denylist policy/denylist.test.yaml
 schema: 1
 profile: test-fixtures
-compiled_at: 2026-09-09T22:33:03Z
+compiled_at: 2026-09-10T01:05:33Z
 compiled_from:
   allowlist: policy/allowlist.test.yaml
   denylist: policy/denylist.test.yaml
@@ -27,7 +27,7 @@ agents:
   codex:
     identity: codex
     listener_port: 3128
-    listener: {scheme: http, tls: false, port: 3128, client_auth: none}
+    listener: {scheme: http, tls: false, port: 3128, client_auth: proxy_auth}
     allow_fqdns:
       - {fqdn: allowed.fixture.lab, port: 443, upgrade: false}
       - {fqdn: neighbour.fixture.lab, port: 443, upgrade: false}
@@ -37,7 +37,7 @@ agents:
   agy:
     identity: agy
     listener_port: 3128
-    listener: {scheme: https, tls: true, port: 3128, client_auth: none}
+    listener: {scheme: https, tls: true, port: 3128, client_auth: proxy_auth}
     allow_fqdns:
       - {fqdn: allowed.fixture.lab, port: 443, upgrade: false}
     allow_cidrs: []

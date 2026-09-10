@@ -76,6 +76,28 @@ forwarded_for delete
 # Squid has a request to log. The wrong-subject refusal below is the one that is logged.
 @PROXY_LISTENERS@
 
+# --------------------------------------------------------- the basic-auth scheme
+# Proxy-credential verification, for the agents whose clients cannot present a
+# certificate but WILL send a credential -- 01.6 SF-1 measured that both `codex` and
+# `agy` do, preemptively, from userinfo in their own proxy URL. Rendered from the same
+# `listener.client_auth` field that renders `clientca=` above, and it must come BEFORE
+# the `acl <name> proxy_auth <identity>` terms below: Squid refuses an ACL that
+# references an authentication scheme it has not been configured with yet.
+#
+# `basic_ncsa_auth` against an htpasswd secret the MEDIATOR ALONE holds. Not
+# `basic_fake_auth`, which accepts any password -- 01.3's record flags it as a fixture
+# helper, and keying policy off a credential nothing verifies would make
+# `identity_source: listener+proxy_auth` a claim about nothing.
+#
+# A credential is a BEARER secret and this template does not pretend otherwise: it is
+# readable in the agent's own environment and `/proc`, and on `codex-net` it crosses
+# the proxy hop in the clear because that hop is plain HTTP by construction. It buys a
+# revocable per-agent token and a stronger audit line, not passage through the
+# Milestone 03 credential-brokering gate, which stays `listener+mtls` alone (D4).
+#
+# This marker renders EMPTY under a profile with no `client_auth: proxy_auth` listener.
+@AUTH_PARAM@
+
 # ------------------------------------------------------- listener identity ACLs
 # `myportname`, not the client address: SF-4 may separate listeners by address, by
 # port or by both, and the inner listeners all share 127.0.0.1. Each agent gets
@@ -193,7 +215,23 @@ deny_info ERR_MEDIATOR_IDENTITY  ctl_identity
 # certificate is still refused AS an identity failure and still annotates `idsrc=listener`,
 # rather than being logged with no attribution strength at all.
 #
-# This marker renders EMPTY under a profile with no `client_auth: mtls` listener.
+# 01.6 SF-3 puts a second refusal here, for a `client_auth: proxy_auth` listener, and it is here
+# for exactly the same reason: without it a credential-less request would fall through to the
+# destination allow rules, be forwarded to the peer, and the INNER listener would annotate
+# `idsrc=listener+proxy_auth` on a connection nothing authenticated. The credential form differs;
+# the ordering constraint does not.
+#
+# That refusal is rendered BARE -- a negated `proxy_auth` ACL and nothing after it. Measured at
+# the SF-3 build (P9): a `proxy_auth` ACL that misses halts ACL evaluation on its line, so any
+# annotation or reason term placed after it never runs. Squid answers 407 with its own challenge,
+# never 403, so `ctl_identity` and ERR_MEDIATOR_IDENTITY are the mtls path's alone. The weak
+# attribution value still reaches that 407 line, from the unconditional baseline annotation
+# rendered with the listener identity ACLs above rather than from this line. (Substitution
+# markers are deliberately never written out inside these comments: the entrypoint greps the
+# RENDERED file for any surviving marker and fatals, so a comment that spells one out aborts the
+# mediator's start. Cost the SF-3 build two starts before the message was read for what it said.)
+#
+# This marker renders EMPTY under a profile whose every listener declares `client_auth: none`.
 @IDENTITY_ENFORCE@
 
 # CONNECT only. Every other method is refused (criterion 3): a plain `GET

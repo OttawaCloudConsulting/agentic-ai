@@ -76,6 +76,9 @@ volumes:
 #   bash scripts/issue-identity.sh listener claude --ip 172.31.10.2
 #   bash scripts/issue-identity.sh listener codex  --ip 172.31.20.2
 #   bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2
+#   bash scripts/issue-identity.sh client     claude          # 01.6 SF-2
+#   bash scripts/issue-identity.sh credential codex           # 01.6 SF-3
+#   bash scripts/issue-identity.sh credential agy             # 01.6 SF-3
 #
 # The codex pair is a BUMPING certificate, not a proxy hop, and the distinction is
 # the whole reason it is called out here. codex opens no TLS to the mediator and
@@ -104,13 +107,41 @@ secrets:
   # Issued by `bash scripts/issue-identity.sh client claude` with subject CN=claude -- the
   # resolved policy's `identity` value, which the mediator's binding rule matches.
   #
-  # There is no codex or agy counterpart: 01.1 SF-2 measured that codex never reaches a TLS
-  # listener and that agy has nothing to offer at the CertificateRequest stage, so their
-  # listeners declare `client_auth: none` and their identity is network-derived.
+  # There is no codex or agy client certificate: 01.1 SF-2 measured that codex never reaches a
+  # TLS listener and that agy has nothing to offer at the CertificateRequest stage. Their
+  # identity is the proxy credential below instead -- a different form, and a weaker one.
   claude-client.crt:
     file: ../mediator/identity/clients/claude-client.crt
   claude-client.key:
     file: ../mediator/identity/clients/claude-client.key
+
+  # 01.6 SF-3 -- the PROXY CREDENTIAL form, for the two agents whose clients cannot present a
+  # certificate but WILL send a credential. SF-1 measured that both codex and agy construct
+  # `Proxy-Authorization: Basic` themselves, preemptively, from userinfo in their own proxy URL,
+  # and that neither exposes any other knob for supplying one.
+  #
+  #   bash scripts/issue-identity.sh credential codex
+  #   bash scripts/issue-identity.sh credential agy
+  #
+  # The split is the point. `mediator-credentials` is the htpasswd -- HASHES only -- and it is
+  # scoped to the mediator alone; each `<agent>-proxy-credential` is that agent's own plaintext
+  # `<username>:<password>` and is scoped to that agent alone. No agent holds another's, and no
+  # agent holds the file the mediator verifies against.
+  #
+  # ACCEPTED, NOT MITIGATED (01.6 Decision 4, recorded in mediator/identity/README.md). A basic
+  # credential is a BEARER secret: the agent's entrypoint splices it into its proxy URL, so it is
+  # readable in that agent's own environment and `/proc`, and for codex it crosses the proxy hop
+  # IN THE CLEAR, because that hop is plain HTTP by construction (01.1 SF-2) on a two-member
+  # `internal: true` network. An agent that can read its own credential can present it. That is
+  # exactly why these two agents do NOT pass the Milestone 03 credential-brokering gate, which
+  # stays `listener+mtls` alone -- claude only, on today's evidence. Rotation is re-issue;
+  # revocation is delete the `.cred`, `credential --rebuild`, restart the mediator.
+  mediator-credentials:
+    file: ../mediator/identity/credentials/htpasswd
+  codex-proxy-credential:
+    file: ../mediator/identity/credentials/codex.cred
+  agy-proxy-credential:
+    file: ../mediator/identity/credentials/agy.cred
 
 x-hardened: &hardened
   user: "1000:1000"
@@ -228,6 +259,10 @@ services:
       - codex-listener.key
       - agy-listener.crt
       - agy-listener.key
+      # 01.6 SF-3. The htpasswd `basic_ncsa_auth` verifies proxy credentials against. HASHES
+      # only -- which is also why the cascade warm-up skips a `proxy_auth` listener: this
+      # container cannot construct a credential to answer its own 407 with.
+      - mediator-credentials
 
   claude:
     <<: *hardened
@@ -351,6 +386,17 @@ services:
     # No CA secret and no trust variable: codex opens no TLS to the mediator, so
     # there is no mediator certificate for it to validate. Its DESTINATION TLS is
     # unaffected and uses its own trust store.
+    secrets:
+      # 01.6 SF-3 -- codex's own proxy credential, and nothing else's. The entrypoint splices it
+      # into HTTPS_PROXY/HTTP_PROXY at start; the URLs above stay credential-free in this file
+      # and in `docker inspect`.
+      #
+      # This is the one agent whose credential crosses the wire IN THE CLEAR: its hop is plain
+      # HTTP CONNECT because 01.1 SF-2 measured that codex rejects an `https://`-scheme proxy URL
+      # at parse time. The exposure is bounded to a two-member `internal: true` network holding
+      # only codex and the mediator, it is recorded rather than mitigated, and it is a concrete
+      # reason the Milestone 03 brokering gate does not admit this agent (01.6 Decision 4).
+      - codex-proxy-credential
     volumes:
       - codex-state:/home/agent
 
@@ -401,5 +447,11 @@ services:
       AUTH_MODE: ${AGY_AUTH_MODE:-apikey}
     secrets:
       - mediator-ca.crt
+      # 01.6 SF-3 -- agy's own proxy credential, and nothing else's. The entrypoint splices it
+      # into HTTPS_PROXY/HTTP_PROXY at start; the URLs above stay credential-free in this file
+      # and in `docker inspect`. agy's hop is TLS, so its credential does not cross the wire in
+      # the clear -- measured on this Squid build at the SF-3 build (P9), because P8 had only
+      # measured `proxy_auth` on a plain `http_port`.
+      - agy-proxy-credential
     volumes:
       - agy-state:/home/agent

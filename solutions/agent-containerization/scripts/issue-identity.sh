@@ -53,13 +53,29 @@
 #       declares `client_auth: mtls`. Followed by a mediator restart AND an agent restart --
 #       the agent re-reads the key pair from its Compose secret at start.
 #
+#   bash scripts/issue-identity.sh credential <claude|codex|agy> [--force]
+#       Issue that agent's PROXY CREDENTIAL: a random password for the username taken from the
+#       resolved policy's `identity`. Refused unless that agent's resolved listener declares
+#       `client_auth: proxy_auth`. Writes the plaintext for that agent alone and rebuilds the
+#       shared htpasswd the mediator verifies against. Followed by a mediator restart AND that
+#       agent's restart -- the agent reads the plaintext from its Compose secret at start and
+#       splices it into its proxy URL.
+#
+#   bash scripts/issue-identity.sh credential --rebuild
+#       Rebuild the htpasswd from the plaintexts still on disk, issuing nothing. This is the
+#       REVOCATION path: delete an agent's `.cred`, rebuild, restart the mediator. Without it a
+#       deleted plaintext would leave its htpasswd line standing and the credential would go on
+#       working, which is a revocation that silently does not revoke.
+#
 #   bash scripts/issue-identity.sh <claude|codex|agy>
 #       Renewal of that agent's LISTENER certificate. Re-issues against the recorded address.
-#       Followed by a mediator restart. Client certificates renew through `client --force`.
+#       Followed by a mediator restart. Client certificates renew through `client --force` and
+#       proxy credentials through `credential --force`.
 #
 #   bash scripts/issue-identity.sh status
 #       Show what exists, its subject, SAN and expiry -- listener and client certificates
-#       alike. Reads nothing secret.
+#       alike, and which agents hold a proxy credential. Reads nothing secret: a credential is
+#       reported as present or absent and by its username, never by its value.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -67,6 +83,11 @@ IDENTITY_DIR="$REPO_ROOT/mediator/identity"
 CA_DIR="$IDENTITY_DIR/ca"
 LISTENER_DIR="$IDENTITY_DIR/listeners"
 CLIENT_DIR="$IDENTITY_DIR/clients"
+# 01.6 SF-3. Proxy credentials for the agents whose clients cannot present a certificate but
+# WILL send a credential (SF-1 measured both `codex` and `agy` do, from proxy-URL userinfo).
+# Plaintext per agent -- the agent needs the value, not a hash -- plus the htpasswd the mediator
+# verifies against. Covered by mediator/identity/.gitignore's deny-all like every sibling.
+CREDENTIAL_DIR="$IDENTITY_DIR/credentials"
 
 # The resolved artifact the `client` mode reads its subject and its permission from. The DEFAULT
 # profile's, named explicitly: it is the artifact the pod runs under, and the test profiles are
@@ -369,6 +390,109 @@ verify_client() {
     || fail "$crt carries a subjectAltName ($san). A client certificate asserts an identity, not a name or an address."
 }
 
+# -------------------------------------------------------------------- proxy credentials (SF-3)
+
+# The proxy_auth counterpart to require_mtls_agent, and it reads the same field for the same
+# reason: the resolved policy is the authority on which agents authenticate and how, so issuance
+# and enforcement cannot disagree. A credential issued for an agent whose listener does not ask
+# for one has no consumer, and one NOT issued for an agent whose listener does ask is a total
+# outage for that agent -- 407 on every request.
+require_proxy_auth_agent() {
+  local agent="$1" mode
+  command -v yq >/dev/null 2>&1 \
+    || fail "yq is required to read $RESOLVED_POLICY (https://github.com/mikefarah/yq)"
+  [[ -f "$RESOLVED_POLICY" ]] \
+    || fail "no resolved policy at $RESOLVED_POLICY. Compile one first: bash scripts/compile-policy-build.sh"
+  [[ "$(yq eval ".agents | has(\"$agent\")" "$RESOLVED_POLICY")" == "true" ]] \
+    || fail "$RESOLVED_POLICY declares no agent '$agent'"
+  mode="$(yq eval ".agents.${agent}.listener.client_auth" "$RESOLVED_POLICY")"
+  [[ "$mode" == "proxy_auth" ]] \
+    || fail "agents.${agent}.listener.client_auth is '$mode' in $RESOLVED_POLICY, not 'proxy_auth'. That agent's listener asks for no proxy credential, so one issued here would have no consumer. Change the profile and recompile if that is the intent."
+}
+
+# The htpasswd the mediator verifies against, rebuilt from the plaintexts on disk EVERY time --
+# never appended to. Append-only would make deletion of a plaintext a no-op at the enforcement
+# point, so the documented revocation path (delete, rebuild, restart) would silently not revoke.
+#
+# `openssl passwd -apr1` and not bcrypt: glibc's crypt(3) has no bcrypt, and basic_ncsa_auth
+# hashes through crypt(3). Measured against the shipped mediator image at the SF-3 build (P9,
+# docs/records/mediator-selection.md) rather than assumed from the helper's documentation.
+rebuild_htpasswd() {
+  local out="$CREDENTIAL_DIR/htpasswd" agent cred userinfo n=0
+  mkdir -p "$CREDENTIAL_DIR"
+  local tmp; tmp="$(mktemp)"
+  for agent in "${BUMP_AGENTS[@]}"; do
+    cred="$CREDENTIAL_DIR/${agent}.cred"
+    [[ -f "$cred" ]] || continue
+    # The username comes from the file, not from the policy: the file IS the record of what was
+    # issued, and hashing a policy-derived username against a file-derived password would let the
+    # two halves of one credential disagree after a profile edit. `credential <agent>` is what
+    # re-reconciles them, and it verifies the username against the policy when it does.
+    userinfo="$(tr -d '\r\n' < "$cred")"
+    [[ "$userinfo" == *:* ]] \
+      || fail "$cred is not '<username>:<password>'. Re-issue it: bash scripts/issue-identity.sh credential $agent --force"
+    printf '%s:%s\n' "${userinfo%%:*}" "$(openssl passwd -apr1 "${userinfo#*:}")" >> "$tmp"
+    n=$(( n + 1 ))
+  done
+  ( umask 077; cp "$tmp" "$out" )
+  rm -f "$tmp"
+  note "htpasswd: $out rebuilt with ${n} credential(s)"
+  note "restart the mediator for it to take effect -- basic_ncsa_auth reads the file at start and Squid caches accepted credentials (credentialsttl)"
+}
+
+issue_credential() {
+  local agent="$1" force="$2"
+  check_agent "$agent"
+  require_proxy_auth_agent "$agent"
+  mkdir -p "$CREDENTIAL_DIR"
+
+  local id; id="$(client_identity "$agent")"
+  local cred="$CREDENTIAL_DIR/${agent}.cred"
+
+  if [[ -e "$cred" && "$force" != "yes" ]]; then
+    fail "$cred already exists. Re-issue it with: bash scripts/issue-identity.sh credential $agent --force"
+  fi
+
+  # The file holds `<username>:<password>` -- the whole userinfo string, not just the secret half.
+  # The agent's entrypoint splices this verbatim into its proxy URL, so it derives no username of
+  # its own. That matters: the username is the RESOLVED POLICY's `identity`, and the only agent-
+  # side token that resembles it is the image-baked `AGENT_NAME`. They are equal in every shipped
+  # profile and nothing keeps them equal, so deriving it there would put a silent wrong-username
+  # 407 one profile edit away. Issuance writes it; delivery does not guess it.
+  #
+  # Hex password, not base64 or a passphrase alphabet: the delivery surface is a URL, and any
+  # character needing percent-encoding would produce a wrong-credential failure whose symptom
+  # names neither the encoding nor the URL. 24 bytes of `openssl rand` is 192 bits.
+  ( umask 077; printf '%s:%s\n' "$id" "$(openssl rand -hex 24)" > "$cred" )
+
+  verify_credential "$agent" "$id"
+  rebuild_htpasswd
+  note "issued: $cred (username ${id}, 192-bit random, no expiry -- rotation is re-issue)"
+  note "restart the mediator AND the ${agent} container -- the agent reads this value from its Compose secret at start and splices it into its proxy URL"
+}
+
+# Issuance verifies its own output, as the certificate paths do. The property is that the hash
+# the mediator will verify against actually accepts the plaintext the agent will send -- a
+# mismatch here is a 407 on every request from that agent, and the audit line for it says
+# `identity_source: listener` rather than anything naming a credential.
+verify_credential() {
+  local agent="$1" id="$2"
+  local cred="$CREDENTIAL_DIR/${agent}.cred" userinfo plain hash
+  userinfo="$(tr -d '\r\n' < "$cred")"
+  [[ -n "$userinfo" ]] || fail "$cred is empty"
+  # `<username>:<hex password>`, and the username must be THIS agent's policy identity -- the
+  # value the mediator's `acl <name> proxy_auth <identity>` term matches. A file naming another
+  # agent would authenticate as that agent, which is the T34 case one credential form over.
+  [[ "$userinfo" =~ ^[A-Za-z0-9_-]+:[0-9a-f]+$ ]] \
+    || fail "$cred is not '<username>:<hex password>'. It is spliced into a proxy URL as userinfo, where any character needing percent-encoding becomes a wrong-credential failure."
+  [[ "${userinfo%%:*}" == "$id" ]] \
+    || fail "$cred names username '${userinfo%%:*}', but ${agent}'s identity in $RESOLVED_POLICY is '$id'. The mediator matches the policy value, so this credential would be refused."
+  plain="${userinfo#*:}"
+  hash="$(openssl passwd -apr1 "$plain")"
+  [[ "$(openssl passwd -apr1 -salt "$(printf '%s' "$hash" | cut -d'$' -f3)" "$plain")" == "$hash" ]] \
+    || fail "openssl passwd -apr1 is not reproducible on this host; the htpasswd would not accept ${id}'s credential"
+}
+
 # ---------------------------------------------------------------------------- status
 
 status() {
@@ -429,10 +553,32 @@ status() {
       echo "client $agent: none"
     fi
   done
+  # Proxy credentials (01.6 SF-3). Reported by PRESENCE and USERNAME only -- the value never
+  # reaches this output. There is no expiry to report: a basic credential has none, so rotation
+  # is re-issue rather than renewal, which is why `status` reports whether the htpasswd the
+  # mediator verifies against actually carries a line for this agent. A plaintext on disk with
+  # no htpasswd line is an agent that will be answered 407 on every request.
+  local cred hpw="$CREDENTIAL_DIR/htpasswd"
+  for agent in "${BUMP_AGENTS[@]}"; do
+    cred="$CREDENTIAL_DIR/${agent}.cred"
+    if [[ -f "$cred" ]]; then
+      echo "credential $agent: $cred"
+      echo "     username: $(client_identity "$agent" 2>/dev/null || echo '(no identity in the resolved policy)')"
+      if [[ -f "$hpw" ]] && grep -q "^$(client_identity "$agent" 2>/dev/null):" "$hpw" 2>/dev/null; then
+        echo "     in the mediator htpasswd: yes"
+      else
+        echo "     in the mediator htpasswd: NO -- rebuild it: bash scripts/issue-identity.sh credential --rebuild"
+      fi
+    else
+      echo "credential $agent: none"
+    fi
+  done
   echo "note: the codex certificate is a BUMPING certificate for its peek stage, not a proxy hop."
   echo "      codex opens no TLS to the mediator and validates nothing it presents (Deviation 5)."
   echo "      a client certificate is issued only for an agent whose resolved listener declares"
-  echo "      client_auth: mtls; the others authenticate by network membership alone (01.6)."
+  echo "      client_auth: mtls, and a proxy credential only for one declaring client_auth:"
+  echo "      proxy_auth. Only the certificate form is cryptographic; a credential is a bearer"
+  echo "      secret, which is why the Milestone 03 brokering gate is mtls alone (01.6 D4)."
 }
 
 # ---------------------------------------------------------------------------- arguments
@@ -496,6 +642,25 @@ case "$MODE" in
       esac
     done
     issue_client "$AGENT" "$FORCE" ;;
+
+  credential)
+    # `--rebuild` takes no agent: it is the revocation path, and it acts on the whole file.
+    if [[ "${1:-}" == "--rebuild" ]]; then
+      shift
+      [[ $# -eq 0 ]] || fail "credential --rebuild takes no further arguments"
+      rebuild_htpasswd
+      exit 0
+    fi
+    AGENT="${1:-}"; [[ -n "$AGENT" ]] || fail "credential needs an agent name, or --rebuild"
+    shift
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --force) FORCE="yes"; shift ;;
+        --ip)    fail "credential takes no --ip: a proxy credential asserts an identity, not an address." ;;
+        *) fail "unknown argument: $1" ;;
+      esac
+    done
+    issue_credential "$AGENT" "$FORCE" ;;
 
   *)
     # Renewal form: `issue-identity.sh <name>`

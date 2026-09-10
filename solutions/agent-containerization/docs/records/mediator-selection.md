@@ -66,7 +66,8 @@ hard on unknown directives, rather than against on-image documentation.
 | P5 | Immediate, body-bearing refusal naming the destination | **FAIL** on any listener that peeks. Structural, not configurable |
 | P6 | SNI observable and comparable to the CONNECT host without decrypting | **PASS only via a self-cascade**. Direct combination with proxy-hop TLS is rejected by Squid |
 | P7 | Heterogeneous listeners in one instance, each selecting independent per-agent policy | **PASS**, and it requires the same self-cascade P6 requires |
-| P8 | Per-client policy selection from a proxy credential | **PASS** on the plain transport |
+| P8 | Per-client policy selection from a proxy credential | **PASS** on the plain transport, with the FIXTURE helper (`basic_fake_auth`) |
+| P9 | The same, on `https_port`, with the REAL helper (`basic_ncsa_auth`) | **PASS** — measured 2026-09-10 (01.6 SF-3). Both transports, real hashes; refusal is **407**, never 403 |
 
 ---
 
@@ -369,6 +370,104 @@ one — is 01.6's, per the split recorded in the plan's Approach section.
 `basic_fake_auth` accepts any password and is a fixture helper only; a real deployment needs a real
 helper or an `external_acl_type`.
 
+### P9 — proxy-credential policy selection on `https_port`, with the real helper: PASS
+
+**Measured 2026-09-10, 01.6 SF-3, against the shipped mediator image** (`sandboxed-agent/mediator:local`,
+`squid-openssl 6.13-2+deb13u2`, Squid Cache: Version 6.13, Debian trixie). P8 left two things
+unmeasured and 01.6 SF-1 handed a third over; this closes all three before `codex`'s and `agy`'s
+profiles were flipped, which is what the feature plan required rather than assumed.
+
+**The three questions, and why each mattered.** P8 ran on a plain `http_port` with
+`basic_fake_auth`. `agy`'s hop to the mediator is TLS, so `https_port` **with** `proxy_auth` was
+unmeasured on this build. `basic_fake_auth` accepts any password, so no hash format had ever been
+exercised — and `basic_ncsa_auth` hashes through glibc `crypt(3)`, which has **no bcrypt**, so
+`htpasswd -B` would have been the wrong reach. And a refusal's status code had never been observed
+at all, which decides whether the `control=identity` / `ERR_MEDIATOR_IDENTITY` route the `mtls`
+path takes is reachable here.
+
+**Method.** A minimal `squid.conf` inside the shipped image: one plain `http_port` and three
+`https_port`s, `auth_param basic program /usr/lib/squid/basic_ncsa_auth <htpasswd>`, per-user
+`acl <name> proxy_auth <user>`, and an `openssl s_server` on 127.0.0.1:9999 as a bare TCP acceptor
+so a permitted CONNECT can actually complete. Credentials were `codexuser` / `agyuser` with
+`openssl passwd -apr1` hashes. Probes were raw CONNECTs — `/dev/tcp` for the plain port,
+`openssl s_client -quiet -verify_return_error` for the TLS ones — with the
+`Proxy-Authorization: Basic` header present, absent, or carrying a wrong username or password.
+
+The three TLS ports differ only in the shape of the rule that annotates the attribution value,
+because that shape is the second finding:
+
+| Port | Rule shape |
+|---|---|
+| `tlsbare` | `http_access allow ... u_agy` only — no annotation |
+| `tlsanno` | `http_access deny p !u_agy idsrc_pl rsn_cred` — the `mtls` path's "override on the miss" idiom, transposed |
+| `tlsbase` | `deny p idsrc_pl !all` then `deny p u_agy idsrc_pa !all` — baseline, then upgrade |
+
+**Result — the helper and the transport.**
+
+```
+plain  3181 no credential:                     HTTP/1.1 407 Proxy Authentication Required
+plain  3181 wrong user:                        HTTP/1.1 407 Proxy Authentication Required
+plain  3181 wrong password:                    HTTP/1.1 407 Proxy Authentication Required
+plain  3181 right credential:                  HTTP/1.1 200 Connection established
+
+TLS    3182 bare-deny  no credential:          HTTP/1.1 407 Proxy Authentication Required
+TLS    3182 bare-deny  wrong user:             HTTP/1.1 407 Proxy Authentication Required
+TLS    3182 bare-deny  right credential:       HTTP/1.1 200 Connection established
+
+TLS    3183 anno-deny  no credential:          HTTP/1.1 407 Proxy Authentication Required
+TLS    3183 anno-deny  wrong user:             HTTP/1.1 407 Proxy Authentication Required
+TLS    3183 anno-deny  right credential:       HTTP/1.1 200 Connection established
+
+TLS    3184 base+upg  no credential:           HTTP/1.1 407 Proxy Authentication Required
+TLS    3184 base+upg  wrong user:              HTTP/1.1 407 Proxy Authentication Required
+TLS    3184 base+upg  right credential:        HTTP/1.1 200 Connection established
+```
+
+`https_port` with `proxy_auth` works, `basic_ncsa_auth` is present in the shipped image at
+`/usr/lib/squid/basic_ncsa_auth`, and it accepts `openssl passwd -apr1` hashes. `agy`'s mediator
+side is therefore verified and its profile can be flipped.
+
+**Result — the refusal is 407, never 403.** On every transport and every rule shape, including the
+one that puts a `deny_info`-eligible ACL last. A missed `proxy_auth` ACL makes Squid answer its own
+challenge, so there is **no error-page route and no `control=identity` verdict** on this path. That
+is a real difference in kind from the `mtls` subject-mismatch refusal, which is a 403 with
+`ERR_MEDIATOR_IDENTITY` — and it is why 01.6 SF-3 renders neither for a `proxy_auth` listener.
+
+**Result — a `proxy_auth` ACL miss halts ACL evaluation on its line.** This is the finding that
+changed the implementation, and it is visible in the `idsrc` column of the access log:
+
+```
+port=plainauth un=-         idsrc=-                   status=407
+port=plainauth un=nobody    idsrc=-                   status=407
+port=plainauth un=codexuser idsrc=-                   status=407   (wrong password)
+port=plainauth un=codexuser idsrc=listener+proxy_auth status=200
+port=tlsanno   un=-         idsrc=-                   status=407
+port=tlsanno   un=nobody    idsrc=-                   status=407
+port=tlsanno   un=agyuser   idsrc=listener+proxy_auth status=200
+port=tlsbase   un=-         idsrc=listener            status=407
+port=tlsbase   un=nobody    idsrc=listener            status=407
+port=tlsbase   un=agyuser   idsrc=listener+proxy_auth status=200
+```
+
+`tlsanno` is the `mtls` idiom transposed, and it **does not work**: the annotation sits after
+`!u_agy` on the deny line, evaluation stops at the credential ACL, and the 407 line carries
+`idsrc=-` — an audit line stating no attribution strength at all, which is precisely what
+criterion 3 exists to prevent. `tlsbase` is the shape that works: annotate the weak value on a line
+carrying **no** `proxy_auth` term, so it always evaluates, then override it to the strong value on a
+line gated on the credential. `annotate_transaction key=value` replaces where `key+=value` appends,
+so last-wins makes the override an override.
+
+**Also confirmed:** `%un` carries the username to the log and the password never appears there.
+Zero `rejected-user`-style helper errors; `cache.log` shows the helper starting normally.
+
+**Consequence for 01.6 SF-3.** Both agents take the positive branch. The renderer emits
+`auth_param basic program /usr/lib/squid/basic_ncsa_auth` against an htpasswd the mediator alone
+holds, an `acl cred_<agent> proxy_auth <identity>` per listener, the baseline-then-upgrade
+annotation pair, and a bare `http_access deny p_<agent>_frontid !cred_<agent>` ahead of every
+forwarding rule. Because the htpasswd holds hashes and not plaintext, the mediator cannot
+authenticate to its own front listener — so the cascade warm-up is skipped for a `proxy_auth` agent
+exactly as it is for an `mtls` one.
+
 ## Operational findings not attached to a property
 
 **Squid cannot log to `/dev/stdout` after dropping to the `proxy` user.** With
@@ -527,5 +626,5 @@ reasons to prefer the fallback:
 | Cannot log to `/dev/stdout` as `proxy`; `error_directory` composition | SF-4 |
 | `cache_peer` cold start | SF-7 (self-check warms), SF-8 (not a control result) |
 | `clientca=` is required-mode by default; `DELAYED_AUTH` did not work | **01.6** — closed 2026-09-09 by design, not by fix (see P1 above); required mode on the `claude` front listener alone |
-| Proxy-credential policy selection works on the plain transport | **01.6** — agent half measured 2026-09-09, positive for both `codex` and `agy` (`docs/records/agent-verification.md`, criterion 1). `https_port` **with** `proxy_auth` remains unmeasured on this Squid build and is 01.6 SF-3's to verify before `agy` is flipped |
+| Proxy-credential policy selection works on the plain transport | **01.6 — CLOSED.** Agent half measured 2026-09-09, positive for both `codex` and `agy` (`docs/records/agent-verification.md`, criterion 1). Mediator half on `https_port`, and with the real helper rather than the fixture one, measured 2026-09-10 as **P9 below** — both agents' listeners now declare `client_auth: proxy_auth` |
 | Pin package version **and** base image digest | SF-4 |

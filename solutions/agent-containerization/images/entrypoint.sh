@@ -77,7 +77,69 @@ bootstrap_auth() {
   bash /usr/local/bin/bootstrap-auth "$AGENT_NAME" --at-start
 }
 
+# 01.6 SF-3. The proxy credential's ONLY delivery surface is userinfo in the proxy URL. SF-1
+# measured that neither `codex` nor `agy` exposes any knob for supplying a proxy credential --
+# `codex --help` has no proxy-auth flag and `agy --help` matches nothing for `proxy` or `auth` --
+# and that both construct `Proxy-Authorization: Basic` themselves, preemptively, from the URL.
+# So the credential is spliced in here rather than written into compose.yaml: the value arrives
+# on the same Compose-secret seam as every other piece of trust material, stays out of the
+# committed Compose file, and stays out of `docker inspect`.
+#
+# It does NOT stay out of this process's environment, and that is the accepted residual rather
+# than an oversight: a basic credential is a bearer secret, readable here and in `/proc`, which
+# is precisely why the Milestone 03 credential-brokering gate is `listener+mtls` alone (01.6
+# Decision 4). For `codex` it also crosses a plain-HTTP proxy hop in the clear, on a two-member
+# `internal: true` network. Both are recorded in mediator/identity/README.md, not mitigated.
+#
+# Absent secret: leave the URLs alone and say so. An agent whose listener declares `proxy_auth`
+# will then be answered 407 on every request -- loudly, at the mediator, on an audit line reading
+# `identity_source: listener` -- which is a better failure than a container that will not start.
+# An EMPTY secret is different and does exit: it means the credential was delivered and is
+# unusable, and splicing `user:@host` would send a credential that can never match.
+inject_proxy_credential() {
+  local f="/run/secrets/${AGENT_NAME:-none}-proxy-credential"
+  [ -n "${AGENT_NAME:-}" ] || return 0
+  if [ ! -r "$f" ]; then
+    return 0
+  fi
+  # The secret holds the WHOLE userinfo string, `<username>:<password>`, and it is spliced in
+  # verbatim. This container derives no username of its own: the username the mediator matches is
+  # the resolved policy's `identity`, and the only token here that resembles it is the
+  # image-baked AGENT_NAME. They agree in every shipped profile and nothing keeps them agreeing,
+  # so deriving it here would put a silent wrong-username 407 one profile edit away.
+  local userinfo; userinfo="$(tr -d '\r\n' < "$f")"
+  if [ -z "$userinfo" ]; then
+    echo "entrypoint: $f is empty. The mediator will answer 407 on every request from this agent." >&2
+    exit 4
+  fi
+  case "$userinfo" in
+    *:*) : ;;
+    *) echo "entrypoint: $f is not '<username>:<password>'; refusing to splice it into a proxy URL" >&2; exit 4 ;;
+  esac
+  local var url proto rest
+  for var in HTTPS_PROXY https_proxy HTTP_PROXY http_proxy; do
+    eval "url=\${$var:-}"
+    [ -n "$url" ] || continue
+    case "$url" in
+      *://*) : ;;
+      *) echo "entrypoint: $var='$url' has no scheme; not splicing a credential into it" >&2; continue ;;
+    esac
+    proto="${url%%://*}"
+    rest="${url#*://}"
+    # Idempotent: a URL that already carries userinfo is left exactly as it is, so a re-exec or
+    # an operator-supplied credential is never double-spliced into an unusable one.
+    case "$rest" in
+      *@*) continue ;;
+    esac
+    export "$var=${proto}://${userinfo}@${rest}"
+  done
+  # The password is never echoed. The username is, because it is the audit line's `agent` value
+  # and an operator needs to be able to tell that the splice happened at all.
+  echo "entrypoint: proxy credential spliced into the proxy URL as user '${userinfo%%:*}'" >&2
+}
+
 seed_home
 ensure_codex_credentials_store
 bootstrap_auth
+inject_proxy_credential
 exec "$@"

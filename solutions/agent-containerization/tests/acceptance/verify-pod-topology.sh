@@ -64,7 +64,10 @@ check_trust_material() {
            mediator/identity/listeners/agy-listener.crt \
            mediator/identity/listeners/agy-listener.key \
            mediator/identity/clients/claude-client.crt \
-           mediator/identity/clients/claude-client.key; do
+           mediator/identity/clients/claude-client.key \
+           mediator/identity/credentials/htpasswd \
+           mediator/identity/credentials/codex.cred \
+           mediator/identity/credentials/agy.cred; do
     [ -f "$f" ] || missing+=("$f")
   done
   if [ "${#missing[@]}" -eq 0 ]; then
@@ -270,10 +273,14 @@ for agent in "${AGENTS[@]}"; do
   # key pair, because it is the only agent whose listener declares `client_auth: mtls`. `agy`
   # keeps the CA and nothing more -- it anchors the proxy hop and presents nothing -- and
   # `codex` keeps neither. A single expected set would now fail on all three.
+  # 01.6 SF-3 extends it again, and to the two agents SF-2 did not touch: `codex` and `agy`
+  # now declare `client_auth: proxy_auth`, so each mounts its OWN proxy credential -- and only
+  # its own. The htpasswd those credentials are verified against goes to the MEDIATOR alone and
+  # appears in no agent's set, which is the property that keeps one agent from reading another's.
   case "$agent" in
     claude) expected_list="/home/agent /run/secrets/claude-client.crt /run/secrets/claude-client.key /run/secrets/mediator-ca.crt /workspace" ;;
-    agy)    expected_list="/home/agent /run/secrets/mediator-ca.crt /workspace" ;;
-    codex)  expected_list="/home/agent /workspace" ;;
+    agy)    expected_list="/home/agent /run/secrets/agy-proxy-credential /run/secrets/mediator-ca.crt /workspace" ;;
+    codex)  expected_list="/home/agent /run/secrets/codex-proxy-credential /workspace" ;;
   esac
 
   # 01.4 SF-1: the two OPTIONAL mounts that feature introduced -- /run/gitconfig
@@ -410,8 +417,45 @@ for agent in "${AGENTS[@]}"; do
     codex|agy)
       for var in CLAUDE_CODE_CLIENT_CERT CLAUDE_CODE_CLIENT_KEY; do
         got="$(docker exec "$cid" printenv "$var" 2>/dev/null || true)"
-        [ -z "$got" ] || { echo "  $agent carries $var=$got; its listener declares client_auth: none"; env_ok=0; }
+        [ -z "$got" ] || { echo "  $agent carries $var=$got; it presents a proxy credential, not a certificate"; env_ok=0; }
       done ;;
+  esac
+
+  # Check 4b-iii (01.6 SF-3). The proxy CREDENTIAL's delivery, and it is asserted on the RUNNING
+  # PROCESS rather than on the container's configured environment, because those are two
+  # different things here and the difference is the mechanism.
+  #
+  # SF-1 measured that neither codex nor agy exposes any knob for supplying a proxy credential,
+  # and that both construct `Proxy-Authorization: Basic` themselves from userinfo in the proxy
+  # URL. So images/entrypoint.sh splices the credential into HTTPS_PROXY/HTTP_PROXY at start,
+  # from a Compose secret. The URL in compose.yaml -- which is what `docker exec printenv` and
+  # `docker inspect` both report -- therefore stays credential-free, and check 4b above asserts
+  # exactly that, unchanged. What the CLIENT sees is PID 1's environment, and that is where the
+  # credential has to be, or the agent talks to an authenticating listener with nothing to say.
+  #
+  # Asserting both halves is the point: the clean URL alone would also pass if the splice never
+  # happened, and the spliced URL alone would not catch the credential leaking into the
+  # committed Compose file.
+  case "$agent" in
+    codex|agy)
+      # `/proc/1/environ` is NUL-separated. The username is asserted; the password is compared
+      # without being printed, so a failure here names the variable and not the secret.
+      penv="$(docker exec "$cid" sh -c "tr '\\0' '\\n' < /proc/1/environ" 2>/dev/null | grep '^HTTPS_PROXY=' | head -1 || true)"
+      want_user="$(tr -d '\r\n' < "mediator/identity/credentials/${agent}.cred" 2>/dev/null | cut -d: -f1)"
+      if [ -z "$penv" ]; then
+        echo "  $agent: PID 1 carries no HTTPS_PROXY at all"; env_ok=0
+      elif ! printf '%s' "$penv" | grep -q "://${want_user}:[0-9a-f][0-9a-f]*@"; then
+        echo "  $agent: PID 1's HTTPS_PROXY carries no '${want_user}:<credential>@' userinfo -- the entrypoint did not splice the credential"; env_ok=0
+      elif [ "$(printf '%s' "$penv" | sed "s/:[0-9a-f]*@/:<redacted>@/")" != "HTTPS_PROXY=${expected_proxy%%://*}://${want_user}:<redacted>@${expected_proxy#*://}" ]; then
+        echo "  $agent: PID 1's HTTPS_PROXY is $(printf '%s' "$penv" | sed "s/:[0-9a-f]*@/:<redacted>@/"), which is not ${expected_proxy} with ${want_user}'s credential spliced in"; env_ok=0
+      fi ;;
+    claude)
+      # claude presents a certificate, so nothing may be spliced into its URL. Asserted, because
+      # a credential appearing here would mean the entrypoint's per-agent scoping had failed.
+      penv="$(docker exec "$cid" sh -c "tr '\\0' '\\n' < /proc/1/environ" 2>/dev/null | grep '^HTTPS_PROXY=' | head -1 || true)"
+      case "$penv" in
+        *@*) echo "  claude: PID 1's HTTPS_PROXY carries userinfo; its identity is a client certificate and it holds no credential"; env_ok=0 ;;
+      esac ;;
   esac
 
   [ "$env_ok" -eq 1 ] && pass "$agent: proxy env matches Interface Contract 2 ($expected_proxy)" \

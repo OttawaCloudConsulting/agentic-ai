@@ -940,7 +940,7 @@
 
 [~] Feature 01.6: Per-agent workload identity
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/per-agent-workload-identity.md
-    Sub-features: 2/4 complete
+    Sub-features: 3/4 complete
     Notes: Created 2026-09-04 by /milestone revision -- split out of 01.3. Closes R8.8 with the
     strongest identity form each agent's client supports; carries T34 and the Milestone 03
     brokering gate. Ordered after 01.3; may land before or after 01.4 and 01.5.
@@ -1007,3 +1007,29 @@
     Test Command NOT yet run -- it is the feature-completion
     gate and SF-3 and SF-4 are outstanding. verify-auth-state.sh is the operator's to run by hand at
     this point, per the plan: it costs the host codex login and is excluded from the Test Command.
+    SF-3 complete 2026-09-10, positive branch for BOTH agents, verified against a running mediator.
+    The mediator half SF-1 handed over was measured FIRST and recorded as P9
+    (docs/records/mediator-selection.md): `https_port` with `proxy_auth` PASSES on this Squid build,
+    `basic_ncsa_auth` is in the shipped image and takes `openssl passwd -apr1` hashes. A live codex
+    allow line reads identity_source: listener+proxy_auth, a credential-less client on either
+    listener is refused 407, and agy's credential is refused on codex's listener (T34, credential
+    form). verify-egress-mediator.sh and verify-pod-topology.sh both pass end to end.
+    P9 also produced TWO plan corrections, both recorded: a proxy_auth refusal is 407 and NEVER 403,
+    so the control=identity / ERR_MEDIATOR_IDENTITY route Interface Contract 3 describes is
+    unreachable on this path (Deviation 7); and a proxy_auth ACL that misses HALTS ACL evaluation on
+    its line, so SF-2's "annotate the override on the miss path" mtls idiom does not transpose --
+    measured idsrc=- on the 407. The shape that works is baseline-then-upgrade (Deviation 8).
+    FIVE deviations, all operator-confirmed. Deviation 10 is the consequential one and it is
+    architectural: images/entrypoint.sh ships inside the CI-published, digest-pinned GHCR base
+    (D21), so the credential-splice edit reached NO local build -- found by building, when all three
+    agents rebuilt and the splice had not happened. SF-3 is the FIRST change to a base-image file
+    since the digest pin landed 2026-09-09, so no precedent existed; the entrypoint COPY and
+    ENTRYPOINT were MOVED (not duplicated) from agent-base to agent-packs, following the precedent
+    SKEL_MARKER set at 01.5 SF-6b for this exact failure mode. Two consequences for SF-4's docs:
+    the published base no longer carries an ENTRYPOINT and is not independently runnable, and
+    images/bootstrap-auth.sh was deliberately LEFT in agent-base carrying the same latent trap.
+    Deviation 9 widens SF-2's warm-up skip to agy -- the mediator holds hashes, not plaintext, so it
+    cannot authenticate to its own front; agy's first request after a start may be 500 and retried.
+    Test Command NOT yet run -- it is the feature-completion gate and SF-4 is outstanding.
+    verify-auth-state.sh is again the operator's to run by hand: SF-3 changes codex's and agy's
+    mount sets and their runtime proxy environment, and that harness asserts both.
