@@ -1033,3 +1033,21 @@
     Test Command NOT yet run -- it is the feature-completion gate and SF-4 is outstanding.
     verify-auth-state.sh is again the operator's to run by hand: SF-3 changes codex's and agy's
     mount sets and their runtime proxy environment, and that harness asserts both.
+    FOUND AT THE SF-3 BUILD, NOT CAUSED BY IT, AND IT WILL GATE SF-4: verify-pack-composition.sh
+    Phase G's SC-3 assertion is NON-DETERMINISTIC. It failed on codex, then on agy, then on claude
+    across four runs of an unchanged tree, and passed on two others. The offending bind is the same
+    every time and is NOT a credential: it is `../workspace`, the default profile's project mount,
+    which compose/overrides/default.yaml binds by design (01.3 SF-4) and which IS inside the
+    solution root. The assertion resolves each bind source with `cd $(dirname) && pwd -P`; Docker
+    Desktop reports that source sometimes as `/Users/.../workspace` and sometimes as
+    `/host_mnt/Users/.../workspace`, and on the `/host_mnt` form the `cd` fails, `real` falls back
+    to `$src`, and the check passes VACUOUSLY. So the FAILING runs are the correct verdict and the
+    passing ones are the bug -- Phase G and the shipped default override contradict each other, and
+    the contradiction has been masked by a path-prefix accident since Phase G landed (01.5 SF-7b,
+    commit 681217b). NOT fixed here: widening the exception would weaken a security assertion,
+    which the plan's Test Strategy says must be called out rather than done quietly, and the real
+    question -- whether SC-3 should exempt the demo profile's own git-ignored workspace/, or whether
+    the default override should bind outside the tree -- is a design decision, not a harness patch.
+    Everything else in the Test Command is green on SF-3's account: pod-topology ALL CHECKS PASSED,
+    egress-mediator green end to end, lint-policy OK, and pack-composition 109 PASS / 0 FAIL on the
+    runs where the prefix accident went the other way.
