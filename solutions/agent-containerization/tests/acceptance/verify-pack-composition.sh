@@ -995,17 +995,50 @@ for a in "${AGENTS[@]}"; do
     # nowhere else to go. Scoped to the agent's OWN credential by name, so codex binding agy's
     # still fails SC-3, and the htpasswd (the mediator's) is not exempted for any agent at all.
     case "$src" in */credentials/"${a}".cred) continue ;; esac
-    real="$(cd "$(dirname "$src")" 2>/dev/null && pwd -P)/$(basename "$src")" || real="$src"
-    if [ "$real" = "$ROOT_REAL" ] || [ "${real}/" = "${ROOT_REAL}/" ]; then
+    # Docker Desktop reports a bind source EITHER as the host path or with a `/host_mnt`
+    # prefix, non-deterministically across runs of an unchanged tree (01.6 SF-3 saw both
+    # forms on four runs). The prefixed form does not exist in this namespace, so the `cd`
+    # below fails on it -- and the old `|| real="$src"` never fired to catch that, because
+    # the assignment's exit status is the trailing `basename`'s and is always 0. `real`
+    # became `/<basename>`, which matched no branch, and the check passed VACUOUSLY. Both
+    # halves are fixed here: the prefix is stripped before resolution, and the fallback is
+    # a statement rather than a `||` on an assignment that cannot fail.
+    case "$src" in /host_mnt/*) src_h="/${src#/host_mnt/}" ;; *) src_h="$src" ;; esac
+    real="$src_h"
+    dir_real="$(cd "$(dirname "$src_h")" 2>/dev/null && pwd -P || true)"
+    [ -z "$dir_real" ] || real="${dir_real%/}/$(basename "$src_h")"
+    # SC-3 reads "a fully compromised agent cannot modify the egress policy, the mount set,
+    # or the enforcement point" (REQUIREMENTS.md:61). It does NOT read "no bind inside the
+    # solution root", and the difference is not academic: the default profile binds
+    # `../workspace` BY DESIGN (01.3 SF-4, compose/overrides/default.yaml), which is inside
+    # the root and holds no policy, no compose file and no mediator config. Writing to it
+    # modifies none of the three things SC-3 names.
+    #
+    # So the predicate is the ENUMERATED control plane, which is the one
+    # verify-egress-mediator.sh has always used and which passes: the tree itself, an
+    # ancestor of it, `policy/`, `mediator/`, `profiles/`, `packs/`, and any private key.
+    # Narrowed at 01.6 SF-4 after the over-broad form was found to contradict the shipped
+    # default override -- the contradiction was masked by the `/host_mnt` accident above
+    # since Phase G landed at 01.5 SF-7b. Same root cause SF-2's Deviation 5 named: three
+    # harnesses each carried their own "is this mount control plane" predicate. This is now
+    # the same predicate in two of them.
+    if [ "$real" = "$ROOT_REAL" ]; then
       bad="${bad}${src} -> ${real} (IS the solution root)"$'\n'
-    elif [ "${real#${ROOT_REAL}/}" != "$real" ]; then
-      bad="${bad}${src} -> ${real} (inside the solution root)"$'\n'
     elif [ "${ROOT_REAL#${real}/}" != "$ROOT_REAL" ]; then
       bad="${bad}${src} -> ${real} (an ancestor of the solution root)"$'\n'
+    else
+      case "$real" in
+        "$ROOT_REAL"/policy|"$ROOT_REAL"/policy/*|\
+        "$ROOT_REAL"/mediator|"$ROOT_REAL"/mediator/*|\
+        "$ROOT_REAL"/profiles|"$ROOT_REAL"/profiles/*|\
+        "$ROOT_REAL"/packs|"$ROOT_REAL"/packs/*|\
+        *.key)
+          bad="${bad}${src} -> ${real} (control plane)"$'\n' ;;
+      esac
     fi
   done <<< "$srcs"
   if [ -z "$bad" ]; then
-    pass "G: SC-3 -- ${a}'s real bind sources resolve outside the solution root (realpath, so a symlink cannot walk in)"
+    pass "G: SC-3 -- ${a} binds no control-plane path (the tree, an ancestor, policy/, mediator/, profiles/, packs/, any private key), with the source resolved through realpath so a symlink cannot walk in"
   else
     fail "G: SC-3 -- ${a} binds the control plane"
     printf '%s' "$bad" | sed 's/^/      /'
