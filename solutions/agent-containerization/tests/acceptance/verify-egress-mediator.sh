@@ -557,7 +557,21 @@ _before="$(audit | jq -c 'select(.verdict != null)' | wc -l | tr -d ' ')"
 out="$(probe_ca "claude" "printf 'CONNECT allowed.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
   | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
       -connect $MED_CLAUDE:3128 2>&1 | head -20")"
-if printf '%s' "$out" | grep -q "200"; then
+#
+# The match is ANCHORED to the response's status line, and that is not cosmetic. This probe keeps
+# stderr (`2>&1`, because the refusal it is looking for arrives as an OpenSSL diagnostic), and
+# OpenSSL prefixes every error line with a 16-hex-digit code that is different on every run:
+#
+#   200067BEFFFF0000:error:0A00045C:SSL routines:...:tlsv13 alert certificate required
+#   ^^^
+#
+# An unanchored `grep -q "200"` reads those three digits as an HTTP 200 and reports that a
+# cert-less client was ACCEPTED, on a run where the transcript directly below it proves it was
+# refused at the handshake. Measured at the 01.6 SF-4 build, on a composite run whose every other
+# assertion passed. It is intermittent by construction -- it fires only when the random prefix
+# happens to contain the digits -- which is the same shape as the Phase G vacuous pass fixed in
+# the same build: an assertion reading a substring where it means a field.
+if printf '%s' "$out" | grep -qE '^HTTP/[0-9.]+[[:space:]]+200([[:space:]]|$)'; then
   fail "claude-net: a CERT-LESS client reached the front listener and its CONNECT was accepted"
   note "$out"
 else
