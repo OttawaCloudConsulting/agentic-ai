@@ -140,6 +140,12 @@ inject_proxy_credential() {
 
 seed_home
 ensure_codex_credentials_store
-bootstrap_auth
+# BEFORE bootstrap_auth, not after. The splice reads a secret and exports four variables; it
+# depends on nothing the seed or the R4.5 merge produce, so nothing is gained by running it later
+# -- and bootstrap-auth's endpoint probe reaches the network THROUGH THE PROXY (`curl` at
+# bootstrap-auth.sh:163). That probe is unreachable on the --at-start pass today (`AT_START` exits
+# first), so this is not a live bug; ordering it first means a future at-start network call cannot
+# become a silent 407 whose symptom names authentication rather than the credential.
 inject_proxy_credential
+bootstrap_auth
 exec "$@"

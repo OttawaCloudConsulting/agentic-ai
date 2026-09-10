@@ -67,7 +67,7 @@ hard on unknown directives, rather than against on-image documentation.
 | P6 | SNI observable and comparable to the CONNECT host without decrypting | **PASS only via a self-cascade**. Direct combination with proxy-hop TLS is rejected by Squid |
 | P7 | Heterogeneous listeners in one instance, each selecting independent per-agent policy | **PASS**, and it requires the same self-cascade P6 requires |
 | P8 | Per-client policy selection from a proxy credential | **PASS** on the plain transport, with the FIXTURE helper (`basic_fake_auth`) |
-| P9 | The same, on `https_port`, with the REAL helper (`basic_ncsa_auth`) | **PASS** — measured 2026-09-10 (01.6 SF-3). Both transports, real hashes; refusal is **407**, never 403 |
+| P9 | The same, on `https_port`, with the REAL helper (`basic_ncsa_auth`) | **PASS** — measured 2026-09-09 (01.6 SF-3). Both transports, real hashes; refusal is **407**, never 403 |
 
 ---
 
@@ -372,7 +372,7 @@ helper or an `external_acl_type`.
 
 ### P9 — proxy-credential policy selection on `https_port`, with the real helper: PASS
 
-**Measured 2026-09-10, 01.6 SF-3, against the shipped mediator image** (`sandboxed-agent/mediator:local`,
+**Measured 2026-09-09, 01.6 SF-3, against the shipped mediator image** (`sandboxed-agent/mediator:local`,
 `squid-openssl 6.13-2+deb13u2`, Squid Cache: Version 6.13, Debian trixie). P8 left two things
 unmeasured and 01.6 SF-1 handed a third over; this closes all three before `codex`'s and `agy`'s
 profiles were flipped, which is what the feature plan required rather than assumed.
@@ -626,5 +626,5 @@ reasons to prefer the fallback:
 | Cannot log to `/dev/stdout` as `proxy`; `error_directory` composition | SF-4 |
 | `cache_peer` cold start | SF-7 (self-check warms), SF-8 (not a control result) |
 | `clientca=` is required-mode by default; `DELAYED_AUTH` did not work | **01.6** — closed 2026-09-09 by design, not by fix (see P1 above); required mode on the `claude` front listener alone |
-| Proxy-credential policy selection works on the plain transport | **01.6 — CLOSED.** Agent half measured 2026-09-09, positive for both `codex` and `agy` (`docs/records/agent-verification.md`, criterion 1). Mediator half on `https_port`, and with the real helper rather than the fixture one, measured 2026-09-10 as **P9 below** — both agents' listeners now declare `client_auth: proxy_auth` |
+| Proxy-credential policy selection works on the plain transport | **01.6 — CLOSED.** Agent half measured 2026-09-09, positive for both `codex` and `agy` (`docs/records/agent-verification.md`, criterion 1). Mediator half on `https_port`, and with the real helper rather than the fixture one, measured 2026-09-09 as **P9 below** — both agents' listeners now declare `client_auth: proxy_auth` |
 | Pin package version **and** base image digest | SF-4 |

@@ -1007,7 +1007,7 @@
     Test Command NOT yet run -- it is the feature-completion
     gate and SF-3 and SF-4 are outstanding. verify-auth-state.sh is the operator's to run by hand at
     this point, per the plan: it costs the host codex login and is excluded from the Test Command.
-    SF-3 complete 2026-09-10, positive branch for BOTH agents, verified against a running mediator.
+    SF-3 complete 2026-09-09, positive branch for BOTH agents, verified against a running mediator.
     The mediator half SF-1 handed over was measured FIRST and recorded as P9
     (docs/records/mediator-selection.md): `https_port` with `proxy_auth` PASSES on this Squid build,
     `basic_ncsa_auth` is in the shipped image and takes `openssl passwd -apr1` hashes. A live codex
@@ -1044,10 +1044,18 @@
     to `$src`, and the check passes VACUOUSLY. So the FAILING runs are the correct verdict and the
     passing ones are the bug -- Phase G and the shipped default override contradict each other, and
     the contradiction has been masked by a path-prefix accident since Phase G landed (01.5 SF-7b,
-    commit 681217b). NOT fixed here: widening the exception would weaken a security assertion,
-    which the plan's Test Strategy says must be called out rather than done quietly, and the real
-    question -- whether SC-3 should exempt the demo profile's own git-ignored workspace/, or whether
-    the default override should bind outside the tree -- is a design decision, not a harness patch.
+    commit 681217b). CORRECTED after reading the requirement rather than the harness: SC-3 reads "a
+    fully compromised agent cannot modify the egress policy, the mount set, or the enforcement
+    point" (REQUIREMENTS.md:61). It does NOT say "no bind inside the solution root". workspace/ is a
+    git-ignored scratch directory holding no policy, no mediator config and no compose file, so
+    writing to it cannot modify any of the three things SC-3 names. Phase G's predicate is therefore
+    OVER-BROAD against SC-3 rather than the default override being in violation of it -- and the
+    correct predicate already exists in verify-egress-mediator.sh, which enumerates the actual
+    control-plane paths (policy/, mediator/, profiles/, packs/, the tree itself) and passes. Same
+    root cause SF-2's Deviation 5 named: three harnesses each carry their own "is this mount control
+    plane" predicate. The fix is to narrow Phase G to that predicate. NOT done here -- it is
+    pre-existing, outside SF-3's scope, and it touches a security assertion, so it is the operator's
+    call and not a harness patch made in passing.
     Everything else in the Test Command is green on SF-3's account: pod-topology ALL CHECKS PASSED,
     egress-mediator green end to end, lint-policy OK, and pack-composition 109 PASS / 0 FAIL on the
     runs where the prefix accident went the other way.

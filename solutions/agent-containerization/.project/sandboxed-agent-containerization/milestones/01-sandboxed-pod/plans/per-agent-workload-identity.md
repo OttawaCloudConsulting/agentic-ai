@@ -1040,7 +1040,10 @@ once by the operator at the end of SF-2 rather than left unrun.
   operator no way to tell which ran. The published base no longer carries an `ENTRYPOINT`, so it is
   not independently runnable — nothing runs it directly, but CI's `--target agent-base` build now
   produces an image that is a rootfs rather than a runnable one, and `README.md`'s
-  "What a local build now pulls" section should say so. **`images/bootstrap-auth.sh` was
+  "What a local build now pulls" section should say so. **CI was checked before the move, not
+  after**: `.github/workflows/agent-sandbox-image.yml` holds no `docker run`, no smoke step and no
+  `--version` invocation against the built base -- `publish-base` builds and pushes it and nothing
+  more -- so removing the `ENTRYPOINT` cannot fail that workflow. **`images/bootstrap-auth.sh` was
   deliberately left in `agent-base`** and carries the same latent property; it is not broken, so
   moving it would be a change nothing asked for. A note at that `COPY` records the trap for the
   next feature that needs to edit it.
