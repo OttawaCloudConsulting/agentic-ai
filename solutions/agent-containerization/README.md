@@ -427,6 +427,18 @@ BuildKit skips a stage nothing references, so a local build **pulls the attested
 rebuilding it**. That is the point of D21: the image you run is the image CI built and attested,
 not a local re-derivation of it. The package is public, so no `docker login ghcr.io` is needed.
 
+**The published base carries no `ENTRYPOINT` and is not independently runnable.** `docker run` on
+it starts the image's default shell and no agent. The entrypoint's `COPY` and the `ENTRYPOINT`
+itself live in the `agent-packs` stage, moved there at 01.6 SF-3 — and that move is worth knowing
+about before you edit anything under `images/`. A file baked into `agent-base` is inside the
+digest-pinned published image, so **editing it reaches no local build at all**: the pin is
+satisfied, the stage is skipped, and every agent rebuilds carrying the old copy with no error
+anywhere. The symptom is a change that is present in the file and absent from the container.
+`images/bootstrap-auth.sh` is still in `agent-base` and carries the same trap; anything moved out of
+it follows the precedent `SKEL_MARKER` set at 01.5 SF-6b — **move**, never duplicate, or the two
+copies drift silently. Republish the base when a file genuinely belongs to it, and re-pin
+`AGENT_BASE_DIGEST`.
+
 `AGENT_BASE_DIGEST` has **no default**. Unset, the `FROM` expands to `…agent-sandbox-base@` and the
 build fails with `invalid reference format` rather than resolving to a mutable tag — the same
 discipline the agent pins use. Every build also prints
@@ -524,11 +536,17 @@ docker compose --env-file compose/pins.env -f compose/compose.yaml \
 | `denylist` | `fqdn_on_denylist` / `resolved_address_on_denylist` | Deny wins. Edit `policy/denylist.base.yaml` only if the range is genuinely not the one R5.6 requires |
 | `ratelimit` | `concurrency_ceiling_exceeded` | Raise `rate_limits.<agent>.max_concurrent` in `profiles/default.yaml` — but a ceiling hit repeatedly is a signal first |
 | `method` | `method_not_connect` | Something spoke plain HTTP through the proxy. The mediator tunnels TLS and never handles a plaintext request |
+| `identity` | `subject_mismatch` | A client certificate valid under the mediator CA, but carrying **another agent's** subject, was presented (T34). Present the certificate issued for this listener's agent, or use that agent's own network. `claude` only — it is the one agent that presents a certificate |
 
-`identity_source` is `listener` on every line at this feature: the agent was identified by the
-network its connection arrived on, not by a credential it presented. Feature 01.6 is what changes
-that, and the field is there so a network-derived attribution is never read later as a
-cryptographic one.
+`identity_source` says **how strongly** the line's `agent` value is attributed, and since 01.6 it
+takes three values: `listener+mtls` (`claude` verified a client certificate), `listener+proxy_auth`
+(`codex` or `agy` presented its own proxy credential), and `listener` (network-derived — the agent
+was identified by the network its connection arrived on and nothing stronger was verified on that
+connection). The field exists so a network-derived attribution is never read later as a
+cryptographic one. See `docs/records/workload-identity.md`.
+
+**A `listener` value on a `claude` line is not a downgrade — it is the T34 refusal.** No certificate
+was accepted on that connection, so the attribution falls back to the network and the line says so.
 
 **What the agent itself sees depends on which listener refused it.** `claude` and `agy` reach a
 non-bumping front listener, so a verdict decided before the CONNECT is accepted comes back as a
@@ -538,6 +556,41 @@ terminated connection with no body — as does any post-ClientHello refusal on t
 mediator never mints a certificate for the destination to deliver an error through, which is the
 capability the architecture rules out. **Diagnosis of which destination was refused is the audit
 line, always.**
+
+#### Three refusals that do NOT look like the above
+
+These are the identity path's, added at 01.6. Each has a symptom an operator will otherwise
+misread.
+
+**1. `claude` gets nothing at all, and there is no audit line.** Its front listener requires a
+client certificate at the TLS handshake, so a `claude` container that has lost its key pair — a
+missing or unreadable Compose secret, a rotation where the mediator was restarted but the agent was
+not — is refused **before Squid has a request to log**. Nothing on the audit trail names the
+attempt: there is one anonymous `proxy_internal` event carrying no agent, no destination and no
+verdict, and that is all. Silence here looks exactly like an agent that made no request. The
+populated surface is the mediator's own cache log:
+
+```bash
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml exec egress-mediator \
+  tail -50 /var/log/mediator/squid-cache.log
+```
+
+Check the agent holds its pair (`/run/secrets/claude-client.crt`, `.key`) and restart the agent, not
+only the mediator.
+
+**2. `codex` or `agy` is answered `407`, never `403`, and gets no error page.** Their listeners
+verify a proxy credential, and a credential that is missing, wrong, or belongs to the *other* agent
+is refused by Squid's own challenge. A `proxy_auth` ACL that misses halts ACL evaluation on its
+line, so no `deny_info` page and no `control=identity` verdict is reachable on that path — a `407`
+is the whole signal. Re-issue with `bash scripts/issue-identity.sh credential <agent> --force` and
+restart **both** the mediator and that agent.
+
+**3. The first request after a mediator start may be answered `500`.** Expected, bounded, and
+recorded: the mediator cannot warm the cascade peer for an authenticating front listener, because
+reaching it means authenticating to it and the mediator holds neither `claude`'s private key nor
+either credential's plaintext. Squid marks the peer dead at start and revives it about a second
+later. It affects `claude` and `agy`. Retry once; a `500` that persists is a real fault.
 
 ### The startup self-check
 

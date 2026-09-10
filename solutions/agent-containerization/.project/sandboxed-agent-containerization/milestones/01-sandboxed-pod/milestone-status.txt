@@ -940,7 +940,7 @@
 
 [~] Feature 01.6: Per-agent workload identity
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/per-agent-workload-identity.md
-    Sub-features: 3/4 complete
+    Sub-features: 4/4 complete
     Notes: Created 2026-09-04 by /milestone revision -- split out of 01.3. Closes R8.8 with the
     strongest identity form each agent's client supports; carries T34 and the Milestone 03
     brokering gate. Ordered after 01.3; may land before or after 01.4 and 01.5.
@@ -1059,3 +1059,37 @@
     Everything else in the Test Command is green on SF-3's account: pod-topology ALL CHECKS PASSED,
     egress-mediator green end to end, lint-policy OK, and pack-composition 109 PASS / 0 FAIL on the
     runs where the prefix accident went the other way.
+    SF-4 complete 2026-09-09, verified against a running mediator before commit: verify-egress-
+    mediator.sh 99 PASS / 0 FAIL, ALL PHASES PASSED, with the new Phase H green on all ten of its
+    assertions. The SC-3 non-determinism SF-3 handed over was RATIFIED AND FIXED FIRST, as a
+    standalone commit ahead of the build (bdd872d): Phase G's predicate is now the enumerated
+    control plane verify-egress-mediator.sh has always used, and a second defect was found while
+    fixing it -- the `real` fallback could never fire, because an assignment's exit status is its
+    trailing `basename`'s, so on the /host_mnt path form `real` became `/<basename>`, matched no
+    branch, and the check passed vacuously. Both halves fixed; the predicate is now shared by two
+    of the three harnesses that carried their own.
+    ONE deviation, Deviation 12, operator-confirmed before the edit: Interface Contract 4's
+    amendment text is applied in a THREE-form shape rather than verbatim. The contract was drafted
+    before SF-1 ran and says codex and agy carry a network-derived identity whose T34 case is
+    structural only; SF-1 came back positive for both and SF-3 built the credential form, so the
+    verbatim text would have put a statement in REQUIREMENTS.md contradicted by the shipped code,
+    the shipped harness and P9. T34 now names cryptographic, credential and structural forms and
+    splits its method across them. R8.8 unchanged, Decision 4 unchanged -- the M03 brokering gate
+    is still listener+mtls alone, so claude alone.
+    Phase H asserts T34's literal case (a same-CA CN=codex certificate on claude's front listener,
+    refused 403 with ERR_MEDIATOR_IDENTITY, one audit line reading control=identity /
+    reason=subject_mismatch / identity_source=listener, and EXACTLY ONE verdict line for the
+    attempt -- no inner line) and its structural case (enumeration off the RENDERED shipped
+    Compose config, not compose.yaml, so an override cannot pass it vacuously). The destination is
+    claude's OWN allowlisted host deliberately: a non-allowlisted one would be refused whether or
+    not the identity rule existed, which would also have made Decision 3's ordering constraint
+    untested.
+    Docs corrected against what was built rather than what was planned: the mediator/identity
+    revocation forecast said "at most six" client certificates, real count is four certificates
+    under this CA (credentials are not CA-bound at all, in either direction); README's R12.2 said
+    identity_source is "listener on every line at this feature", which SF-2 and SF-3 made false,
+    and now carries the three refusals that do not look like an allowlist denial (the handshake
+    refusal with NO audit line, the 407 with no error-page route, the cold-peer 500 on first use);
+    and the published base image's missing ENTRYPOINT is documented where local builds are
+    described, with SF-3's Deviation 10 trap named -- a file baked into the digest-pinned base
+    reaches no local build, and bootstrap-auth.sh still carries it.

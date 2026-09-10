@@ -32,6 +32,13 @@ FIXTURE_COLLECTOR=172.31.40.20
 FIXTURE_NEIGHBOUR=172.31.40.21
 
 CA=mediator/identity/ca/mediator-ca.crt
+# 01.6 SF-4. The CA's PRIVATE key, and it is here for one assertion only: T34's literal case
+# needs a certificate that is VALID under the mediator's own CA and carries the WRONG subject.
+# A self-signed fixture would be refused at the handshake by `clientca=` and would prove nothing
+# about the subject binding -- the refusal has to happen at the ACL, with the chain already
+# accepted, or the test is measuring `clientca=` twice. Read-only, mounted into a throwaway
+# container, and the certificate it signs lives for a day under $TLS_DIR and is torn down.
+CA_KEY=mediator/identity/ca/mediator-ca.key
 # 01.6 SF-2: claude's front listener requires a client certificate, so every probe that has to
 # reach it now presents one. The pair is the OPERATOR's, issued into mediator/identity/clients/
 # -- not a fixture. A fixture pair would not chain to the mediator CA and the probe would be
@@ -102,6 +109,16 @@ probe_client() { # <agent> <bash script>
     -v "$ROOT/$CA:/tmp/ca.crt:ro" \
     -v "$ROOT/$CLIENT_CRT:/tmp/client.crt:ro" \
     -v "$ROOT/$CLIENT_KEY:/tmp/client.key:ro" \
+    --entrypoint bash "$MED_IMAGE" -c "$2" 2>&1
+}
+# 01.6 SF-4. The fifth variant, and the only one that presents a certificate the listener is
+# supposed to REFUSE: same CA, wrong subject. Minted into $TLS_DIR by Phase H and torn down with
+# the rest of the fixture PKI.
+probe_t34() { # <agent> <bash script>
+  docker run --rm --network "${PROJECT}_${1}-net" \
+    -v "$ROOT/$CA:/tmp/ca.crt:ro" \
+    -v "$ROOT/$TLS_DIR/t34.crt:/tmp/client.crt:ro" \
+    -v "$ROOT/$TLS_DIR/t34.key:/tmp/client.key:ro" \
     --entrypoint bash "$MED_IMAGE" -c "$2" 2>&1
 }
 # Which helper reaches this agent's front listener with the credential its policy requires.
@@ -195,6 +212,12 @@ dns_audit() { med cat /var/log/mediator/dns-audit.log 2>/dev/null; }
 last_verdict() { # <dest_host>
   audit | jq -c --arg h "$1" 'select(.verdict != null and .dest_host == $h)' | tail -1
 }
+# How many verdict lines the trail holds for a destination. 01.6 SF-4 needs the DELTA across one
+# attempt: "the front refused it and the inner never saw it" is a statement about the NUMBER of
+# verdict lines that attempt produced, and there is no layer field on the line to read instead.
+verdict_count() { # <dest_host>
+  audit | jq -c --arg h "$1" 'select(.verdict != null and .dest_host == $h)' | wc -l | tr -d ' '
+}
 
 # The attribution strength an audit line SHOULD carry, derived from the line's own agent. Not a
 # literal any more (01.6 SF-2): `claude`'s listener verifies a client certificate, so its verdict
@@ -255,7 +278,10 @@ _missing=""
 # The credential files join the list for the same reason the client pair did: they are `file:`
 # sources in compose.yaml, so `compose up` fails on a missing one and the symptom names a path
 # rather than the issuance step that was skipped.
-for _f in "$CA" "$CLIENT_CRT" "$CLIENT_KEY" \
+# $CA_KEY is not a Compose source -- it never leaves the operator host. It is listed because
+# Phase H mints T34's wrong-subject certificate under it, and a missing CA key would otherwise
+# surface as a phase failure five minutes in rather than as a named path now.
+for _f in "$CA" "$CA_KEY" "$CLIENT_CRT" "$CLIENT_KEY" \
           "$CREDENTIAL_DIR/htpasswd" "$CREDENTIAL_DIR/codex.cred" "$CREDENTIAL_DIR/agy.cred"; do
   [ -f "$_f" ] || _missing="${_missing} ${_f}"
 done
@@ -950,6 +976,147 @@ if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "stage 1 self-check" \
   pass "T17: a corrupt resolved policy aborts the start, naming the file and the failure"
 else
   fail "T17: the mediator did not abort on a corrupt policy (exit $rc)"; note "$(printf '%s' "$out" | tail -3)"
+fi
+
+# ---------------------------------------------------------------------------
+# Phase H (01.6 SF-4) -- T34, per-agent workload identity
+# ---------------------------------------------------------------------------
+# A phase of its own rather than assertions scattered through B and C, so a T34 failure is
+# legible at the phase boundary. It runs BEFORE G for the reason G runs before F: the lines it
+# produces have to be in the sink when G snapshots it.
+#
+# T34 is stated as the property it protects -- AN IDENTITY BOUND TO ONE AGENT CANNOT BE USED BY
+# ANOTHER -- and its method is split by the identity form the agent actually carries
+# (REQUIREMENTS.md, amended by this sub-feature). All three forms are asserted:
+#
+#   cryptographic  claude          present a same-CA certificate carrying another agent's
+#                                  subject on claude's listener                    <- HERE
+#   credential     codex, agy      present another agent's proxy credential on this
+#                                  agent's listener                                <- Phase B
+#   structural     all three       no route exists over which either could be presented
+#                                  to another agent's listener at all               <- HERE
+#
+# The credential form is asserted in Phase B, where the credential-bearing probes already live
+# ("T34 (credential form)"), and is not repeated here.
+phase "H -- T34, per-agent workload identity"
+
+# The wrong-subject certificate. Same CA, same extensions issue_client writes, ONE variable: the
+# subject. That is what makes a refusal attributable to the subject binding -- a fixture pair
+# would be refused by `clientca=` at the handshake, and a certificate differing in EKU or basic
+# constraints could be refused by the TLS stack, either of which would pass this phase while
+# proving nothing about T34. Minted in the mediator image so the harness needs no host OpenSSL,
+# and `-CAserial` points into /out because the CA directory is mounted read-only.
+if docker run --rm \
+      -v "$ROOT/$CA:/ca/mediator-ca.crt:ro" \
+      -v "$ROOT/$CA_KEY:/ca/mediator-ca.key:ro" \
+      -v "$ROOT/$TLS_DIR:/out" \
+      --entrypoint bash "$MED_IMAGE" -c '
+        set -e
+        printf "%s\n" \
+          "basicConstraints = critical,CA:FALSE" \
+          "keyUsage = critical,digitalSignature" \
+          "extendedKeyUsage = clientAuth" \
+          "subjectKeyIdentifier = hash" > /out/t34.ext
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /out/t34.key 2>/dev/null
+        openssl req -new -key /out/t34.key -subj "/CN=codex" -out /out/t34.csr
+        openssl x509 -req -in /out/t34.csr -CA /ca/mediator-ca.crt -CAkey /ca/mediator-ca.key \
+          -CAcreateserial -CAserial /out/t34.srl -days 1 -sha256 \
+          -extfile /out/t34.ext -out /out/t34.crt 2>/dev/null
+        openssl verify -CAfile /ca/mediator-ca.crt /out/t34.crt
+        chmod 0644 /out/t34.crt /out/t34.key' >/dev/null 2>&1; then
+  pass "T34 fixture: a CN=codex certificate is issued under the mediator CA and verifies against it"
+else
+  fail "T34 fixture: could not mint the wrong-subject certificate; the literal case cannot run"
+fi
+
+# The literal case. The destination is claude's OWN allowlisted host, and that is deliberate: a
+# non-allowlisted one would be refused by the allowlist whether or not the identity rule existed,
+# and the phase would pass on a mediator that checks no subject at all. Refusing a host the
+# certificate holder WOULD be allowed is the identity control and nothing else -- which is also
+# Decision 3's first ordering constraint, that the subject-mismatch deny is rendered ahead of the
+# agent's allow rules.
+_t34_before="$(verdict_count claude-only.fixture.lab)"
+out="$(probe_t34 "claude" "printf 'CONNECT claude-only.fixture.lab:443 HTTP/1.1\r\nHost: h\r\n\r\n' \
+  | timeout 15 openssl s_client -quiet -verify_return_error -CAfile /tmp/ca.crt \
+      -cert /tmp/client.crt -key /tmp/client.key -connect $MED_CLAUDE:3128 2>/dev/null | head -40")"
+if printf '%s' "$out" | grep -q "403" && ! printf '%s' "$out" | grep -q "200"; then
+  pass "T34 (certificate form): a same-CA CN=codex certificate is REFUSED on claude's listener, for a host claude itself may reach"
+else
+  fail "T34 (certificate form): the wrong-subject certificate was not refused"; note "$out"
+fi
+# The refusal takes the identity control's own error page, which names the binding and points the
+# operator at the audit line. R12.2's surface, and the one that distinguishes this refusal from
+# an allowlist denial at the agent.
+printf '%s' "$out" | grep -q "subject_mismatch" \
+  && pass "T34 (certificate form): the refusal carries ERR_MEDIATOR_IDENTITY, naming the subject binding" \
+  || { fail "T34 (certificate form): the refusal did not deliver the identity error page"; note "$out"; }
+
+# The audit line, and it is the assertion that matters: a refusal with no record is not a
+# demonstrated control (Interface Contract 6). `identity_source` is passed EXPLICITLY as
+# `listener` -- the sixth argument exists for this call. No certificate was accepted on this
+# connection, so the attribution is network-derived and the line has to say so; `expected_idsrc`
+# would derive `listener+mtls` from the agent name and would be wrong here, which is exactly the
+# annotation override SF-2's Decision 3 renders.
+sleep 1
+assert_verdict "T34 (certificate form): the refusal is on the audit trail as control=identity, reason=subject_mismatch" \
+  claude-only.fixture.lab deny identity subject_mismatch listener
+
+# One verdict line, not two. Together with the assertion above this is what shows that
+# `listener+mtls` on an INNER line is unreachable without a verified, subject-matched
+# certificate: the front refused the attempt and the inner peer never saw it. There is no layer
+# field on the line to read, so the delta across the attempt is the observable.
+_t34_after="$(verdict_count claude-only.fixture.lab)"
+if [ "$(( _t34_after - _t34_before ))" = "1" ]; then
+  pass "T34 (certificate form): the attempt produced exactly ONE verdict line -- the front deny, and no inner line"
+else
+  fail "T34 (certificate form): the attempt produced $(( _t34_after - _t34_before )) verdict lines, expected 1"
+  note "$(audit | jq -c 'select(.verdict != null and .dest_host == "claude-only.fixture.lab")' | tail -3)"
+fi
+
+# ------------------------------------------------------------------ the structural case
+# For every agent, including the two that hold a presentable credential: no route exists over
+# which one agent could reach another's listener at all, so the cross-binding refusals above are
+# the SECOND bar rather than the only one. The method is enumeration of network membership, per
+# the amended T34.
+#
+# Read off the SHIPPED configuration -- base plus the default override -- and not off
+# compose.yaml alone: an override can add a network to a service, and a base file that looks
+# disjoint on its own would pass vacuously. It is deliberately NOT this harness's own compose
+# set: `test-egress.yaml` layers fixture services and is a test artifact, while the property
+# T34 protects is a property of the pod the operator runs.
+SHIPPED_CONFIG="$(docker compose --env-file compose/pins.env \
+                    -f compose/compose.yaml -f compose/overrides/default.yaml config 2>/dev/null)"
+if [ -z "$SHIPPED_CONFIG" ]; then
+  fail "T34 (structural form): could not render the shipped Compose configuration"
+else
+  # Exactly three `internal: true` networks, and they are the three agent networks. `internal:`
+  # is what withholds the default route; an agent network that lost it would give that agent a
+  # path off its own segment and the enumeration below would be measuring the wrong thing.
+  nets="$(printf '%s' "$SHIPPED_CONFIG" \
+    | yq eval '.networks | to_entries | map(select(.value.internal == true) | .key) | sort | join(",")' -)"
+  [ "$nets" = "agy-net,claude-net,codex-net" ] \
+    && pass "T34 (structural form): the pod declares exactly three internal networks -- one per agent {$nets}" \
+    || fail "T34 (structural form): the internal networks are {$nets}, expected {agy-net,claude-net,codex-net}"
+
+  # Each agent holds exactly ONE interface, and it is its own.
+  for a in "${AGENTS[@]}"; do
+    anets="$(printf '%s' "$SHIPPED_CONFIG" | yq eval ".services.${a}.networks | keys | sort | join(\",\")" -)"
+    [ "$anets" = "${a}-net" ] \
+      && pass "T34 (structural form): ${a} holds exactly one interface, on ${a}-net" \
+      || fail "T34 (structural form): ${a} is on {$anets}, expected {${a}-net} alone"
+  done
+
+  # And the same fact from the network's side, which is the half that catches a THIRD service
+  # joining an agent's segment: each agent network carries that agent and the mediator, and
+  # nothing else. No agent holds an interface on another agent's network or on egress-net.
+  for a in "${AGENTS[@]}"; do
+    members="$(printf '%s' "$SHIPPED_CONFIG" \
+      | yq eval ".services | to_entries | map(select(.value.networks // {} | has(\"${a}-net\")) | .key) | sort | join(\",\")" -)"
+    want="$(printf '%s\negress-mediator\n' "$a" | sort | paste -sd, -)"
+    [ "$members" = "$want" ] \
+      && pass "T34 (structural form): ${a}-net carries {$members} and nothing else" \
+      || fail "T34 (structural form): ${a}-net carries {$members}, expected {$want}"
+  done
 fi
 
 # ---------------------------------------------------------------------------

@@ -392,7 +392,7 @@ Each is amended in the sub-feature that causes the break, not in a cleanup pass 
   concrete reason Decision 4 does not admit it to the brokering gate. Depends on SF-1 and SF-2 (SF-2
   pins the `idsrc` annotation and the `client_auth` schema this extends).
 
-- [ ] **SF-4: T34 in the harness, the register amendment, and the Milestone 03 inherited input** —
+- [x] **SF-4: T34 in the harness, the register amendment, and the Milestone 03 inherited input** —
   The closing unit. Extends `verify-egress-mediator.sh` with a T34 phase in its existing idiom
   (`phase`/`pass`/`fail`/`note`, `set -uo pipefail` accumulating into `FAILED`): the **literal** case
   for `claude` — issue a same-CA certificate with subject `CN=codex`, present it on the `claude`
@@ -1065,3 +1065,35 @@ once by the operator at the end of SF-2 rather than left unrun.
 - **Impact:** None outward. `rebuild_htpasswd` reads the username from the file rather than the
   policy, so the two halves of one credential cannot disagree after a profile edit; `credential
   <agent>` is what re-reconciles them and it checks the policy when it does.
+
+### Deviation 12: Interface Contract 4's amendment text is applied in a three-form shape, not verbatim
+
+- **What changed:** The T34 amendment block and matrix row written into `REQUIREMENTS.md` name
+  **three** identity forms and split T34's method across them — *cryptographic* (`claude`: present a
+  same-CA certificate carrying another agent's subject on its listener), *credential* (`codex`,
+  `agy`: present another agent's proxy credential on this agent's listener, refused 407), and
+  *structural* (all three: enumerate network membership; no route exists over which either could be
+  presented). The plan's own text is otherwise preserved, including the reason the amendment exists
+  and the unchanged status of R8.8.
+- **Originally planned:** Interface Contract 4 gives the amendment verbatim in a **two**-form shape.
+  It states that "`codex` rejects an `https://`-scheme proxy URL at parse time and never reaches a
+  TLS listener, and `agy` reaches the `CertificateRequest` stage with nothing to offer", and
+  concludes that "for two of three agents the method names an artifact that does not exist" — so
+  their identity is network-derived and their T34 case is structural only.
+- **Why necessary:** That text was drafted at plan time, before SF-1 ran. SF-1's measured result was
+  **positive for both**: each constructs `Proxy-Authorization` from proxy-URL userinfo
+  preemptively, and SF-3 built on it — `codex` and `agy` now carry a presentable per-agent
+  credential, their verdict lines read `identity_source: listener+proxy_auth`, and the harness has
+  shipped a credential-form T34 assertion since SF-3 (`verify-egress-mediator.sh`, "T34 (credential
+  form): agy's credential is refused on codex's listener"). Applying Interface Contract 4 verbatim
+  would put a statement in the acceptance register that the shipped code, the shipped harness and
+  `docs/records/mediator-selection.md` P9 all contradict. The two clauses about what each client
+  cannot do remain true and are kept — they are why the *certificate* form is `claude`'s alone —
+  but they no longer imply that no credential can be presented. Operator-confirmed before the edit.
+- **Impact:** The register now describes what was built. `docs/records/workload-identity.md` is
+  written in the same three-form shape, and Decision 4 is untouched: the Milestone 03 brokering gate
+  remains `listener+mtls` alone, so `claude` only — the credential form is a real identity but not a
+  cryptographic one, and the plaintext-hop residual recorded for `codex` at SF-3 is the concrete
+  reason. The milestone's Definition of Done wording ("which agents carry a cryptographic identity
+  and which carry network-derived identity") is now a two-form phrasing of a three-form outcome; the
+  record it names is accurate and the Definition of Done text is left to the milestone to restate.

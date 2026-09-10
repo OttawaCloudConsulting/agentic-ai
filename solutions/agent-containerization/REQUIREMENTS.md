@@ -425,6 +425,33 @@ which is R4.9's own definition of headless. **R4.9 and R4.12 are unchanged and n
 removed**; the seven-cell support matrix is Interface Contract 1 of the Feature 01.4 plan. An
 interactive terminal is permitted; a browser inside the container is not.
 
+**Amendment, 2026-09-09 (Feature 01.6 SF-4, Gate 4 criterion 5).** T34's method previously read
+*"Present agent A's client certificate for a credential bound to agent B; inspect audit lines"*.
+01.1 SF-2 measured that only `claude` can present a client **certificate** at all: `codex` rejects
+an `https://`-scheme proxy URL at parse time and never reaches a TLS listener, and `agy` reaches the
+`CertificateRequest` stage with nothing to offer. For two of three agents the method named an
+artifact that does not exist, so the test was unexecutable rather than failing — the same defect
+shape as T28 and T24 above. T34 is now stated as the property it exists to protect — **an identity
+bound to one agent cannot be used by another** — and its method is split by the identity form the
+agent actually carries. There are **three**, and 01.6 built all three:
+
+| Form | Agents | How the cross-binding refusal is demonstrated |
+|---|---|---|
+| **Cryptographic** — a client certificate, subject `CN=<identity>`, verified at the listener | `claude` | Unchanged and run literally: present a same-CA certificate carrying another agent's subject on this agent's listener. Refused at the identity ACL with `control=identity`, `reason=subject_mismatch` |
+| **Credential** — a per-agent proxy credential, verified against the mediator's htpasswd | `codex`, `agy` | Present another agent's credential on this agent's listener. Refused `407` by that listener's own `proxy_auth` ACL, both listeners verifying against the same one-file, two-username htpasswd |
+| **Structural** — no presentation route exists | all three | Enumeration of network membership: each agent holds exactly one interface, on its own `internal: true` network, which carries that agent and the mediator alone |
+
+The certificate form is `claude`'s alone because of what 01.1 SF-2 measured, not because the other
+two are unidentified: 01.6 SF-1 measured that `codex` and `agy` **do** construct a
+`Proxy-Authorization: Basic` header from proxy-URL userinfo, preemptively, which is what the
+credential form rests on. **R8.8 is unchanged and no agent is exempted** — every agent carries a
+distinct identity recorded on every audit line. What changes is how the refusal is demonstrated for
+an agent that holds no presentable certificate. The attribution strength of each form is recorded
+per audit line in `identity_source` (`listener+mtls`, `listener+proxy_auth`, `listener`), and the
+Milestone 03 brokering gate remains the cryptographic form alone (D6) — the credential form is a
+real identity but crosses `codex`'s plain-HTTP hop in the clear, which is the recorded reason it is
+not admitted. See `docs/records/workload-identity.md`.
+
 | Test | Method | Passes when | SC |
 |---|---|---|---|
 | T1 Host filesystem containment | Attempt to read paths outside declared mounts | All attempts fail | SC-1 |
@@ -474,7 +501,7 @@ these tests verify requirements that no success criterion reaches directly.
 | T31 MCP install channel | Attempt `npx <server>` for a server not in the pinned registry | Refused. No wholesale package-registry egress entry permits arbitrary server installation | R7.16 |
 | T32 Capability-declaration integrity | From inside each agent, attempt to write that agent's MCP capability declaration file | Blocked for Claude Code via `srt`. For agents where it is not blocked, the test records the gap rather than passing | R7.17 |
 | T33 Build-time-only packages | Inspect installed package versions; then attempt a package install as the agent user at runtime | Versions match the profile pins and the declared repository; the runtime install fails for want of both privilege and write access | R7.18, R7.19 |
-| T34 Per-agent workload identity | Present agent A's client certificate for a credential bound to agent B; inspect audit lines | Cross-binding is refused; every audit line carries the issuing agent's identity | R8.8 |
+| T34 Per-agent workload identity | **Per identity form.** *Cryptographic:* present agent A's client certificate on agent B's listener; inspect audit lines. *Credential:* present agent A's proxy credential on agent B's listener. *Structural:* enumerate each agent's network interfaces and each `internal: true` network's membership | Cross-binding is refused — by the listener for a presented certificate or credential, and by the absence of any route in the structural case. Every audit line carries the issuing agent's identity and the strength of that attribution | R8.8 |
 | T35 Agent action log | Perform a tool invocation and a file modification in a session; inspect the sink. Then edit the on-volume transcript retroactively and re-inspect | Both actions are recorded outside the agent's blast radius and correlate with the egress log by session ID and timestamp. The retroactive edit does not propagate to the sink | R9.7, R9.8 |
 | T36 Export toggle cannot disable recording | Disable each of the four exports in turn; inspect the sink | Recording continues in every case; each disabled export is explicitly recorded | R9.9 |
 | T37 Human authorization gate | Attempt an action the profile classifies as irreversible or high-impact, unattended | The action halts for authorization, or the profile carries an explicit recorded waiver | R12.7 |
