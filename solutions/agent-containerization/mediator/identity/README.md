@@ -167,10 +167,12 @@ bash scripts/issue-identity.sh client claude --force
 secrets verified against an htpasswd, and the CA has no part in that path. The two lifecycles are
 independent in both directions: a CA reissue leaves `codex` and `agy` authenticating exactly as
 before, and rotating either credential leaves every certificate valid. Revoking a **credential** is
-its own operation — delete the plaintext, rebuild the htpasswd, restart the mediator, which
-`issue-identity.sh credential <agent> --force` does in one step. The rebuild is from scratch every
-time and never appended to, so deleting a plaintext actually revokes rather than silently leaving
-the old hash in place.
+its own operation: `issue-identity.sh credential <agent> --force` rotates the secret and rebuilds
+the htpasswd, and **you restart the mediator yourself** — the script tells you to and cannot do it
+for you. That restart is not a formality. `basic_ncsa_auth` reads the htpasswd at start and Squid
+caches accepted credentials for `credentialsttl`, so until the mediator restarts, **the credential
+you just revoked still works**. The rebuild itself is from scratch every time and never appended
+to, so deleting a plaintext genuinely revokes rather than leaving the old hash behind.
 
 This is a recorded choice, not an oversight. The pod holds **four** certificates under this CA —
 three listener certificates and one client certificate, `claude`'s. (The forecast this paragraph

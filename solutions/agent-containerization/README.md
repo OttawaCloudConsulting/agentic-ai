@@ -568,9 +568,15 @@ missing or unreadable Compose secret, a rotation where the mediator was restarte
 not — is refused **before Squid has a request to log**. Nothing on the audit trail names the
 attempt: there is one anonymous `proxy_internal` event carrying no agent, no destination and no
 verdict, and that is all. Silence here looks exactly like an agent that made no request. The
-populated surface is the mediator's own cache log:
+populated surface is the mediator's own cache log. The entrypoint tails it to stderr, so it is
+already in the container's logs — where an operator looks first — and it is also on disk:
 
 ```bash
+# already streamed into the mediator's container logs
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml logs egress-mediator | tail -50
+
+# or read the file directly
 docker compose --env-file compose/pins.env -f compose/compose.yaml \
   -f compose/overrides/default.yaml exec egress-mediator \
   tail -50 /var/log/mediator/squid-cache.log
