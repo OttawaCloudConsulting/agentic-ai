@@ -333,17 +333,35 @@ boundary. The ceiling is exceeded by one, on a milestone whose feature count was
 
 ## Definition of Done
 
-- [ ] All features complete (`[x]` in `milestone-status.txt`)
-- [ ] All acceptance criteria verified
-- [ ] `gate-3-review.md` checklist fully resolved
-- [ ] `milestone-status.txt` updated with final counts
-- [ ] `progress.txt` milestone summary shows 6/6 features complete
-- [ ] SC-4 demonstrated end to end: restart the pod, all three agents still authenticated with state
-      intact (T9)
-- [ ] The provisional status of `policy/allowlist.base.yaml` is recorded in the file itself
-- [ ] R8.8's per-agent identity form is recorded — which agents carry a cryptographic identity and
+Discharged 2026-09-09. Each item records the evidence rather than the intention.
+
+- [x] All features complete (`[x]` in `milestone-status.txt`) — 6/6
+- [x] All acceptance criteria verified — every feature's Gate 4 test command is green on its own
+      account, the last of them (01.6) at 269 PASS / 0 FAIL. Read as "each feature's acceptance
+      criteria were verified at its completion gate", which is the only reading the per-feature
+      test commands support; the milestone carries no separate criteria of its own
+- [x] `gate-3-review.md` checklist fully resolved — 20/20 checked, 0 unchecked
+- [x] `milestone-status.txt` updated with final counts — 6 features, 6 complete
+- [x] `progress.txt` milestone summary shows 6/6 features complete
+- [x] SC-4 demonstrated end to end: restart the pod, all three agents still authenticated with state
+      intact (T9) — `verify-auth-state.sh` Phase E, 45 PASS / 0 FAIL, six assertions: three agents
+      by two forms (container restart, and `down` → `build` → `up` per R4.1). `agy` was added to
+      that phase here; before this milestone closed, Phase E covered claude and codex only and the
+      criterion's "all three" was met by argument rather than by assertion
+- [x] The provisional status of `policy/allowlist.base.yaml` is recorded in the file itself
+- [x] R8.8's per-agent identity form is recorded — which agents carry a cryptographic identity and
       which carry network-derived identity — together with the resulting Milestone 03 brokering
-      restriction, so the gate is inherited explicitly rather than rediscovered there
-- [ ] `README.md` drift corrected (Gate 2 open item, due at this milestone's start)
-- [ ] The environment carries a stated **not for real work** notice until Milestone 02 completes
-      (R12.8)
+      restriction, so the gate is inherited explicitly rather than rediscovered there —
+      `docs/records/workload-identity.md` (01.6 SF-4). Note the wording predates the outcome: there
+      are **three** forms, not two — cryptographic (`claude`), credential (`codex`, `agy`) and
+      structural, with network-derived as the baseline underneath all three
+- [~] `README.md` drift corrected (Gate 2 open item, due at this milestone's start) — **partially,
+      and the item is underspecified.** No specific drift is named here, in `gate-2-review.md`, or
+      in the architecture's Open Items table, so what it originally referred to cannot be
+      established. What was actually done: three stale statements were found and corrected at 01.6
+      SF-4 — `identity_source` described as "`listener` on every line at this feature", the absent
+      denial-troubleshooting cases for the identity path, and the published base image's missing
+      `ENTRYPOINT`. Left `[~]` rather than `[x]` because clearing an item whose content is unknown
+      would be clearing it by assumption
+- [x] The environment carries a stated **not for real work** notice until Milestone 02 completes
+      (R12.8) — present in `README.md`

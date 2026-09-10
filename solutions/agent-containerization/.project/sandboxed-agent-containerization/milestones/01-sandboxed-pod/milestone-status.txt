@@ -1,9 +1,35 @@
 # Milestone 01: Sandboxed Pod
-# Status: [~] in progress  6 features, 6 complete
-# All six features are built and their test commands are green. The milestone's Definition of
-# Done is NOT discharged -- see the README's checklist: the gate-3 review, the SC-4 end-to-end
-# restart demonstration (T9) and the allowlist provisional-status note are outstanding. The
-# status stays [~] until those are done rather than being closed on feature count alone.
+# Status: [x] complete  6 features, 6 complete
+# Closed 2026-09-09. All six features built and green, and the Definition of Done discharged --
+# see the README checklist, where each item now records its evidence rather than its intention.
+#
+# SC-4 / T9 was the only item that needed work at close. It is verify-auth-state.sh Phase E:
+# 45 PASS / 0 FAIL, six assertions, three agents by two forms (container restart, and
+# down -> build -> up per R4.1). Two changes were needed to get there and both are committed:
+#
+#   * agy was NOT in Phase E (50afde7). It was excluded on the reasoning that its apikey is
+#     env-delivered so nothing is persisted -- true of the credential half, silent about the
+#     session-state half, which agy has a state volume for like the other two. T9 and SC-4 both
+#     say "all three", so the criterion was being met by argument for one agent. Now asserted.
+#   * Phase D (T25) is the only phase that spends anything -- it forces a codex OAuth refresh and
+#     rolls the token -- and the harness had no phase selector, so demonstrating T9 meant paying
+#     for it. AUTH_SKIP_PHASE_D=1 (e6e9684), off by default, finishes the run before D and says
+#     so in the footer. T9 needs credential SHAPE, not a valid token, so the already-rolled seed
+#     satisfies it.
+#
+# ONE item is [~] rather than [x]: "README.md drift corrected (Gate 2 open item)". It names no
+# specific drift, and none is recorded in gate-2-review.md or the architecture's Open Items, so
+# what it referred to cannot be established. Three real drifts were found and corrected at 01.6
+# SF-4; the item is left open rather than cleared by assumption. It is the operator's to close or
+# restate.
+#
+# STILL OPEN, carried out of this milestone rather than resolved by it:
+#   * T25 / criterion 5 is unverified by the closing run -- Phase D was skipped. It needs a fresh
+#     host `codex login` and a reseed of sf3_codex-state first, because that volume holds a token
+#     a previous Phase D already rolled ("refresh token was already used").
+#   * ELEVEN unanchored status greps in verify-egress-mediator.sh, one of them added at 01.6 SF-4.
+#     Same class as the two assertion defects fixed during 01.6.
+#   * A /design refresh is overdue: 20 deviations queued from 01.5 and 12 more from 01.6.
 
 ## Features
 

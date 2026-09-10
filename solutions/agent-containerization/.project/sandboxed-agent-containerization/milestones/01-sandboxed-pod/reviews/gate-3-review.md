@@ -119,3 +119,15 @@
   01.6's first criterion. If neither does, both carry network-derived identity and Milestone 03
   brokers to `claude` alone — a possibility this review accepts in advance rather than treating as a
   later surprise.
+
+  **Answered, 2026-09-09 (01.6 SF-1, recorded at milestone close).** POSITIVE for **both**. Each
+  constructs `Proxy-Authorization: Basic` from proxy-URL userinfo, preemptively — `codex` on the
+  plain transport, `agy` on TLS and on plain — so neither needed a credential knob it does not have.
+  Both now carry a per-agent proxy credential verified against the mediator's htpasswd, and their
+  verdict lines read `identity_source: listener+proxy_auth`. The possibility this review accepted in
+  advance did not materialise, but **the Milestone 03 restriction it anticipated stands anyway, for
+  a different reason**: the brokering gate is the *cryptographic* form alone (D6), and the credential
+  form is excluded because `codex`'s credential crosses its plain-HTTP hop in the clear. So
+  Milestone 03 does broker to `claude` alone — not because the other two are unidentified, but
+  because a credential an attacker can read off the wire is not a key. See
+  `docs/records/workload-identity.md`.
