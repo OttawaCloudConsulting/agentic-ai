@@ -335,7 +335,7 @@ Following 01.6 Decision 8, these known breakages are fixed in the SF that causes
   volume read-only and read the transcript; and whether `compile-policy.sh` can compile a profile
   from outside `profiles/`. Output: `docs/records/agent-action-log.md`. **Closes with the `agy`
   branch decision (Decision 3) surfaced to the operator.**
-- [ ] **SF-2: Recorder and action sink.** Build `images/recorder/Dockerfile` on the mediator's
+- [x] **SF-2: Recorder and action sink.** Build `images/recorder/Dockerfile` on the mediator's
   pinned base digest, adding only pinned `jq`. Write `images/recorder/recorder.sh` (Decision 3
   shipping; per-agent source spec from SF-1). Add three `<agent>-recorder` services on the
   `x-hardened` anchor with `network_mode: none`, three `<agent>-action-audit` volumes, a `configs:`
@@ -586,4 +586,22 @@ Per DD-12 the operator may adjust this at build time without gate re-approval.
 
 ## Architectural Deviations
 
-(none)
+1. **The recorder image carries a pinned `yq`, not "only jq."** Interface Contract 2 requires
+   the recorder to read `.agents.$RECORDER_AGENT.identity` from the resolved-policy `configs:`
+   mount, a YAML file, and `jq` alone cannot parse YAML. `images/recorder/Dockerfile` adds the
+   same pinned `yq` build (`YQ_VERSION`/`YQ_SHA256_*` from `compose/pins.env`) the mediator's
+   compile stage already uses, rather than a second pinned parser or a fragile grep of the
+   scalar. Surfaced at SF-2 build time; not assumed from the plan's "adding only pinned jq"
+   phrasing.
+2. **`RECORDER_MODE=snapshot` ships `{sha256, size}`, not the file.** The plan's `record_snapshot`
+   branch (Decision 3) does not fix a payload shape. Base64-embedding `agy`'s 100-140 KB SQLite
+   rewrite per turn (docs/records/agent-action-log.md) would bloat the sink and complicate line
+   handling for no benefit T35's byte-compare (SF-3) actually needs: a hash-and-size pair is
+   sufficient to detect and evidence a change, and is what a retroactive-edit comparison checks
+   against anyway.
+3. **SF-2's recorder relays to stdout unconditionally; SF-4 adds the toggle.** Decision 6's
+   `agent_action_log` export does not exist in any resolved artifact until SF-4 emits the
+   `exports` block (today's committed artifacts have no such key). Gating the relay on a key
+   that cannot resolve would crash-loop every recorder before SF-4 lands. `recorder.sh` writes
+   each action line to both the sink file and its own stdout in the same step; SF-4 wraps that
+   emission behind `.exports.agent_action_log` as its own sub-feature scope.

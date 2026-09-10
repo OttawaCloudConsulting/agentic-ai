@@ -961,7 +961,12 @@ else
       pass "T8: '$attempt' fails"
     fi
   done
-  for p in /etc/mediator/policy /etc/mediator/config /var/log/mediator; do
+  # 02.1 SF-2: the action trail sits outside every agent's reach exactly as the egress
+  # trail does (Acceptance Criterion 3). Each action volume is mounted only into its own
+  # recorder, never into any agent -- CID_TAMPER is claude, so its own sink is included
+  # alongside the other two to also cover the general case.
+  for p in /etc/mediator/policy /etc/mediator/config /var/log/mediator \
+           /var/log/actions; do
     if docker exec "$CID_TAMPER" bash -c "ls $p" >/dev/null 2>&1; then
       fail "T8: an agent can read $p"
     else

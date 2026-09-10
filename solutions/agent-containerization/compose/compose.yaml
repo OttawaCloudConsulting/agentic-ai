@@ -59,6 +59,22 @@ volumes:
   # references it, which the acceptance harness asserts by enumeration rather than
   # by inspection of this file.
   audit:
+  # The action trail (02.1, R9.2, D12, Decision 2). One recorder-owned volume per
+  # agent -- never the mediator's `audit` volume above, and never a volume any
+  # agent service mounts. Each has exactly one mounter: that agent's own recorder.
+  claude-action-audit:
+  codex-action-audit:
+  agy-action-audit:
+
+# The resolved-policy source recorders read the identity token from (02.1
+# Interface Contract 2/3). The mediator reads the same artifact by COPYing it into
+# its own image layer at build time (images/mediator/Dockerfile); recorders read
+# it at runtime through this `configs:` mount instead, because a recorder has no
+# build stage of its own and this is the one path Compose offers for handing a
+# host file into a container without a bind mount into /workspace or a secret.
+configs:
+  resolved_policy:
+    file: ../policy/resolved/${AGENT_PROFILE:-default}.yaml
 
 # Proxy-hop trust material (01.3 SF-3, Interface Contract 3). `file:` sources are
 # the runtime-injection mechanism available on Docker Desktop; nothing here is baked
@@ -264,8 +280,102 @@ services:
       # container cannot construct a credential to answer its own 407 with.
       - mediator-credentials
 
+  # The agent action recorders (02.1, R9.7, D20, Decision 1). One per agent, each
+  # reading only that agent's own state volume, read-only, with no network route
+  # anywhere -- the recorder can read its agent's credential but has nowhere to
+  # send it. `network_mode: none` is the whole enforcement; there is no second
+  # network to accidentally attach.
+  #
+  # `RECORDER_SOURCE_GLOB` / `RECORDER_SESSION_ID` / `RECORDER_MODE` are per-agent
+  # measurements from `docs/records/agent-action-log.md` (SF-1), not guesses:
+  # claude and codex append-only JSONL with the session id in the filename;
+  # `agy` rewrites a whole SQLite file per turn, so its filename stem (the
+  # `conversation_id`) is its session id and its mode is `snapshot`.
+  claude-recorder:
+    <<: *hardened
+    build:
+      context: ..
+      dockerfile: images/recorder/Dockerfile
+      args:
+        MEDIATOR_BASE_DIGEST: ${MEDIATOR_BASE_DIGEST}
+        JQ_VERSION: ${JQ_VERSION}
+        YQ_VERSION: ${YQ_VERSION}
+        YQ_SHA256_ARM64: ${YQ_SHA256_ARM64}
+        YQ_SHA256_AMD64: ${YQ_SHA256_AMD64}
+    image: sandboxed-agent/recorder:local
+    network_mode: none
+    environment:
+      RECORDER_AGENT: claude
+      RECORDER_SOURCE_GLOB: "/src/.claude/projects/*/*.jsonl"
+      RECORDER_SESSION_ID: "filename:^(.+)\\.jsonl$"
+      RECORDER_MODE: append
+      RECORDER_POLL_SECONDS: "1"
+    volumes:
+      - claude-state:/src:ro
+      - claude-action-audit:/var/log/actions
+    configs:
+      - source: resolved_policy
+        target: /etc/recorder/resolved.yaml
+    restart: on-failure
+
+  codex-recorder:
+    <<: *hardened
+    build:
+      context: ..
+      dockerfile: images/recorder/Dockerfile
+      args:
+        MEDIATOR_BASE_DIGEST: ${MEDIATOR_BASE_DIGEST}
+        JQ_VERSION: ${JQ_VERSION}
+        YQ_VERSION: ${YQ_VERSION}
+        YQ_SHA256_ARM64: ${YQ_SHA256_ARM64}
+        YQ_SHA256_AMD64: ${YQ_SHA256_AMD64}
+    image: sandboxed-agent/recorder:local
+    network_mode: none
+    environment:
+      RECORDER_AGENT: codex
+      RECORDER_SOURCE_GLOB: "/src/.codex/sessions/*/*/*/rollout-*.jsonl"
+      RECORDER_SESSION_ID: "filename:^rollout-.*-([0-9a-fA-F-]{36})\\.jsonl$"
+      RECORDER_MODE: append
+      RECORDER_POLL_SECONDS: "1"
+    volumes:
+      - codex-state:/src:ro
+      - codex-action-audit:/var/log/actions
+    configs:
+      - source: resolved_policy
+        target: /etc/recorder/resolved.yaml
+    restart: on-failure
+
+  agy-recorder:
+    <<: *hardened
+    build:
+      context: ..
+      dockerfile: images/recorder/Dockerfile
+      args:
+        MEDIATOR_BASE_DIGEST: ${MEDIATOR_BASE_DIGEST}
+        JQ_VERSION: ${JQ_VERSION}
+        YQ_VERSION: ${YQ_VERSION}
+        YQ_SHA256_ARM64: ${YQ_SHA256_ARM64}
+        YQ_SHA256_AMD64: ${YQ_SHA256_AMD64}
+    image: sandboxed-agent/recorder:local
+    network_mode: none
+    environment:
+      RECORDER_AGENT: agy
+      RECORDER_SOURCE_GLOB: "/src/.gemini/antigravity-cli/conversations/*.db"
+      RECORDER_SESSION_ID: "filename:^(.+)\\.db$"
+      RECORDER_MODE: snapshot
+      RECORDER_POLL_SECONDS: "1"
+    volumes:
+      - agy-state:/src:ro
+      - agy-action-audit:/var/log/actions
+    configs:
+      - source: resolved_policy
+        target: /etc/recorder/resolved.yaml
+    restart: on-failure
+
   claude:
     <<: *hardened
+    depends_on:
+      - claude-recorder
     build:
       context: ..
       dockerfile: images/Dockerfile
@@ -340,6 +450,8 @@ services:
 
   codex:
     <<: *hardened
+    depends_on:
+      - codex-recorder
     build:
       context: ..
       dockerfile: images/Dockerfile
@@ -402,6 +514,8 @@ services:
 
   agy:
     <<: *hardened
+    depends_on:
+      - agy-recorder
     build:
       context: ..
       dockerfile: images/Dockerfile

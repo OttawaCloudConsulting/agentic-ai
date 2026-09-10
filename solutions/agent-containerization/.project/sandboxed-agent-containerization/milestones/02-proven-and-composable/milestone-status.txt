@@ -5,7 +5,7 @@
 
 [~] Feature 02.1: Audit completeness — agent action log, sink and exports
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/audit-completeness-agent-action-log-sink-and-exports.md
-    Sub-features: 1/5 complete
+    Sub-features: 2/5 complete
     Notes: Started 2026-09-10.
 
 [~] Feature 02.2: Adversarial boundary validation

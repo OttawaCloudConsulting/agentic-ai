@@ -102,31 +102,76 @@ check_mediator_pin_agreement() {
 
 # 01.4 SF-1, criterion 3 (R4.7, R8.7, D7): state volumes are secret material.
 #
-# D7 is "no state volume is shared between two services", and the check is by ENUMERATION
-# over the rendered config rather than by reading compose.yaml -- a shared volume introduced
-# by an override fragment would be invisible to the second reading. Sharing one state volume
-# between two agents would put one agent's OAuth refresh token inside another's blast radius,
-# which is the property R4.7 exists to protect and the one a topology test can actually prove.
+# D7 was "no state volume is shared between two services", checked by ENUMERATION over the
+# rendered config rather than by reading compose.yaml -- a shared volume introduced by an
+# override fragment would be invisible to the second reading. 02.1 SF-2 narrows it to two
+# rules instead of one, because the recorder sidecars now legitimately mount a state volume
+# too (Decision 1): sharing a state volume between two AGENTS still puts one agent's OAuth
+# refresh token inside another's blast radius; sharing it between an agent and ANY recorder
+# but its own would do the same to the recorder, which is exactly the concentration D7's own
+# original comment named as the thing it prevents.
 check_volume_exclusivity() {
   local config owners dupes
   config="$("${COMPOSE_A[@]}" config --format json 2>/dev/null)" || {
     fail "volume exclusivity: could not render compose config"
     return
   }
-  # service -> named volumes it mounts, one "volume service" pair per line.
-  owners="$(echo "$config" | jq -r '
+  local agents=(claude codex agy)
+
+  # Rule 1: no state volume is mounted by two AGENT services.
+  owners="$(echo "$config" | jq -r --argjson agents '["claude","codex","agy"]' '
     .services | to_entries[] as $s
+    | select(.key as $k | $agents | index($k) != null)
     | ($s.value.volumes // [])[]
     | select(.type == "volume")
     | "\(.source) \($s.key)"' | sort -u)"
-
   dupes="$(echo "$owners" | awk 'NF {c[$1]=c[$1]" "$2; n[$1]++} END {for (v in n) if (n[v] > 1) print v ":" c[v]}')"
   if [ -z "$dupes" ]; then
-    pass "volume exclusivity: no named volume is mounted by two services (D7, R4.7)"
+    pass "volume exclusivity: no state volume is mounted by two agent services (D7, R4.7)"
   else
     echo "$dupes" | while IFS= read -r d; do echo "  shared volume $d"; done
-    fail "volume exclusivity: a named volume is shared between services"
+    fail "volume exclusivity: a state volume is shared between agent services"
   fi
+
+  # Rule 2: recorder posture. Each <agent>-recorder mounts exactly {<agent>-state (ro),
+  # <agent>-action-audit}, network_mode none, and no OTHER service mounts <agent>-state.
+  local a ok=1 got want
+  for a in "${agents[@]}"; do
+    got="$(echo "$config" | jq -r --arg a "$a" '
+      .services[$a + "-recorder"].volumes // [] | map("\(.source):\(.read_only // false)") | sort | join(",")')"
+    want="${a}-action-audit:false,${a}-state:true"
+    if [ "$got" != "$want" ]; then
+      echo "  ${a}-recorder mounts {$got}, expected {$want}"; ok=0
+    fi
+    netmode="$(echo "$config" | jq -r --arg a "$a" '.services[$a + "-recorder"].network_mode // "unset"')"
+    if [ "$netmode" != "none" ]; then
+      echo "  ${a}-recorder network_mode is '$netmode', expected 'none'"; ok=0
+    fi
+    other="$(echo "$config" | jq -r --arg a "$a" --arg rec "${a}-recorder" '
+      .services | to_entries[] as $s
+      | select($s.key != $rec)
+      | ($s.value.volumes // [])[] | select(.source == ($a + "-state")) | $s.key' | sort -u)"
+    if [ -n "$other" ]; then
+      echo "  ${a}-state is also mounted by: $other"; ok=0
+    fi
+  done
+  [ "$ok" -eq 1 ] && pass "recorder posture: each <agent>-recorder mounts only <agent>-state (ro) and <agent>-action-audit, network_mode none" \
+                  || fail "recorder posture: an <agent>-recorder deviates from the required mount set or network_mode"
+
+  # Rule 3: action sink exclusivity. No <agent>-action-audit volume is mounted by any
+  # service other than its own recorder (D12's reading extended to the action trail).
+  ok=1
+  for a in "${agents[@]}"; do
+    other="$(echo "$config" | jq -r --arg vol "${a}-action-audit" --arg rec "${a}-recorder" '
+      .services | to_entries[] as $s
+      | select($s.key != $rec)
+      | ($s.value.volumes // [])[] | select(.source == $vol) | $s.key' | sort -u)"
+    if [ -n "$other" ]; then
+      echo "  ${a}-action-audit is also mounted by: $other"; ok=0
+    fi
+  done
+  [ "$ok" -eq 1 ] && pass "action sink: no <agent>-action-audit volume is mounted by any other service" \
+                  || fail "action sink: an <agent>-action-audit volume is shared beyond its own recorder"
 }
 
 # The version-control half of R8.7. The backup half is NOT enforceable from inside a
