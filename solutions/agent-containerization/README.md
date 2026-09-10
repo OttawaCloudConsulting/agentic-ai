@@ -614,6 +614,41 @@ On a host with no working internet, stage 2 will fail a pod that is otherwise co
 `startup_check.offline: true` in `profiles/default.yaml` and recompile — the skip is written to the
 audit trail at every start, so a pod running without a proven path out says so in its own record.
 
+### Correlating the egress and action trails (T35)
+
+The egress trail (`egress-mediator`'s `egress-audit.log`) and the action trail (each
+`<agent>-action-audit` volume, written by that agent's recorder — 02.1) carry no shared session
+id: the mediator never sees inside the TLS tunnel it splices (D4), so it cannot learn a session id
+the agent's own client assigns. The two trails join on `agent` plus a time window instead, using
+the recorder's clock (never the agent's own transcript timestamps, which are a claim the agent
+makes about itself, not evidence) and a slack of at least one second plus the recorder's poll
+interval, to cover the ms/second timestamp-precision difference between the two trails and the
+one-poll-interval shipping delay.
+
+```bash
+# 1. Pick a session id from one agent's action trail.
+SESSION=<session_id from an action-audit.log line>
+
+# 2. That session's window, from the RECORDER's ts (never the transcript's own).
+WINDOW="$(docker exec <project>-<agent>-recorder-1 cat /var/log/actions/action-audit.log \
+  | jq -s --arg s "$SESSION" '
+      map(select(.session_id == $s)) | {min: (map(.ts) | min), max: (map(.ts) | max)}')"
+
+# 3. The egress (and DNS) lines for that agent, in the window widened by the slack.
+docker exec <project>-egress-mediator-1 cat /var/log/mediator/egress-audit.log \
+  | jq -c --argjson w "$WINDOW" --arg agent "<agent's resolved identity>" '
+      def norm: sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
+      ($w.min | norm) as $lo | ($w.max | norm) as $hi |
+      select(.verdict != null and .agent == $agent
+             and ((.ts | norm) >= ($lo - 2) and (.ts | norm) <= ($hi + 2)))'
+```
+
+`fromdateiso8601` does not accept a fractional-second suffix, so the recipe strips it first —
+egress timestamps carry milliseconds, action-trail and DNS timestamps do not. Two concurrent
+`run --rm` sessions of the *same* agent are not separable this way: they share one identity and
+one egress listener, so the join can only narrow to "this agent, this window," not to one session
+among several running at once (recorded limitation, `docs/records/agent-action-log.md`).
+
 ## What Now Exists, and What's Still Out of Scope
 
 `prd.md` and `progress.txt` exist at this directory's root. The architecture document exists at

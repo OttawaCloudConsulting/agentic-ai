@@ -342,7 +342,7 @@ Following 01.6 Decision 8, these known breakages are fixed in the SF that causes
   mount of the resolved artifact, and `depends_on` from each agent to its recorder. Harness
   changes: narrow the D7 check and add recorder posture assertions (read-only state mount, no
   network, sink volume not mounted elsewhere); extend T8 to the action volumes. Composite green.
-- [ ] **SF-3: T35, correlation and the privilege-change limb.** New
+- [x] **SF-3: T35, correlation and the privilege-change limb.** New
   `tests/acceptance/verify-audit-completeness.sh` in the house idiom. Phases:
   - A: recorder mechanics, driven by synthetic native-format appends made from inside the agent
     container (complete, partial, invalid JSON, truncate, replace).

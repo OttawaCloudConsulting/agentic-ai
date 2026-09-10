@@ -124,8 +124,16 @@ ship_append() {
     if [ -n "$chunk" ]; then
       # Only complete, \n-terminated lines are shipped; a trailing partial line
       # (no closing \n yet) is dropped here and re-read whole on the next poll.
-      if [ "${chunk: -1}" = $'\n' ]; then
-        complete="$chunk"
+      #
+      # `$chunk` came out of a `$(...)` capture, which unconditionally strips
+      # trailing newlines -- so `$chunk` itself NEVER ends in \n, even when the
+      # file on disk does, and `${chunk: -1} = $'\n'` can never be true. Read
+      # the file's actual last byte separately: `$(tail -c1 "$file")` is empty
+      # iff that byte is \n (same stripping, applied to exactly one byte), which
+      # is the signal `${chunk: -1}` was meant to give. The \n stripped off
+      # `$chunk` is added back explicitly below.
+      if [ -z "$(tail -c1 "$file")" ]; then
+        complete="$chunk"$'\n'
       elif [[ "$chunk" == *$'\n'* ]]; then
         complete="${chunk%$'\n'*}"$'\n'
       else
