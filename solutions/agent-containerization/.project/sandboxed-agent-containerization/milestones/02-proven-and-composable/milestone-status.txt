@@ -3,17 +3,22 @@
 
 ## Features
 
-[ ] Feature 02.1: Audit completeness — agent action log, sink and exports
-    Plan: (not yet planned)
+[~] Feature 02.1: Audit completeness — agent action log, sink and exports
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/audit-completeness-agent-action-log-sink-and-exports.md
+    Sub-features: 0/5 complete
 
-[ ] Feature 02.2: Adversarial boundary validation
-    Plan: (not yet planned)
+[~] Feature 02.2: Adversarial boundary validation
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/adversarial-boundary-validation.md
+    Sub-features: 0/6 complete
 
-[ ] Feature 02.3: Tool pack set, use-case profiles and MCP inventory
-    Plan: (not yet planned)
+[~] Feature 02.3: Tool pack set, use-case profiles and MCP inventory
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/tool-pack-set-use-case-profiles-and-mcp-inventory.md
+    Sub-features: 0/8 complete
 
-[ ] Feature 02.4: Reproducibility, provenance and onboarding
-    Plan: (not yet planned)
+[~] Feature 02.4: Reproducibility, provenance and onboarding
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
+    Sub-features: 0/6 complete
 
-[ ] Feature 02.5: Containment, response and the authorization gate
-    Plan: (not yet planned)
+[~] Feature 02.5: Containment, response and the authorization gate
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
+    Sub-features: 0/7 complete
