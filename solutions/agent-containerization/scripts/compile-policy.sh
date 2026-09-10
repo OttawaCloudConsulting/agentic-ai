@@ -687,7 +687,7 @@ for ((i = 0; i < PACKS_LEN; i++)); do
     || invalid "packs/$PN/pack.yaml: field 'runtime_install' must be true or false, found '$RI' (R7.6)"
   RT_N=$(( $(yq eval '.egress.runtime.allow_fqdns | length' "$PF") + $(yq eval '.egress.runtime.allow_cidrs | length' "$PF") ))
   if [[ "$RI" == "false" ]] && ((RT_N > 0)); then
-    refuse "packs/$PN/pack.yaml declares $RT_N runtime egress entr(y|ies) with runtime_install: false. Runtime egress to a package registry is what makes runtime installation possible, so R7.6 requires it declared: set runtime_install: true WITH runtime_install_reason, or remove the entries. Note that registry egress also re-enables arbitrary 'npx <server>' and breaks T31 on every profile loading this pack"
+    refuse "packs/$PN/pack.yaml declares $RT_N runtime egress entr(y|ies) with runtime_install: false. Any runtime egress is what makes runtime installation possible -- a package registry is the common case, but a cluster API server, or any other named destination, can serve arbitrary bytes just as well (02.3). R7.6 requires the widening declared: set runtime_install: true WITH runtime_install_reason, or remove the entries. Where the destination IS a package registry, declaring it also re-enables arbitrary 'npx <server>' and breaks T31 on every profile loading this pack"
   fi
   if [[ "$RI" == "true" ]]; then
     scalar_nonblank "$PF" '.runtime_install_reason' >/dev/null \
@@ -698,35 +698,124 @@ for ((i = 0; i < PACKS_LEN; i++)); do
 done
 
 
-# ---- the three surfaces with no consumer yet, AFTER the R7.6 gate ---------------------------
-# Ordering is load-bearing and was WRONG when first written: these refusals lived in the pack
-# resolution loop, which runs BEFORE the R7.6 gate, so a pack declaring both runtime egress with
-# runtime_install: false AND an `env` entry was refused with the env message. Both refuse and both
-# fail closed, but the operator was told the wrong thing to fix, and the milestone record claimed
-# an ordering the code did not have. Found by the Codex adversarial pass, 2026-09-08.
+# ---- mounts: still refused, message corrected (02.3 Decision 1) -----------------------------
+# Interface Contract 3 fixes the resolved schema and names exactly two things packs populate:
+# compiled_from.packs, and the per-agent allow_fqdns/allow_cidrs. There is no resolved-policy
+# field for a pack mount, and no shipped pack needs one: Terraform, kubectl, helm and gh keep
+# their state and caches under /home/agent on the state volume. A pack mount is REFUSED rather
+# than ignored, for the reason the mount-key gate above exists: a declared requirement that is
+# silently dropped is indistinguishable from one that was honoured. Building a mount landing
+# point with no consumer fails the over-engineering discriminator in any case; when a pack does
+# need one, that is a design change reviewed against R2.8's enumeration, not a default a
+# manifest can opt into.
 for ((i = 0; i < PACKS_LEN; i++)); do
   PN="${PACK_NAMES[$i]}"; PF="${PACK_FILES[$i]}"; REL_PF="packs/$PN/pack.yaml"
   PM_N="$(yq eval '.mounts | length' "$PF")"
-  # Interface Contract 3 fixes the resolved schema and names exactly two things packs populate:
-  # compiled_from.packs, and the per-agent allow_fqdns/allow_cidrs. There is no resolved-policy
-  # field for a pack mount, environment variable or credential, and SF-3's own prose saying it
-  # composes them is what Contract 3 overrides (recorded as a deviation). They are REFUSED rather
-  # than ignored, for the reason the mount-key gate above exists: a declared requirement that is
-  # silently dropped is indistinguishable from one that was honoured.
-  #
-  # The landing points differ and are named separately rather than blanket-assigned to SF-5:
-  #   mounts       SF-5, which builds the per-agent build cache and extends the mount-set assertion
-  #   env          no contract exists yet
-  #   credentials  no contract exists yet -- and R8 bars baking a secret into an image, so the
-  #                delivery mechanism cannot be a build argument and is not a resolved-policy field
   [[ "$PM_N" == "0" ]] \
-    || refuse "$REL_PF declares $PM_N mount(s), and the resolved policy schema (01.3 Interface Contract 1) has no field for one. Pack-supplied mounts land at 01.5 SF-5, with the per-agent build cache and the mount-set assertion that verifies them; until then a declared mount would be dropped silently"
+    || refuse "$REL_PF declares $PM_N mount(s), and the resolved policy schema (01.3 Interface Contract 1) has no field for one. No shipped pack needs a host mount -- state and caches land under /home/agent, credentials land as Compose secrets, and non-secret configuration is baked into the per-profile image. A pack mount is a design change reviewed against R2.8's enumeration, never a default a manifest can opt into"
+done
+
+# ---- env / credentials / third_parties: Interface Contract 1 (02.3 Decision 1) --------------
+# 01.5's SF-3 refused both unconditionally, naming no landing point. 02.3 gives each one:
+# `env` rides the per-profile image (R7.5 holds by construction -- remove the pack, rebuild,
+# and the variable is gone); `credentials` become Compose `file:` secrets, never baked into an
+# image layer (R8.1). Both are validated here, not trusted from lint-policy.sh's well-formedness
+# pass, because a pack manifest is third-party content and this is the build's enforcement point.
+ENV_NAME_RE='^[A-Z_][A-Z0-9_]*$'
+CRED_NAME_RE='^[a-z0-9-]+$'
+# The pod contract's own variables. A pack overriding one would silently change the proxy, auth
+# or identity behaviour an operator did not choose (Interface Contract 1).
+is_reserved_env() {
+  case "$1" in
+    PATH|HOME|USER|SHELL|LD_*) return 0 ;;
+    HTTP_PROXY|http_proxy|HTTPS_PROXY|https_proxy|NO_PROXY|no_proxy) return 0 ;;
+    AUTH_MODE|AGENT_NAME) return 0 ;;
+    *_API_KEY|CLAUDE_*|CODEX_*|GEMINI_*) return 0 ;;
+    NODE_EXTRA_CA_CERTS|SSL_CERT_FILE) return 0 ;;
+    GIT_CONFIG_*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+declare -A SEEN_ENV_NAMES=()   # name -> "packs/<pn>/pack.yaml", for the cross-pack duplicate gate
+
+for ((i = 0; i < PACKS_LEN; i++)); do
+  PN="${PACK_NAMES[$i]}"; PF="${PACK_FILES[$i]}"; REL_PF="packs/$PN/pack.yaml"
+
   EV_N="$(yq eval '.env | length' "$PF")"
-  [[ "$EV_N" == "0" ]] \
-    || refuse "$REL_PF declares $EV_N environment variable(s), and the resolved policy schema has no field for one. No contract delivers a pack-supplied environment variable yet; the existing per-variable mechanisms are hand-authored Compose fragments (compose/overrides/), and extending one to pack content is a decision no sub-feature of 01.5 currently owns"
+  for ((e = 0; e < EV_N; e++)); do
+    EN="$(yq eval ".env[$e].name" "$PF")"
+    [[ "$EN" =~ $ENV_NAME_RE ]] \
+      || invalid "$REL_PF: env[$e].name '$EN' does not match $ENV_NAME_RE (Interface Contract 1)"
+    if is_reserved_env "$EN"; then
+      refuse "$REL_PF: env[$e] declares '$EN', which the pod contract already sets. A pack overriding it would silently change the proxy, auth or identity behaviour an operator did not choose (Interface Contract 1)"
+    fi
+    VTAG="$(yq eval ".env[$e].value | tag" "$PF" 2>/dev/null)" || VTAG="(unreadable)"
+    [[ "$VTAG" == "!!str" ]] \
+      || invalid "$REL_PF: env[$e].value must be a literal string scalar, found $VTAG. A pack env value is never a secret (Interface Contract 1)"
+    scalar_nonblank "$PF" ".env[$e].reason" >/dev/null \
+      || invalid "$REL_PF: env[$e].reason is missing, empty or blank. Every pack env variable records why it is needed (Interface Contract 1)"
+    if [[ -n "${SEEN_ENV_NAMES[$EN]+x}" ]]; then
+      refuse "$REL_PF: env[$e] declares '$EN', already declared by ${SEEN_ENV_NAMES[$EN]}. A variable declared by two selected packs is refused rather than silently letting one win (Interface Contract 1)"
+    fi
+    SEEN_ENV_NAMES[$EN]="$REL_PF"
+  done
+
+  declare -A SEEN_CRED_NAMES_IN_PACK=()
   CR_N="$(yq eval '.credentials | length' "$PF")"
-  [[ "$CR_N" == "0" ]] \
-    || refuse "$REL_PF declares $CR_N credential(s), and the resolved policy schema has no field for one. R8 bars baking a secret into an image, so a build argument is not the mechanism either; a pack-supplied credential needs an explicit delivery contract that does not exist yet"
+  for ((c = 0; c < CR_N; c++)); do
+    CN="$(yq eval ".credentials[$c].name" "$PF")"
+    [[ "$CN" =~ $CRED_NAME_RE ]] \
+      || invalid "$REL_PF: credentials[$c].name '$CN' does not match $CRED_NAME_RE (Interface Contract 1)"
+    if [[ -n "${SEEN_CRED_NAMES_IN_PACK[$CN]+x}" ]]; then
+      refuse "$REL_PF: credentials declares '$CN' twice. A credential name duplicated within a pack is refused (Interface Contract 1)"
+    fi
+    SEEN_CRED_NAMES_IN_PACK[$CN]=1
+    DELIV_TAG="$(yq eval ".credentials[$c].delivery | tag" "$PF" 2>/dev/null)" || DELIV_TAG="(unreadable)"
+    [[ "$DELIV_TAG" == "!!map" ]] \
+      || invalid "$REL_PF: credentials[$c].delivery must be a mapping, found $DELIV_TAG"
+    HAS_ENV_D="$(yq eval ".credentials[$c].delivery | has(\"env\")" "$PF")"
+    HAS_PATH_ENV_D="$(yq eval ".credentials[$c].delivery | has(\"path_env\")" "$PF")"
+    DELIV_KEY_N="$(yq eval ".credentials[$c].delivery | keys | length" "$PF")"
+    [[ "$DELIV_KEY_N" == "1" && ( "$HAS_ENV_D" == "true" || "$HAS_PATH_ENV_D" == "true" ) ]] \
+      || invalid "$REL_PF: credentials[$c].delivery must be exactly one of {env: VAR} or {path_env: VAR}, found keys: $(yq eval ".credentials[$c].delivery | keys | .[]" "$PF" | tr '\n' ' ')"
+    for field in description blast_radius revocation; do
+      scalar_nonblank "$PF" ".credentials[$c].$field" >/dev/null \
+        || invalid "$REL_PF: credentials[$c].$field is missing, empty or blank (Interface Contract 1, R8.4/R7.12)"
+    done
+  done
+  unset SEEN_CRED_NAMES_IN_PACK
+
+  # third_parties: required non-empty iff egress.runtime is non-empty (R14.1). The anchor
+  # itself is resolved by lint-policy.sh, not here -- the compile stage's job is to require the
+  # field was answered, not to reach into docs/records/ from inside the mediator build.
+  TP_N="$(yq eval '.third_parties | length' "$PF")"
+  RT_N=$(( $(yq eval '.egress.runtime.allow_fqdns | length' "$PF") + $(yq eval '.egress.runtime.allow_cidrs | length' "$PF") ))
+  if ((RT_N > 0)); then
+    ((TP_N > 0)) \
+      || refuse "$REL_PF declares $RT_N runtime egress entr(y|ies) but an empty third_parties. R14.1 requires a record for every party the agent's traffic can reach before that traffic is possible, named here, not after the fact"
+    for ((t = 0; t < TP_N; t++)); do
+      scalar_nonblank "$PF" ".third_parties[$t].party" >/dev/null \
+        || invalid "$REL_PF: third_parties[$t].party is missing, empty or blank"
+      scalar_nonblank "$PF" ".third_parties[$t].record" >/dev/null \
+        || invalid "$REL_PF: third_parties[$t].record is missing, empty or blank"
+    done
+  fi
+done
+
+# ---- GATE (R7.8) -- unknown top-level pack manifest keys are refused, not ignored -----------
+# The same philosophy as the mount-key gate above: an ignored key is indistinguishable from an
+# honoured one until the day it is implemented. A third-party pack manifest carrying `cap_add`,
+# `privileged` or `devices` must fail here, not be silently dropped on the floor.
+KNOWN_PACK_KEYS="name description schema blast_radius needs_write_access packages egress runtime_install runtime_install_reason mounts env credentials third_parties"
+for ((i = 0; i < PACKS_LEN; i++)); do
+  PN="${PACK_NAMES[$i]}"; PF="${PACK_FILES[$i]}"; REL_PF="packs/$PN/pack.yaml"
+  PACK_KEYS="$(yq eval 'keys | .[]' "$PF")"
+  while IFS= read -r pk; do
+    [[ -n "$pk" ]] || continue
+    grep -qFx "$pk" <<< "$(tr ' ' '\n' <<< "$KNOWN_PACK_KEYS")" \
+      || invalid "$REL_PF: unrecognised top-level key '$pk'. A pack manifest may declare only: $KNOWN_PACK_KEYS -- an unknown key such as cap_add, privileged or devices is refused rather than ignored (R7.8), because a schema field this compiler does not read is a capability request nothing enforces"
+  done <<< "$PACK_KEYS"
 done
 
 # ---- GATE (SC-3, R5.14) -- project-mount containment ----------------------------------------

@@ -60,3 +60,4 @@ runtime_install: false           # R7.6 -- true requires a recorded reason and r
 mounts: []                       # R7.3 -- required mounts and their modes. Keys must be in the R2 set
 env: []                          # R7.3 -- required environment variables
 credentials: []                  # R7.3 -- required credentials
+third_parties: []                # R14.1 -- required non-empty iff egress.runtime is non-empty (empty here: no runtime egress)

@@ -124,7 +124,7 @@ lint_pack_manifest() {
   # as absent. This is the same trap 01.3 documented for `provisional` and `tls`.
   local field
   for field in name description schema blast_radius needs_write_access packages egress \
-               runtime_install mounts env credentials; do
+               runtime_install mounts env credentials third_parties; do
     [[ "$(yq eval "has(\"$field\")" "$f")" == "true" ]] \
       || fail "$rel: mandatory field '$field' is missing"
   done
@@ -212,6 +212,52 @@ lint_pack_manifest() {
       [[ "$(yq eval ".egress.$field | has(\"$sub\")" "$f")" == "true" ]] \
         || fail "$rel: field 'egress.$field.$sub' is missing (must be present, may be empty)"
     done
+  done
+
+  # env / credentials: well-formedness only -- the build's enforcement gate (reserved names,
+  # duplicates, delivery-form validity) is compile-policy.sh's (02.3 Decision 1). This asks
+  # whether each entry has the shape Interface Contract 1 names, not whether it collides.
+  local ev_n cr_n
+  ev_n="$(yq eval '.env | length' "$f")"
+  for ((i = 0; i < ev_n; i++)); do
+    for field in name value reason; do
+      local v; v="$(yq eval ".env[$i].$field // \"\"" "$f")"
+      [[ -n "$v" ]] || fail "$rel: field 'env[$i].$field' is missing or empty"
+    done
+  done
+
+  cr_n="$(yq eval '.credentials | length' "$f")"
+  for ((i = 0; i < cr_n; i++)); do
+    for field in name description blast_radius revocation; do
+      local v; v="$(yq eval ".credentials[$i].$field // \"\"" "$f")"
+      [[ -n "$v" ]] || fail "$rel: field 'credentials[$i].$field' is missing or empty"
+    done
+    [[ "$(yq eval ".credentials[$i] | has(\"delivery\")" "$f")" == "true" ]] \
+      || fail "$rel: field 'credentials[$i].delivery' is missing"
+  done
+
+  # third_parties: required non-empty iff egress.runtime is non-empty (R14.1, criterion 3), and
+  # each entry's `record` must resolve to an anchor lint-policy can find on disk. This is the
+  # mechanical half of "no traffic before an assessment": the compiler refuses an EMPTY list
+  # (compile-policy.sh); this refuses a list whose anchor does not exist.
+  local rt_n tp_n
+  rt_n=$(( $(yq eval '.egress.runtime.allow_fqdns | length' "$f") + $(yq eval '.egress.runtime.allow_cidrs | length' "$f") ))
+  tp_n="$(yq eval '.third_parties | length' "$f")"
+  if ((rt_n > 0)); then
+    ((tp_n > 0)) || fail "$rel: declares $rt_n runtime egress entry(ies) but an empty third_parties (R14.1)"
+  fi
+  for ((i = 0; i < tp_n; i++)); do
+    local party record; party="$(yq eval ".third_parties[$i].party // \"\"" "$f")"
+    record="$(yq eval ".third_parties[$i].record // \"\"" "$f")"
+    [[ -n "$party" ]] || fail "$rel: field 'third_parties[$i].party' is missing or empty"
+    [[ -n "$record" ]] || fail "$rel: field 'third_parties[$i].record' is missing or empty"
+    local rec_file="${record%%#*}" rec_anchor="${record#*#}"
+    [[ "$record" == *"#"* ]] \
+      || fail "$rel: third_parties[$i].record '$record' has no '#anchor' component"
+    [[ -f "$REPO_ROOT/$rec_file" ]] \
+      || fail "$rel: third_parties[$i].record '$record' names a file that does not exist: $rec_file"
+    grep -q "id=\"$rec_anchor\"" "$REPO_ROOT/$rec_file" \
+      || fail "$rel: third_parties[$i].record '$record' does not resolve -- no id=\"$rec_anchor\" anchor in $rec_file"
   done
 
   echo "lint-policy: $rel is a well-formed pack manifest"

@@ -3,13 +3,13 @@
 # Verify with: bash scripts/compile-policy.sh --check
 schema: 1
 profile: default
-compiled_at: 2026-09-10T19:37:16Z
+compiled_at: 2026-09-10T21:41:05Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
   profile: profiles/default.yaml
   packs:
-    - {name: language-runtimes, path: packs/language-runtimes/pack.yaml, sha256: 1bf0613ff53ff4530ad7c17f48de50ddcf798aae3e6b4c5915df86f528991a29}
+    - {name: language-runtimes, path: packs/language-runtimes/pack.yaml, sha256: 3db75d16933588a9e52c6ec1e5eaec1f51a91a5c69631173be09be50943b982e}
 provisional: true
 pins: agent-verification.md
 

@@ -14,19 +14,20 @@ Two consumers read these files, and only one of them is the policy compiler:
 | the agent image build (`images/Dockerfile`) | `packages`, `egress.build` | the installed toolchain in that agent's image layer |
 
 
-**`mounts`, `env` and `credentials` are declared but not yet consumed, and the compiler REFUSES a
-pack that populates them** (exit 3, added at 01.5 SF-3). The resolved policy schema is fixed by
-01.3 Interface Contract 1 and has no field for any of the three, so a declared entry would be
-dropped silently -- which is indistinguishable from one correctly refused, right up to the day the
-field is implemented. The landing points differ and are not one deferral:
+**`env` and `credentials` gained landing points at 02.3. `mounts` stays refused** (exit 3). The
+resolved policy schema is fixed by 01.3 Interface Contract 1 and has no field for a pack mount, so
+a declared one would be dropped silently -- which is indistinguishable from one correctly refused,
+right up to the day the field is implemented. The three land differently:
 
 | Field | Status | Landing point |
 |---|---|---|
-| `mounts` | key gated against the closed R2 set (`project`, `build_cache`, `host_git_config`) at exit 3; a populated list is refused | 01.5 SF-5, with the per-agent build cache and the mount-set assertion |
-| `env` | populated list refused | no contract exists. Per-variable delivery today is a hand-authored Compose fragment under `compose/overrides/`, and extending one to pack content is a decision no sub-feature of 01.5 owns |
-| `credentials` | populated list refused | no contract exists, and R8 bars baking a secret into an image -- so a build argument is not the mechanism either |
+| `mounts` | key gated against the closed R2 set (`project`, `build_cache`, `host_git_config`) at exit 3; a populated list is refused | No shipped pack needs a host mount -- state and caches land under `/home/agent`. A pack mount is a design change reviewed against R2.8's enumeration, never a default a manifest can opt into |
+| `env` | validated against Interface Contract 1 (name, reserved names, literal value, `reason`) | non-secret, baked into the per-profile image; the entrypoint exports it before the agent starts (02.3 Decision 1) |
+| `credentials` | validated against Interface Contract 1 (name, delivery form, `description`, `blast_radius`, `revocation`) | secret, never in an image layer (R8.1); becomes a Compose `file:` secret, sourced per profile under `compose/generated/credentials/<profile>/<pack>/<cred>` (02.3 Decision 1) |
+| `third_parties` | required non-empty iff `egress.runtime` is non-empty; each entry's `record` must resolve to an anchor in `docs/records/third-party-assessments.md` | R14.1 -- named before any traffic reaches the party |
 
-The reference pack declares all three as empty lists, so nothing about it is blocked by this.
+The reference pack declares all four as empty lists (no runtime egress, so no third party either),
+so nothing about it is blocked by this.
 
 A change to the schema below therefore touches both readers.
 
@@ -50,8 +51,9 @@ as a pack that needs none.
 | `runtime_install` | R7.6 | `true` requires `runtime_install_reason` **and** non-empty `egress.runtime`. Both directions are enforced |
 | `runtime_install_reason` | R7.6 | mandatory **only** where `runtime_install: true`; absent otherwise, as in this pack. Must be TEXT: an empty list or map is refused, because yq renders both as printable strings and a `[]` here would record nothing while looking filled in |
 | `mounts` | R7.3 | required mounts and their modes. Keys must be in the enumerated R2 set |
-| `env` | R7.3 | required environment variables |
-| `credentials` | R7.3 | required credentials |
+| `env` | R7.3 | non-secret environment variables; each entry names, values and gives a `reason` (Interface Contract 1) |
+| `credentials` | R7.3 | secret credentials; each entry names, gives a `delivery` (`{env: VAR}` or `{path_env: VAR}`), a `description`, a `blast_radius` (R8.4) and a `revocation` path (R7.12) |
+| `third_parties` | R14.1 | required non-empty iff `egress.runtime` is non-empty; each entry's `record` resolves to an anchor in `docs/records/third-party-assessments.md` |
 
 `runtime_install` and its reason are refused in **both** directions (01.5 SF-2). Runtime egress
 with `runtime_install: false` is a widening R7.6 requires declared; `runtime_install: true` with
