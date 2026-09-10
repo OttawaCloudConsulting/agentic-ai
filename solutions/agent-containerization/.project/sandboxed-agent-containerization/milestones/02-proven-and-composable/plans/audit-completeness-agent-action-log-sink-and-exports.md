@@ -353,13 +353,13 @@ Following 01.6 Decision 8, these known breakages are fixed in the SF that causes
   - L: one live session per agent, gated by `AUDIT_LIVE_SESSION=1` following the
     `AUTH_SKIP_PHASE_D` precedent. The operator runs it once at SF close and records it.
   Add the README `jq` join recipe.
-- [ ] **SF-4: Exports and T36.** Compiler: emit and validate `exports`, then recompile all three
+- [x] **SF-4: Exports and T36.** Compiler: emit and validate `exports`, then recompile all three
   resolved artifacts in the same commit. Mediator: relay gating, the `export_config` event and the
   supervisor change. Recorder: relay gating. Add `scripts/export-artifacts.sh` and call it from
   `build.sh`. Add `compose/overrides/test-exports.yaml`. Harness phase E: four variants in turn,
   each asserting that recording continues, the disabled channel is absent, the other three are
   present, and `export_config` names the disabled export. Add `exports/` to `.gitignore`.
-- [ ] **SF-5: R8.6, documentation and close.** Harness phase F: scan every action volume for the
+- [x] **SF-5: R8.6, documentation and close.** Harness phase F: scan every action volume for the
   literal proxy passwords (read from the Compose secret files), the userinfo pattern and the token
   prefixes. Apply the mitigation that SF-1's finding selects (Decision 8 default: redaction on the
   export relay). Record the finding and mitigation in `credential-inventory.md`. README audit

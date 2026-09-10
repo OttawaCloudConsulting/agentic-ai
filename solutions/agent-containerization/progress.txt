@@ -14,7 +14,7 @@
 ## Milestones
 
 [x] Milestone 01: Sandboxed Pod  .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/  6/6 features complete
-[ ] Milestone 02: Proven and Composable  .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/  0/5 features complete
+[ ] Milestone 02: Proven and Composable  .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/  1/5 features complete
 [ ] Milestone 03: AWS Access  .project/sandboxed-agent-containerization/milestones/03-aws-access/  0/5 features complete
 
 ## Spikes
