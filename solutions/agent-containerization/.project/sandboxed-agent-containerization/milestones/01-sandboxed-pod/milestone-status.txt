@@ -1,5 +1,9 @@
 # Milestone 01: Sandboxed Pod
-# Status: [~] in progress  6 features, 5 complete
+# Status: [~] in progress  6 features, 6 complete
+# All six features are built and their test commands are green. The milestone's Definition of
+# Done is NOT discharged -- see the README's checklist: the gate-3 review, the SC-4 end-to-end
+# restart demonstration (T9) and the allowlist provisional-status note are outstanding. The
+# status stays [~] until those are done rather than being closed on feature count alone.
 
 ## Features
 
@@ -938,7 +942,7 @@
     passing is a regression check and not a formality. 20 architectural deviations recorded
     across the feature; /design refresh is worth running to consolidate them.
 
-[~] Feature 01.6: Per-agent workload identity
+[x] Feature 01.6: Per-agent workload identity
     Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/per-agent-workload-identity.md
     Sub-features: 4/4 complete
     Notes: Created 2026-09-04 by /milestone revision -- split out of 01.3. Closes R8.8 with the
@@ -1093,3 +1097,23 @@
     and the published base image's missing ENTRYPOINT is documented where local builds are
     described, with SF-3's Deviation 10 trap named -- a file baked into the digest-pinned base
     reaches no local build, and bootstrap-auth.sh still carries it.
+    Completed 2026-09-09. TEST COMMAND GREEN END TO END on the second run: 269 PASS / 0 FAIL,
+    exit 0, pack-composition and pod-topology both green, egress-mediator ALL PHASES PASSED,
+    lint-policy OK. The FIRST run failed 1/269 and the failure was a THIRD assertion defect of the
+    same class, pre-existing and found here rather than caused here: the SF-2 assertion that
+    proves client-certificate verification is on read its outcome with an unanchored
+    `grep -q "200"`, and OpenSSL's per-run 16-hex-digit error prefix came up 200067BE on that run.
+    The harness reported a cert-less client ACCEPTED while printing the `tlsv13 alert certificate
+    required` transcript that refuted it, and the adjacent no-verdict-line assertion passed. Fixed
+    by anchoring to the status line (6eeead0), verified against the exact failing transcript, and
+    scoped to that one call site on the operator's call.
+    RESIDUAL, open and deliberate: ELEVEN sibling call sites in verify-egress-mediator.sh carry the
+    same unanchored `grep -q "200"|"403"|"407"` idiom, including one Phase H added at SF-4. Each can
+    produce the same intermittent false verdict whenever a probe keeps stderr and OpenSSL's random
+    prefix contains the digits. A re-run makes any of them go green without fixing anything, which
+    is what makes the class expensive to diagnose twice. The fix is one `http_status` helper and
+    twelve call sites; it is a /design refresh or a standalone fix candidate, not carried here.
+    THREE assertion defects of one shape were found across this feature (Phase G's vacuous pass,
+    the mount-set predicate duplicated across three harnesses, this one). The pattern is worth
+    naming at the refresh: assertions that read a substring where they mean a field, in harnesses
+    that each re-implement the same predicate.
