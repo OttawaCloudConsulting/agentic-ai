@@ -55,6 +55,13 @@ fi
 
 mkdir -p "$STATE_DIR"
 
+# 02.1 SF-4 (R9.9, D11, Decision 6): the `agent_action_log` export is this
+# stdout relay alone. Recording is unaffected by construction -- the sink append
+# two lines down does not read this value, so no profile setting can reach it.
+EXPORT_AGENT_ACTION_LOG="$(yq eval '.exports.agent_action_log' "$RESOLVED" 2>/dev/null)"
+[ "$EXPORT_AGENT_ACTION_LOG" = "true" ] || [ "$EXPORT_AGENT_ACTION_LOG" = "false" ] \
+  || EXPORT_AGENT_ACTION_LOG="true"
+
 jstr() { jq -Rn --arg v "$1" '$v'; }
 
 emit() {
@@ -65,7 +72,8 @@ emit() {
   line="$(jq -cn --arg ts "$ts" --arg agent "$AGENT_IDENTITY" --argjson rest "$1" \
     '{ts: $ts, agent: $agent, identity_source: "state_volume"} + $rest')"
   printf '%s\n' "$line" >> "$SINK_LOG"
-  printf '%s\n' "$line"
+  [ "$EXPORT_AGENT_ACTION_LOG" = "true" ] && printf '%s\n' "$line"
+  return 0
 }
 
 session_id_for() {

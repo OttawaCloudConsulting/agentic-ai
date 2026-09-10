@@ -11,6 +11,10 @@ references/.env_keys
 # SF-2 fixture scratch (throwaway PKI, proxy logs, agent workspaces)
 .build-scratch/
 
+# 02.1 SF-4: scripts/export-artifacts.sh output (R9.9). Reviewable inputs are
+# policy/resolved/*.yaml and .build-scratch/build/*.images.txt; this is a derived copy.
+exports/
+
 # Generated trust material (01.3 SF-3). mediator/identity/ carries its own
 # deny-all .gitignore; this is the second line of defence, so a private key
 # cannot be committed by someone working from the repository root who has not

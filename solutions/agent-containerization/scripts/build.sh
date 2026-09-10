@@ -107,6 +107,15 @@ record_one() {
 
 echo
 echo "build: recorded ${RECORD}"
+
+# Export-artifact producer (02.1 SF-4, Interface Contract 6). Called here, after the
+# build record above exists, because image_digest_sbom reads exactly that record.
+RESOLVED_ARTIFACT="policy/resolved/${PROFILE}.yaml"
+if [[ -f "$RESOLVED_ARTIFACT" ]]; then
+  bash scripts/export-artifacts.sh --resolved "$RESOLVED_ARTIFACT" --out "exports/${PROFILE}"
+else
+  echo "build: no committed policy/resolved/${PROFILE}.yaml -- skipping export-artifacts.sh (see scripts/compile-policy.sh)" >&2
+fi
 echo "build: the agent images are also tagged :${PROFILE}, so a second profile's build does not"
 echo "build: silently replace this one's -- Compose's own :local tag is reused by every profile."
 echo

@@ -1172,6 +1172,17 @@ bad="$(printf '%s' "$AUDIT_SNAPSHOT" | jq -c 'select((.verdict != null) == (.eve
 [ -z "$bad" ] && pass "Contract 4: every line is either a verdict or an event, never both" \
               || { fail "Contract 4: malformed lines"; note "$bad"; }
 
+# 02.1 SF-4, Decision 9: `export_config` (Interface Contract 5) is a new event line, and this
+# is asserted -- not assumed -- to hold Contract 4's shape: an `event` key and no `verdict` key,
+# so the check above accepts it rather than flagging it as malformed.
+if printf '%s' "$AUDIT_SNAPSHOT" \
+     | jq -e 'select(.event == "export_config") | (.verdict == null) and (.exports | type == "object") and (.exports | length == 4)' \
+     >/dev/null 2>&1; then
+  pass "Contract 5: export_config is present, carries no verdict, and names all four exports"
+else
+  fail "Contract 5: export_config is missing or malformed"
+fi
+
 # One verdict per attempt: a bumping listener's CONNECT-acceptance record is an event, and a
 # fronted agent's tunnel line is dropped, so a denied attempt cannot also appear as an allow.
 for host in denied.fixture.lab neighbour.fixture.lab denied-by-fqdn.fixture.lab; do

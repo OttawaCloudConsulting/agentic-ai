@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Acceptance test for Feature 02.1 SF-3 (T35, correlation, the privilege-change limb).
-# See the feature plan's Test Strategy for what each phase maps to.
+# Acceptance test for Feature 02.1 SF-3 (T35, correlation, the privilege-change limb) and
+# SF-4 (exports, T36). See the feature plan's Test Strategy for what each phase maps to.
 #
 # Requires: docker, docker compose, jq. Invoked as `bash tests/acceptance/verify-audit-completeness.sh`.
 #
-# Phases A-D run unattended against synthetic transcript writes made from inside each agent
+# Phases A-E run unattended against synthetic transcript writes made from inside each agent
 # container as uid 1000 -- no model tokens spent. Phase L is a real, authenticated session per
 # agent and is OFF by default (AUDIT_LIVE_SESSION=1 to run it), following the AUTH_SKIP_PHASE_D
 # precedent in verify-auth-state.sh, but with the opposite default: this harness runs unattended
@@ -444,6 +444,134 @@ for a in "${AGENTS[@]}"; do
 done
 note "Finding (D15): no privilege-change event is reachable from inside any agent container."
 note "The evidence above IS the finding; no privilege-change line needs recording because none can occur."
+
+# ---------------------------------------------------------------------------
+# Phase E -- exports and T36 (02.1 SF-4, R9.9, D11, Decision 7)
+#
+# Four scratch-compiled variants of `default`, one toggle false at a time (Decision
+# 7), each brought up as its OWN small stack -- egress-mediator, claude-recorder and
+# one `claude` session -- under compose/overrides/test-exports.yaml, which mounts the
+# variant over the mediator's baked policy path and the recorders' `configs:` source.
+# `default`'s own stage 1/2 startup self-check is the "traffic" that populates the
+# egress trail; a synthetic transcript append (Phase A's idiom) populates the action
+# trail. Per variant: recording continues on both trails, the disabled channel is
+# absent (relay toggles) or the MANIFEST says so (file toggles), the other channels
+# are unaffected, and `export_config` names exactly the disabled toggle false.
+# ---------------------------------------------------------------------------
+phase "E -- exports and T36"
+
+mkdir -p .build-scratch/t36
+EXPORT_TOGGLES="egress_audit_log agent_action_log resolved_policy image_digest_sbom"
+
+for toggle in $EXPORT_TOGGLES; do
+  VARIANT_SRC=".build-scratch/t36/${toggle}-profile.yaml"
+  VARIANT=".build-scratch/t36/variant.yaml"
+  sed "s/^  ${toggle}: true\$/  ${toggle}: false/" profiles/default.yaml > "$VARIANT_SRC"
+  if bash scripts/compile-policy.sh --profile default --profile-file "$VARIANT_SRC" --out "$VARIANT" >/dev/null 2>&1; then
+    pass "E ($toggle): compiled a 'default' variant with ${toggle}=false"
+  else
+    fail "E ($toggle): could not compile the variant"; rm -f "$VARIANT_SRC"; continue
+  fi
+  rm -f "$VARIANT_SRC"
+
+  EPROJECT="sf9-t36-${toggle}-$$"
+  ECOMPOSE=(docker compose --env-file compose/pins.env
+            -f compose/compose.yaml -f compose/overrides/default.yaml
+            -f compose/overrides/test-exports.yaml -p "$EPROJECT")
+  ecleanup() {
+    docker rm -f "${EPROJECT}-claude" >/dev/null 2>&1 || true
+    "${ECOMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+  }
+
+  if ! "${ECOMPOSE[@]}" up -d egress-mediator claude-recorder >/dev/null 2>&1; then
+    fail "E ($toggle): stack bring-up"; ecleanup; continue
+  fi
+
+  eup=0
+  for _ in $(seq 1 60); do
+    docker exec "${EPROJECT}-egress-mediator-1" true >/dev/null 2>&1 && { eup=1; break; }
+    sleep 1
+  done
+  if [ "$eup" -ne 1 ]; then
+    fail "E ($toggle): mediator never came up"; ecleanup; continue
+  fi
+
+  # Recording continues on the egress trail (D11): the mediator's own startup
+  # self-check writes stage 1/2 events whatever the export toggles say.
+  egress_lines="$(docker exec "${EPROJECT}-egress-mediator-1" sh -c 'wc -l < /var/log/mediator/egress-audit.log' 2>/dev/null || echo 0)"
+  [ "${egress_lines:-0}" -gt 0 ] \
+    && pass "E ($toggle): the egress trail gained lines (self-check) -- recording continues" \
+    || fail "E ($toggle): the egress trail is empty"
+
+  # Recording continues on the action trail: one synthetic tool-call append.
+  CID_UNUSED="$("${ECOMPOSE[@]}" run -d --name "${EPROJECT}-claude" --rm claude sleep 60)"
+  E_SESSION="e4e4e4e4-0000-4000-8000-e4e4e4e4e4e4"
+  E_MARK="sf4-t36-${toggle}"
+  docker exec "${EPROJECT}-claude" mkdir -p /home/agent/.claude/projects/-scratch
+  docker exec "${EPROJECT}-claude" sh -c \
+    "printf '%s\n' '{\"type\":\"tool_call\",\"sessionId\":\"$E_SESSION\",\"name\":\"$E_MARK\"}' >> /home/agent/.claude/projects/-scratch/$E_SESSION.jsonl"
+  wait_until 5 sh -c "docker exec ${EPROJECT}-claude-recorder-1 sh -c \"grep -q ${E_MARK} /var/log/actions/action-audit.log\""
+  action_lines="$(docker exec "${EPROJECT}-claude-recorder-1" sh -c 'wc -l < /var/log/actions/action-audit.log' 2>/dev/null || echo 0)"
+  [ "${action_lines:-0}" -gt 0 ] \
+    && pass "E ($toggle): the action trail gained lines -- recording continues" \
+    || fail "E ($toggle): the action trail is empty"
+
+  mlog="$("${ECOMPOSE[@]}" logs egress-mediator 2>/dev/null)"
+  rlog="$("${ECOMPOSE[@]}" logs claude-recorder 2>/dev/null)"
+  case "$toggle" in
+    egress_audit_log)
+      printf '%s' "$mlog" | grep -q '"stage":1' \
+        && fail "E ($toggle): the egress-audit.log/dns-audit.log relay is present, though disabled" \
+        || pass "E ($toggle): the egress-audit.log/dns-audit.log relay is absent, as disabled"
+      printf '%s' "$rlog" | grep -q "$E_MARK" \
+        && pass "E ($toggle): the agent_action_log relay is unaffected (still present)" \
+        || fail "E ($toggle): the agent_action_log relay unexpectedly stopped"
+      ;;
+    agent_action_log)
+      printf '%s' "$rlog" | grep -q "$E_MARK" \
+        && fail "E ($toggle): the agent_action_log relay is present, though disabled" \
+        || pass "E ($toggle): the agent_action_log relay is absent, as disabled"
+      printf '%s' "$mlog" | grep -q '"stage":1' \
+        && pass "E ($toggle): the egress-audit.log/dns-audit.log relay is unaffected (still present)" \
+        || fail "E ($toggle): the egress-audit.log/dns-audit.log relay unexpectedly stopped"
+      ;;
+    resolved_policy|image_digest_sbom)
+      printf '%s' "$mlog" | grep -q '"stage":1' \
+        && pass "E ($toggle): the egress-audit.log relay is unaffected (a file export, not a relay)" \
+        || fail "E ($toggle): the egress-audit.log relay unexpectedly stopped"
+      printf '%s' "$rlog" | grep -q "$E_MARK" \
+        && pass "E ($toggle): the agent_action_log relay is unaffected (a file export, not a relay)" \
+        || fail "E ($toggle): the agent_action_log relay unexpectedly stopped"
+      ;;
+  esac
+
+  ec="$(docker exec "${EPROJECT}-egress-mediator-1" sh -c 'grep export_config /var/log/mediator/egress-audit.log | tail -1' 2>/dev/null)"
+  if printf '%s' "$ec" | jq -e --arg t "$toggle" '.exports[$t] == false' >/dev/null 2>&1; then
+    pass "E ($toggle): export_config names ${toggle} false"
+  else
+    fail "E ($toggle): export_config does not name ${toggle} false"; note "$ec"
+  fi
+  if printf '%s' "$ec" | jq -e --arg t "$toggle" '[.exports | to_entries[] | select(.key != $t) | .value] | all' >/dev/null 2>&1; then
+    pass "E ($toggle): export_config names the other three exports true"
+  else
+    fail "E ($toggle): export_config does not name the other three exports true"; note "$ec"
+  fi
+
+  # File exports (resolved_policy, image_digest_sbom): MANIFEST records the toggle.
+  rm -rf ".build-scratch/t36/out-${toggle}"
+  bash scripts/export-artifacts.sh --resolved "$VARIANT" --out ".build-scratch/t36/out-${toggle}" >/dev/null 2>&1
+  manifest_line="$(grep "^${toggle} " ".build-scratch/t36/out-${toggle}/MANIFEST" 2>/dev/null || true)"
+  case "$toggle" in
+    resolved_policy|image_digest_sbom)
+      printf '%s' "$manifest_line" | grep -qx "${toggle} disabled" \
+        && pass "E ($toggle): MANIFEST records '${toggle} disabled'" \
+        || fail "E ($toggle): MANIFEST does not record '${toggle} disabled' (got '${manifest_line}')" ;;
+    *) note "E ($toggle): not a file export -- MANIFEST check not applicable" ;;
+  esac
+
+  ecleanup
+done
+rm -rf .build-scratch/t36
 
 # ---------------------------------------------------------------------------
 # Phase L -- one live, authenticated session per agent (T35's real-world case)

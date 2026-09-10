@@ -43,6 +43,7 @@ ALLOWLIST_IN=""
 DENYLIST_IN=""
 OUT=""
 VALIDATE_TARGET=""
+PROFILE_FILE_IN=""
 
 # Exit codes (01.5 Interface Contract 6). The shipped 01.3 form exited 1 for everything; 2 and 3
 # are added here because SF-2's gates need them -- a REFUSAL is a recorded policy decision the
@@ -92,6 +93,13 @@ PACK_RE='^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$'
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile)  PROFILE="${2:?--profile needs a value}"; shift 2 ;;
+    # 02.1 SF-4 (Decision 7 trigger, docs/records/agent-action-log.md "Compiler
+    # measurement"): --profile compiles profiles/<name>.yaml only. T36's harness
+    # compiles four scratch variants under .build-scratch/t36/, outside profiles/,
+    # so this reads the PROFILE FILE from an explicit path while --profile still
+    # names the artifact ('profile:' field, default OUT path). Not a general
+    # profile-directory feature -- the one caller this exists for is named above.
+    --profile-file) PROFILE_FILE_IN="${2:?--profile-file needs a path}"; shift 2 ;;
     --out)      OUT="${2:?--out needs a value}"; shift 2 ;;
     --allowlist) ALLOWLIST_IN="${2:?--allowlist needs a path}"; shift 2 ;;
     --denylist)  DENYLIST_IN="${2:?--denylist needs a path}"; shift 2 ;;
@@ -106,7 +114,7 @@ command -v yq >/dev/null 2>&1 || fail "yq is required (https://github.com/mikefa
 
 ALLOWLIST="${ALLOWLIST_IN:-$REPO_ROOT/policy/allowlist.base.yaml}"
 DENYLIST="${DENYLIST_IN:-$REPO_ROOT/policy/denylist.base.yaml}"
-PROFILE_FILE="$REPO_ROOT/profiles/${PROFILE}.yaml"
+PROFILE_FILE="${PROFILE_FILE_IN:-$REPO_ROOT/profiles/${PROFILE}.yaml}"
 RESOLVED_DIR="$REPO_ROOT/policy/resolved"
 [[ -n "$OUT" ]] || OUT="$RESOLVED_DIR/${PROFILE}.yaml"
 
@@ -343,6 +351,25 @@ validate_resolved() {
   [[ "$offline" == "true" || "$offline" == "false" ]] \
     || invalid "$f: startup_check.offline must be true or false, found '$offline'"
 
+  # 02.1 SF-4: required, exactly the four keys. A resolved artifact compiled before this key
+  # existed must fail --validate loudly (T17's path) rather than let the mediator or a recorder
+  # assume a default the artifact never recorded.
+  [[ "$(yq eval 'has("exports")' "$f")" == "true" ]] \
+    || invalid "$f: field 'exports' is missing (R9.9). Recompile with scripts/compile-policy.sh"
+  require_tag "$f" '.exports' '!!map' "$f: field 'exports' must be a mapping"
+  local export_keys="egress_audit_log agent_action_log resolved_policy image_digest_sbom"
+  local ek
+  for ek in $export_keys; do
+    [[ "$(yq eval ".exports | has(\"$ek\")" "$f")" == "true" ]] \
+      || invalid "$f: field 'exports.$ek' is missing"
+    local ev; ev="$(yq eval ".exports.$ek" "$f")"
+    [[ "$ev" == "true" || "$ev" == "false" ]] \
+      || invalid "$f: field 'exports.$ek' must be true or false, found '$ev'"
+  done
+  local export_count; export_count="$(yq eval '.exports | keys | length' "$f")"
+  [[ "$export_count" == "4" ]] \
+    || invalid "$f: field 'exports' must carry exactly the four keys ($export_keys), found $export_count"
+
   echo "compile-policy: $f validates against schema 1"
 }
 
@@ -363,7 +390,7 @@ done
 # the operator's directory layout into a committed file.
 REL_ALLOWLIST="${ALLOWLIST#$REPO_ROOT/}"
 REL_DENYLIST="${DENYLIST#$REPO_ROOT/}"
-REL_PROFILE="profiles/${PROFILE}.yaml"
+REL_PROFILE="${PROFILE_FILE_IN:-profiles/${PROFILE}.yaml}"
 
 # --------------------------------------------------------------------------------------------
 # Profile schema validation (exit 2) and the build-refusal gates (exit 3) -- 01.5 SF-2
@@ -1066,6 +1093,38 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
   echo "  allowed: {agent: $(yq eval '.startup_check.allowed.agent' "$PROFILE_FILE"), fqdn: $(yq eval '.startup_check.allowed.fqdn' "$PROFILE_FILE"), port: $(yq eval '.startup_check.allowed.port' "$PROFILE_FILE")}"
   echo "  denied: {ip: $(yq eval '.startup_check.denied.ip' "$PROFILE_FILE"), port: $(yq eval '.startup_check.denied.port' "$PROFILE_FILE")}"
   echo "  offline: $(yq eval '.startup_check.offline' "$PROFILE_FILE")"
+
+  # ---- exports (02.1 SF-4, R9.9/D11) -----------------------------------------------------
+  # A missing block resolves to all four true -- an operator who never heard of exports still
+  # gets every export, the pre-02.1 default. An unknown key or a non-boolean is an INPUT error:
+  # the toggle set is closed, because entrypoint.sh and recorder.sh each branch on exactly these
+  # four names and a fifth key would be read by nothing, silently.
+  echo ""
+  echo "exports:"
+  EXPORT_KEYS="egress_audit_log agent_action_log resolved_policy image_digest_sbom"
+  HAS_EXPORTS_BLOCK="$(yq eval 'has("exports")' "$PROFILE_FILE")"
+  if [[ "$HAS_EXPORTS_BLOCK" == "true" ]]; then
+    require_tag "$PROFILE_FILE" '.exports' '!!map' \
+      "$REL_PROFILE: field 'exports' must be a mapping of the four export toggles"
+    PROFILE_EXPORT_KEYS="$(yq eval '.exports | keys | .[]' "$PROFILE_FILE")"
+    while IFS= read -r pk; do
+      [[ -z "$pk" ]] && continue
+      case " $EXPORT_KEYS " in
+        *" $pk "*) : ;;
+        *) invalid "$REL_PROFILE: exports.${pk} is not a recognised export. The four exports are: ${EXPORT_KEYS}" ;;
+      esac
+    done <<< "$PROFILE_EXPORT_KEYS"
+  fi
+  for ek in $EXPORT_KEYS; do
+    if [[ "$HAS_EXPORTS_BLOCK" == "true" && "$(yq eval ".exports | has(\"$ek\")" "$PROFILE_FILE")" == "true" ]]; then
+      EV="$(yq eval ".exports.${ek}" "$PROFILE_FILE")"
+      [[ "$EV" == "true" || "$EV" == "false" ]] \
+        || invalid "$REL_PROFILE: exports.${ek} must be true or false, found '$EV'"
+    else
+      EV="true"
+    fi
+    echo "  ${ek}: ${EV}"
+  done
 } > "$TMP"
 
 if [[ "$MODE" == "check" ]]; then

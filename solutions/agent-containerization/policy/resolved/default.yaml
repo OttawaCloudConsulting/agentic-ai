@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check
 schema: 1
 profile: default
-compiled_at: 2026-09-10T01:04:58Z
+compiled_at: 2026-09-10T19:37:16Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
@@ -65,3 +65,9 @@ startup_check:
   allowed: {agent: claude, fqdn: api.anthropic.com, port: 443}
   denied: {ip: 169.254.169.254, port: 443}
   offline: false
+
+exports:
+  egress_audit_log: true
+  agent_action_log: true
+  resolved_policy: true
+  image_digest_sbom: true

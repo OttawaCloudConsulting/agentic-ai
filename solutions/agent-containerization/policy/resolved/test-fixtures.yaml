@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check --profile test-fixtures --allowlist policy/allowlist.test.yaml --denylist policy/denylist.test.yaml
 schema: 1
 profile: test-fixtures
-compiled_at: 2026-09-10T01:05:33Z
+compiled_at: 2026-09-10T19:37:52Z
 compiled_from:
   allowlist: policy/allowlist.test.yaml
   denylist: policy/denylist.test.yaml
@@ -60,3 +60,9 @@ startup_check:
   allowed: {agent: claude, fqdn: allowed.fixture.lab, port: 443}
   denied: {ip: 169.254.169.254, port: 443}
   offline: true
+
+exports:
+  egress_audit_log: true
+  agent_action_log: true
+  resolved_policy: true
+  image_digest_sbom: true

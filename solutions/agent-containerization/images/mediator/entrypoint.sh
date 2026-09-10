@@ -189,6 +189,23 @@ fi
 audit_event "\"stage\":1,\"result\":\"pass\",\"profile\":\"${MEDIATOR_PROFILE}\",\"policy\":\"${POLICY_SOURCE}\""
 note "stage 1 self-check: ${_v1}"
 
+# ------------------------------------------------------------------ export toggles
+# 02.1 SF-4 (R9.9, D11, T36). Read once here, right after stage 1 validates the
+# artifact carries the block. Recording itself never reads these -- the audit writer
+# and the recorder's sink append do not consult them (D11) -- only the stdout relay
+# started below does. `export_config` is written unconditionally, whatever is
+# disabled, so the record of the toggle state exists no matter which channel it
+# describes is off.
+EXPORT_EGRESS_AUDIT_LOG="$(yq eval '.exports.egress_audit_log' "$RESOLVED_POLICY")"
+EXPORT_AGENT_ACTION_LOG="$(yq eval '.exports.agent_action_log' "$RESOLVED_POLICY")"
+EXPORT_RESOLVED_POLICY="$(yq eval '.exports.resolved_policy' "$RESOLVED_POLICY")"
+EXPORT_IMAGE_DIGEST_SBOM="$(yq eval '.exports.image_digest_sbom' "$RESOLVED_POLICY")"
+printf '{"ts":"%s","event":"export_config","profile":"%s","exports":{"agent_action_log":%s,"egress_audit_log":%s,"image_digest_sbom":%s,"resolved_policy":%s}}\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)" "$MEDIATOR_PROFILE" \
+  "$EXPORT_AGENT_ACTION_LOG" "$EXPORT_EGRESS_AUDIT_LOG" "$EXPORT_IMAGE_DIGEST_SBOM" "$EXPORT_RESOLVED_POLICY" \
+  >> "$AUDIT_LOG" \
+  || note "WARNING: could not write an export_config event to $AUDIT_LOG -- the audit sink is not accepting writes"
+
 # ---------------------------------------------- stage 2's inputs, read and checked
 # Read here rather than at probe time so a malformed startup_check fails the start
 # next to stage 1's other checks, not eight steps later with the listeners already up.
@@ -989,9 +1006,21 @@ dnsdist --check-config -C "$POLICY_CONF" >/dev/null 2>&1 \
 # relayed the same way, so both trails reach both sinks.
 CHILDREN=()
 
-tail -n 0 -F "$AUDIT_LOG"     >&1 & CHILDREN+=($!); TAIL_AUDIT=$!
+# The `egress_audit_log` export (Decision 6) is these two relays -- the only path by
+# which either log leaves the pod for outside consumption. Disabled, the relay is
+# ABSENT, not started and not watched: the supervisor below only treats an absent
+# relay as configured because TAIL_AUDIT/TAIL_DNS stay unset, so `case "$DIED"` never
+# matches an empty variable. `squid-cache.log` is diagnostics, not an export, and is
+# always relayed.
+TAIL_AUDIT=""
+TAIL_DNS=""
+if [ "$EXPORT_EGRESS_AUDIT_LOG" = "true" ]; then
+  tail -n 0 -F "$AUDIT_LOG"     >&1 & CHILDREN+=($!); TAIL_AUDIT=$!
+  tail -n 0 -F "$DNS_AUDIT_LOG" >&1 & CHILDREN+=($!); TAIL_DNS=$!
+else
+  note "export egress_audit_log is disabled -- the egress-audit.log and dns-audit.log stdout relays are not started. Recording is unaffected: the audit writer still appends to $AUDIT_LOG on the volume (D11)."
+fi
 tail -n 0 -F "$CACHE_LOG"     >&2 & CHILDREN+=($!); TAIL_CACHE=$!
-tail -n 0 -F "$DNS_AUDIT_LOG" >&1 & CHILDREN+=($!); TAIL_DNS=$!
 
 # The audit writer, started BEFORE squid. It blocks opening the FIFO until a writer
 # appears, and squid blocks opening it until a reader does -- so this order is what
