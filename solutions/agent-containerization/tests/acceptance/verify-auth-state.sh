@@ -682,18 +682,28 @@ credential_present() { # <agent>  -- shape only, never content
               'test -s /state/.claude/.credentials.json || test -s /state/.claude.json' ;;
     codex)  volume_has "${PROJECT}_codex-state" \
               'grep -q "\"refresh_token\"" /state/.codex/auth.json' ;;
-    agy)    return 0 ;;  # apikey is env-delivered by design: nothing is persisted to assert
+    # agy's credential is env-delivered by design, so there is nothing persisted to assert and
+    # "still authenticated after a restart" is true by construction -- the key is re-supplied at
+    # start. Its SESSION STATE is a different half and is NOT trivial: agy has a state volume
+    # like the other two, and the marker below asserts it. See PERSIST_AGENTS.
+    agy)    return 0 ;;
   esac
 }
 
+# T9 and SC-4 both say ALL THREE agents, so all three are exercised here. Until 01.6 SF-4 this
+# loop ran claude and codex only, on the reasoning that agy persists no credential -- which is
+# true of the credential half and says nothing about the session-state half. The marker is the
+# assertion agy was missing, and it is the one T9's "state intact" wording actually names.
+PERSIST_AGENTS=(claude codex agy)
+
 # --- restart form ----------------------------------------------------------
-for agent in claude codex; do
+for agent in "${PERSIST_AGENTS[@]}"; do
   "${COMPOSE[@]}" run -d --name "${PROJECT}-p-${agent}" \
                   -e "AUTH_MODE=${EMODE[$agent]}" "$agent" sleep 600 >/dev/null
   docker exec "${PROJECT}-p-${agent}" sh -c "echo session-state > $MARKER" >/dev/null 2>&1
 done
 
-for agent in claude codex; do
+for agent in "${PERSIST_AGENTS[@]}"; do
   docker restart "${PROJECT}-p-${agent}" >/dev/null 2>&1
   # A restart re-runs the entrypoint, and therefore bootstrap-auth's --at-start pass. A
   # container that came back up at all has already passed the fail-closed half.
@@ -711,7 +721,7 @@ if [ "$AUTH_LIVE_RUN" = "1" ]; then
                   || { fail "codex: login status exited $rc after restart"; note "$(echo "$out" | tail -2)"; }
 fi
 
-for agent in claude codex; do docker rm -f "${PROJECT}-p-${agent}" >/dev/null 2>&1 || true; done
+for agent in "${PERSIST_AGENTS[@]}"; do docker rm -f "${PROJECT}-p-${agent}" >/dev/null 2>&1 || true; done
 
 # --- rebuild form ----------------------------------------------------------
 #
@@ -721,7 +731,7 @@ echo "--- down (no -v) -> build -> up ---"
 "${COMPOSE[@]}" down --remove-orphans >/dev/null 2>&1
 "${COMPOSE[@]}" build >/dev/null 2>&1 || fail "rebuild failed"
 
-for agent in claude codex; do
+for agent in "${PERSIST_AGENTS[@]}"; do
   out="$(agent_run base "$agent" "AUTH_MODE=${EMODE[$agent]}" -- \
          sh -c "$DELIM_PRINT \"\$(cat $MARKER 2>/dev/null)\"")"
   rc=$?
