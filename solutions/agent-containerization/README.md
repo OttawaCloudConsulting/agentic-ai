@@ -649,7 +649,58 @@ egress timestamps carry milliseconds, action-trail and DNS timestamps do not. Tw
 one egress listener, so the join can only narrow to "this agent, this window," not to one session
 among several running at once (recorded limitation, `docs/records/agent-action-log.md`).
 
-## What Now Exists, and What's Still Out of Scope
+### The audit sink: layout, exports and retention (02.1)
+
+Two independent trails, neither able to produce the other. The **egress trail**
+(`egress-audit.log`, 01.3) is written by the mediator and covers network attempts only, allow and
+deny alike. The **action trail** — one `<agent>-action-audit` volume per agent, written by that
+agent's own recorder — covers tool invocations, file modifications and privilege-change evidence,
+sourced from the agent's own session transcript (D20). A recorder has no network route and a
+read-only mount of its agent's state volume; its worst case is writing a false line into its own
+agent's action log, which that agent could already do. See "Correlating the egress and action
+trails (T35)" above for how the two join.
+
+**D20's limitation stands regardless of the sink.** The record is complete as written and
+tamper-evident once shipped, but a compromised agent can still write a false line before the next
+poll ships it — the poll interval is the tamper-evidence window, stated by `RECORDER_POLL_SECONDS`.
+Detection is **pull-based**, the same posture the egress trail takes (R9.6): nothing here pushes an
+alert, so review is an operator action, triggered by the same signal as an unnoticed blocked
+attempt — investigate when something looks wrong, not on a fixed cadence.
+
+**Four exports, each with one channel**, toggled per profile (`exports:` in the resolved policy;
+missing resolves to all four `true`):
+
+| Export | Channel | Disabling it stops... | Disabling it does NOT stop... |
+|---|---|---|---|
+| `egress_audit_log` | mediator's `egress-audit.log`/`dns-audit.log` relay | that relay | recording — the file write continues; only the relay copy is gone |
+| `agent_action_log` | each recorder's stdout relay | that relay, and its redaction with it | recording to the `<agent>-action-audit` volume, which continues unconditionally |
+| `resolved_policy` | `scripts/export-artifacts.sh`'s copy into `exports/<profile>/` | that file export | the resolved artifact itself, which stays on `policy/resolved/` regardless |
+| `image_digest_sbom` | same exporter, the digest/SBOM file | that file export | the digest/SBOM data, which is computed at build time independent of export |
+
+A disabled export never disables recording (D11) — every one of the four gates a **copy** leaving
+the container or the host, never the thing being copied. Verified per toggle by
+`tests/acceptance/verify-audit-completeness.sh` Phase E (T36): both trails keep gaining lines,
+the disabled channel is absent, the other three are unaffected, and the mediator's
+`export_config` event names the disabled toggle `false`.
+
+**R8.6 — credential values in a transcript.** A tool call that echoes a secret (SF-1 measured this
+for `codex` and `agy`'s proxy password, landing verbatim in their own transcripts) lands in the
+action trail too, because the sink is transcript-faithful by design (Decision 8): it holds nothing
+the agent's own state volume did not already hold, which keeps the tamper-evidence byte comparison
+exact. **Redaction happens only on the `agent_action_log` relay** — the one channel that leaves the
+host — via `images/recorder/recorder.sh`'s proxy-URL-userinfo and known-token-prefix patterns; a
+redacted relay line carries a `redacted` count. `agy`'s whole-file snapshot mode ships a hash and
+size only, never file content, so its transcript's credential values never reach the sink or the
+relay at all — a structural property, not a redaction outcome. See
+`docs/records/credential-inventory.md` for the finding and `verify-audit-completeness.sh` Phase F
+for the assertions.
+
+**Retention (R4.10, SHOULD).** Action-log contents are plaintext conversation history, the same
+sensitivity class as the state volumes' session transcripts they are sourced from. `exports/` is
+git-ignored (SF-4), so no export copy is ever committable. The `<agent>-action-audit` volumes
+themselves carry no retention automation — they are excluded from host backups under the same
+`tmutil` procedure as the state volumes ("Backing up the state volumes" above), since Docker
+Desktop's single-VM-disk-image storage makes a per-volume exclusion impossible either way.
 
 `prd.md` and `progress.txt` exist at this directory's root. The architecture document exists at
 `.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md` — **not** at

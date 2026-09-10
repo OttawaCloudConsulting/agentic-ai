@@ -65,9 +65,16 @@ credential values. Measured against the same live sessions as `agent-action-log.
 
 | # | Agent | Finding | Mitigation |
 |---|---|---|---|
-| P1 | `codex` | `printenv HTTPS_PROXY` returns `http://codex:<plaintext>@172.31.20.2:3128`. The value appears verbatim in the on-volume rollout JSONL (both the tool-call record and the model's echoed confirmation) | Decision 8 default: the sink stays faithful (it holds nothing the agent's own volume did not already hold). Redaction applies only on the `agent_action_log` stdout export relay (proxy-URL userinfo pattern), built in SF-4 |
-| P2 | `agy` | `printenv HTTPS_PROXY` returns `https://agy:<plaintext>@172.31.30.2:3128`. The value appears 3× raw inside the whole-file-rewritten SQLite `.db` | Same as P1 |
+| P1 | `codex` | `printenv HTTPS_PROXY` returns `http://codex:<plaintext>@172.31.20.2:3128`. The value appears verbatim in the on-volume rollout JSONL (both the tool-call record and the model's echoed confirmation) | Decision 8 default: the sink stays faithful (it holds nothing the agent's own volume did not already hold). Redaction applies only on the `agent_action_log` stdout export relay (proxy-URL userinfo pattern, `images/recorder/recorder.sh`'s `redact_for_relay`), **built and verified in SF-5** (`tests/acceptance/verify-audit-completeness.sh` Phase F) |
+| P2 | `agy` | `printenv HTTPS_PROXY` returns `https://agy:<plaintext>@172.31.30.2:3128`. The value appears 3× raw inside the whole-file-rewritten SQLite `.db` | **No relay mitigation needed.** `RECORDER_MODE=snapshot` (Architectural Deviation 2) ships `{sha256, size}` only, never file content, so the plaintext inside the `.db` structurally cannot reach the sink or the relay — verified in SF-5 Phase F |
 | — | `claude` | **Not exposed.** claude authenticates the proxy hop via mTLS client certificate; its `HTTPS_PROXY` carries no userinfo, so `printenv` returns a credential-free URL | None needed |
+
+**SF-5 redaction patterns (`recorder.sh`).** Two families, applied ONLY to the relayed copy, never
+to `$SINK_LOG`: proxy-URL userinfo (`://user:<redacted>@`, the P1 pattern above) and known
+provider API-key/token prefixes (`sk-ant-`, `sk-proj-`, `sk-`, `AIza`), in case one is ever echoed
+into a transcript the same way a proxy credential is. Every redacted relay line carries a
+`redacted` count (Decision 8). No such prefix has been observed in a live transcript to date —
+the token-prefix patterns are a defense-in-depth floor, not a second measured finding.
 
 **Both proxy credentials exercised in this measurement were rotated afterward.** They are locally
 issued (`scripts/issue-identity.sh credential codex|agy`), scoped to this pod's `mediator/identity/`

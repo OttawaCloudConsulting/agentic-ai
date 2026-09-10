@@ -86,3 +86,20 @@ committed to the repository) were rotated after this record was produced, becaus
 values were printed to the operator's terminal and to this session's own tool-call transcript during
 the live probe — an exposure surface outside the pod boundary the architecture's "ACCEPTED, NOT
 MITIGATED" reasoning (01.6 Decision 4) scopes to the internal Docker network alone.
+
+## SF-5 close
+
+The R8.6 mitigation this feature's acceptance criterion 8 requires is built: `images/recorder/
+recorder.sh`'s `redact_for_relay` applies the userinfo and token-prefix patterns to the
+`agent_action_log` relay only, never to the sink. `tests/acceptance/verify-audit-completeness.sh`
+Phase F re-derives the P1/P2 finding from the same credential plaintexts (`mediator/identity/
+credentials/{codex,agy}.cred`) and asserts: the sink stays faithful (the literal value is present,
+unredacted) for every agent; the relay redacts it and carries a `redacted` count for `codex`; and
+for `agy` the value never reaches either surface, because `record_snapshot` ships a hash and size,
+never file content (Architectural Deviation 2) — a structural property, not a redaction outcome.
+
+**Phase L (live session, `AUDIT_LIVE_SESSION=1`) remains an operator-run, per-agent step**, gated
+exactly as the feature plan requires; it is not re-run as part of this close, since SF-1 already
+measured one live session per agent and the SF-3/SF-4/SF-5 unattended phases (A-F) exercise the
+same mechanics synthetically at no token cost. An operator who wants a fresh end-to-end live
+confirmation runs Phase L and records the result here.

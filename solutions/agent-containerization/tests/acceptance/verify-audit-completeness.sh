@@ -574,6 +574,104 @@ done
 rm -rf .build-scratch/t36
 
 # ---------------------------------------------------------------------------
+# Phase F -- R8.6 credential-value scan and redaction (02.1 SF-5, Decision 8)
+#
+# The SF-1 finding: codex and agy splice a plaintext proxy password into HTTPS_PROXY, and a
+# tool call that echoes it lands the value verbatim in the transcript. Decision 8's mitigation
+# is a faithful sink (the value is not removed from $SINK_LOG -- it holds nothing the agent's
+# own volume did not already hold) with redaction ONLY on the agent_action_log relay, the one
+# channel that leaves the host. The literal passwords come from the same Compose secret files
+# the mediator's htpasswd is built from (mediator/identity/credentials/<agent>.cred), not a
+# value chosen by this harness.
+# ---------------------------------------------------------------------------
+phase "F -- R8.6 credential scan and redaction"
+
+CODEX_PASS="$(tr -d '\r\n' < "$CREDENTIAL_DIR/codex.cred" | cut -d: -f2)"
+AGY_PASS="$(tr -d '\r\n' < "$CREDENTIAL_DIR/agy.cred" | cut -d: -f2)"
+[ -n "$CODEX_PASS" ] || fail "F: could not read codex's credential plaintext"
+[ -n "$AGY_PASS" ] || fail "F: could not read agy's credential plaintext"
+
+# F1/F2: the literal proxy password, echoed into each agent's transcript exactly as SF-1
+# measured it, must appear verbatim in the sink (faithful) and must NOT appear on the
+# agent_action_log relay (redacted), which must instead carry a <redacted> marker and a
+# `redacted` count.
+codex_mark="sf5-f-codex-$$"
+codex_line='{"type":"tool_call","id":"'"$codex_mark"'","proxy":"http://codex:'"$CODEX_PASS"'@172.31.20.2:3128"}'
+aexec codex sh -c "printf '%s\n' '$codex_line' >> '$CODEX_TS'"
+if wait_until 5 sh -c "docker exec ${PROJECT}-codex-recorder-1 sh -c \"grep -q ${codex_mark} /var/log/actions/action-audit.log\""; then
+  if sink codex | grep -q "$CODEX_PASS"; then
+    pass "F1 (codex): the sink is faithful -- the literal password is present, unredacted"
+  else
+    fail "F1 (codex): the literal password is missing from the sink -- it should be faithful"
+  fi
+  rlog_codex="$("${COMPOSE[@]}" logs codex-recorder 2>/dev/null)"
+  if printf '%s' "$rlog_codex" | grep -q "$codex_mark"; then
+    if printf '%s' "$rlog_codex" | grep "$codex_mark" | grep -q "$CODEX_PASS"; then
+      fail "F1 (codex): the literal password reached the agent_action_log relay, unredacted"
+    else
+      redacted_line="$(printf '%s' "$rlog_codex" | grep "$codex_mark" | tail -1)"
+      if printf '%s' "$redacted_line" | grep -q '<redacted' \
+         && printf '%s' "$redacted_line" | jq -e '.redacted >= 1' >/dev/null 2>&1; then
+        pass "F1 (codex): the relay redacts the password and carries a redacted count"
+      else
+        fail "F1 (codex): the password is absent from the relay but no <redacted> marker/count is present"; note "$redacted_line"
+      fi
+    fi
+  else
+    fail "F1 (codex): the marked line never reached the agent_action_log relay at all"
+  fi
+else
+  fail "F1 (codex): the synthetic credential-bearing line was never shipped"
+fi
+
+# F2: agy ships via record_snapshot (Decision 3/Architectural Deviation 2) -- {sha256, size}
+# only, never file content -- so the plaintext SF-1 found inside the SQLite .db structurally
+# cannot reach the sink or the relay, independent of any redaction pattern.
+agy_mark="sf5-f-agy-$$"
+agy_snap_before="$(rexec agy sh -c 'grep -c record_snapshot /var/log/actions/action-audit.log 2>/dev/null' || echo 0)"
+aexec agy sh -c "printf 'tool_call %s proxy http://agy:%s@172.31.30.2:3128' '$agy_mark' '$AGY_PASS' > '$AGY_DB'"
+if wait_until 5 sh -c "docker exec ${PROJECT}-agy-recorder-1 sh -c \"[ \\\$(grep -c record_snapshot /var/log/actions/action-audit.log) -gt ${agy_snap_before:-0} ]\""; then
+  if sink agy | grep -q "$AGY_PASS"; then
+    fail "F2 (agy): the literal password reached the sink -- record_snapshot should never embed file content"
+  else
+    pass "F2 (agy): record_snapshot ships only {sha256, size} -- the password never reaches the sink"
+  fi
+  rlog_agy="$("${COMPOSE[@]}" logs agy-recorder 2>/dev/null)"
+  if printf '%s' "$rlog_agy" | grep -q "$AGY_PASS"; then
+    fail "F2 (agy): the literal password reached the agent_action_log relay"
+  else
+    pass "F2 (agy): the password never reaches the relay either"
+  fi
+else
+  fail "F2 (agy): the third synthetic snapshot was never shipped"
+fi
+
+# F3: known token-prefix redaction, exercised on claude (whose real HTTPS_PROXY carries no
+# credential, per SF-1) with a synthetic Anthropic-shaped key -- proves the prefix patterns
+# fire independent of the userinfo pattern.
+fake_key="sk-ant-api03-$(head -c 40 /dev/zero | tr '\0' 'x')"
+claude_mark="sf5-f-claude-$$"
+claude_line='{"type":"tool_call","sessionId":"'"$CLAUDE_SESSION"'","id":"'"$claude_mark"'","key":"'"$fake_key"'"}'
+aexec claude sh -c "printf '%s\n' '$claude_line' >> '$CLAUDE_TS'"
+if wait_until 5 sh -c "docker exec ${PROJECT}-claude-recorder-1 sh -c \"grep -q ${claude_mark} /var/log/actions/action-audit.log\""; then
+  sink claude | grep -q "$fake_key" \
+    && pass "F3 (claude): the sink is faithful -- the synthetic key is present, unredacted" \
+    || fail "F3 (claude): the synthetic key is missing from the sink"
+  rlog_claude="$("${COMPOSE[@]}" logs claude-recorder 2>/dev/null)"
+  redacted_line="$(printf '%s' "$rlog_claude" | grep "$claude_mark" | tail -1)"
+  if printf '%s' "$redacted_line" | grep -q "$fake_key"; then
+    fail "F3 (claude): the sk-ant- prefixed key reached the relay unredacted"
+  elif printf '%s' "$redacted_line" | grep -q '<redacted:sk-ant>' \
+       && printf '%s' "$redacted_line" | jq -e '.redacted >= 1' >/dev/null 2>&1; then
+    pass "F3 (claude): the sk-ant- token prefix is redacted on the relay, with a redacted count"
+  else
+    fail "F3 (claude): the key is absent from the relay but not via the expected sk-ant- marker"; note "$redacted_line"
+  fi
+else
+  fail "F3 (claude): the synthetic token-bearing line was never shipped"
+fi
+
+# ---------------------------------------------------------------------------
 # Phase L -- one live, authenticated session per agent (T35's real-world case)
 # ---------------------------------------------------------------------------
 phase "L -- live session (gated)"

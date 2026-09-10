@@ -64,6 +64,20 @@ EXPORT_AGENT_ACTION_LOG="$(yq eval '.exports.agent_action_log' "$RESOLVED" 2>/de
 
 jstr() { jq -Rn --arg v "$1" '$v'; }
 
+# 02.1 SF-5 (R8.6, Decision 8): the sink stays faithful -- these patterns run ONLY on the
+# relayed copy that leaves the container via the agent_action_log export, never on $SINK_LOG.
+# Two families: proxy-URL userinfo (the SF-1 P1/P2 finding -- codex and agy splice a plaintext
+# password into HTTPS_PROXY, and a tool call that echoes it lands the value in the transcript),
+# and known provider API-key/token prefixes, in case one is ever echoed the same way.
+redact_for_relay() {
+  printf '%s' "$1" | sed -E \
+    -e 's#(://[A-Za-z0-9_.%-]+:)[^@"[:space:]]+(@)#\1<redacted>\2#g' \
+    -e 's#sk-ant-[A-Za-z0-9_-]{10,}#<redacted:sk-ant>#g' \
+    -e 's#sk-proj-[A-Za-z0-9_-]{10,}#<redacted:sk-proj>#g' \
+    -e 's#(^|[^-])sk-[A-Za-z0-9]{20,}#\1<redacted:sk>#g' \
+    -e 's#AIza[A-Za-z0-9_-]{10,}#<redacted:AIza>#g'
+}
+
 emit() {
   # $1: a jq object literal (already valid JSON) to merge onto the common envelope.
   local ts
@@ -72,7 +86,13 @@ emit() {
   line="$(jq -cn --arg ts "$ts" --arg agent "$AGENT_IDENTITY" --argjson rest "$1" \
     '{ts: $ts, agent: $agent, identity_source: "state_volume"} + $rest')"
   printf '%s\n' "$line" >> "$SINK_LOG"
-  [ "$EXPORT_AGENT_ACTION_LOG" = "true" ] && printf '%s\n' "$line"
+  if [ "$EXPORT_AGENT_ACTION_LOG" = "true" ]; then
+    local relay n
+    relay="$(redact_for_relay "$line")"
+    n="$(printf '%s' "$relay" | grep -o '<redacted[^>]*>' | wc -l | tr -d ' ')"
+    [ "$n" -gt 0 ] && relay="$(printf '%s' "$relay" | jq -c --argjson n "$n" '. + {redacted: $n}')"
+    printf '%s\n' "$relay"
+  fi
   return 0
 }
 
