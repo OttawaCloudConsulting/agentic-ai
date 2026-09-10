@@ -149,7 +149,7 @@ check_volume_exclusivity() {
     fi
     other="$(echo "$config" | jq -r --arg a "$a" --arg rec "${a}-recorder" '
       .services | to_entries[] as $s
-      | select($s.key != $rec)
+      | select($s.key != $rec and $s.key != $a)
       | ($s.value.volumes // [])[] | select(.source == ($a + "-state")) | $s.key' | sort -u)"
     if [ -n "$other" ]; then
       echo "  ${a}-state is also mounted by: $other"; ok=0
