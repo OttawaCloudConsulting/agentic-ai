@@ -62,6 +62,19 @@ SEED_CODEX_VOLUME="${SEED_CODEX_VOLUME:-sf3_codex-state}"
 # are what T9 actually needs, and the live path was exercised at SF-2b and again in phase D.
 AUTH_LIVE_RUN="${AUTH_LIVE_RUN:-0}"
 
+# Skip Phase D, which is the ONLY phase that spends something (it forces a real codex OAuth
+# refresh, rolling the refresh token the seed volume holds). OFF by default -- a harness that
+# quietly skipped its expensive assertion would be worse than one that warns and runs it.
+#
+# It exists because T9/SC-4 is Phase E and does not need Phase D: E asserts marker survival and
+# credential SHAPE, so it is satisfied by a seed whose token has already been rolled. Demanding
+# a fresh host `codex login` to demonstrate restart persistence was a cost with no assertion
+# behind it. Phase D is last, so skipping it means finishing early.
+#
+#   bash tests/acceptance/verify-auth-state.sh                   # everything, D included
+#   AUTH_SKIP_PHASE_D=1 bash tests/acceptance/verify-auth-state.sh   # 0,A,B,C,E -- T25 NOT run
+AUTH_SKIP_PHASE_D="${AUTH_SKIP_PHASE_D:-0}"
+
 SEED_IMAGE=sandboxed-agent/codex:local
 BOOTSTRAP=/usr/local/bin/bootstrap-auth
 
@@ -722,6 +735,23 @@ for agent in claude codex; do
 done
 
 # ---------------------------------------------------------------------------
+# The Phase D guard. Placed here rather than around the phase body so the skip is impossible to
+# read as "D passed": the run ends, and its footer says which phases it covered.
+if [ "$AUTH_SKIP_PHASE_D" = "1" ]; then
+  echo
+  echo "=== Phase D SKIPPED (AUTH_SKIP_PHASE_D=1) ================================"
+  note "T25 was NOT exercised. Criterion 5 is unverified by this run, and the codex refresh"
+  note "token in $SEED_CODEX_VOLUME is untouched. Re-run without the flag to cover T25."
+  echo
+  if [ "$FAILED" -eq 0 ]; then
+    echo "PHASES 0,A,B,C,E PASSED -- D SKIPPED, so this is NOT a full run"
+    exit 0
+  else
+    echo "ONE OR MORE CHECKS FAILED"
+    exit 1
+  fi
+fi
+
 # Phase D -- oauth-mount shape and the bootstrap boundary, T25 (criterion 5).
 #
 # LAST, and destructive by design. D1 forces a real refresh, which ROLLS the codex refresh
