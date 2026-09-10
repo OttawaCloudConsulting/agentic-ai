@@ -326,7 +326,7 @@ Following 01.6 Decision 8, these known breakages are fixed in the SF that causes
 
 ## Sub-Features
 
-- [ ] **SF-1: Transcript source verification.** Observations, not assertions, following 01.6 SF-1's
+- [x] **SF-1: Transcript source verification.** Observations, not assertions, following 01.6 SF-1's
   disposition. Run one real session per agent against the operator's existing authenticated
   volumes. This spends model tokens but no login. Each session makes one tool call, one file edit
   and a `printenv HTTPS_PROXY` probe. Record, per agent: transcript path, write model, session-id

@@ -58,6 +58,25 @@ Table B carries controls, revocation, review trigger and the 02.5 column, keyed 
 | V3 | As V2, plus the three structural controls SF-4 built and verified: the host source is mounted `:ro` (R4.13, asserted from `/proc/self/mountinfo` rather than trusted from the fragment) as a **dedicated directory** rather than the credential file (R4.14); **only during the one-shot bootstrap** — at steady state there is no host mount at all (R4.15), so an agent that deletes its own credential finds no source to re-copy from and **fails its next container start**; and the R4.17 record must be present in the staged directory or the copy is refused (exit 3) | As V2. The host side turned out **not** to need re-establishing: SF-5 measured that the superseded host copy still redeems (see V3's blast-radius column), so `codex login` on the host keeps working. The revocation path is therefore the only thing that retires a leaked copy — `codex logout` is local removal, not revocation | As E1 | *(empty by design — 02.5)* |
 | S1 | — | — | — | *(not yet applicable — 01.6)* |
 
+## R8.6 — transcript-level credential exposure (02.1 SF-1)
+
+**Requirement.** Feature 02.1's acceptance criterion 8: the agent action sink is scanned for
+credential values. Measured against the same live sessions as `agent-action-log.md`.
+
+| # | Agent | Finding | Mitigation |
+|---|---|---|---|
+| P1 | `codex` | `printenv HTTPS_PROXY` returns `http://codex:<plaintext>@172.31.20.2:3128`. The value appears verbatim in the on-volume rollout JSONL (both the tool-call record and the model's echoed confirmation) | Decision 8 default: the sink stays faithful (it holds nothing the agent's own volume did not already hold). Redaction applies only on the `agent_action_log` stdout export relay (proxy-URL userinfo pattern), built in SF-4 |
+| P2 | `agy` | `printenv HTTPS_PROXY` returns `https://agy:<plaintext>@172.31.30.2:3128`. The value appears 3× raw inside the whole-file-rewritten SQLite `.db` | Same as P1 |
+| — | `claude` | **Not exposed.** claude authenticates the proxy hop via mTLS client certificate; its `HTTPS_PROXY` carries no userinfo, so `printenv` returns a credential-free URL | None needed |
+
+**Both proxy credentials exercised in this measurement were rotated afterward.** They are locally
+issued (`scripts/issue-identity.sh credential codex|agy`), scoped to this pod's `mediator/identity/`
+tree (git-ignored, never committed) — not the class of external, long-lived credential the rest of
+this inventory tracks. The rotation was precautionary: their plaintext values were printed to the
+operator's terminal and to the assistant session's own tool-call transcript while running the SF-1
+live probe, which is an exposure surface outside the "internal Docker network only" scope that
+01.6 Decision 4 accepts for these bearer credentials.
+
 ## Residuals recorded rather than solved
 
 1. **Volumes are secret material that nothing encrypts (R4.7, R8.7, edge case 14).** Docker Desktop
