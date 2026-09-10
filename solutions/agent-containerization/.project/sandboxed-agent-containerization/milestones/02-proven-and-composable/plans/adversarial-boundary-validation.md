@@ -221,7 +221,7 @@ the R13.2/D21 amendments land, not this feature's to do.
 
 ## Sub-Features
 
-- [ ] **SF-1: Suite skeleton, record schema, and the host/filesystem/policy rows.** Create
+- [x] **SF-1: Suite skeleton, record schema, and the host/filesystem/policy rows.** Create
   `tests/acceptance/validate-boundary.sh` in the house idiom (`set -uo pipefail`, private project
   name, `phase`/`pass`/`fail`/`note`, `trap cleanup EXIT` with `down -v --remove-orphans`, lifted
   `start_agents`/`in_agent`/`agent_ctr`). Define the JSON record line and the six-scenario × three-
@@ -453,4 +453,8 @@ at build time without gate re-approval.
 
 ## Architectural Deviations
 
-(none)
+### Deviation 1: `validate-boundary.sh` placed in `tests/acceptance/`, not `scripts/`
+- **What changed:** The suite lives at `tests/acceptance/validate-boundary.sh`.
+- **Originally planned:** `docs/ARCHITECTURE_AND_DESIGN.md` file tree (`:170`) places it at `scripts/validate-boundary.sh`.
+- **Why necessary:** Every acceptance harness — the fixture set, the composite Test Command, `trap cleanup` / `down -v`, and the `start_agents`/`in_agent` helpers this suite reuses — lives under `tests/acceptance/`. Placing it in `scripts/` would isolate it from the fixtures and harnesses it shares helpers with.
+- **Impact:** None on other components; the composite Test Command already references `tests/acceptance/`. Carried for the milestone's consolidation pass to correct the architecture doc's file tree.

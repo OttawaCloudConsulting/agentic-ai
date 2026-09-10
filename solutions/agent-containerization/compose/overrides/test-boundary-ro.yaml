@@ -1,0 +1,21 @@
+# Test-only override for Feature 02.2 (adversarial boundary validation), R11.4. Distinct from
+# test-readonly.yaml (01.2's T2 smoke fixture, which mounts the whole solution root -- CA private
+# key included -- and would trip verify-pack-composition.sh's containment predicate if reused
+# here). This mounts a dedicated, committed, harmless directory instead.
+#
+# Layered ONLY for the R11.4 phase, never for the rest of the suite -- every other row runs with
+# the base COMPOSE set so a mount-set check does not see an extra mount it did not ask for.
+#
+# Compose resolves relative bind paths from the project dir (compose/), as default.yaml's
+# ../workspace and test-readonly.yaml's ../ both do -- so the source is ../tests/..., not ./tests/....
+
+services:
+  claude:
+    volumes:
+      - ../tests/fixtures/ro-fixture:/fixture-ro:ro
+  codex:
+    volumes:
+      - ../tests/fixtures/ro-fixture:/fixture-ro:ro
+  agy:
+    volumes:
+      - ../tests/fixtures/ro-fixture:/fixture-ro:ro
