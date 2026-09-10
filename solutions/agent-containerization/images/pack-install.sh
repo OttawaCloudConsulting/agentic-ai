@@ -86,8 +86,9 @@ while read -r name version url sha; do
   [ -n "${name:-}" ] || continue
   tmp="$(mktemp -d)"
   case "$name" in
-    node) f="$tmp/node.tar.xz" ;;
-    go)   f="$tmp/go.tar.gz" ;;
+    node)      f="$tmp/node.tar.xz" ;;
+    go)        f="$tmp/go.tar.gz" ;;
+    terraform) f="$tmp/terraform.zip" ;;
     *)    die "no install rule for archive '$name'" ;;
   esac
 
@@ -120,6 +121,20 @@ while read -r name version url sha; do
       installed="$(/usr/local/go/bin/go version | awk '{print $3}')"
       [ "$installed" = "go${version}" ] \
         || die "go reports ${installed} after installing the pin for ${version}"
+      ;;
+    terraform)
+      # A single flat binary inside the zip. `unzip` (an apt item on the SAME pack)
+      # has already installed at this point, because apt items run before archives
+      # in this file.
+      unzip -o "$f" -d /usr/local/bin terraform >/dev/null
+      chmod 0755 /usr/local/bin/terraform
+      # CHECKPOINT_DISABLE=1 here, NOT because the pack env plan applies at build
+      # time (it does not -- Decision 1 exports it at container start), but because
+      # `terraform version` would otherwise attempt checkpoint-api.hashicorp.com
+      # from inside the build, which this stage's own network policy denies.
+      installed="$(CHECKPOINT_DISABLE=1 /usr/local/bin/terraform version | head -1 | awk '{print $2}')"
+      [ "$installed" = "v${version}" ] \
+        || die "terraform reports ${installed} after installing the pin for ${version}"
       ;;
   esac
   rm -rf "$tmp"

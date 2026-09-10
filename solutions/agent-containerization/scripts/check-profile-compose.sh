@@ -123,7 +123,7 @@ done
 #         build args -----------------------------------------------------------------
 normalise() {
   local rendered="$1" service="$2"
-  yq eval ".services.${service} | del(.secrets) | del(.build.args.PROFILE) | del(.build.args.MEDIATOR_PROFILE) | (.. | select(tag == \"!!seq\")) |= sort" "$rendered"
+  yq eval ".services.${service} | del(.secrets) | del(.build.args.PROFILE) | del(.environment.MEDIATOR_PROFILE) | (.. | select(tag == \"!!seq\")) |= sort" "$rendered"
 }
 
 drift_found=0

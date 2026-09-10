@@ -1,0 +1,54 @@
+# Hand-authored Compose counterpart of profiles/terraform.yaml (R12.9, Feature
+# 02.3 SF-3, Decision 2). The terraform pack declares no `credentials`, so this
+# carries no `secrets:` block -- it is byte-identical to default.yaml's service
+# shape apart from this header comment. `scripts/check-profile-compose.sh
+# --profile terraform` asserts the secret-set delta from `default` is empty and
+# every other rendered field matches.
+#
+# mounts.project.path in profiles/default.yaml is a placeholder for the
+# operator's own project directory. This minimal/demo profile (not for real
+# work -- see README.md) binds a dedicated, git-ignored `workspace/` directory
+# as a stand-in; a real profile would parameterize this via 01.5's policy
+# compiler.
+#
+# It binds `../workspace`, NOT `..`, and that changed at 01.3 SF-4. 01.3 puts a
+# control plane into this solution tree -- policy/, mediator/config/,
+# mediator/identity/ -- and 01.2's override bound that tree read-write into all
+# three agents. A compromised agent could then rewrite allowlist.base.yaml or
+# proxy.conf.tmpl through /workspace, and the next `docker compose build` would
+# compile agent-authored policy into the enforcement point. R1.2 puts the
+# enforcement point outside the agent's blast radius; a mount can put its SOURCE
+# back inside it. That is the half of T8 a tamper test aimed at the running
+# config would miss, because the agent never touches the running config -- it
+# edits the input to the next build. A README warning does not fix a default
+# that is wrong.
+
+x-limits: &limits
+  cpus: "2.0"
+  mem_limit: 4g
+  pids_limit: 512
+
+services:
+  # The enforcement point gets ceilings too. Not for the runaway-agent reason
+  # D15 gives -- it runs no model -- but so that a mediator wedged by a traffic
+  # pattern cannot take the host down with it, and because "the one container
+  # with a route out" is the last place to leave unbounded.
+  egress-mediator:
+    cpus: "1.0"
+    mem_limit: 1g
+    pids_limit: 256
+
+  claude:
+    <<: *limits
+    volumes:
+      - ../workspace:/workspace:rw
+
+  codex:
+    <<: *limits
+    volumes:
+      - ../workspace:/workspace:rw
+
+  agy:
+    <<: *limits
+    volumes:
+      - ../workspace:/workspace:rw

@@ -430,7 +430,7 @@ path `compose/generated/credentials/...` is checked against the harnesses' conta
 
 ## Sub-Features
 
-- [ ] **SF-1: Pack manifest schema — `env`, `credentials`, `third_parties`, unknown-key refusal.**
+- [x] **SF-1: Pack manifest schema — `env`, `credentials`, `third_parties`, unknown-key refusal.**
   - `compile-policy.sh`:
     - lift the exit-3 refusal of `env` and `credentials`, and validate both against Interface
       Contract 1: name regex, reserved names, literal values, delivery form, the two required
@@ -444,7 +444,7 @@ path `compose/generated/credentials/...` is checked against the harnesses' conta
   - New harness `tests/acceptance/verify-tool-packs.sh`, Phase A: positive and negative probes on
     the `sf7-probe` idiom.
   - Composite green.
-- [ ] **SF-2: Delivery — pack env and credential plan, entrypoint export, compose check.**
+- [x] **SF-2: Delivery — pack env and credential plan, entrypoint export, compose check.**
   - `pack-plan.sh` emits `pack-env.txt` and `pack-credentials.txt`.
   - `pack-install.sh` installs them under `/opt/agent-pack/`.
   - `images/entrypoint.sh` exports the env, and maps each credential (`env` or `path_env`), failing
@@ -454,7 +454,7 @@ path `compose/generated/credentials/...` is checked against the harnesses' conta
   - Harness Phase B: a probe pack with one `env` and one credential against a scratch
     `PACK_CREDENTIALS_DIR`, asserting the variable, the secret and its absence under `default`.
   - Composite green.
-- [ ] **SF-3: Terraform pack, `terraform` profile, T14 and SC-6.**
+- [x] **SF-3: Terraform pack, `terraform` profile, T14 and SC-6.**
   - Create `packs/terraform/pack.yaml`: zip plus pinned `unzip`, `CHECKPOINT_DISABLE=1`,
     `third_parties: [HashiCorp]`.
   - Add a `terraform` archive rule to `pack-plan.sh` and `pack-install.sh`.

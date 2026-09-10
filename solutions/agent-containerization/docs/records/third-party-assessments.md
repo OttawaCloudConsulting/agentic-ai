@@ -20,6 +20,7 @@ record past the next agent version bump (R10.6).
 - [R14.1 + R14.2 — OpenAI](#r141--r142--openai)
 - [R14.1 + R14.2 — Google (Gemini API / Antigravity `agy`)](#r141--r142--google-gemini-api--antigravity-agy)
 - [R14.3 — Antigravity ToS Monitoring Owner](#r143--antigravity-tos-monitoring-owner)
+- [R14.1 — HashiCorp](#r141--hashicorp)
 - [Summary Table](#summary-table)
 
 ---
@@ -116,6 +117,25 @@ record past the next agent version bump (R10.6).
 
 ---
 
+## R14.1 — HashiCorp
+
+<a id="r141-hashicorp"></a>
+
+| Field | Value |
+|---|---|
+| Party | HashiCorp, Inc. |
+| Role on the traffic path | Placed by `packs/terraform/pack.yaml` (Feature 02.3 SF-3). `releases.hashicorp.com` serves the pinned Terraform CLI archive (build time) and provider binaries the CLI may fetch outside the registry proxy (runtime). `registry.terraform.io` serves provider and module metadata and binaries at `terraform init` time (runtime). Both are `runtime_install: true` destinations under R7.6 |
+| What it can observe | Connection metadata common to any HTTPS destination (source IP as seen by the mediator's egress, requested provider/module name and version, timing) via GET requests for provider indices and binaries. This is metadata about *which tools the agent fetches*, not agent prompt or source content — Terraform's own traffic to this host carries no workspace file content, only provider/module resolution requests |
+| Stated retention | **Not published for this traffic.** HashiCorp's general privacy policy states only that "Personal Information" is kept "for as long as necessary to achieve the purpose for which the information was originally collected," with no stated period, and does not address download/registry infrastructure logs (`releases.hashicorp.com`, `registry.terraform.io`) specifically |
+| Deletion terms | **Not published for this traffic.** The general policy describes an account-erasure request path ("if you wish to delete or suspend your account...we may retain certain information as required by law or for legitimate business purposes"), which does not apply to unauthenticated CLI/registry fetches — there is no HashiCorp account in this architecture |
+| Breach-notification path | **Not published.** No breach-notification commitment specific to this infrastructure was found |
+| Assessment status | **Incomplete** |
+| Resulting constraint on use | The registry/release infrastructure is a checksum-verified binary source, not a data sink this architecture sends workspace content to. The mitigation is upstream of retention/breach terms: `CHECKPOINT_DISABLE=1` (the pack's `env`, Decision 1) suppresses Terraform's separate telemetry call to `checkpoint-api.hashicorp.com`, which is not allowlisted and would otherwise appear as a denied attempt on every run. No credential is sent to either host. Providers hosted outside `releases.hashicorp.com` (third-party providers on GitHub) fail to install — intended, recorded in `packs/terraform/pack.yaml`'s blast radius |
+| Date | 2026-09-10 |
+| Source | [HashiCorp Privacy Policy](https://www.hashicorp.com/en/privacy) · [Terraform SHA256SUMS, v1.16.2](https://releases.hashicorp.com/terraform/1.16.2/terraform_1.16.2_SHA256SUMS) |
+
+---
+
 ## Summary Table
 
 | Party | R14.1 status | R14.2 applicable | Primary constraint |
@@ -124,3 +144,4 @@ record past the next agent version bump (R10.6).
 | Anthropic | Incomplete (retention, breach-notification unconfirmed on-domain) | Yes — pinning strong, training opt-out confirmed off | Don't rely on unsourced retention/breach figures for contractual obligations |
 | OpenAI | Complete | Yes — pinning present but weaker guarantee, training opt-out confirmed off | Pin to full named-snapshot model ID, not bare alias |
 | Google | Incomplete (breach-notification, tier unconfirmed) | Yes — pinning moderate, training opt-out tier-dependent | **Confirm `GEMINI_API_KEY` is billed (paid tier) before real use** |
+| HashiCorp | Incomplete (retention, deletion, breach-notification not published for this infrastructure) | No (not a model provider) | Checksum-verified binary source only, no credential or workspace content sent; `CHECKPOINT_DISABLE=1` suppresses the unrelated telemetry call |

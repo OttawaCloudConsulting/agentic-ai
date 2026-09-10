@@ -262,7 +262,130 @@ else
   pass "B: neither name resolves under 'default', which does not load the probe pack"
 fi
 
+# ---------------------------------------------------------------------------
+# Phase C -- SF-3: T14 recorded acceptance, on Terraform (Decision 4)
+# ---------------------------------------------------------------------------
+phase C "Terraform pack, T14 recorded acceptance (Decision 4)"
+
+C_TMP="$(mktemp -d)"
+trap 'cleanup; b_cleanup 2>/dev/null || true; rm -rf "$C_TMP"' EXIT
+
+C_AT="2026-01-01T00:00:00Z"
+COMPILED_AT="$C_AT" bash scripts/compile-policy.sh --profile default   --out "$C_TMP/default.yaml"
+COMPILED_AT="$C_AT" bash scripts/compile-policy.sh --profile terraform --out "$C_TMP/terraform.yaml"
+
+# Decision 4's rule, per agent: entries(profile+P)[a] - entries(profile)[a] == P.runtime -
+# base[a], and the reverse difference is empty. No base agent carries a HashiCorp host, so
+# P.runtime - base[a] = P.runtime for all three -- the clean case the plan names.
+TF_RUNTIME="$(yq eval '.egress.runtime.allow_fqdns[].fqdn' packs/terraform/pack.yaml | LC_ALL=C sort -u)"
+t14_ok=1
+for a in claude codex agy; do
+  base_set="$(yq eval ".agents.${a}.allow_fqdns[].fqdn" "$C_TMP/default.yaml" | LC_ALL=C sort -u)"
+  tf_set="$(yq eval ".agents.${a}.allow_fqdns[].fqdn" "$C_TMP/terraform.yaml" | LC_ALL=C sort -u)"
+  gained="$(comm -13 <(printf '%s\n' "$base_set") <(printf '%s\n' "$tf_set") 2>/dev/null || true)"
+  lost="$(comm -23 <(printf '%s\n' "$base_set") <(printf '%s\n' "$tf_set") 2>/dev/null || true)"
+  if [ -n "$lost" ]; then
+    t14_ok=0
+    echo "      C: agent '${a}' lost entries loading terraform, expected none:" >&2
+    sed 's/^/        /' <<< "$lost" >&2
+  fi
+  if [ "$gained" != "$TF_RUNTIME" ]; then
+    t14_ok=0
+    echo "      C: agent '${a}' gained set does not equal packs/terraform/pack.yaml's egress.runtime" >&2
+    diff <(printf '%s\n' "$TF_RUNTIME") <(printf '%s\n' "$gained") | sed 's/^/        /' >&2
+  fi
+done
+if [ "$t14_ok" = 1 ]; then
+  pass "C: T14 -- terraform gains exactly its declared egress.runtime and loses nothing, per agent"
+else
+  fail "C: T14 -- gained/lost set does not match Decision 4's rule"
+fi
+
+# The no-residue check: remove the pack from a probe copy of `terraform` and recompile
+# under the NAME 'default' (via --profile-file) -- byte-identical to `default` apart from
+# `compiled_from` (which carries the scratch file's own path) and `compiled_at`, both
+# already pinned above.
+C_PROBE="$C_TMP/terraform-without-pack.yaml"
+yq eval '.packs = ["language-runtimes"]' profiles/terraform.yaml > "$C_PROBE"
+COMPILED_AT="$C_AT" bash scripts/compile-policy.sh --profile default --profile-file "$C_PROBE" --out "$C_TMP/terraform-removed.yaml"
+
+# The header's generated "# Edit ... <profile>, then recompile." comment line also names
+# the profile file -- excluded here for the same reason `compiled_from` is: it is
+# provenance, not resolved policy, and the probe recompiles from a scratch path by
+# construction.
+if diff -u \
+     <(yq eval 'del(.compiled_from)' "$C_TMP/default.yaml" | grep -v '^# Edit ') \
+     <(yq eval 'del(.compiled_from)' "$C_TMP/terraform-removed.yaml" | grep -v '^# Edit ') > "$C_TMP/residue.diff"; then
+  pass "C: T14 no-residue -- removing the pack from a probe copy of terraform recompiles byte-identical to default"
+else
+  fail "C: T14 no-residue -- probe-removed artifact differs from default apart from compiled_from"
+  sed 's/^/      /' "$C_TMP/residue.diff" >&2
+fi
+
 rm -rf "$PROBE_PACK_DIR" "$PROBE_PROFILE"
+
+# ---------------------------------------------------------------------------
+# Phase D -- SF-3: SC-6, the live default -> terraform -> default switch
+# ---------------------------------------------------------------------------
+phase D "terraform profile, SC-6 live switch (default -> terraform -> default)"
+
+D_PROJECT="sf3-sc6-$$"
+D_COMPOSE_BASE=(docker compose --env-file compose/pins.env -f compose/compose.yaml -p "$D_PROJECT")
+
+d_cleanup() {
+  AGENT_PROFILE=default "${D_COMPOSE_BASE[@]}" -f compose/overrides/default.yaml down -v --remove-orphans >/dev/null 2>&1 || true
+}
+trap 'cleanup; b_cleanup 2>/dev/null || true; rm -rf "$C_TMP"; d_cleanup' EXIT
+
+med_d() { docker exec "${D_PROJECT}-egress-mediator-1" "$@"; }
+
+live_packs() {
+  local profile="$1"
+  med_d yq eval ".compiled_from.packs[].name" "/etc/mediator/policy/${profile}.yaml" 2>/dev/null | LC_ALL=C sort -u | tr '\n' ' '
+}
+
+# --- default -> terraform ---------------------------------------------------
+AGENT_PROFILE=terraform "${D_COMPOSE_BASE[@]}" -f compose/overrides/terraform.yaml \
+  up -d --build --force-recreate egress-mediator >"$C_TMP/d-mediator-terraform.log" 2>&1 \
+  || { fail "D: mediator failed to start under profile 'terraform'"; sed 's/^/      /' "$C_TMP/d-mediator-terraform.log" | tail -20; }
+
+LIVE_TF="$(live_packs terraform)"
+if [ "$LIVE_TF" = "language-runtimes terraform " ]; then
+  pass "D: mediator's live policy under 'terraform' reports the pack set {language-runtimes, terraform}"
+else
+  fail "D: expected live pack set 'language-runtimes terraform', got '${LIVE_TF}'"
+fi
+
+TF_RUN_OUT="$(AGENT_PROFILE=terraform "${D_COMPOSE_BASE[@]}" -f compose/overrides/terraform.yaml \
+  run --build --rm claude sh -c 'terraform version' 2>&1)" || true
+if grep -qF 'Terraform v1.16.2' <<< "$TF_RUN_OUT"; then
+  pass "D: terraform binary present and runs under profile 'terraform'"
+else
+  fail "D: expected 'Terraform v1.16.2' from the terraform profile's claude container"
+  printf '%s\n' "$TF_RUN_OUT" | tail -5 | sed 's/^/      /'
+fi
+
+# --- terraform -> default (SC-6 requires the return leg measured too) ------
+AGENT_PROFILE=default "${D_COMPOSE_BASE[@]}" -f compose/overrides/default.yaml \
+  up -d --build --force-recreate egress-mediator >"$C_TMP/d-mediator-default.log" 2>&1 \
+  || { fail "D: mediator failed to start under profile 'default'"; sed 's/^/      /' "$C_TMP/d-mediator-default.log" | tail -20; }
+
+LIVE_DEF="$(live_packs default)"
+if [ "$LIVE_DEF" = "language-runtimes " ]; then
+  pass "D: mediator's live policy is back to {language-runtimes} after switching to 'default'"
+else
+  fail "D: expected live pack set 'language-runtimes' after the return leg, got '${LIVE_DEF}'"
+fi
+
+TF_GONE_OUT="$(AGENT_PROFILE=default "${D_COMPOSE_BASE[@]}" -f compose/overrides/default.yaml \
+  run --build --rm claude sh -c 'command -v terraform' 2>&1)" || true
+if [ -z "$TF_GONE_OUT" ] || ! grep -qF '/terraform' <<< "$TF_GONE_OUT"; then
+  pass "D: terraform binary absent under 'default' after the switch back"
+else
+  fail "D: terraform binary still present under 'default': $TF_GONE_OUT"
+fi
+
+d_cleanup
 
 echo
 echo "=== Results: $PASSED passed, $FAILED failed ==="
