@@ -77,6 +77,21 @@
     it from phase D's scan -- retagged, and a negative control (an injected `up -d`) confirmed
     the check then catches it. Standalone run: 19 passed, 1 failed (phase C's pre-existing
     EXPECTED RED, unaffected by SF-3).
+    SF-4 (in progress, 2026-09-11): PR #39 (feature/containerization -> main, D21 promotion)
+    prepared and merged by operator (commit 6d39fe93f567455f16dade84d458b6f03cc95358, run
+    34652870008). Published digest confirmed via `docker buildx imagetools inspect` against
+    ghcr.io directly (sha256:bc8d16b022b41377c0e1704387adf153199830d03fcabb4f4b97ca206b87d855)
+    -- the workflow's "Report the digest to pin" step's env-context log lines echo pins.env's
+    stale pre-repin value, not the run's actual output; the step's own stdout (steps.build.
+    outputs.digest) carries the correct value and agrees with the direct GHCR query. AGENT_BASE_DIGEST
+    repinned on branch feature/repin-main-agent-base, PR #40 opened per Decision 1 step 5 (repin
+    lands through PR, not a direct main commit) -- awaiting operator merge. verify-reproducibility.sh
+    standalone: 20/20 pass, including Phase C's head_branch=='main' (previously the one EXPECTED
+    RED). Full feature composite (verify-pack-composition through lint-policy) re-run clean
+    end-to-end against the main digest, including the two pre-existing recorded gaps (T6
+    cold-peer 500, resolved_ip-on-deny) with no new failures. D21 trigger amendment drafted in
+    PR #39's description; not yet applied to ARCHITECTURE_AND_DESIGN.md (SF-6 records it,
+    applying it is out of this feature's scope).
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
