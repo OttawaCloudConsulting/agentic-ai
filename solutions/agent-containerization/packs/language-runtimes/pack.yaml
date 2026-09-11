@@ -1,0 +1,63 @@
+# The reference pack (Feature 01.5, Interface Contract 1).
+#
+# Node, Python and Go toolchains, BUILD-TIME ONLY. It declares NO runtime egress
+# by deliberate decision -- see Acceptance Criterion 4, T31, and packs/README.md
+# for what that costs an operator at runtime.
+#
+# Every package carries a SHA-256, `apt` items included: R7.3 is a MUST and says
+# "checksums" without qualification. The apt hashes below are the .deb SHA-256
+# values read from the SIGNED Packages index of the snapshot repository named in
+# the profile's `package_repository`, and that chain was verified rather than
+# assumed -- see packs/README.md, "How these hashes were obtained".
+#
+# ARCHITECTURE: the archive URLs are linux-arm64. A1/R11.1 pin the platform to
+# Apple silicon and the agent images are built locally per profile (never by CI),
+# so one architecture is the whole supported surface. A second architecture means
+# a second manifest or a schema that keys hashes by arch; neither is needed yet
+# and neither is invented here.
+
+name: language-runtimes
+description: Node, Python and Go toolchains, build-time only
+schema: 1
+
+blast_radius: |                  # R7.11 -- what a compromised agent gains when this pack loads
+  Language interpreters and compilers inside the container. No new egress, no new credential,
+  no new mount. The gain is local execution capability, not reach. An agent that can already
+  run `node` gains `python3` and `go build`; it gains no destination it could not already
+  reach, because this pack adds nothing to the resolved allowlist.
+
+needs_write_access: false        # R7.3 -- whether the pack needs write access
+
+packages:                        # R7.3, R7.18 -- pinned versions WITH checksums, both kinds
+  apt:
+    repository: profile          # resolves to profiles.<p>.package_repository (R7.18)
+    items:                       # sha256 is the .deb hash from the signed Packages index
+      - {name: python3, version: "3.11.2-1+b1", sha256: d31a6f8bdea49711f221baee0e27197c314d0cbe748c020262d32650aca5f017}
+      - {name: python3-venv, version: "3.11.2-1+b1", sha256: 9e56023bb7ea5f65b6c491cf6efeee17fc26d2bd25dae58a1845262e134d0010}
+  archives:                      # direct downloads, where apt has no acceptable pin
+    # Node is pinned to the version the `agent-base` stage ALREADY carries
+    # (node:22-slim shipped v22.23.2 on 2026-09-07), not to a different major.
+    # Installing a second, older Node would leave two runtimes on PATH and the
+    # winner would decide what the agent CLIs execute against. Declaring it here
+    # rather than treating it as base-provided is an operator decision: the pin
+    # becomes explicit and checksum-verified instead of riding a moving tag.
+    - {name: node, version: "22.23.2", url: "https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-arm64.tar.xz", sha256: fff4078c5def658577f92c88db7db3bc0072924bfb93fe52c1e744a54e94abb8}
+    - {name: go, version: "1.23.4", url: "https://go.dev/dl/go1.23.4.linux-arm64.tar.gz", sha256: 16e5017863a7f6071363782b1b8042eb12c6ca4f4cd71528b2123f0a1275b13e}
+
+egress:                          # R7.3 -- required FQDNs and CIDRs
+  runtime:
+    allow_fqdns: []              # EMPTY BY DECISION -- see Acceptance Criterion 4 and T31
+    allow_cidrs: []
+  build:                         # consumed by the image build only; never enters resolved policy
+    allow_fqdns:                 # every build-time destination, R10.4
+      - {fqdn: snapshot.debian.org, port: 443}
+      - {fqdn: nodejs.org, port: 443}
+      - {fqdn: go.dev, port: 443}
+      - {fqdn: dl.google.com, port: 443}   # go.dev/dl redirects here for the archive itself
+
+runtime_install: false           # R7.6 -- true requires a recorded reason and registry egress above
+
+mounts: []                       # R7.3 -- required mounts and their modes. Keys must be in the R2 set
+env: []                          # R7.3 -- required environment variables
+credentials: []                  # R7.3 -- required credentials
+third_parties: []                # R14.1 -- required non-empty iff egress.runtime is non-empty (empty here: no runtime egress)

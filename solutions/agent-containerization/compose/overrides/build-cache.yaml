@@ -1,0 +1,66 @@
+# Optional per-agent build cache (R2.10, T23, criterion 4). Layered ONLY when the profile
+# sets `mounts.build_cache` to something other than `false` -- profiles/default.yaml leaves
+# it false, so T21's "only the project directory and the state volume" assertion is
+# unaffected by this fragment.
+#
+#   docker compose -f compose/compose.yaml \
+#                  -f compose/overrides/default.yaml \
+#                  -f compose/overrides/build-cache.yaml up --build --force-recreate
+#
+# ONE VOLUME PER AGENT, AND NO WAY TO SPELL A SHARED ONE. R2.10's real content is that a
+# build cache must not become a cross-agent write channel: whatever one agent writes into
+# a cache another agent reads is an unaudited path between two containers that the mediator
+# never sees. The profile schema closes that by SHAPE -- `mounts.build_cache` accepts
+# `false`, `true`, or a map keyed by agent, and a single shared cache is not expressible at
+# all (01.5 SF-2). This fragment is the Compose counterpart of the `true` case: three
+# services, three distinct named volumes, no volume referenced twice.
+#
+# TO ENABLE FOR A SUBSET, delete the services you do not want from this file rather than
+# adding a condition to it. `mounts.build_cache: {claude: true, codex: false, agy: false}`
+# and a fragment naming only `claude` are the same statement, and a Compose fragment has no
+# way to read the profile that would let it derive one from the other.
+#
+# WHY /build-cache AND NOT /home/agent/.cache. 01.2 already places /home/agent/.cache on the
+# per-agent state volume, so caching is ALREADY per-agent and T23 would pass against it
+# trivially without this option existing -- Edge Case 14 names that trap. The option
+# therefore means a separate, dedicated volume, and T23 is asserted against THIS one. The
+# path is top-level rather than nested under /home/agent because a named volume mounted
+# inside another volume is created root-owned and would be unwritable by the agent it exists
+# for; /build-cache is created in the image as agent:agent, and a fresh named volume inherits
+# that ownership.
+#
+# The environment variables are what make the mount do anything: without them the toolchains
+# keep writing under $HOME and the dedicated volume stays empty. They are set HERE and
+# nowhere else, following the precedent host-gitconfig.yaml set with GIT_CONFIG_GLOBAL --
+# the variable and its target appear and disappear together, so nothing points at an absent
+# path under the default profile.
+
+x-build-cache: &build-cache
+  environment:
+    GOCACHE: /build-cache/go-build
+    GOMODCACHE: /build-cache/go-mod
+    npm_config_cache: /build-cache/npm
+    PIP_CACHE_DIR: /build-cache/pip
+    XDG_CACHE_HOME: /build-cache/xdg
+
+services:
+  claude:
+    <<: *build-cache
+    volumes:
+      - claude-build-cache:/build-cache
+  codex:
+    <<: *build-cache
+    volumes:
+      - codex-build-cache:/build-cache
+  agy:
+    <<: *build-cache
+    volumes:
+      - agy-build-cache:/build-cache
+
+# Declared here rather than in compose.yaml so an operator who never layers this fragment
+# never has the volumes created. Distinct names are the mechanism T23 asserts against: there
+# is no name appearing under two services.
+volumes:
+  claude-build-cache:
+  codex-build-cache:
+  agy-build-cache:

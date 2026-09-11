@@ -1,0 +1,7 @@
+403 egress denied
+destination: %H:%p
+control:     method (only CONNECT is accepted on this proxy)
+policy:      @POLICY_PATH@  (profile "@PROFILE@")
+remediation: none -- the mediator tunnels TLS and never handles a plaintext HTTP request, because
+             holding one would be the content-inspection capability this architecture does not have
+record:      the mediator's audit line for this attempt is the authoritative denial record

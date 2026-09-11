@@ -1,0 +1,11 @@
+# Bind source for the default profile's /workspace mount.
+#
+# Committed rather than left to Docker: a missing bind source is auto-created by
+# the daemon as root-owned, and the agent containers run as uid 1000 and cannot
+# write to it -- which would turn a security fix into a broken demo profile.
+#
+# The contents are git-ignored (see ../.gitignore). This directory exists so the
+# demo profile has a working /workspace that is NOT this checkout: 01.3 puts a
+# control plane (policy/, mediator/config/, mediator/identity/) into the solution
+# tree, and binding that tree read-write into the agents would let a compromised
+# agent rewrite the input to the next `docker compose build`.

@@ -1,0 +1,103 @@
+# TEST-ONLY override (01.3 SF-8). Not a shipped profile, and never layered on an operator's
+# bring-up: `tests/acceptance/verify-egress-mediator.sh` applies it under its OWN Compose
+# project name so its `up`/`down -v` cannot touch the default project's containers, state
+# volumes or audit volume.
+#
+# It supplies the four things the harness needs and the shipped topology deliberately does not
+# have: static addressing on `egress-net`, the fixtures themselves, the mediator pointed at the
+# fixture resolver, and a test-scoped policy profile.
+
+# `egress-net` gains an `ipam` block here and has none in compose.yaml. The fixtures need
+# addresses the policy files can name: `policy/denylist.test.yaml` denies one of them as a /32
+# and the fixture resolver answers the others, so a dynamically-assigned address would mean a
+# policy that cannot be written down. The shipped network keeps no ipam because nothing on it
+# is addressed by policy.
+networks:
+  egress-net:
+    internal: false
+    ipam:
+      config:
+        - subnet: 172.31.40.0/24
+
+x-fixture: &fixture
+  image: sandboxed-agent/mediator:local
+  # The fixtures reuse the mediator image rather than adding one: it already carries a pinned
+  # OpenSSL and a pinned unbound, so the harness introduces no unpinned software into a
+  # verification whose whole point is that the pins are what was tested.
+  #
+  # They bind :53 and :443, which are privileged. The same namespaced sysctl the mediator uses
+  # is applied here rather than running the fixtures as root -- a fixture with more privilege
+  # than the thing it is testing is a bad habit even in a test file.
+  sysctls:
+    net.ipv4.ip_unprivileged_port_start: "0"
+  restart: "no"
+
+services:
+  egress-mediator:
+    environment:
+      # The test-scoped artifact. `test-fixtures` skips stage 2 (phases A-E and G bring the
+      # mediator up repeatedly, including on deliberately broken input); the harness sets
+      # MEDIATOR_TEST_PROFILE=test-selfcheck for Phase F, which runs stage 2 for real against
+      # the fixture below.
+      MEDIATOR_PROFILE: ${MEDIATOR_TEST_PROFILE:-test-fixtures}
+      # T4's redirect. The mediator's re-originating stage forwards here and nowhere else, so
+      # every name the pod resolves is answered by a server the harness reads the log of.
+      MEDIATOR_DNS_UPSTREAM: "172.31.40.10"
+    networks:
+      claude-net:
+        ipv4_address: 172.31.10.2
+      codex-net:
+        ipv4_address: 172.31.20.2
+      agy-net:
+        ipv4_address: 172.31.30.2
+      egress-net:
+        ipv4_address: 172.31.40.2
+
+  # T4's controlled authoritative server. Answers the fixture names, forwards nowhere, logs
+  # every query that arrives -- which is the surface T4's ABSENCE assertion is made against.
+  fixture-dns:
+    <<: *fixture
+    entrypoint: ["unbound", "-d", "-c", "/fixture/unbound.conf"]
+    volumes:
+      - ../tests/fixtures/authoritative-dns/unbound.conf:/fixture/unbound.conf:ro
+    networks:
+      egress-net:
+        ipv4_address: 172.31.40.10
+
+  # The allowed destination, and the address `allowed`, `denied`, `denied-by-fqdn` and
+  # `claude-only` all resolve to. One address behind four names is the point: the allowed name
+  # must succeed and the others must be refused, which no address-level control can express.
+  fixture-collector:
+    <<: *fixture
+    entrypoint: ["bash", "/fixture/tls-server.sh", "www"]
+    volumes:
+      - ../tests/fixtures/tls-server.sh:/fixture/tls-server.sh:ro
+      - ../tests/fixtures/tls:/fixture/tls:ro
+    networks:
+      egress-net:
+        ipv4_address: 172.31.40.20
+
+  # The neighbour of the /32 deny. `neighbour.fixture.lab` resolves here and must be refused
+  # while the collector one address below keeps working -- the pair that tells a real
+  # single-address deny from a mis-sized mask.
+  fixture-neighbour:
+    <<: *fixture
+    entrypoint: ["bash", "/fixture/tls-server.sh", "www"]
+    volumes:
+      - ../tests/fixtures/tls-server.sh:/fixture/tls-server.sh:ro
+      - ../tests/fixtures/tls:/fixture/tls:ro
+    networks:
+      egress-net:
+        ipv4_address: 172.31.40.21
+
+  # criterion 3's `Upgrade`-capable endpoint. Under peek+splice there is no configuration flag
+  # to inspect, so the transport is asserted by completing a WebSocket upgrade through it.
+  fixture-upgrade:
+    <<: *fixture
+    entrypoint: ["bash", "/fixture/tls-server.sh", "upgrade"]
+    volumes:
+      - ../tests/fixtures/tls-server.sh:/fixture/tls-server.sh:ro
+      - ../tests/fixtures/tls:/fixture/tls:ro
+    networks:
+      egress-net:
+        ipv4_address: 172.31.40.30

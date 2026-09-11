@@ -9,7 +9,7 @@ Every review checklist file begins with this header:
 ```
 # Gate 3 Review -- Milestone Planning
 
-**Artifact:** milestones/<NN>-<name>/README.md
+**Artifact:** .project/<slug>/milestones/<NN>-<name>/README.md
 **Status:** [ ] Pending
 **Reviewer(s):**
 **Date:**
@@ -36,7 +36,7 @@ Format:
 
 ## Gate 3: Milestone Planning -- Static Items
 
-These items always appear in `milestones/<NN>-<name>/reviews/gate-3-review.md`:
+These items always appear in `.project/<slug>/milestones/<NN>-<name>/reviews/gate-3-review.md`:
 
 - `[ ] Does the milestone represent a coherent, deployable increment?`
 - `[ ] Are features correctly grouped? Any that belong in a different milestone?`
@@ -46,7 +46,7 @@ These items always appear in `milestones/<NN>-<name>/reviews/gate-3-review.md`:
 
 ## Content-Specific [Auto] Items
 
-Claude generates content-specific items based on the actual `milestones/<NN>-<name>/README.md` content. These items are prefixed with `[Auto]` and target specific elements of the milestone definition. Examples:
+Claude generates content-specific items based on the actual `.project/<slug>/milestones/<NN>-<name>/README.md` content. These items are prefixed with `[Auto]` and target specific elements of the milestone definition. Examples:
 
 - `[ ] [Auto] Verify feature: "{feature name}" has specific acceptance criteria`
 - `[ ] [Auto] Confirm sizing: "{feature name}" fits 2-5 sub-features`

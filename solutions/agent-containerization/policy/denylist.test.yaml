@@ -1,0 +1,29 @@
+# TEST-SCOPED denylist (01.3 SF-8). Never loaded by a shipped profile.
+#
+# **This file deliberately omits `172.16.0.0/12`, which R5.6 requires and
+# `policy/denylist.base.yaml` carries.** Docker's bridges are RFC 1918 by construction, so the
+# harness's own fixtures live at 172.31.40.0/24 -- inside that range. With the shipped denylist
+# loaded, control 2 would refuse every fixture connection post-resolution and the harness could
+# not assert that an ALLOWED destination succeeds. There is no way to have both: either the
+# fixtures are reachable or the range that contains them is denied.
+#
+# What that costs, stated rather than glossed: the shipped denylist's coverage of that range is
+# NOT exercised by this artifact. The other four required ranges are kept, and `169.254.0.0/16`
+# in particular is what the link-local assertions and the startup self-check's denied target
+# rest on. `bash scripts/lint-policy.sh` checks the BASE denylist for all five ranges and is
+# unaffected by this file.
+deny_cidrs:
+  - 169.254.0.0/16
+  - 127.0.0.0/8
+  - 10.0.0.0/8
+  - 192.168.0.0/16
+  # The single-address deny of criterion 10. `neighbour.fixture.lab` resolves here and must be
+  # refused; `allowed.fixture.lab` at .20 must not be. The compiler normalises a bare address
+  # to /32, so this is written long-hand to assert the shape the mediator actually receives.
+  - 172.31.40.21/32
+deny_fqdns:
+  # R5.1's FQDN deny, which is empty in every shipped profile because criterion 10 asked for the
+  # field to be SUPPORTED rather than populated. The harness is where it gets populated: this
+  # name resolves to the same address as an allowed one, so a passing assertion cannot be an
+  # address deny wearing an FQDN's name.
+  - denied-by-fqdn.fixture.lab

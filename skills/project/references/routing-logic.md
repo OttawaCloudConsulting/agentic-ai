@@ -116,7 +116,7 @@ Per PROJ-05 and D-07, `/project` validates that milestone summaries in `progress
 **Process:**
 
 1. For each milestone entry in the `## Milestones` section of `progress.txt`, extract the milestone directory path and the `N/M features complete` count.
-2. Read the corresponding `milestone-status.txt` at `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` (path derived from the milestone summary line, resolved against the artifact base path).
+2. Read the corresponding `milestone-status.txt` at `.project/{slug}/milestones/<NN>-<name>/milestone-status.txt` (the path is read verbatim from the milestone summary line, which already carries the resolved `.project/{slug}/` base path -- do not prepend the base path again).
 3. Count the `[x]` feature entries in `milestone-status.txt`. Compare to the `N` (completed) and `M` (total) values in the `progress.txt` milestone summary line.
 4. If the counts diverge, emit an inline warning after the milestone entry in the status report:
 

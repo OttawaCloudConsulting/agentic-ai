@@ -1,0 +1,68 @@
+# Live credentials — never committed
+references/.env_keys
+*.env
+*.env.*
+
+# Not a credential: version pins interpolated into build.args (01.2 SF-2).
+# Committed intentionally so the smoke check can assert it agrees with
+# docs/records/agent-verification.md.
+!compose/pins.env
+
+# SF-2 fixture scratch (throwaway PKI, proxy logs, agent workspaces)
+.build-scratch/
+
+# 02.1 SF-4: scripts/export-artifacts.sh output (R9.9). Reviewable inputs are
+# policy/resolved/*.yaml and .build-scratch/build/*.images.txt; this is a derived copy.
+exports/
+
+# Generated trust material (01.3 SF-3). mediator/identity/ carries its own
+# deny-all .gitignore; this is the second line of defence, so a private key
+# cannot be committed by someone working from the repository root who has not
+# read that file.
+mediator/identity/ca/
+mediator/identity/listeners/
+mediator/identity/clients/
+# 01.6 SF-3. Proxy credentials: per-agent PLAINTEXT and the htpasswd the mediator verifies
+# against. `*.key` and `*.pem` below do not cover these -- a `.cred` file is a bearer secret
+# with no extension anyone would guess, which is exactly why it gets its own line.
+mediator/identity/credentials/
+*.key
+*.pem
+
+# The default profile's project mount (01.3 SF-4). The directory is committed
+# via its .gitkeep so Docker does not auto-create it root-owned; its contents
+# are the operator's scratch work and are never this repository's.
+workspace/*
+!workspace/.gitkeep
+
+# The acceptance harness's throwaway fixture PKI (01.3 SF-8). Generated before every run and
+# torn down with it; a self-signed certificate for `*.fixture.test` is not trust material
+# anyone should be able to find in version control and mistake for the mediator's.
+tests/fixtures/tls/
+
+# Generated host-derived material (01.4 SF-1, R8.7). compose/generated/ carries its own
+# deny-all .gitignore; this is the second line of defence, so the operator's scrubbed
+# gitconfig cannot be committed by someone working from the repository root who has not read
+# that file. The scrub removes credential.helper, but name, email and signing config are
+# still the operator's personal configuration and still derived material regenerated before
+# every `up`.
+compose/generated/gitconfig.d/
+
+# Agent credential material (01.4, R4.7/R8.7). None of this SHOULD reach the repository --
+# OAuth credentials live on the per-agent state volumes and API keys arrive by environment --
+# so every one of these patterns firing means something went wrong. They are here to make that
+# mistake non-committable rather than to describe a normal layout.
+#
+# auth.json is Codex's OAuth credential file; .credentials.json is Claude Code's; .claude.json
+# is the account record R4.4 places OUTSIDE CLAUDE_CONFIG_DIR. The oauth-mount staging
+# directory (SF-4) holds a copy of the host credential with OPENAI_API_KEY stripped, and is
+# the one path here an operator is actually expected to create.
+auth.json
+.credentials.json
+.claude.json
+compose/generated/oauth-src/
+
+# Pack credential staging (02.3 Decision 1). The operator stages a dedicated, scoped
+# credential file per profile/pack under here before `up`; it is never committed, the same
+# reasoning as compose/generated/oauth-src/ above.
+compose/generated/credentials/

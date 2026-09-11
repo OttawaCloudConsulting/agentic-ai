@@ -1,0 +1,16 @@
+# Test-only override, not a shipped profile. Supplies T2's read-only fixture
+# mount -- the default profile has no :ro mount (it mounts the project rw,
+# because that is what the profile is for), so T2 needs its own dedicated
+# target rather than changing the default profile's mode. See feature plan
+# criterion 8 and Test Strategy.
+
+services:
+  claude:
+    volumes:
+      - ../:/fixture-ro:ro
+  codex:
+    volumes:
+      - ../:/fixture-ro:ro
+  agy:
+    volumes:
+      - ../:/fixture-ro:ro

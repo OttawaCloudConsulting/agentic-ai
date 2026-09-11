@@ -1,0 +1,220 @@
+# Sandboxed Agent Containerization -- base image publish and policy drift gate.
+#
+# THIS REPOSITORY'S FIRST WORKFLOW (D21). Two jobs, deliberately independent:
+#
+#   policy-drift   rebuilds solutions/agent-containerization's mediator policy from its
+#                  committed inputs and FAILS if the result differs from the committed
+#                  policy/resolved/*.yaml. Runs on every push and pull request.
+#   publish-base   builds the profile-INDEPENDENT `agent-base` stage and pushes it to
+#                  GHCR with an SBOM and provenance attestation. Never runs on a pull
+#                  request -- `packages: write` on a fork PR is how a registry gets
+#                  written by an untrusted contributor.
+#
+# `publish-base` does NOT depend on `policy-drift`. The base image is profile-independent
+# and carries no policy; a drifted resolved artifact says nothing about its correctness,
+# and Interface Contract 4 already makes drift fail the LOCAL build, which is the gate
+# that actually protects the operator. This job is a second net, not the first one.
+#
+# WHY THE PUBLISH JOB RUNS ON ARM. `images/Dockerfile`'s agent-base stage installs `git`
+# through images/apt-pinned.sh, which hashes the .deb that `apt-get download` fetches for
+# the container's own dpkg architecture. compose/pins.env carries ONE `GIT_SHA256` and it
+# is the linux/arm64 hash -- the pod's target is Docker Desktop on Apple silicon (R11.1,
+# assumption A1). An amd64 runner does not fail late or subtly: it fails at the checksum
+# comparison in apt-pinned.sh. Going multi-arch would mean inventing a second pin nothing
+# has verified, so this builds the one architecture the project targets.
+#
+# The drift job has no such constraint and runs on the cheaper x86 runner: the mediator's
+# base digest is a multi-platform index and the compile stage's yq is pinned for both
+# architectures.
+#
+# ACTIONS ARE PINNED BY COMMIT SHA, not by tag. Every other supply-chain input in this
+# solution is pinned by digest or checksum, and `publish-base` holds `packages: write`:
+# an action consumed by a movable tag is a write path into the registry that no pin
+# covers. The `# vX.Y.Z` comments are what the SHAs resolved to when they were written.
+
+name: agent-sandbox-image
+
+on:
+  push:
+    branches:
+      - main
+      - feature/containerization
+    paths:
+      - 'solutions/agent-containerization/**'
+      - '.github/workflows/agent-sandbox-image.yml'
+  pull_request:
+    paths:
+      - 'solutions/agent-containerization/**'
+      - '.github/workflows/agent-sandbox-image.yml'
+  workflow_dispatch:
+
+# Read-only by default. The repository's default workflow permission is already `read`;
+# stating it here means a change to that org/repo setting cannot silently widen this
+# workflow. `publish-base` re-declares its own, narrower set.
+permissions:
+  contents: read
+
+env:
+  SOLUTION_DIR: solutions/agent-containerization
+  # Lowercase, because GHCR rejects uppercase path components -- the owner is
+  # `OttawaCloudConsulting`. Hardcoded rather than derived from ${{ github.repository }}
+  # for the same reason the digest is committed rather than resolved: the image the agent
+  # Dockerfiles pin must be a reviewable constant, not something a fork silently redirects.
+  IMAGE: ghcr.io/ottawacloudconsulting/agentic-ai/agent-sandbox-base
+
+jobs:
+  # ==================================================================================
+  # Resolved-policy drift. Interface Contract 4's CI half.
+  policy-drift:
+    name: Resolved policy drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      # pins.env is READ AS DATA, never sourced -- scripts/compile-policy-build.sh records
+      # why (a policy refresh that sources a Compose data file executes it). Named keys
+      # only: this job needs four of them and dumping the whole file into the environment
+      # would put agent version pins and download URLs into an unrelated build.
+      - name: Load the mediator pins from compose/pins.env
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: |
+          set -euo pipefail
+          for a in MEDIATOR_BASE_DIGEST YQ_VERSION YQ_SHA256_ARM64 YQ_SHA256_AMD64; do
+            v="$(sed -n "s/^[[:space:]]*${a}=//p" compose/pins.env | tail -n 1)"
+            v="${v%\"}"; v="${v#\"}"; v="${v%\'}"; v="${v#\'}"
+            [ -n "$v" ] || { echo "compose/pins.env does not define ${a}" >&2; exit 1; }
+            printf '%s=%s\n' "$a" "$v" >> "$GITHUB_ENV"
+          done
+
+      # --target drift, and nothing is pushed or loaded: the stage's whole output is its
+      # exit code. images/mediator/compile-stage.sh compiles EVERY committed artifact
+      # under policy/resolved/ from its own declared inputs and compares, so this is one
+      # build rather than a per-profile matrix.
+      - name: Compile the resolved policy and refuse drift
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ${{ env.SOLUTION_DIR }}
+          file: ${{ env.SOLUTION_DIR }}/images/mediator/Dockerfile
+          target: drift
+          push: false
+          build-args: |
+            MEDIATOR_BASE_DIGEST=${{ env.MEDIATOR_BASE_DIGEST }}
+            YQ_VERSION=${{ env.YQ_VERSION }}
+            YQ_SHA256_ARM64=${{ env.YQ_SHA256_ARM64 }}
+            YQ_SHA256_AMD64=${{ env.YQ_SHA256_AMD64 }}
+
+  # ==================================================================================
+  # agent-base publish. D21, R10.2, R10.7.
+  publish-base:
+    name: Publish agent-base to GHCR
+    # Fork pull requests get no registry write. `push` and `workflow_dispatch` only.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+      # NO `id-token: write`. It was here on the belief that buildx's provenance
+      # attestation signs through the OIDC token; it does not. BuildKit writes an
+      # UNSIGNED in-toto statement into an attestation manifest, and
+      # docker/build-push-action never reads ACTIONS_ID_TOKEN -- checked, the string
+      # appears nowhere in its src/ or dist/, only in that repository's own CI.
+      # Signing would mean actions/attest-build-provenance or cosign, neither of which
+      # this workflow uses. A permission that grants nothing to a job already holding
+      # `packages: write` is widening for free.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Load the agent-base pins from compose/pins.env
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: |
+          set -euo pipefail
+          # AGENT_BASE_DIGEST is in this list even though the `agent-base` stage does not
+          # consume it, and that is not belt-and-braces. Since SF-6b the `agent-packs` stage
+          # reads `FROM ghcr.io/...@${AGENT_BASE_DIGEST}`, and BuildKit PARSES every stage's
+          # FROM before it prunes the ones the target cannot reach -- only image-config
+          # RESOLUTION is reachability-gated. So an unset value fails `--target agent-base`
+          # at parse time with "invalid reference format", even though that stage is the one
+          # being built and has nothing to do with the digest. Verified by running the exact
+          # CI invocation locally with the variable unset: it failed; with it set, it builds.
+          # The ARG still gets NO DEFAULT -- that is Edge Case 11's contract and the reason
+          # an unset digest must never resolve to a tag.
+          for a in SNAPSHOT_URL SNAPSHOT_SUITE SNAPSHOT_FINGERPRINT GIT_VERSION GIT_SHA256 AGENT_BASE_DIGEST NODE_BASE_DIGEST; do
+            v="$(sed -n "s/^[[:space:]]*${a}=//p" compose/pins.env | tail -n 1)"
+            v="${v%\"}"; v="${v#\"}"; v="${v%\'}"; v="${v#\'}"
+            [ -n "$v" ] || { echo "compose/pins.env does not define ${a}" >&2; exit 1; }
+            printf '%s=%s\n' "$a" "$v" >> "$GITHUB_ENV"
+          done
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # `latest=false` is the load-bearing line (Edge Case 12). Branch builds get a
+      # branch-named tag and a full-length commit-sha tag; nothing gets `:latest`, so
+      # there is no mutable tag for a consumer to drift onto. Consumers pin the digest
+      # this job prints -- a tag here is for a human reading the package listing.
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=ref,event=branch
+            type=sha,format=long
+
+      # --target agent-base: the profile-independent stage. The three per-agent stages
+      # below it in images/Dockerfile are NOT built here -- they layer the profile's pack
+      # packages and are local, per-profile builds by D10.
+      - id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ${{ env.SOLUTION_DIR }}
+          file: ${{ env.SOLUTION_DIR }}/images/Dockerfile
+          target: agent-base
+          platforms: linux/arm64
+          push: true
+          # R10.7's SBOM half. buildx's own attestation rather than a third-party
+          # scanner: adding a binary to the toolchain to satisfy a MAY would be more
+          # supply chain, not less (Edge Case 13).
+          sbom: true
+          provenance: mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            SNAPSHOT_URL=${{ env.SNAPSHOT_URL }}
+            SNAPSHOT_SUITE=${{ env.SNAPSHOT_SUITE }}
+            SNAPSHOT_FINGERPRINT=${{ env.SNAPSHOT_FINGERPRINT }}
+            GIT_VERSION=${{ env.GIT_VERSION }}
+            GIT_SHA256=${{ env.GIT_SHA256 }}
+            AGENT_BASE_DIGEST=${{ env.AGENT_BASE_DIGEST }}
+            NODE_BASE_DIGEST=${{ env.NODE_BASE_DIGEST }}
+
+      # The digest is this job's actual product. It goes to the run summary because the
+      # operator has to COPY it into compose/pins.env by hand -- a deliberate, reviewed
+      # edit, which is the whole of Edge Case 11's bootstrap.
+      - name: Report the digest to pin
+        run: |
+          set -euo pipefail
+          {
+            echo '## agent-base published'
+            echo
+            echo 'Pin this in `solutions/agent-containerization/compose/pins.env`:'
+            echo
+            echo '```'
+            echo "AGENT_BASE_DIGEST=${{ steps.build.outputs.digest }}"
+            echo '```'
+            echo
+            echo "Image: \`${{ env.IMAGE }}\`"
+            echo "Tags: \`${{ steps.meta.outputs.tags }}\`"
+            echo
+            echo 'This is the index digest: ONE linux/arm64 manifest plus the SBOM and'
+            echo 'provenance attestation manifests. Not a multi-platform index -- the base'
+            echo 'is single-architecture on purpose (Deviation 15). Pinning the index rather'
+            echo 'than the platform manifest is what keeps the attestations reachable from it.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,16 @@
+# TEST-ONLY override (02.3 SF-7, T29/T32). Mounts a scratch, per-agent MCP inventory over the
+# fixed path the gate reads (Interface Contract 2/6), the same "mount over the image's own copy"
+# shape compose/overrides/test-exports.yaml uses for the resolved policy: the harness
+# (tests/acceptance/verify-mcp-inventory.sh, Phases C-D) writes
+# .build-scratch/mcp/inventory.<agent>.json before each `up`/`run`, and only that file's content
+# changes between scenarios (empty inventory, one matching server, one drifted server).
+services:
+  claude:
+    volumes:
+      - ../.build-scratch/mcp/inventory.claude.json:/opt/agent-pack/mcp-inventory.json:ro
+  codex:
+    volumes:
+      - ../.build-scratch/mcp/inventory.codex.json:/opt/agent-pack/mcp-inventory.json:ro
+  agy:
+    volumes:
+      - ../.build-scratch/mcp/inventory.agy.json:/opt/agent-pack/mcp-inventory.json:ro

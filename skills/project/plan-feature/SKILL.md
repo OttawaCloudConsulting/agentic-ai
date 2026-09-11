@@ -32,7 +32,7 @@ entry in `milestone-status.txt` from `[ ]` to `[~] planned, awaiting build`.
 - **No auto-dispatch.** Tell the user what to run next after completion. Never
   auto-invoke another skill.
 - **Spike artifacts are user-referenced only.** Do not auto-detect or auto-scan
-  `docs/spikes/`. Read spike docs only when the user explicitly references them
+  `.project/<slug>/docs/spikes/`. Read spike docs only when the user explicitly references them
   (D-11).
 
 ## Prerequisites

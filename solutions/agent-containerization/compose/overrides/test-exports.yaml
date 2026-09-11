@@ -1,0 +1,28 @@
+# TEST-ONLY override (02.1 SF-4, Decision 7, T36). Mounts a compiler-produced T36
+# variant over both consumers of the resolved artifact, so a real Compose bring-up
+# exercises each of the four export toggles without four committed test profiles
+# (01.6 Deviation 3's recompile burden, avoided the same way here):
+#
+#   * the mediator's baked policy path -- a single-file bind mount over the image's
+#     read-only rootfs (read-only mounts are unaffected by `read_only: true`);
+#   * the recorders' `configs:` source -- the top-level `configs:` block below.
+#
+# The mediator still runs its stage-1 --validate against whatever this mounts (T17):
+# a malformed variant fails the mediator's own start, not this override.
+#
+# tests/acceptance/verify-audit-completeness.sh phase E writes the variant to
+# .build-scratch/t36/variant.yaml before each `up`, one toggle disabled at a time.
+# The path here is fixed; only the file's content changes between the four runs.
+#
+# `${AGENT_PROFILE:-default}` matches compose.yaml's own
+# `MEDIATOR_PROFILE: ${AGENT_PROFILE:-default}` -- the container reads the profile
+# named MEDIATOR_PROFILE at that path, so the bind mount below has to land on the
+# SAME path the entrypoint resolves, not a fixed 'default.yaml'.
+configs:
+  resolved_policy:
+    file: ../.build-scratch/t36/variant.yaml
+
+services:
+  egress-mediator:
+    volumes:
+      - ../.build-scratch/t36/variant.yaml:/etc/mediator/policy/${AGENT_PROFILE:-default}.yaml:ro

@@ -1,0 +1,12 @@
+# Generated, never committed (R8.7).
+#
+# scripts/scrub-gitconfig.sh writes gitconfig.d/.gitconfig here from the operator's own
+# host gitconfig. Even scrubbed of credential.helper it is the operator's personal
+# configuration -- name, email, signing keys, remotes -- and it is derived material that
+# every checkout regenerates before `docker compose up`. Nothing in this directory is
+# this repository's to carry.
+#
+# Deny everything, keep only this file. An allowlist rather than a pattern list, so a
+# future generated artifact is ignored by default instead of by remembering to add it.
+*
+!.gitignore

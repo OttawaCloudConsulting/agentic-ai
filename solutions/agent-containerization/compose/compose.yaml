@@ -1,0 +1,577 @@
+name: sandboxed-agent-pod
+
+# Topology and hardening are invariant (D2, D15) and never profile-selectable.
+# Profile-controlled fields (resource limits, the workspace bind mount) live in
+# compose/overrides/<profile>.yaml, layered on with -f at invocation time.
+
+networks:
+  # `ipam` with an explicit subnet, and a static mediator address on each agent
+  # network, are load-bearing rather than tidy (01.3 criterion 4): Compose `dns:`
+  # takes an ADDRESS, not a service name, and each TLS listener certificate carries
+  # an iPAddress SAN for exactly the address below. Change one of these and the
+  # matching certificate must be re-issued against the new address
+  # (`bash scripts/issue-identity.sh listener <agent> --ip <addr>`).
+  #
+  # `ip_range` RESERVES THE MEDIATOR'S ADDRESS, and it is what makes the documented
+  # entry point work at all (01.5 SF-7b, Deviation 19). Without it, dynamic assignment
+  # starts at .2 -- the very address the mediator declares -- so a plain
+  # `docker compose up` fails with "failed to set up container networking: Address
+  # already in use" whenever an agent is still alive when the mediator claims its
+  # address. The agents' command is `<agent> --version`, so they exit almost at once
+  # and a SEQUENTIAL bring-up succeeds by luck of timing; a parallel one, which is what
+  # `up` does, failed 3 times out of 3. Restricting dynamic allocation to .128/25 leaves
+  # the whole .2-.127 span, the mediator's address included, unreachable by IPAM.
+  #
+  # The subnet stays /24 because the listener certificates' iPAddress SANs and the
+  # agents' `dns:` keys are written against it; ip_range narrows only what Docker hands
+  # out on its own, and the mediator's explicit ipv4_address is unaffected by it.
+  claude-net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.10.0/24
+          ip_range: 172.31.10.128/25
+  codex-net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.20.0/24
+          ip_range: 172.31.20.128/25
+  agy-net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.30.0/24
+          ip_range: 172.31.30.128/25
+  # Compose-managed bridge, internal:false (NOT Compose `external:`). No agent
+  # container attaches to this network -- the mediator is its only member, which
+  # is what makes the mediator the pod's single route out (R1.2, D1). 01.2 recorded
+  # this network as declared-but-not-live (Deviation 3); attaching the mediator here
+  # is what makes it a real Docker resource, and closes that deviation.
+  egress-net:
+    internal: false
+
+volumes:
+  claude-state:
+  codex-state:
+  agy-state:
+  # The audit sink (R9.2, D12). Mounted into the mediator alone -- no agent service
+  # references it, which the acceptance harness asserts by enumeration rather than
+  # by inspection of this file.
+  audit:
+  # The action trail (02.1, R9.2, D12, Decision 2). One recorder-owned volume per
+  # agent -- never the mediator's `audit` volume above, and never a volume any
+  # agent service mounts. Each has exactly one mounter: that agent's own recorder.
+  claude-action-audit:
+  codex-action-audit:
+  agy-action-audit:
+
+# The resolved-policy source recorders read the identity token from (02.1
+# Interface Contract 2/3). The mediator reads the same artifact by COPYing it into
+# its own image layer at build time (images/mediator/Dockerfile); recorders read
+# it at runtime through this `configs:` mount instead, because a recorder has no
+# build stage of its own and this is the one path Compose offers for handing a
+# host file into a container without a bind mount into /workspace or a secret.
+configs:
+  resolved_policy:
+    file: ../policy/resolved/${AGENT_PROFILE:-default}.yaml
+
+# Proxy-hop trust material (01.3 SF-3, Interface Contract 3). `file:` sources are
+# the runtime-injection mechanism available on Docker Desktop; nothing here is baked
+# into an image layer (R8.1, criterion 9).
+#
+# The CA PRIVATE key is deliberately absent and must stay absent: issuance is an
+# offline operator script and the key never leaves the operator host, so a mediator
+# compromise cannot mint agent identities. See mediator/identity/README.md.
+#
+# These files do not exist in a fresh checkout -- they are generated, and git-ignored.
+# `docker compose up` fails on a missing `file:` source, which is the bring-up order
+# surfacing rather than a fault:
+#
+#   bash scripts/issue-identity.sh ca
+#   bash scripts/issue-identity.sh listener claude --ip 172.31.10.2
+#   bash scripts/issue-identity.sh listener codex  --ip 172.31.20.2
+#   bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2
+#   bash scripts/issue-identity.sh client     claude          # 01.6 SF-2
+#   bash scripts/issue-identity.sh credential codex           # 01.6 SF-3
+#   bash scripts/issue-identity.sh credential agy             # 01.6 SF-3
+#
+# The codex pair is a BUMPING certificate, not a proxy hop, and the distinction is
+# the whole reason it is called out here. codex opens no TLS to the mediator and
+# gets no CA certificate; its listener nonetheless PEEKS the ClientHello, and
+# Squid's peek stage silently declines to run without a signing certificate --
+# verified at 01.3 SF-6, feature plan Deviation 5. It is never presented on an
+# allowed path, because peek+splice hands the origin's own chain through untouched.
+secrets:
+  mediator-ca.crt:
+    file: ../mediator/identity/ca/mediator-ca.crt
+  claude-listener.crt:
+    file: ../mediator/identity/listeners/claude-listener.crt
+  claude-listener.key:
+    file: ../mediator/identity/listeners/claude-listener.key
+  codex-listener.crt:
+    file: ../mediator/identity/listeners/codex-listener.crt
+  codex-listener.key:
+    file: ../mediator/identity/listeners/codex-listener.key
+  agy-listener.crt:
+    file: ../mediator/identity/listeners/agy-listener.crt
+  agy-listener.key:
+    file: ../mediator/identity/listeners/agy-listener.key
+  # 01.6 SF-2 -- claude's WORKLOAD IDENTITY, and the only client key pair in this file. It is
+  # scoped to the `claude` service alone below; no other agent and NOT the mediator, which
+  # verifies it against the CA certificate it already holds and needs no private key to do so.
+  # Issued by `bash scripts/issue-identity.sh client claude` with subject CN=claude -- the
+  # resolved policy's `identity` value, which the mediator's binding rule matches.
+  #
+  # There is no codex or agy client certificate: 01.1 SF-2 measured that codex never reaches a
+  # TLS listener and that agy has nothing to offer at the CertificateRequest stage. Their
+  # identity is the proxy credential below instead -- a different form, and a weaker one.
+  claude-client.crt:
+    file: ../mediator/identity/clients/claude-client.crt
+  claude-client.key:
+    file: ../mediator/identity/clients/claude-client.key
+
+  # 01.6 SF-3 -- the PROXY CREDENTIAL form, for the two agents whose clients cannot present a
+  # certificate but WILL send a credential. SF-1 measured that both codex and agy construct
+  # `Proxy-Authorization: Basic` themselves, preemptively, from userinfo in their own proxy URL,
+  # and that neither exposes any other knob for supplying one.
+  #
+  #   bash scripts/issue-identity.sh credential codex
+  #   bash scripts/issue-identity.sh credential agy
+  #
+  # The split is the point. `mediator-credentials` is the htpasswd -- HASHES only -- and it is
+  # scoped to the mediator alone; each `<agent>-proxy-credential` is that agent's own plaintext
+  # `<username>:<password>` and is scoped to that agent alone. No agent holds another's, and no
+  # agent holds the file the mediator verifies against.
+  #
+  # ACCEPTED, NOT MITIGATED (01.6 Decision 4, recorded in mediator/identity/README.md). A basic
+  # credential is a BEARER secret: the agent's entrypoint splices it into its proxy URL, so it is
+  # readable in that agent's own environment and `/proc`, and for codex it crosses the proxy hop
+  # IN THE CLEAR, because that hop is plain HTTP by construction (01.1 SF-2) on a two-member
+  # `internal: true` network. An agent that can read its own credential can present it. That is
+  # exactly why these two agents do NOT pass the Milestone 03 credential-brokering gate, which
+  # stays `listener+mtls` alone -- claude only, on today's evidence. Rotation is re-issue;
+  # revocation is delete the `.cred`, `credential --rebuild`, restart the mediator.
+  mediator-credentials:
+    file: ../mediator/identity/credentials/htpasswd
+  codex-proxy-credential:
+    file: ../mediator/identity/credentials/codex.cred
+  agy-proxy-credential:
+    file: ../mediator/identity/credentials/agy.cred
+
+x-hardened: &hardened
+  user: "1000:1000"
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+
+services:
+  # The single enforcement point (R1.2, D1): the only container on more than one
+  # network and the only one with a route off the host. Same D15 baseline as the
+  # agents, at a different uid -- 13:13 is the `proxy` user the Squid package ships
+  # and the owner of its packaged paths.
+  egress-mediator:
+    build:
+      # Solution root, not ../images: the image carries policy/resolved/ and (from
+      # SF-5/SF-6) mediator/config/. `.dockerignore` at that root is deny-all plus
+      # an allowlist, so references/.env_keys and the CA private key under
+      # mediator/identity/ never reach the daemon.
+      context: ..
+      dockerfile: images/mediator/Dockerfile
+      args:
+        MEDIATOR_BASE_DIGEST: ${MEDIATOR_BASE_DIGEST}
+        SQUID_VERSION: ${SQUID_VERSION}
+        UNBOUND_VERSION: ${UNBOUND_VERSION}
+        DNSDIST_VERSION: ${DNSDIST_VERSION}
+        SNAPSHOT_URL: ${MEDIATOR_SNAPSHOT_URL}
+        SNAPSHOT_SUITE: ${MEDIATOR_SNAPSHOT_SUITE}
+        SNAPSHOT_FINGERPRINT: ${MEDIATOR_SNAPSHOT_FINGERPRINT}
+        YQ_VERSION: ${YQ_VERSION}
+        YQ_SHA256_ARM64: ${YQ_SHA256_ARM64}
+        YQ_SHA256_AMD64: ${YQ_SHA256_AMD64}
+    image: sandboxed-agent/mediator:local
+    environment:
+      # Which network belongs to which agent (01.3 SF-5). The pod resolver applies
+      # a PER-AGENT allowlist and each `internal: true` network carries exactly one
+      # agent, so the subnet a query arrives from is that agent's identity -- but
+      # the mediator cannot infer the NAME from an address, and guessing it would
+      # mean serving one agent's allowlist to another.
+      #
+      # This is a fourth copy of the fact the `ipam` blocks above, the agents'
+      # `dns:` literals and the listener certificates' iPAddress SANs already
+      # carry. It is deliberately adjacent to the ipam blocks, and the entrypoint
+      # refuses to start if an address named here is not one the container actually
+      # holds -- so a renumber that misses this line fails loudly at start rather
+      # than quietly applying the wrong policy.
+      MEDIATOR_AGENT_NETWORKS: "claude=172.31.10.2/24,codex=172.31.20.2/24,agy=172.31.30.2/24"
+      # Where allowlisted names are resolved. Docker's embedded resolver inside the
+      # mediator's own namespace, which forwards to the daemon's configured
+      # upstreams: the pod inherits the operator's DNS instead of this repository
+      # hardcoding a third-party resolver, and the query leaves over egress-net --
+      # the mediator's only external interface. The acceptance harness overrides
+      # this to aim at its own controlled authoritative server (T4).
+      MEDIATOR_DNS_UPSTREAM: "127.0.0.11"
+      # ONE VARIABLE SELECTS THE WHOLE POD (01.5 SF-6). The agent builds interpolate
+      # their pack set from AGENT_PROFILE; before this line the mediator read nothing
+      # and images/mediator/entrypoint.sh defaulted the runtime profile to `default`.
+      # So `AGENT_PROFILE=oauth-mount docker compose up --build` built agent images for
+      # one profile's pack set and enforced a DIFFERENT profile's policy, with no
+      # surface reporting the mismatch -- recorded as a residual at SF-5's review pass
+      # and assigned here.
+      #
+      # The name stays AGENT_PROFILE rather than becoming POD_PROFILE: renaming it
+      # would touch the three agent build blocks that already read it, and a second
+      # name for one selection is how the divergence comes back. It now means "the
+      # profile this pod is built and run for", and the comment above each agent
+      # `PROFILE:` still explains why it is not the bare `PROFILE`.
+      #
+      # The acceptance harness still wins: compose/overrides/test-egress.yaml sets
+      # MEDIATOR_PROFILE from MEDIATOR_TEST_PROFILE and later files layer over this one.
+      MEDIATOR_PROFILE: ${AGENT_PROFILE:-default}
+    user: "13:13"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    # `uid`/`gid` on the /run tmpfs, and they are not decoration: a tmpfs mount
+    # arrives root-owned mode 0755, so a container running as uid 13 with
+    # `cap_drop: ALL` cannot create the runtime directories it needs there.
+    # Owning the mount is narrower than making it world-writable.
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=13,gid=13,mode=0700
+      - /run:rw,noexec,nosuid,size=16m,uid=13,gid=13,mode=0750
+    # Binding :53 with no capabilities requires the unprivileged-port floor to be
+    # lowered. This is the namespaced sysctl, preferred over `cap_add:
+    # NET_BIND_SERVICE` precisely so `cap_drop: ALL` survives intact -- the recorded
+    # fallback if Docker Desktop's VM refuses it is that single capability, which is
+    # still narrower than running the resolver as root. Verified, not assumed:
+    # docs/records/mediator-runtime-verification.md.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+      # Criterion 3 asserts the mediator is not a router. Verified, and the default
+      # is NOT what the plan assumed: a fresh container on this Docker Desktop
+      # inherits `ip_forward=1`, so the container that holds an interface on both an
+      # agent network and the external one was one routing table entry away from
+      # being a bypass. Set explicitly rather than asserted from the namespace default.
+      net.ipv4.ip_forward: "0"
+    networks:
+      claude-net:
+        ipv4_address: 172.31.10.2
+      codex-net:
+        ipv4_address: 172.31.20.2
+      agy-net:
+        ipv4_address: 172.31.30.2
+      egress-net:
+    volumes:
+      - audit:/var/log/mediator
+    secrets:
+      - mediator-ca.crt
+      - claude-listener.crt
+      - claude-listener.key
+      - codex-listener.crt
+      - codex-listener.key
+      - agy-listener.crt
+      - agy-listener.key
+      # 01.6 SF-3. The htpasswd `basic_ncsa_auth` verifies proxy credentials against. HASHES
+      # only -- which is also why the cascade warm-up skips a `proxy_auth` listener: this
+      # container cannot construct a credential to answer its own 407 with.
+      - mediator-credentials
+
+  # The agent action recorders (02.1, R9.7, D20, Decision 1). One per agent, each
+  # reading only that agent's own state volume, read-only, with no network route
+  # anywhere -- the recorder can read its agent's credential but has nowhere to
+  # send it. `network_mode: none` is the whole enforcement; there is no second
+  # network to accidentally attach.
+  #
+  # `RECORDER_SOURCE_GLOB` / `RECORDER_SESSION_ID` / `RECORDER_MODE` are per-agent
+  # measurements from `docs/records/agent-action-log.md` (SF-1), not guesses:
+  # claude and codex append-only JSONL with the session id in the filename;
+  # `agy` rewrites a whole SQLite file per turn, so its filename stem (the
+  # `conversation_id`) is its session id and its mode is `snapshot`.
+  claude-recorder:
+    <<: *hardened
+    build:
+      context: ..
+      dockerfile: images/recorder/Dockerfile
+      args:
+        MEDIATOR_BASE_DIGEST: ${MEDIATOR_BASE_DIGEST}
+        JQ_VERSION: ${JQ_VERSION}
+        YQ_VERSION: ${YQ_VERSION}
+        YQ_SHA256_ARM64: ${YQ_SHA256_ARM64}
+        YQ_SHA256_AMD64: ${YQ_SHA256_AMD64}
+    image: sandboxed-agent/recorder:local
+    network_mode: none
+    environment:
+      RECORDER_AGENT: claude
+      RECORDER_SOURCE_GLOB: "/src/.claude/projects/*/*.jsonl"
+      RECORDER_SESSION_ID: "filename:^(.+)\\.jsonl$"
+      RECORDER_MODE: append
+      RECORDER_POLL_SECONDS: "1"
+    volumes:
+      - claude-state:/src:ro
+      - claude-action-audit:/var/log/actions
+    configs:
+      - source: resolved_policy
+        target: /etc/recorder/resolved.yaml
+    restart: on-failure
+
+  codex-recorder:
+    <<: *hardened
+    build:
+      context: ..
+      dockerfile: images/recorder/Dockerfile
+      args:
+        MEDIATOR_BASE_DIGEST: ${MEDIATOR_BASE_DIGEST}
+        JQ_VERSION: ${JQ_VERSION}
+        YQ_VERSION: ${YQ_VERSION}
+        YQ_SHA256_ARM64: ${YQ_SHA256_ARM64}
+        YQ_SHA256_AMD64: ${YQ_SHA256_AMD64}
+    image: sandboxed-agent/recorder:local
+    network_mode: none
+    environment:
+      RECORDER_AGENT: codex
+      RECORDER_SOURCE_GLOB: "/src/.codex/sessions/*/*/*/rollout-*.jsonl"
+      RECORDER_SESSION_ID: "filename:^rollout-.*-([0-9a-fA-F-]{36})\\.jsonl$"
+      RECORDER_MODE: append
+      RECORDER_POLL_SECONDS: "1"
+    volumes:
+      - codex-state:/src:ro
+      - codex-action-audit:/var/log/actions
+    configs:
+      - source: resolved_policy
+        target: /etc/recorder/resolved.yaml
+    restart: on-failure
+
+  agy-recorder:
+    <<: *hardened
+    build:
+      context: ..
+      dockerfile: images/recorder/Dockerfile
+      args:
+        MEDIATOR_BASE_DIGEST: ${MEDIATOR_BASE_DIGEST}
+        JQ_VERSION: ${JQ_VERSION}
+        YQ_VERSION: ${YQ_VERSION}
+        YQ_SHA256_ARM64: ${YQ_SHA256_ARM64}
+        YQ_SHA256_AMD64: ${YQ_SHA256_AMD64}
+    image: sandboxed-agent/recorder:local
+    network_mode: none
+    environment:
+      RECORDER_AGENT: agy
+      RECORDER_SOURCE_GLOB: "/src/.gemini/antigravity-cli/conversations/*.db"
+      RECORDER_SESSION_ID: "filename:^(.+)\\.db$"
+      RECORDER_MODE: snapshot
+      RECORDER_POLL_SECONDS: "1"
+    volumes:
+      - agy-state:/src:ro
+      - agy-action-audit:/var/log/actions
+    configs:
+      - source: resolved_policy
+        target: /etc/recorder/resolved.yaml
+    restart: on-failure
+
+  claude:
+    <<: *hardened
+    depends_on:
+      - claude-recorder
+    build:
+      context: ..
+      dockerfile: images/Dockerfile
+      target: claude
+      args:
+        CLAUDE_VERSION: ${CLAUDE_VERSION}
+        CLAUDE_SOURCE: ${CLAUDE_SOURCE}
+        # Which profile's pack set this image is built with (D10, 01.5 SF-5). Interpolated
+        # from AGENT_PROFILE and NOT from PROFILE: `PROFILE` is a common shell variable and a
+        # stray value in the operator's environment would silently select a different pack set
+        # here. The Dockerfile's ARG keeps its own name. NOTHING SETS THIS TODAY -- the two
+        # shipped profiles select identical pack sets by operator decision at SF-3, so the
+        # default is correct for both; SF-6's scripts/build.sh is the per-profile build that
+        # drives it.
+        PROFILE: ${AGENT_PROFILE:-default}
+        SNAPSHOT_URL: ${SNAPSHOT_URL}
+        SNAPSHOT_SUITE: ${SNAPSHOT_SUITE}
+        SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
+        GIT_VERSION: ${GIT_VERSION}
+        GIT_SHA256: ${GIT_SHA256}
+        # The CI-published base, by digest (01.5 SF-6b, D21, R10.2). NO `:-` fallback:
+        # an unset value must fail the build, not resolve to something. Compose warns and
+        # substitutes empty, and images/Dockerfile's FROM then dies on `...@`, which is
+        # the intended end state -- pins.env is where the value lives.
+        AGENT_BASE_DIGEST: ${AGENT_BASE_DIGEST}
+        NODE_BASE_DIGEST: ${NODE_BASE_DIGEST}
+    image: sandboxed-agent/claude:local
+    networks:
+      - claude-net
+    # Replaces Docker's embedded resolver upstreams with the mediator (R5.4, D3).
+    # `internal: true` withholds the default route but leaves 127.0.0.11 forwarding
+    # to the daemon's own upstreams -- a path out that does not traverse the
+    # container's routing table, and therefore a DNS exfiltration channel the
+    # network mode does not close.
+    dns:
+      - 172.31.10.2
+    environment:
+      # https:// -- claude reaches a TLS proxy hop (Interface Contract 2). Both
+      # cases are set: the three agents' HTTP clients do not agree on which they read.
+      HTTPS_PROXY: https://172.31.10.2:3128
+      https_proxy: https://172.31.10.2:3128
+      HTTP_PROXY: https://172.31.10.2:3128
+      http_proxy: https://172.31.10.2:3128
+      NO_PROXY: localhost,127.0.0.1
+      no_proxy: localhost,127.0.0.1
+      # Anchors the PROXY HOP only (R5.12). No mediator CA appears in any
+      # destination chain -- destination TLS is spliced, never terminated
+      # (REQUIREMENTS.md T28 as amended by SF-3).
+      NODE_EXTRA_CA_CERTS: /run/secrets/mediator-ca.crt
+      # 01.4 Interface Contract 4 -- the ONLY thing 01.4 adds to this file. No service,
+      # no network, no volume, no default mount, no published port, no GIT_CONFIG_GLOBAL.
+      # Sourced from the profile's auth_mode block (profiles/default.yaml). R4.12 makes
+      # oauth-interactive the safest mode claude supports; bootstrap-auth exits 2 if this
+      # is unset, so an empty value fails rather than falling back.
+      AUTH_MODE: ${CLAUDE_AUTH_MODE:-oauth-interactive}
+      # 01.6 Interface Contract 5 -- the client certificate this agent presents on the proxy
+      # hop. Measured at 01.1 SF-2 against claude 2.1.260: these two variables are the
+      # documented and confirmed mechanism, and claude is the only one of the three agents that
+      # completes a client-certificate handshake against a proxy listener.
+      #
+      # The mediator's front listener requires one (`client_auth: mtls`), and required means
+      # required-at-handshake: without these the connection dies before Squid has a request to
+      # log, so the audit trail is SILENT rather than carrying a denial. The diagnostic surface
+      # that is populated is the mediator's own cache_log.
+      CLAUDE_CODE_CLIENT_CERT: /run/secrets/claude-client.crt
+      CLAUDE_CODE_CLIENT_KEY: /run/secrets/claude-client.key
+    secrets:
+      - mediator-ca.crt
+      - claude-client.crt
+      - claude-client.key
+    volumes:
+      - claude-state:/home/agent
+
+  codex:
+    <<: *hardened
+    depends_on:
+      - codex-recorder
+    build:
+      context: ..
+      dockerfile: images/Dockerfile
+      target: codex
+      args:
+        CODEX_VERSION: ${CODEX_VERSION}
+        CODEX_SOURCE: ${CODEX_SOURCE}
+        # Which profile's pack set this image is built with (D10, 01.5 SF-5). Interpolated
+        # from AGENT_PROFILE and NOT from PROFILE: `PROFILE` is a common shell variable and a
+        # stray value in the operator's environment would silently select a different pack set
+        # here. The Dockerfile's ARG keeps its own name. NOTHING SETS THIS TODAY -- the two
+        # shipped profiles select identical pack sets by operator decision at SF-3, so the
+        # default is correct for both; SF-6's scripts/build.sh is the per-profile build that
+        # drives it.
+        PROFILE: ${AGENT_PROFILE:-default}
+        SNAPSHOT_URL: ${SNAPSHOT_URL}
+        SNAPSHOT_SUITE: ${SNAPSHOT_SUITE}
+        SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
+        GIT_VERSION: ${GIT_VERSION}
+        GIT_SHA256: ${GIT_SHA256}
+        # The CI-published base, by digest (01.5 SF-6b, D21, R10.2). NO `:-` fallback:
+        # an unset value must fail the build, not resolve to something. Compose warns and
+        # substitutes empty, and images/Dockerfile's FROM then dies on `...@`, which is
+        # the intended end state -- pins.env is where the value lives.
+        AGENT_BASE_DIGEST: ${AGENT_BASE_DIGEST}
+        NODE_BASE_DIGEST: ${NODE_BASE_DIGEST}
+    image: sandboxed-agent/codex:local
+    networks:
+      - codex-net
+    dns:
+      - 172.31.20.2
+    environment:
+      # http:// -- and this asymmetry is a finding, not a preference: 01.1 SF-2
+      # established that codex rejects an `https://`-scheme proxy URL at URL-parse
+      # time, before any handshake. Its hop is plain HTTP CONNECT.
+      HTTPS_PROXY: http://172.31.20.2:3128
+      https_proxy: http://172.31.20.2:3128
+      HTTP_PROXY: http://172.31.20.2:3128
+      http_proxy: http://172.31.20.2:3128
+      NO_PROXY: localhost,127.0.0.1
+      no_proxy: localhost,127.0.0.1
+      # 01.4 Interface Contract 4. R4.12 default for codex is oauth-interactive;
+      # oauth-mount is its other supported OAuth cell and is selected per profile.
+      AUTH_MODE: ${CODEX_AUTH_MODE:-oauth-interactive}
+    # No CA secret and no trust variable: codex opens no TLS to the mediator, so
+    # there is no mediator certificate for it to validate. Its DESTINATION TLS is
+    # unaffected and uses its own trust store.
+    secrets:
+      # 01.6 SF-3 -- codex's own proxy credential, and nothing else's. The entrypoint splices it
+      # into HTTPS_PROXY/HTTP_PROXY at start; the URLs above stay credential-free in this file
+      # and in `docker inspect`.
+      #
+      # This is the one agent whose credential crosses the wire IN THE CLEAR: its hop is plain
+      # HTTP CONNECT because 01.1 SF-2 measured that codex rejects an `https://`-scheme proxy URL
+      # at parse time. The exposure is bounded to a two-member `internal: true` network holding
+      # only codex and the mediator, it is recorded rather than mitigated, and it is a concrete
+      # reason the Milestone 03 brokering gate does not admit this agent (01.6 Decision 4).
+      - codex-proxy-credential
+    volumes:
+      - codex-state:/home/agent
+
+  agy:
+    <<: *hardened
+    depends_on:
+      - agy-recorder
+    build:
+      context: ..
+      dockerfile: images/Dockerfile
+      target: agy
+      args:
+        AGY_VERSION: ${AGY_VERSION}
+        AGY_URL: ${AGY_URL}
+        AGY_SHA512: ${AGY_SHA512}
+        # Which profile's pack set this image is built with (D10, 01.5 SF-5). Interpolated
+        # from AGENT_PROFILE and NOT from PROFILE: `PROFILE` is a common shell variable and a
+        # stray value in the operator's environment would silently select a different pack set
+        # here. The Dockerfile's ARG keeps its own name. NOTHING SETS THIS TODAY -- the two
+        # shipped profiles select identical pack sets by operator decision at SF-3, so the
+        # default is correct for both; SF-6's scripts/build.sh is the per-profile build that
+        # drives it.
+        PROFILE: ${AGENT_PROFILE:-default}
+        SNAPSHOT_URL: ${SNAPSHOT_URL}
+        SNAPSHOT_SUITE: ${SNAPSHOT_SUITE}
+        SNAPSHOT_FINGERPRINT: ${SNAPSHOT_FINGERPRINT}
+        GIT_VERSION: ${GIT_VERSION}
+        GIT_SHA256: ${GIT_SHA256}
+        # The CI-published base, by digest (01.5 SF-6b, D21, R10.2). NO `:-` fallback:
+        # an unset value must fail the build, not resolve to something. Compose warns and
+        # substitutes empty, and images/Dockerfile's FROM then dies on `...@`, which is
+        # the intended end state -- pins.env is where the value lives.
+        AGENT_BASE_DIGEST: ${AGENT_BASE_DIGEST}
+        NODE_BASE_DIGEST: ${NODE_BASE_DIGEST}
+    image: sandboxed-agent/agy:local
+    networks:
+      - agy-net
+    dns:
+      - 172.31.30.2
+    environment:
+      HTTPS_PROXY: https://172.31.30.2:3128
+      https_proxy: https://172.31.30.2:3128
+      HTTP_PROXY: https://172.31.30.2:3128
+      http_proxy: https://172.31.30.2:3128
+      NO_PROXY: localhost,127.0.0.1
+      no_proxy: localhost,127.0.0.1
+      # agy's mechanism is SSL_CERT_FILE, not NODE_EXTRA_CA_CERTS (01.1 SF-2).
+      SSL_CERT_FILE: /run/secrets/mediator-ca.crt
+      # 01.4 Interface Contract 4. agy is apikey-only BY DECISION (D9) -- see
+      # Interface Contract 1 for why no OAuth cell is offered.
+      AUTH_MODE: ${AGY_AUTH_MODE:-apikey}
+    secrets:
+      - mediator-ca.crt
+      # 01.6 SF-3 -- agy's own proxy credential, and nothing else's. The entrypoint splices it
+      # into HTTPS_PROXY/HTTP_PROXY at start; the URLs above stay credential-free in this file
+      # and in `docker inspect`. agy's hop is TLS, so its credential does not cross the wire in
+      # the clear -- measured on this Squid build at the SF-3 build (P9), because P8 had only
+      # measured `proxy_auth` on a plain `http_port`.
+      - agy-proxy-credential
+    volumes:
+      - agy-state:/home/agent

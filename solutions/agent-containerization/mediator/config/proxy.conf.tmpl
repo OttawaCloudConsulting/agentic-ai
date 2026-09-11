@@ -1,0 +1,327 @@
+# The pod's L7 egress policy engine (01.3 SF-6). RENDERED at start by
+# images/mediator/entrypoint.sh from policy/resolved/<profile>.yaml -- never
+# hand-edited (SC-6). Lines marked @...@ are substituted; everything else ships as
+# written, and the ORDER below is the policy, so the fixed lines carry the
+# ordering and the markers carry only the per-agent content.
+#
+# The topology is a self-cascade, and that is a verified necessity rather than a
+# preference (docs/records/mediator-selection.md, P6/P7). Squid 6.13 cannot both
+# terminate the proxy-hop TLS and peek the client's ClientHello on ONE listener:
+# `https_port` refuses `ssl-bump` outright, and `http_port ... tls-cert=` does not
+# terminate client TLS at all -- that `tls-cert=` is the bumping certificate. So
+# the two TLS-fronted agents get two listeners each:
+#
+#   claude/agy:  https_port <agent addr>:3128   (terminates the proxy hop)
+#                  -> cache_peer -> http_port 127.0.0.1:32xx ssl-bump  (peek+splice)
+#   codex:       http_port <agent addr>:3128 ssl-bump                  (does both)
+#
+# Identity survives the hop because each layer has its own port NAME and
+# `myportname` is what selects policy -- never the client address, which is
+# 127.0.0.1 on every inner listener.
+
+pid_filename none
+# The cascade's peers are this process's OWN loopback listeners, and Squid probes its parents at
+# start before those listeners are accepting -- so every peer is marked DEAD at t=0. With the
+# default 10s this leaves a window (measured at ~19s) in which a fronted agent's first request is
+# answered 500 with no peer to forward to. Shortened so the window closes in about a second.
+# The peers are in the same process; a probe interval sized for a remote cache is not the right
+# scale for a loopback hop.
+dead_peer_timeout 1 seconds
+cache deny all
+# The ICMP pinger needs a raw socket, which `cap_drop: ALL` does not grant, and it
+# FATALs on every start. The mediator has no ICMP path out by construction
+# (criterion 3), so this is off rather than NET_RAW being granted.
+pinger_enable off
+cache_log @CACHE_LOG@
+shutdown_lifetime 1 seconds
+
+# Squid's own resolver, and it is deliberately NOT the pod resolver this mediator
+# also runs. dnsdist applies a PER-AGENT allowlist selected by the arriving
+# subnet; Squid's queries arrive from 127.0.0.1, match no agent network and would
+# be REFUSED by default-deny (feature plan, Deviation 3). This is the path SF-1
+# verified control 2 against, and pointing both stages at the same upstream is what
+# keeps the resolver and control 2 from disagreeing about what a name resolves to.
+dns_nameservers @DNS_NAMESERVERS@
+
+# Nothing about the mediator is advertised to the destination. `forwarded_for
+# delete` matters beyond tidiness: the agent's container address is pod-internal
+# topology and there is no reason for it to leave.
+via off
+httpd_suppress_version_string on
+forwarded_for delete
+
+# ------------------------------------------------------------------- listeners
+# Front listeners bind the mediator's STATIC ADDRESS on that agent's network, never
+# 0.0.0.0. The mediator also holds an interface on egress-net, and a wildcard bind
+# would put the proxy on it -- outward-facing, which criterion 1 forbids and which
+# no assertion in the harness looks for. The addresses are the same fact as
+# compose.yaml's `ipam` blocks, the agents' `dns:` literals, dnsdist's `addLocal`
+# calls and the listener certificates' iPAddress SANs.
+#
+# Client-certificate verification is per listener and comes from POLICY, not from this
+# template: `clientca=` and `tls-cafile=` are rendered onto a FRONT `https_port` when that
+# agent's resolved `listener.client_auth` is `mtls` (01.6 SF-2, Decision 5). On today's
+# artifact that is `claude` alone -- 01.1 SF-2 measured that `codex` never reaches a TLS
+# listener and that `agy` has nothing to offer at the CertificateRequest stage.
+#
+# It is REQUIRED-at-handshake, which SF-1's P1 measured and P1's DELAYED_AUTH half could not
+# make optional. That is safe here only because D2 gives every agent its own listener: the
+# `claude` front serves exactly one client and that client holds a certificate. It is why
+# `clientca=` never appears on an INNER bump listener (whose client is Squid's own cascade
+# hop) or on a self-check shadow (whose client is the startup probe) -- either would refuse
+# the mediator's own traffic at the handshake, and the symptom would be a self-check failure
+# at every start rather than anything naming identity.
+#
+# A cert-less refusal therefore produces NO AUDIT LINE AT ALL: the connection dies before
+# Squid has a request to log. The wrong-subject refusal below is the one that is logged.
+@PROXY_LISTENERS@
+
+# --------------------------------------------------------- the basic-auth scheme
+# Proxy-credential verification, for the agents whose clients cannot present a
+# certificate but WILL send a credential -- 01.6 SF-1 measured that both `codex` and
+# `agy` do, preemptively, from userinfo in their own proxy URL. Rendered from the same
+# `listener.client_auth` field that renders `clientca=` above, and it must come BEFORE
+# the `acl <name> proxy_auth <identity>` terms below: Squid refuses an ACL that
+# references an authentication scheme it has not been configured with yet.
+#
+# `basic_ncsa_auth` against an htpasswd secret the MEDIATOR ALONE holds. Not
+# `basic_fake_auth`, which accepts any password -- 01.3's record flags it as a fixture
+# helper, and keying policy off a credential nothing verifies would make
+# `identity_source: listener+proxy_auth` a claim about nothing.
+#
+# A credential is a BEARER secret and this template does not pretend otherwise: it is
+# readable in the agent's own environment and `/proc`, and on `codex-net` it crosses
+# the proxy hop in the clear because that hop is plain HTTP by construction. It buys a
+# revocable per-agent token and a stronger audit line, not passage through the
+# Milestone 03 credential-brokering gate, which stays `listener+mtls` alone (D4).
+#
+# This marker renders EMPTY under a profile with no `client_auth: proxy_auth` listener.
+@AUTH_PARAM@
+
+# ------------------------------------------------------- listener identity ACLs
+# `myportname`, not the client address: SF-4 may separate listeners by address, by
+# port or by both, and the inner listeners all share 127.0.0.1. Each agent gets
+# three ACLs -- front only, inner only, and both -- because the three controls do
+# not all belong on the same layer (see the access rules below).
+@LISTENER_ACLS@
+
+# The transaction annotation R9.1's per-line identity is read back from. Bound to
+# the listener on a never-matching rule so it tags without deciding anything --
+# SF-1's P4 shape, which populates on allow and deny alike and needs no client
+# credential.
+@IDENTITY_RULES@
+
+# ----------------------------------------------------------- the cascade peers
+# Plain HTTP to the loopback inner listener; the proxy hop was already terminated
+# by the front. `never_direct` is what stops a fronted request from bypassing its
+# own peek stage and going straight out -- without it the front would happily
+# connect direct and the SNI control would never run.
+@PEERS@
+
+# --------------------------------------------------------------- peek + splice
+# Peek at the ClientHello (which is what makes the SNI readable), then splice: the
+# tunnel is opaque and no destination traffic is decrypted (R5.15, D4, criterion 5).
+# `generate-host-certificates=off` on every bumping listener is load-bearing and is
+# set there rather than here -- minting a per-destination certificate is exactly the
+# MITM capability the architecture rules out.
+acl step1 at_step SslBump1
+ssl_bump peek step1
+ssl_bump splice all
+
+# ---------------------------------------------------------------- policy ACLs
+acl CONNECT method CONNECT
+
+# ------------------------------------------- SF-7: control naming and deny_info
+# Two jobs, one ACL. `annotate_transaction` ALWAYS matches and decides nothing, so
+# appending `... rsn_x ctl_y` to a deny line changes no verdict -- but the
+# annotation only happens when every term BEFORE it matched, which is exactly when
+# that line is the one refusing. So the note is populated on the refusing line and
+# on no other.
+#
+# The second job is `deny_info`, which keys on the LAST ACL of the matched line.
+# That is why the control ACL is last on every deny rule below and why there is one
+# ACL per control rather than one per rule: the page an operator sees and the
+# `control` field a parser reads are then the same fact, and they cannot drift.
+#
+# `method` is a FOURTH control value. Interface Contract 4 enumerated allowlist,
+# denylist and ratelimit; the CONNECT-only restriction refuses on its own terms and
+# would otherwise be logged as one of the other three or as nothing at all.
+# Recorded as a deviation on the feature plan.
+acl ctl_method    annotate_transaction control=method
+acl ctl_allowlist annotate_transaction control=allowlist
+acl ctl_denylist  annotate_transaction control=denylist
+acl ctl_ratelimit annotate_transaction control=ratelimit
+# `identity` is a FIFTH control value (01.6 SF-2). It names the subject-to-listener binding
+# refusal -- a certificate valid under the mediator CA whose subject is not this listener's
+# agent -- which is T34's literal case. It refuses on its own terms and would otherwise be
+# logged as `allowlist` or as nothing at all.
+acl ctl_identity  annotate_transaction control=identity
+
+# The reason is a TOKEN, not a sentence: annotation values cannot carry spaces, and
+# a machine-read audit trail is better served by a closed vocabulary anyway. The
+# human sentence lives in the error page the same ACL selects.
+acl rsn_method  annotate_transaction reason=method_not_connect
+acl rsn_host    annotate_transaction reason=host_not_allowlisted
+acl rsn_port    annotate_transaction reason=port_not_allowlisted
+acl rsn_noallow annotate_transaction reason=agent_has_no_allowlist
+acl rsn_sni     annotate_transaction reason=sni_does_not_match_connect_host
+acl rsn_fqdn    annotate_transaction reason=fqdn_on_denylist
+acl rsn_cidr    annotate_transaction reason=resolved_address_on_denylist
+acl rsn_maxconn annotate_transaction reason=concurrency_ceiling_exceeded
+acl rsn_subject annotate_transaction reason=subject_mismatch
+
+# The client half of Interface Contract 6, and it is BEST EFFORT by construction:
+# these pages are only reachable for a verdict reached BEFORE the CONNECT is
+# accepted. A post-ClientHello refusal (the SNI control) terminates with no body,
+# because writing one would mean minting a destination certificate. The pages are
+# rendered into error_directory by the entrypoint, on top of the packaged set.
+deny_info ERR_MEDIATOR_METHOD    ctl_method
+deny_info ERR_MEDIATOR_ALLOWLIST ctl_allowlist
+deny_info ERR_MEDIATOR_DENYLIST  ctl_denylist
+deny_info ERR_MEDIATOR_RATELIMIT ctl_ratelimit
+# The identity refusal is decided BEFORE the CONNECT is accepted -- it is an `http_access`
+# deny on the front listener -- so it takes Interface Contract 6's 403-with-body path in
+# full, the same route ERR_MEDIATOR_METHOD takes.
+deny_info ERR_MEDIATOR_IDENTITY  ctl_identity
+
+@DENY_ACLS@
+
+@AGENT_ACLS@
+
+# --------------------------------------------------------------- access rules
+# THE ORDER IS THE POLICY. Deny lines precede allow lines, so deny wins (R5.3,
+# R5.7). Within the denies, every ACL that can be decided WITHOUT a DNS lookup runs
+# before the one that cannot.
+#
+# That ordering is a control, not a style choice, and it is where SF-1's verified
+# fixture was wrong for production. `dst` (deny_cidrs) forces Squid to resolve the
+# CONNECT host. SF-1 evaluated it first, which means `CONNECT <payload>.attacker:443`
+# would be RESOLVED by the mediator -- through its own upstream, on no audit line,
+# bypassing the pod resolver entirely -- and only then refused. That is the DNS
+# exfiltration channel criterion 4 exists to close, reopened one layer up. Putting
+# the per-agent `dstdomain` gate first means a name that is not on that agent's
+# allowlist is refused before anything resolves it.
+
+# Control 0 -- the subject-to-listener binding, on the FRONT layer of an mtls agent, and it
+# is FIRST for two reasons (01.6 SF-2, Decision 3's first ordering constraint).
+#
+# `cache_peer_access` is evaluated after `http_access`. A certificate whose subject is not
+# this listener's agent, reaching an allow rule first, would be forwarded to the peer -- and
+# the INNER listener would then annotate `idsrc=listener+mtls` on a connection its front
+# should have refused, which is exactly the false attribution `identity_source` exists to
+# prevent. So the deny is rendered ahead of every rule that can forward.
+#
+# Ahead of the method deny as well, so a non-CONNECT request carrying a wrong-subject
+# certificate is still refused AS an identity failure and still annotates `idsrc=listener`,
+# rather than being logged with no attribution strength at all.
+#
+# 01.6 SF-3 puts a second refusal here, for a `client_auth: proxy_auth` listener, and it is here
+# for exactly the same reason: without it a credential-less request would fall through to the
+# destination allow rules, be forwarded to the peer, and the INNER listener would annotate
+# `idsrc=listener+proxy_auth` on a connection nothing authenticated. The credential form differs;
+# the ordering constraint does not.
+#
+# That refusal is rendered BARE -- a negated `proxy_auth` ACL and nothing after it. Measured at
+# the SF-3 build (P9): a `proxy_auth` ACL that misses halts ACL evaluation on its line, so any
+# annotation or reason term placed after it never runs. Squid answers 407 with its own challenge,
+# never 403, so `ctl_identity` and ERR_MEDIATOR_IDENTITY are the mtls path's alone. The weak
+# attribution value still reaches that 407 line, from the unconditional baseline annotation
+# rendered with the listener identity ACLs above rather than from this line. (Substitution
+# markers are deliberately never written out inside these comments: the entrypoint greps the
+# RENDERED file for any surviving marker and fatals, so a comment that spells one out aborts the
+# mediator's start. Cost the SF-3 build two starts before the message was read for what it said.)
+#
+# This marker renders EMPTY under a profile whose every listener declares `client_auth: none`.
+@IDENTITY_ENFORCE@
+
+# CONNECT only. Every other method is refused (criterion 3): a plain `GET
+# http://host/` through this proxy would arrive as an absolute-URI request that the
+# mediator would hold in PLAINTEXT -- the content-inspection capability D4 states
+# this architecture does not have.
+http_access deny !CONNECT rsn_method ctl_method
+
+# Control 1a -- the per-agent allowlist gate, on both layers, decided from the
+# CONNECT host and port alone. Default-deny: a name absent from THIS agent's list is
+# refused here, and no DNS lookup has happened yet. The allowlist is per agent and
+# never a union (01.1 SF-3's contract).
+@GATE_RULES@
+
+# Control 2 -- deny wins. FQDN deny first (no lookup, R5.1/criterion 10), then the
+# post-resolution address deny on the INNER layer only. Inner is where the
+# connection is actually made, which is the invariant SF-1's P2 verified: the
+# address checked is the address connected to. The front forwards to a peer and
+# connects to no destination, so a `dst` ACL there would check an address nothing
+# uses.
+@DENY_RULES@
+
+# Control 3a -- concurrency, on the FRONT layer. `maxconn` counts per client
+# ADDRESS: at an inner listener every client is 127.0.0.1, so the fronted agents'
+# counters would pool into one bucket and either agent could exhaust the other's
+# ceiling. At the front the client is the agent container itself, one bucket per
+# agent by construction.
+@MAXCONN_RULES@
+
+# The fronted agents' front layer has now passed the allowlist gate, the FQDN deny
+# and its concurrency ceiling. It is allowed through to its own peer, where the
+# SNI control below actually runs. The front cannot evaluate SNI -- it does not
+# peek, which is the entire reason the cascade exists.
+@FRONT_ALLOW@
+
+# Control 1b -- SNI equals the CONNECT host, on the peeking layer.
+#
+# Squid 6.13 has NO `ssl::server_name_mismatch` ACL (SF-1, P6: it is rejected at
+# parse time). Equality is therefore written as one PAIRED rule per allowlisted
+# name -- the `dstdomain` ACL and the `ssl::server_name --client-requested` ACL on
+# the same line -- so N allowlist entries produce N access lines per agent.
+#
+# This shape is not optional. On a listener that does NOT peek, the
+# `ssl::server_name` ACL still matches, by silently falling back to the CONNECT
+# hostname: SF-1 sent CONNECT `allowed.test` with SNI `denied.test` through a
+# non-peeking listener and it returned 200. A configuration that looks like it
+# enforces SNI, parses cleanly and passes an allowlist test can enforce nothing at
+# all, which is why the pairing lives on the inner listeners and why SF-8 asserts
+# the fronting case rather than the happy one.
+@ALLOW_RULES@
+
+# Anything reaching here matched no paired host+SNI rule -- including a CONNECT to
+# an allowlisted host carrying a different SNI, which is the domain-fronting case.
+http_access deny all rsn_sni ctl_allowlist
+
+# ----------------------------------------------- control 3b -- byte rate ceiling
+# One class-1 pool per agent, bound by `myportname` to that agent's INNER listener
+# -- the layer that actually carries destination bytes. SF-1 verified `delay_pools`
+# shapes SPLICED CONNECT tunnels, which was the open question. Bound on one layer
+# only: shaping the front as well would apply the ceiling twice to one byte stream.
+#
+# The direction is server->client. The client->server direction is NOT shaped by
+# this mechanism and nothing here claims it is.
+@DELAY_POOLS@
+
+# ----------------------------------------------------------------------- audit
+# SF-7's Interface Contract 4. This is the INTERMEDIATE format, not the audit trail:
+# it is written to a FIFO that images/mediator/audit-writer.awk reads and turns into
+# one JSON object per line. Squid emits no structure, so a hostile SNI or CONNECT
+# authority carrying a quote would corrupt a machine-parsed trail at exactly the
+# moment it matters. `%#` URL-escapes every attacker-controlled field, so a valid
+# hostname reaches the log unchanged and a hostile one cannot leave its string.
+#
+# The field ORDER is a contract with the writer; the writer asserts the count. Change
+# either alone and the trail breaks silently.
+#
+# `%note{agent}` carries the identity annotated at the listener, on allow and deny alike.
+# `%note{layer}` is what lets the writer discard a fronted agent's FRONT allow line: the
+# front reports its tunnel to the peer (200, TCP_TUNNEL) while the inner reports the real
+# verdict, so a front line read alone says a denied connection succeeded. Front DENIES are
+# kept -- control 3's concurrency ceiling is enforced there and nowhere else.
+#
+# `%note{idsrc}` is the 14th field (01.6 SF-2) and it states the STRENGTH of the attribution
+# `agent` carries: `listener` for network-derived, `listener+mtls` where a client certificate
+# whose subject equals this listener's agent was verified, `listener+proxy_auth` where a
+# per-agent proxy credential was accepted. It is INSERTED AT POSITION 2, not appended, and
+# that is load-bearing rather than cosmetic: the writer's `read` ends in a trailing `extra`
+# variable, so a field appended at the end would be absorbed into it and discarded with no
+# error at all -- the short-line guard tests an empty `$server`, which would still be
+# populated. The field order here and the `read` list in audit-writer.sh are ONE contract.
+logformat mediator_raw %{%Y-%m-%dT%H:%M:%S}tg.%03tuZ %#{agent}note %#{idsrc}note %#{layer}note %#{control}note %#{reason}note %#ru %>Hs %Ss %>st %<st %#ssl::>sni %#>rm %<a
+access_log stdio:@AUDIT_RAW@ mediator_raw
+error_directory @ERROR_DIR@

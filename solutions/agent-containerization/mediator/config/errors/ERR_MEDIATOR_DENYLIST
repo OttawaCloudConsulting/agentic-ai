@@ -1,0 +1,7 @@
+403 egress denied
+destination: %H:%p
+control:     denylist (deny wins; the name is denied, or it resolved into a denied range)
+policy:      @POLICY_PATH@  (profile "@PROFILE@")
+remediation: edit policy/denylist.base.yaml, then: bash scripts/compile-policy.sh
+             the five ranges of R5.6 are required and removing one is a policy regression
+record:      the mediator's audit line for this attempt is the authoritative denial record

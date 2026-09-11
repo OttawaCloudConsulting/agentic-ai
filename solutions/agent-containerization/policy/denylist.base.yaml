@@ -1,0 +1,26 @@
+# Post-resolution CIDR deny list. Deny always wins over allow (R5.3, R5.7); enforced by the
+# 01.3 mediator, not by this repository. Link-local (incl. the cloud metadata endpoint),
+# loopback and RFC1918 — the ranges no agent traffic should ever legitimately reach (R5.6).
+#
+# deny_fqdns closes R5.1, which IS a MUST and does ask for FQDN-level deny: "The policy supports
+# denying specific IP addresses, CIDR ranges and FQDNs." The header this file previously carried
+# ("nothing in the requirements register asks for FQDN-level deny") was false against R5.1 and is
+# corrected here by 01.3 SF-2. The field is supported and empty -- no entries are invented for it;
+# an empty supported field is the minimum that closes the MUST. Deny wins over allow for FQDNs
+# exactly as it does for CIDRs (R5.3, R5.7).
+#
+# R5.1's "specific IP addresses" term is closed by deny_cidrs, not by a separate deny_ips field:
+# a single address is a /32 (IPv4) or /128 (IPv6) entry, and the compiler normalises a bare
+# address to one rather than rejecting it. A second spelling would be a second place for
+# deny-wins precedence to be got wrong.
+#
+# Per-agent rate and concurrency limits (D5's third control) are deliberately absent here — that
+# is mediator configuration owned by 01.3, not base policy. The omission is a decision, not a gap.
+deny_fqdns: []          # R5.1 -- supported and empty, not absent (01.3 criterion 10)
+
+deny_cidrs:
+  - 169.254.0.0/16      # link-local, incl. 169.254.169.254 metadata endpoint (R5.6)
+  - 127.0.0.0/8         # loopback
+  - 10.0.0.0/8          # RFC1918
+  - 172.16.0.0/12       # RFC1918
+  - 192.168.0.0/16      # RFC1918

@@ -1,0 +1,6 @@
+403 egress denied
+destination: %H:%p
+control:     allowlist (default-deny; not present for the agent on %i)
+policy:      @POLICY_PATH@  (profile "@PROFILE@")
+remediation: add the host to policy/allowlist.base.yaml, then: bash scripts/compile-policy.sh
+record:      the mediator's audit line for this attempt is the authoritative denial record

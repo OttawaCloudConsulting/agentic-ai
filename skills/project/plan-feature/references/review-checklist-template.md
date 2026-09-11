@@ -9,7 +9,7 @@ Every review checklist file begins with this header:
 ```
 # Gate 4 Review -- Feature Plan: {Feature Name}
 
-**Artifact:** milestones/<NN>-<name>/plans/<feature-slug>.md
+**Artifact:** .project/<slug>/milestones/<NN>-<name>/plans/<feature-slug>.md
 **Status:** [ ] Pending
 **Reviewer(s):**
 **Date:**
@@ -36,7 +36,7 @@ Format:
 
 ## Gate 4: Feature Implementation Plan -- Static Items
 
-These items always appear in `milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md`:
+These items always appear in `.project/<slug>/milestones/<NN>-<name>/reviews/gate-4-<feature-slug>-review.md`:
 
 - `[ ] Does the approach handle known edge cases?`
 - `[ ] Are the sub-features correctly scoped for single-session work?`
@@ -46,7 +46,7 @@ These items always appear in `milestones/<NN>-<name>/reviews/gate-4-<feature-slu
 
 ## Content-Specific [Auto] Items
 
-Claude generates content-specific items based on the actual `milestones/<NN>-<name>/plans/<feature-slug>.md` content. These items are prefixed with `[Auto]` and target specific elements of the feature plan. Examples:
+Claude generates content-specific items based on the actual `.project/<slug>/milestones/<NN>-<name>/plans/<feature-slug>.md` content. These items are prefixed with `[Auto]` and target specific elements of the feature plan. Examples:
 
 - `[ ] [Auto] Verify sub-feature: "{SF name}" fits within ~120k token session`
 - `[ ] [Auto] Confirm interface: "{interface}" matches existing codebase pattern`

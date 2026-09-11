@@ -1,0 +1,57 @@
+# Terraform pack (Feature 02.3 SF-3, Decision 5).
+#
+# The clean R7.6/T14 case: no base agent carries a HashiCorp host, so this pack's
+# entire declared runtime egress is what T14 measures as "gained". Ships Terraform,
+# not OpenTofu -- see Decision 5 for why, and packs/README.md for the licensing note.
+
+name: terraform
+description: Terraform CLI, runtime provider download from registry.terraform.io
+schema: 1
+
+blast_radius: |                  # R7.11
+  A compromised agent under this profile can run `terraform` against any state and
+  provider it is pointed at inside the workspace mount, and can download and execute
+  arbitrary provider binaries served from registry.terraform.io or
+  releases.hashicorp.com -- both allowlisted destinations under runtime_install: true.
+  Runtime provider download is a supply-chain widening (Decision 5): the registry's
+  GET paths are also a low-bandwidth exfil channel. A third-party provider hosted
+  outside releases.hashicorp.com fails to install, which is intended, not a gap.
+  No credential and no host mount are granted by this pack.
+
+needs_write_access: false        # R7.3
+
+packages:
+  apt:
+    repository: profile          # R7.18 -- resolves to profiles.<p>.package_repository
+    items:
+      # apt installs run BEFORE archives (images/pack-install.sh), so unzip is
+      # present before the terraform archive is unpacked with it.
+      - {name: unzip, version: "6.0-28", sha256: 2ab1b850b61f4c5666903827f04e6c6297363868354d0a6c1ff2f5edb106d243}
+  archives:
+    # linux_arm64, matching A1/R11.1's single-architecture constraint. Hash taken
+    # from the SIGNED terraform_1.16.2_SHA256SUMS file HashiCorp publishes alongside
+    # the release, fetched over https.
+    - {name: terraform, version: "1.16.2", url: "https://releases.hashicorp.com/terraform/1.16.2/terraform_1.16.2_linux_arm64.zip", sha256: c040bd1e3122b4290f70f74288d8c5a54ddd4254a3e52a29e7cc666653f50a0a}
+
+egress:
+  runtime:
+    allow_fqdns:                 # Decision 5 -- terraform init/plan/apply provider traffic
+      - {fqdn: registry.terraform.io, port: 443, upgrade: false}
+      - {fqdn: releases.hashicorp.com, port: 443, upgrade: false}
+    allow_cidrs: []
+  build:
+    allow_fqdns:                 # R10.4 -- build-time only, never enters resolved policy
+      - {fqdn: snapshot.debian.org, port: 443}
+      - {fqdn: releases.hashicorp.com, port: 443}
+
+runtime_install: true            # R7.6 -- terraform init downloads provider executables
+runtime_install_reason: "terraform init/plan/apply download provider executables from registry.terraform.io, verified against releases.hashicorp.com's checksums -- this IS the provider installation channel R7.6 requires be declared, not a package registry npx-equivalent"
+
+mounts: []                       # R7.3 -- terraform state/plugin cache live under /home/agent
+env:                              # R7.3 -- Decision 1: non-secret, baked into the per-profile image
+  - name: CHECKPOINT_DISABLE
+    value: "1"
+    reason: "R5.11 -- without this, every terraform invocation attempts checkpoint-api.hashicorp.com, which the resolved allowlist denies. That denied attempt would land on the audit trail on every run, degrading SC-7's detection signal with noise rather than signal."
+credentials: []                  # R7.3 -- no credential needed to run terraform itself
+third_parties:                   # R14.1 -- required non-empty because egress.runtime is non-empty
+  - {party: HashiCorp, record: "docs/records/third-party-assessments.md#r141-hashicorp"}

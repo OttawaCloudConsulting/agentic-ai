@@ -1,0 +1,9 @@
+# Nothing generated under mediator/identity/ is committed (criterion 9, R8.7).
+#
+# Private key material is the obvious half. The certificates are excluded too: each listener
+# certificate carries an iPAddress SAN for one deployment's mediator address, so a committed
+# copy would be wrong for every other operator host and would invite reuse instead of issuance.
+# Regenerate with `bash scripts/issue-identity.sh` -- see README.md.
+*
+!.gitignore
+!README.md

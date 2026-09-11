@@ -1,0 +1,11 @@
+403 egress denied
+destination: %H:%p
+control:     identity (the client certificate's subject is not this listener's agent)
+policy:      @POLICY_PATH@  (profile "@PROFILE@")
+remediation: present the certificate issued for THIS listener's agent, or use that agent's own
+             network. A certificate is bound to one agent by its subject and the binding is
+             checked here -- a valid certificate from the same CA carrying another agent's
+             subject is refused rather than accepted as that other agent (T34)
+record:      the mediator's audit line for this attempt is the authoritative denial record, and
+             it carries reason=subject_mismatch with identity_source=listener -- no certificate
+             was accepted, so the attribution is network-derived and says so

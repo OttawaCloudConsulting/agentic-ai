@@ -2,7 +2,7 @@
 
 ## Overview
 
-The project pipeline uses plain-text checkbox notation across two tiers of state files: a project-level `progress.txt` at the project root (tracking gate approvals, milestone summaries, and spike entries) and milestone-level `milestone-status.txt` files at `milestones/<NN>-<name>/milestone-status.txt` (tracking per-feature details, sub-feature checklists, and notes). Both files use the same four-marker status notation defined below. This format was chosen over YAML for superior write-safety, token efficiency (~53% fewer tokens), and human editability (see DESIGN.md DD-3, progress-file/TEXT_vs_YAML_REPORT.md).
+The project pipeline uses plain-text checkbox notation across two tiers of state files: a project-level `progress.txt` at the project root (tracking gate approvals, milestone summaries, and spike entries) and milestone-level `milestone-status.txt` files at `.project/<slug>/milestones/<NN>-<name>/milestone-status.txt` (tracking per-feature details, sub-feature checklists, and notes). Both files use the same four-marker status notation defined below. This format was chosen over YAML for superior write-safety, token efficiency (~53% fewer tokens), and human editability (see DESIGN.md DD-3, progress-file/TEXT_vs_YAML_REPORT.md).
 
 ## Status Notation
 
@@ -45,19 +45,48 @@ The exact `progress.txt` content created by `/project` on first run (the only ti
 Notes:
 
 - `<Project Name>` is derived from the project directory name or user input at bootstrap time.
-- `<slug>` is the slugified form of the project name (lowercase, hyphens, alphanumeric only).
+- `<slug>` is the slugified form of the project name — see Slug Derivation Rules below.
 - `<ISO date>` is the current date in YYYY-MM-DD format.
 - The `# Status:` header line serves as an inline legend for anyone reading the file.
 
-Parsing instruction for skills: find the line starting with `# Project-ID:`, take the
-value after `:`, trim whitespace, and use it as `<slug>`. Construct the artifact base
-path as `.project/<slug>/`.
+## Slug Derivation Rules
+
+The `# Project-ID:` value is a URL-safe slug derived from the project name. All skills read this value to compute the artifact base path (`.project/<slug>/`).
+
+Derivation steps (apply in order):
+
+1. Lowercase the entire string.
+2. Replace any character that is not a letter, digit, or space with a space.
+3. Collapse consecutive spaces into a single space and trim leading/trailing spaces.
+4. Replace spaces with hyphens.
+5. If the result is empty (e.g., the name was entirely punctuation), use `untitled-project` as the fallback slug.
+
+The final slug must match `^[a-z0-9]+(-[a-z0-9]+)*$`. Note: hyphens are separators produced by the derivation process, not characters preserved from the original name directly (though a hyphen in the original becomes a space in step 2 and a hyphen again in step 4).
+
+Examples:
+
+| Project Name | Slug |
+|---|---|
+| My Web App | `my-web-app` |
+| OCC Agentic AI | `occ-agentic-ai` |
+| E-Commerce Platform! | `e-commerce-platform` |
+| `api_v2 (internal)` | `api-v2-internal` |
+| `!!!` | `untitled-project` |
+
+Parsing instruction for skills: find the line starting with `# Project-ID:`, split on the first `:`, take everything after it, and trim whitespace to get the slug. Construct the artifact base path as `.project/<slug>/`.
 
 ## Greenfield Bootstrap Variant
 
 When the project is greenfield (empty directory or boilerplate-only, per DD-10), Gate 0 is recorded as skipped in the bootstrap template instead of pending:
 
 ```
+# Progress: <Project Name>
+# Created: <ISO date>
+# Project-ID: <slug>
+# Status: [ ] pending  [~] in progress  [x] complete  [-] skipped
+
+## Gates
+
 [-] Gate 0: Codebase Alignment  Skipped (greenfield)
 ```
 
@@ -74,9 +103,6 @@ Gate entries appear in the `## Gates` section, one per line. The format varies b
 ```
 
 Format: `[x] Gate N: Name  Approved: <YYYY-MM-DD>  <artifact-path>`
-
-The artifact path is relative to the project root and uses the `.project/<slug>/` base
-path derived from the `# Project-ID: <slug>` header in `progress.txt`.
 
 **Skipped:**
 
@@ -110,15 +136,17 @@ Or with a reason:
 
 The artifact path on approved entries is the primary deliverable of that gate. `/project` validates these paths exist on disk (PROJ-04).
 
+All artifact paths recorded in `progress.txt` are relative to the project root and carry the `.project/<slug>/` base path derived from the `# Project-ID: <slug>` header. They are stored resolved -- readers use them as written and MUST NOT prepend the base path a second time.
+
 ## Milestone Summary Line Format
 
 One line per milestone in the `## Milestones` section:
 
 ```
-[ ] Milestone 01: Core Auth  milestones/01-core-auth/  0/3 features complete
+[ ] Milestone 01: Core Auth  .project/<slug>/milestones/01-core-auth/  0/3 features complete
 ```
 
-Format: `[status] Milestone NN: Name  milestones/<NN>-<name>/  N/M features complete`
+Format: `[status] Milestone NN: Name  .project/<slug>/milestones/<NN>-<name>/  N/M features complete`
 
 Where:
 
@@ -134,20 +162,22 @@ All spikes (open and resolved) appear in the `## Spikes` section, per decision D
 **Open spike:**
 
 ```
-[ ] WebSocket Auth Compatibility  docs/spikes/websocket-auth.md
+[ ] WebSocket Auth Compatibility  .project/<slug>/docs/spikes/websocket-auth.md
 ```
 
 **Resolved spike:**
 
 ```
-[x] SQLite to Postgres Migration  docs/spikes/sqlite-postgres.md  Resolved: 2026-03-17
+[x] SQLite to Postgres Migration  .project/<slug>/docs/spikes/sqlite-postgres.md  Resolved: 2026-03-17
 ```
 
 Format: `[status] Spike Name  <artifact-path>` with an optional `Resolved: <date>` suffix for completed spikes.
 
+The `<slug>` is read from the `# Project-ID:` header in `progress.txt` at the time the spike entry is written.
+
 ## milestone-status.txt Format
 
-Per-milestone file located at `milestones/<NN>-<name>/milestone-status.txt`. Uses the same checkbox notation as `progress.txt` (per STATE-02). Contains detailed feature tracking for a single milestone.
+Per-milestone file located at `.project/<slug>/milestones/<NN>-<name>/milestone-status.txt`. Uses the same checkbox notation as `progress.txt` (per STATE-02). Contains detailed feature tracking for a single milestone.
 
 ```
 # Milestone 01: Core Auth
@@ -156,11 +186,11 @@ Per-milestone file located at `milestones/<NN>-<name>/milestone-status.txt`. Use
 ## Features
 
 [x] Feature 01.1: User Registration
-    Plan: milestones/01-core-auth/plans/user-registration.md
+    Plan: .project/<slug>/milestones/01-core-auth/plans/user-registration.md
     Sub-features: 3/3 complete
 
 [~] Feature 01.2: Session Management
-    Plan: milestones/01-core-auth/plans/session-management.md
+    Plan: .project/<slug>/milestones/01-core-auth/plans/session-management.md
     Sub-features: 1/4 complete
     Notes: Switched from JWT to session cookies (see architectural deviation)
 
@@ -188,6 +218,7 @@ Note: `/project` itself only writes at bootstrap (PROJ-10), so this contract app
 Instructions for the LLM reading these files:
 
 - Lines starting with `#` are headers or comments (the `# Status:` line is a legend, not data)
+- `# Project-ID:` is the third header line (after `# Progress:` and `# Created:`); its value is the slug used to construct `.project/<slug>/`
 - Status is determined by the bracket marker at the start of each entry line (`[x]`, `[~]`, `[ ]`, `[-]`)
 - Artifact paths follow the date on approved gate entries
 - Feature counts in milestone summaries are `N/M` format where N=complete, M=total

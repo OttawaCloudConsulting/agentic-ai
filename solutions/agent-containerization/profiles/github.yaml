@@ -1,0 +1,99 @@
+# The `github` use-case profile (Feature 02.3 SF-4, Acceptance Criterion 6):
+# `default` plus the `github-cli` pack. Everything below this point is `default`'s
+# content unchanged, except `packs` and `name` -- Decision 4's overlap case is measured
+# by switching AGENT_PROFILE between this file and `default` and reading the mediator's
+# live `compiled_from.packs`: `codex` gains nothing (its base already carries both
+# hosts), `claude` and `agy` gain both.
+#
+# This is a schema/contract file, not itself interpreted by `docker compose`
+# -- compose/overrides/github.yaml is its hand-authored Compose counterpart, and it
+# DOES carry a `secrets:` block, unlike terraform.yaml's, because this pack declares
+# a credential (Decision 1, Interface Contract 3).
+
+name: github
+
+packs:
+  - language-runtimes           # unchanged from `default`
+  - github-cli                   # packs/github-cli/pack.yaml -- the pack this profile adds.
+                                  # `codex`'s base already carries api.github.com and github.com
+                                  # (allowlist.base.yaml), so Decision 4's "gained" set is empty
+                                  # for `codex` and this pack's full egress.runtime for the others
+
+# R7.18 -- the repository pack `apt` items are sourced from. Same snapshot as `terraform.yaml`;
+# this pack's own apt.items list is empty (gh ships as a self-contained tarball), but the field is
+# declared here regardless, same reasoning as terraform.yaml.
+package_repository:
+  apt:
+    url: https://snapshot.debian.org/archive/debian/20260901T000000Z/
+    suite: bookworm
+    signed_by: images/keyrings/debian-archive.gpg
+    fingerprint: B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8
+
+# R12.7 -- see profiles/terraform.yaml's comment; unchanged reasoning.
+authorization:
+  classify:
+    - git-push                 # leaves the pod and rewrites shared history
+    - infrastructure-apply     # Milestone 03's terraform apply; irreversible against real accounts
+  # waiver: <recorded reason this profile waives R12.7>
+
+# R4.12 defaults -- unchanged from `default` / `terraform.yaml`.
+auth_mode:
+  claude: oauth-interactive
+  codex: oauth-interactive
+  agy: apikey
+
+mounts:
+  project:
+    path: <host path>          # operator-supplied; this profile's Compose override binds a
+                                # git-ignored `workspace/` directory (see terraform.yaml's comment)
+    mode: rw
+  build_cache: false
+  host_git_config: false
+
+# `oauth_mount` is deliberately absent -- see profiles/terraform.yaml's comment; unchanged.
+
+limits:
+  cpus: "2.0"
+  memory: 4g
+  pids: 512
+
+listeners:
+  claude: {scheme: https, tls: true,  port: 3128, client_auth: mtls}
+  codex:  {scheme: http,  tls: false, port: 3128, client_auth: proxy_auth}
+  agy:    {scheme: https, tls: true,  port: 3128, client_auth: proxy_auth}
+
+rate_limits:
+  claude: {max_concurrent: 16, bytes_per_second: 2000000}
+  codex:  {max_concurrent: 16, bytes_per_second: 2000000}
+  agy:    {max_concurrent: 16, bytes_per_second: 2000000}
+
+egress_exclusions:
+  - agent: agy
+    fqdn: antigravity-cli-auto-updater-974169037036.us-central1.run.app
+    reason: >-
+      R10.3 is a MUST: agent auto-updaters are disabled so a pinned build stays pinned. Allowing
+      the updater to reach its manifest is the opposite. agy has no flag or env var that disables
+      the check (docs/records/agent-verification.md), so default-deny is the only mechanism left
+      and the entry is simply not copied through. 01.3 SF-8 Phase C asserts agy still starts,
+      runs a task and exits normally with this host denied, and records the updater's actual
+      write target; if agy hard-fails without it the recorded fallback is to allow it with an
+      explicit residual against R10.3.
+
+startup_check:
+  allowed: {agent: claude, fqdn: api.anthropic.com, port: 443}
+  denied:  {ip: 169.254.169.254, port: 443}
+  offline: false
+
+exports:
+  egress_audit_log: true
+  agent_action_log: true
+  resolved_policy: true
+  image_digest_sbom: true
+
+# R7.14, D18, Interface Contract 5 -- MCP inventory. No real server ships in this
+# feature (Decision 9): the empty lists ARE the explicit "none".
+mcp:
+  registry: none
+  servers: []
+  plugins: []
+  skills: []

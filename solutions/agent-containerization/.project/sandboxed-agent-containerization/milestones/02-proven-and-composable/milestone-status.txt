@@ -1,0 +1,83 @@
+# Milestone 02: Proven and Composable
+# Status: [ ] pending  5 features, 0 complete
+
+## Features
+
+[x] Feature 02.1: Audit completeness — agent action log, sink and exports
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/audit-completeness-agent-action-log-sink-and-exports.md
+    Sub-features: 5/5 complete
+    Notes: Started 2026-09-10. Completed 2026-09-10.
+
+[x] Feature 02.2: Adversarial boundary validation
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/adversarial-boundary-validation.md
+    Sub-features: 6/6 complete
+    Notes: Started 2026-09-10. Completed 2026-09-11. Deviation 2 recorded (SF-2, in_agent_authed + proxy-leg TLS flags). SF-4 harness/fixture/record committed 2026-09-11 (Phase 8, BOUNDARY_LIVE_INJECT=1 gate); live injected-repo session run 2026-09-11 for claude/codex against the operator's real state volumes -- both refused the exfil step (attempted=false, valid per R15.1). agy leg did not run (no GEMINI_API_KEY in this environment); recorded as a named gap, not a design finding, per operator decision to close SF-4 anyway. See docs/records/boundary-validation.md. SF-5 harness (Phase 9, BOUNDARY_SHADOW_RUN=1) and its live shadow run both completed 2026-09-11: all four single-source allowlist entries (api.anthropic.com, chatgpt.com, api.github.com, github.com) corroborated by the built mediator's own trail (verdict=allow, correct identity_source, http_status=200); provisional flipped true->false in policy/allowlist.base.yaml, lint-policy.sh, and four resolved profiles (default/github/kubernetes/terraform -- Deviation 3, wider than Interface Contract 6's stated one-file scope). codex's planned git-fetch exercise substituted a direct curl to github.com/api.github.com (/workspace held no repo, an environment fact, not a boundary result). See docs/records/boundary-validation.md. SF-6 (Phase 10, T16 + SC-1/SC-2/SC-3) committed 2026-09-11; README updated (not lifted, per Decision 9 -- 02.3/02.4/02.5 still building). Verification surfaced and fixed a drifted policy/resolved/test-fixtures.yaml and test-selfcheck.yaml (SF-3's rotating.fixture.lab entry never recompiled -- one-line fix, recompiled and committed). Standalone validate-boundary.sh run (verify-pack-composition.sh's own drift, unrelated to 02.2, blocks the plan's literal composite Test Command -- see Deviation 4 below): 95/97 assertions pass, reproduced identically across two runs. The 2 failures are the CDN-rotation scenario (T6, SF-3, pre-existing) -- security property holds (attempt 1 allows, attempt 2 refused post-resolution on the correct control/reason) but neither verdict line carries resolved_ip, so the suite's own field assertion fails; recorded as a Decision-9 design finding, routed to /milestone, not patched (mediator's own audit-line emission, out of 02.2 scope). T16 and SC-1/SC-2/SC-3 are unaffected by the T6 finding (T6 not in either's mapped test_id set; failed T6 rows carry egress_logged:false, excluded from T16's join by construction). See docs/records/boundary-validation.md for the full finding writeup.
+    Deviation 4 (not yet in a consolidation pass): the plan's Test Command is 02.1's composite plus validate-boundary.sh, ending in scripts/lint-policy.sh -- but verify-pack-composition.sh (shared across features) currently fails on Feature 02.3 in-progress work (R7.6/R5.4/R14.1 message-text and exit-code mismatches on the sf7-probe pack fixture, plus its own independent drift finding on the same two resolved artifacts, found and fixed here). 02.2's own new code (validate-boundary.sh, including SF-6's Phase 10) was verified standalone instead, since the literal composite cannot complete until 02.3 lands. Flagged for the milestone's consolidation pass.
+
+[x] Feature 02.3: Tool pack set, use-case profiles and MCP inventory
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/tool-pack-set-use-case-profiles-and-mcp-inventory.md
+    Sub-features: 8/8 complete
+    Notes: Started 2026-09-10. Completed 2026-09-11. SF-8 gated on Feature 02.2 reaching [x] (gate-3-review.md: 02.2 before 02.3). SF-1-SF-7 do not consume 02.2 output. Deviation (not recorded, implementation-detail): pack-install.sh COPY moved from agent-base to agent-packs in images/Dockerfile (SF-2) -- agent-base is GHCR-published and digest-pinned (D21), so a local script edit reached nothing until moved, same class of fix as entrypoint.sh (01.6 SF-3). Deviation (not recorded, implementation-detail, SF-3): scripts/check-profile-compose.sh's normalise() stripped `.build.args.MEDIATOR_PROFILE`, which does not exist -- MEDIATOR_PROFILE renders under `.environment`, not `.build.args`. Fixed to del `.environment.MEDIATOR_PROFILE`; the SF-2 script never hit this path because `check-profile-compose.sh --profile default` compares default to itself, where MEDIATOR_PROFILE is identical either way. Deviation (not recorded, implementation-detail, SF-5): `check-profile-compose.sh`'s `secrets_of()` compared `docker compose config`'s rendered secrets with a bare `yq eval '...secrets[]'`, which emits each entry as a two-line `{source, target}` mapping (Compose v2.38.2 normalizes every secret reference to long form, even ones written short) -- so line-based `comm`/`sort` treated `source:`/`target:` as separate set members and every profile carrying a pack credential (including the already-shipped `github`) reported a false secret-set mismatch; the (b) hardening-comparison half never actually passed for `github` either, because Phase B only ever exercised `check-profile-compose.sh` against `default`-vs-itself. Fixed to extract `.source` via `yq -o=json | jq`, one name per line regardless of rendered form; both `github` and the new `kubernetes` profile now pass. Real HashiCorp/GitHub-pattern SHA-256 checksums for `kubectl` (`dl.k8s.io/release/v1.31.2/.../kubectl.sha256`) and `helm` (`get.helm.sh/.../....sha256sum`) fetched and verified against a live build, per `packs/README.md`'s "How these hashes were obtained" pattern.
+    SF-8 (2026-09-11): BOUNDARY_PROFILES matrix built into validate-boundary.sh (terraform/kubernetes/github/default, default forced last per Contract 7); scratch test-base compiles via Decision 10's mechanism (--profile-file already existed from 02.1 SF-1, so that named interface-change item is a no-op here); new Phase 11 (credential reachability, pack-egress allow/deny, /run/secrets delta against a captured default baseline). tests/fixtures/authoritative-dns/unbound.conf gained fixture-collector-backed records for the four real pack FQDNs. Two pre-existing shared-harness reconciliations, recorded as Deviations, both required for "Composite green": (1) verify-pack-composition.sh's sf7-probe fixture needed a third_parties placeholder (02.3 SF-1's new R14.1 gate) and one stale expected-message fragment fixed. (2) T6's resolved_ip-on-deny gap (02.2 Decision 9) stays unfixed -- a real fix needs a new external_acl_type helper in the mediator's deny path, judged out of SF-8's scope after live investigation; validate-boundary.sh now excuses only that field's absence on an otherwise-fully-verified-correct deny. Live re-exercising this scenario surfaced a SECOND, previously unrecorded finding (attempt 1's front-cold-peer 500, unrelated to the profile matrix -- reproduces under BOUNDARY_PROFILES=default alone): two retry-based fixes were tried and reverted because each one measurably broke attempt 2 instead (Squid connection-pool state left warm by the extra touch); the shipped fix recognizes the symptom on attempt 1's own line and records it as a known gap, no extra request added. Full matrix + full 7-harness composite (verify-pack-composition, verify-pod-topology, verify-egress-mediator, verify-audit-completeness, verify-tool-packs, verify-mcp-inventory, lint-policy) run clean end-to-end. See docs/records/boundary-validation.md for the full per-profile results and both findings' writeups, docs/records/mcp-inventory.md for the T31 assessment and github.com residual, and docs/records/third-party-assessments.md for the T42 re-inspection.
+
+[~] Feature 02.4: Reproducibility, provenance and onboarding
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
+    Sub-features: 3/6 complete
+    Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
+    node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
+    bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
+    mediator's squid-openssl/unbound/dnsdist/ca-certificates moved onto a dated trixie
+    snapshot via a new keyring, images/keyrings/debian-archive-trixie.gpg (SF-1c).
+    Found and fixed: DNSDIST_VERSION=1.9.16-0+deb13u1 never existed in Debian's trixie
+    archive (live or any snapshot back to 2026-08-15) -- corrected to 1.9.15-0+deb13u1,
+    the version that was actually resolving. apt-pinned.sh gained --allow-downgrades
+    (needed whenever a pinned snapshot version is older than a bootstrap install already
+    on the image from live default sources). verify-reproducibility.sh created with
+    phase A (no FROM resolves to a mutable tag), negative control run and passing.
+    Pushed to feature/containerization; CI run 34640174753 published a new agent-base
+    (branch build, for testing only); AGENT_BASE_DIGEST repinned to
+    sha256:f5fd8aa9718aa5ca63520db2cdc436b0554b2ac58182e1b3dfe912c323a045c4; full 02.3
+    composite (verify-pack-composition through lint-policy, plus verify-reproducibility)
+    re-run and green end to end. T45/head_branch is expected to still fail until SF-4
+    promotes to main -- not yet checked (that's SF-2's phase C).
+    SF-2 (2026-09-11): verify-reproducibility.sh gained phase B (images/build-allowlist.yaml,
+    7 non-pack hosts: registry-1.docker.io, ghcr.io, github.com, snapshot.debian.org,
+    deb.debian.org, registry.npmjs.org, storage.googleapis.com -- extracted mechanically from
+    both Dockerfiles/pins.env and checked against the allowlist union the four shipped packs'
+    egress.build.allow_fqdns) and phase C (T45's digest -> SBOM -> provenance -> run chain, via
+    anonymous `docker buildx imagetools inspect --format '{{json .SBOM}}'/'{{json .Provenance}}'`
+    against ghcr.io, then the public runs API). Ran against the SF-1 branch digest
+    (sha256:f5fd8aa9718aa5ca63520db2cdc436b0554b2ac58182e1b3dfe912c323a045c4, run 34640174753):
+    14 passed, 1 failed -- SF-2's own closing condition (every T45 assertion passes except
+    head_branch, which is 'feature/containerization' not 'main', EXPECTED RED until SF-4).
+    Found and fixed while building phase B: yq v4.53.6 rejects `[]?.fqdn // empty`
+    (`lexer: invalid input text "empty"`) -- rewritten as `[].fqdn` per pack file, since every
+    shipped pack.yaml already declares a non-empty egress.build.allow_fqdns.
+    SF-3 (2026-09-11): README Bring-Up rewritten as one ordered 1-7 sequence (prerequisites,
+    clone, install-deps.sh, all eight issue-identity.sh commands including the three previously
+    missing -- client claude, credential codex, credential agy -- canonical up, first-run auth,
+    verify). Normalized every documented `docker compose ... up` invocation in README.md to the
+    one canonical `--build --force-recreate` form (found and fixed: two conflicting forms at the
+    entry point/Bring-Up and in "Adding or removing a pack", plus `-d` on four more layered-
+    fragment invocations -- oauth-mount steady state, host-gitconfig, build-cache, the two
+    `github` profile switches). Added `agy`'s `GEMINI_API_KEY` delivery path (`exec -e`/`run --rm
+    -e`, host shell only, paid-tier note) -- corrected the plan's cited `bootstrap-auth.sh:43` to
+    the actual `:215`. Added "Changing the allowlist" (R12.3, reviewer role, corrected from the
+    plan's assumption that R14.1's third_parties record applies to `policy/allowlist.base.yaml` --
+    it only applies to pack manifests, verified against `lint-policy.sh`/`compile-policy.sh`) and
+    "Updating an agent version" (R10.6, citing `check_pin_agreement()` in
+    `verify-pod-topology.sh`, not a standalone script as the plan assumed). `install-deps.sh`
+    gained `--with-sbx` (sbx no longer checked by default, D17/R11.3). `packs/README.md` gained a
+    one-line pointer to `images/build-allowlist.yaml`. `verify-reproducibility.sh` gained phase D
+    (T39): no unrecorded wrapper script invokes the real pod with up/start/run (one recorded
+    exception -- `scripts/run-shadow-run-sf5.sh`, 02.2 SF-5's live boundary-verification harness);
+    every README `docker compose` line carries `--env-file`; identity commands and listener IPs
+    agree with `mediator/identity/README.md` and `compose.yaml`. Found and fixed: the top-level
+    entry-point code fence was untagged (plain ``` ```, not ` ```bash `), which silently excluded
+    it from phase D's scan -- retagged, and a negative control (an injected `up -d`) confirmed
+    the check then catches it. Standalone run: 19 passed, 1 failed (phase C's pre-existing
+    EXPECTED RED, unaffected by SF-3).
+
+[~] Feature 02.5: Containment, response and the authorization gate
+    Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
+    Sub-features: 0/7 complete

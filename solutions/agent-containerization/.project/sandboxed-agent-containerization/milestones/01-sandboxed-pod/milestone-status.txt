@@ -1,0 +1,1145 @@
+# Milestone 01: Sandboxed Pod
+# Status: [x] complete  6 features, 6 complete
+# Closed 2026-09-09. All six features built and green, and the Definition of Done discharged --
+# see the README checklist, where each item now records its evidence rather than its intention.
+#
+# SC-4 / T9 was the only item that needed work at close. It is verify-auth-state.sh Phase E:
+# 45 PASS / 0 FAIL, six assertions, three agents by two forms (container restart, and
+# down -> build -> up per R4.1). Two changes were needed to get there and both are committed:
+#
+#   * agy was NOT in Phase E (50afde7). It was excluded on the reasoning that its apikey is
+#     env-delivered so nothing is persisted -- true of the credential half, silent about the
+#     session-state half, which agy has a state volume for like the other two. T9 and SC-4 both
+#     say "all three", so the criterion was being met by argument for one agent. Now asserted.
+#   * Phase D (T25) is the only phase that spends anything -- it forces a codex OAuth refresh and
+#     rolls the token -- and the harness had no phase selector, so demonstrating T9 meant paying
+#     for it. AUTH_SKIP_PHASE_D=1 (e6e9684), off by default, finishes the run before D and says
+#     so in the footer. T9 needs credential SHAPE, not a valid token, so the already-rolled seed
+#     satisfies it.
+#
+# ONE item is [~] rather than [x]: "README.md drift corrected (Gate 2 open item)". It names no
+# specific drift, and none is recorded in gate-2-review.md or the architecture's Open Items, so
+# what it referred to cannot be established. Three real drifts were found and corrected at 01.6
+# SF-4; the item is left open rather than cleared by assumption. It is the operator's to close or
+# restate.
+#
+# STILL OPEN, carried out of this milestone rather than resolved by it:
+#   * T25 / criterion 5 is unverified by the closing run -- Phase D was skipped. It needs a fresh
+#     host `codex login` and a reseed of sf3_codex-state first, because that volume holds a token
+#     a previous Phase D already rolled ("refresh token was already used").
+#   * ELEVEN unanchored status greps in verify-egress-mediator.sh, one of them added at 01.6 SF-4.
+#     Same class as the two assertion defects fixed during 01.6.
+#   * A /design refresh is overdue: 20 deviations queued from 01.5 and 12 more from 01.6.
+
+## Features
+
+[x] Feature 01.1: Pre-build verification, provider governance and egress discovery
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pre-build-verification-provider-governance-and-egress-discovery.md
+    Sub-features: 3/3 complete
+    Notes: Completed 2026-09-04.
+
+[x] Feature 01.2: Pod topology, hardened runtime and minimal profile
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pod-topology-hardened-runtime-and-minimal-profile.md
+    Sub-features: 5/5 complete
+    Notes: Completed 2026-09-04. 3 architectural deviations recorded (Deviation 1: single
+    multi-stage images/Dockerfile with target: selection; Deviation 2: native agent sandboxes
+    disabled by default, D14 amendment needed; Deviation 3: egress-net not a live Docker
+    resource until 01.3 attaches a service to it). Consolidated into ARCHITECTURE_AND_DESIGN.md
+    on 2026-09-07 (commit 162faec, with 882b86c finishing data flow, resource inventory and the
+    file tree) -- no /design refresh outstanding.
+
+[x] Feature 01.3: Egress mediator
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/egress-mediator.md
+    Sub-features: 8/8 complete
+    Notes: Re-planned 2026-09-05, Gate 4 re-approved (supersedes the 2026-09-04 approval, which the
+    /milestone revision invalidated). Identity, R8.8 and T34 moved to Feature 01.6; 01.3 keeps L7
+    controls, DNS, audit, the non-uniform listener surface (claude/agy https, codex plain http
+    CONNECT) and the proxy-hop trust anchors, on network-derived identity. T28 amendment stays 01.3's
+    and re-homed to SF-3. Codex adversarial pass: 8 findings, 6 fixed, 2 downgraded from blocking with
+    operator ratification. Two re-plans queued behind this: 01.1 (deny_fqdns contradiction, carried
+    from the prior gate) and 01.4 (stale against Interface Contract 2 -- CODEX_CA_CERTIFICATE, mTLS
+    client keys, SF-7a). See docs/records/r8-8-identity-mechanism-gap-escalation.md.
+    Completed 2026-09-07. Test command passes: bash tests/acceptance/verify-egress-mediator.sh,
+    77 assertions across phases A-G. 11 architectural deviations recorded on the plan (6-11 added
+    at the SF-7/SF-8 build). Two mediator defects were found by the harness and fixed rather than
+    worked around: Squid's cache_peers are DEAD at start and cost the first fronted request a 500
+    (the entrypoint now warms the cascade), and unbound answers RFC 6761 special-use TLDs itself
+    and never forwards them (docs/records/resolver-verification.md addendum -- worth a
+    compile-time warning in 01.5). All 11 consolidated into ARCHITECTURE_AND_DESIGN.md on
+    2026-09-07 (commits 162faec and 882b86c) -- no /design refresh outstanding. The 01.1 deny_fqdns
+    re-plan queued here is also closed: recorded as a SUPERSEDED block in 01.1's plan rather than
+    re-planned, since 01.1's built artifacts were correct and only its prose was stale.
+
+[x] Feature 01.4: Agent authentication and state persistence
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/agent-authentication-and-state-persistence.md
+    Sub-features: 5/5 complete
+    Build started 2026-09-07. SF-1 complete (commit fbe5e06): R4.5 config seed + merge, host-side
+    scrub-gitconfig.sh, host-gitconfig override, .gitignore/tmutil, and the pod-topology harness
+    extensions (parameterized mount-set, volume exclusivity, auth-surface assertions).
+    SF-2 complete 2026-09-07, built in the plan's own sanctioned two-part split.
+    SF-2a (commit 56a318e): dispatcher, seven-cell matrix, exits 2/3/4, compose AUTH_MODE seam,
+    profile enum surface, T24 amendment, architecture file-tree correction.
+    SF-2b: both oauth-interactive cells run live against the pod and
+    the endpoint set DERIVED from the audit log, not assumed. Added platform.claude.com (required
+    -- claude fails startup without it) and auth.openai.com (four device-code sessions). REMOVED
+    claude.ai, console.anthropic.com and platform.openai.com -- all three were candidate guesses
+    that the completed flows never contacted. NOT added: mcp-proxy.anthropic.com and
+    downloads.claude.ai, both attempted and denied with the login succeeding regardless
+    (attempted is not required; R10.3 covers the second). Two implementation defects were found
+    by running the cells rather than reasoning about them: the exit-4 probe was unanchored on the
+    TLS hop and matched the wrong curl field, so it could never fire; and codex needs
+    --device-auth, because plain `codex login` strands on an in-container callback port the host
+    browser cannot reach. The claude cell passed while carrying that same second bug. 2 architectural deviations recorded (1: image-tree paths corrected
+    to 01.2's multi-stage Dockerfile; 2: absent credential warns at start, fatal only on explicit
+    invocation -- operator decision, prevents a verify-pod-topology.sh regression).
+    SF-3 complete 2026-09-07. BOTH providers ROLL the refresh token on refresh -- measured, not
+    assumed: claude's refreshToken and codex's tokens.refresh_token both changed, each cross-validated
+    against a mediator audit line for the refresh endpoint (platform.claude.com 6728/2119 at
+    21:32:58Z; auth.openai.com 12492/2168 at 21:35:58Z). Neither endpoint needed an allowlist change --
+    SF-2 added both off the LOGIN flow and this is the first evidence the REFRESH flow uses the same
+    two hosts. Also measured: claude's refreshTokenExpiresAt is NOT extended by a refresh (same
+    absolute instant before and after), so the family dies ~28 days after the original login however
+    often it refreshes; codex's refresh trigger is the access token's own 10-day JWT exp, NOT the
+    last_refresh field (backdating it 60 days was inert, as was backdating the id_token exp), and
+    codex does not verify that JWT's signature locally. SF-4 gate answered: oauth-mount is a one-shot
+    bootstrap. Deliverables: docs/records/credential-inventory.md (new, Contract 7, 8 rows incl. the
+    not-yet-populated secret-mounted path, 02.5 column empty by design) and the rotation section
+    appended to docs/records/agent-verification.md. 1 architectural deviation recorded (3: criterion
+    8's cross-client invalidation half is recorded as UNMEASURED by operator decision -- the only
+    test is replaying a superseded refresh token against the operator's live account. R4.17 is
+    narrowed, not closed, and SF-4 must write accepted_risk.rotation against the conservative
+    reading).
+    SF-4 complete 2026-09-07. oauth-mount built and its shape constraints VERIFIED by running
+    them, not by reasoning: steady state with no source exits 3 and FAILS THE CONTAINER START
+    (criterion 5, confirmed -- `codex --version` never ran); a rw-mounted source is refused from
+    /proc/self/mountinfo (R4.13); a source without accepted-risk.yaml, or missing any of its five
+    fields, is refused (R4.17); a staged copy still carrying OPENAI_API_KEY is refused (the
+    test-validity control); a credential with no refresh_token is refused (edge case 11); a
+    populated volume is an idempotent no-op. Smoked with a SYNTHETIC credential and scratch
+    volumes -- the operator's live host codex login was never spent and codex itself was never
+    run against a copy (that is SF-5's call). All smoke volumes removed. 2 architectural
+    deviations recorded, both operator-ratified before building (4: the callback publish ships as
+    its own compose/overrides/codex-callback.yaml rather than inside the bootstrap fragment, since
+    a fragment cannot be layered by halves; 5: the accepted_risk record reaches the container via
+    scripts/stage-oauth-mount.sh from a new profiles/oauth-mount.yaml -- the plan required the
+    exit-3 check but named no mechanism, and the profile does not exist inside the container).
+    VOLUME HAZARD, kept by operator decision. Live credentials are in sf3_claude-state and
+    sf3_codex-state ONLY. Four volumes hold SUPERSEDED refresh tokens -- sf2bd_claude-state,
+    sf2bd_codex-state, sf3-claude-pristine, sf3-codex-pristine -- and were kept as authenticated
+    sessions for testing. They are usable only until their ACCESS token lapses: codex ~2026-09-17
+    (10-day exp), claude 2026-09-08T05:03:59Z (8-hour exp). Past those edges the agent refreshes
+    with the superseded token UNATTENDED on first run, which is exactly the replay Deviation 3
+    records as untested. SF-4/SF-5 should use the sf3_* pair. sf2bd is down (no -v); sf3's mediator
+    is up.
+    SF-5 complete 2026-09-07. tests/acceptance/verify-auth-state.sh, 56 assertions across phases
+    A-E: all seven supported cells, three fail-closed cells plus the unset-AUTH_MODE case, the R4.5
+    read in every Codex mode, T22 on the mounted file, T25 in both stages and T9 in both forms.
+    FEATURE COMPLETE 2026-09-07 -- the composite test command passes end to end: verify-auth-state
+    56/56, verify-pod-topology and verify-egress-mediator 137/137 together, 0 failures.
+    TWO DEFECTS FOUND BY RUNNING, NOT BY REASONING. (1) Sourcing references/.env_keys LEAKED A
+    CREDENTIAL: the operator's pasted CLAUDE_CODE_OAUTH_TOKEN line was missing its `=`, bash treated
+    the line as a command and echoed the token in cleartext to the terminal and the run log. The
+    harness now PARSES the file and never executes it; the token is scheduled for revocation (see
+    OUTSTANDING below). (2) NO AGENT IMAGE CONTAINS git -- all three are node:22-slim and none
+    installs it -- so criterion 6's `git config --global --get-all credential.helper` assertion could
+    not be made as written. R2.9/T22 still hold (with no git binary nothing can resolve a helper, and
+    the mounted-file assertion carries T22), but mounts.host_git_config currently mounts a config
+    nothing in the container can read. Whether git belongs in the images is 01.5's pack-composition
+    call, recorded not fixed.
+    CRITERION 8'S SECOND QUESTION IS NOW MEASURED, and SF-3's Deviation 3 is closed for OpenAI. The
+    harness was run twice from the same unchanged seed, so phase D replayed a SUPERSEDED refresh
+    token -- and it WORKED: parent 51ffa144 refreshed to f0952196 on run 2 and to 1ffe309a on run 3.
+    A refresh in one client does NOT invalidate another's copy (OpenAI, minutes-long window, same
+    account; Anthropic was NOT replayed). Two consequences, opposite in sign: oauth-mount does NOT
+    cost the operator their host codex login, and -- the load-bearing half -- ROTATION IS NOT A
+    REVOCATION MECHANISM, so a refresh token captured from a state volume stays valid after the
+    legitimate client refreshes past it. Only explicit provider revocation ends it. Recorded in
+    docs/records/agent-verification.md, and the now-known-wrong conservative text in
+    profiles/oauth-mount.yaml accepted_risk.rotation and credential-inventory.md row V3 was corrected
+    rather than left standing.
+    4 architectural deviations recorded (6: the harness SEEDS its state volumes from the operator's
+    sf3_* pair, operator decision, which makes each run destructive to credential state -- codex rolls,
+    so the seed is one refresh behind afterwards; 7: `set -uo pipefail` and phase D last, so one
+    failure does not hide the rest and D's destructive half does not precede E's persistence
+    assertions; 8: .env_keys parsed not sourced, from the leak above; 9: the git-absence finding).
+    OUTSTANDING, and it is this feature's close obligation rather than advice: REVOKE THE
+    CLAUDE_CODE_OAUTH_TOKEN. It is a ONE-YEAR credential minted to prove one test cell (R4.16), and
+    it additionally leaked in cleartext during the first run. The operator deferred revocation until
+    testing finished; testing has finished.
+    Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
+    CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
+    2026-09-04 approval). Ready to build. The plan consumed per-agent client certificates that 01.3 does not issue
+    -- they left with R8.8 for Feature 01.6 at the milestone revision -- and set
+    CODEX_CA_CERTIFICATE on an agent that has no TLS hop to anchor. Interface Contract 6 now states
+    what each agent actually gets. Sub-feature count unchanged. Three checklist items need the
+    operator: the test command's relationship to the two existing harnesses, the throwaway provider
+    accounts T24 needs, and confirmation that the OAuth endpoint allowlist addition stays 01.4's.
+
+[x] Feature 01.5: Pack composition, policy compiler and build pipeline
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/pack-composition-policy-compiler-and-build-pipeline.md
+    Sub-features: 7/7 complete
+    Build started 2026-09-07. Codebase assessment ABSENT (no .project/<slug>/docs/codebase-assessment.md);
+    the refresh was skipped with a warning rather than blocking, per the /build spec.
+    SF-1 complete 2026-09-07: packs/language-runtimes/pack.yaml, packs/README.md, and the pack-manifest
+    validator added to scripts/lint-policy.sh (18 negative assertions run against a throwaway probe pack --
+    every mandatory field removed in turn, plus deny_* rejection, checksum shape, non-https URL and
+    name/directory mismatch -- all fired). CHECKSUMS ARE REAL AND THEIR CHAIN WAS VERIFIED, not copied:
+    the bookworm archive key from the base image's own keyring gives a good gpgv signature on the
+    snapshot 20260901T000000Z InRelease, the downloaded Packages.xz hash matches that signed index, and
+    the per-.deb sha256 values come from it. Node and Go hashes from nodejs.org SHASUMS256.txt and the
+    go.dev release index. 2 architectural deviations recorded, both operator-ratified before writing
+    (1: Node pinned to 22.23.2, the version node:22-slim already ships, not the plan's 20.18.1 -- 01.2
+    built agent-base FROM node:22-slim and a second older Node would shadow the runtime the agent CLIs
+    execute against; 2: git installed in the agent-base stage rather than supplied by a pack, closing
+    01.4 Deviation 9 -- mounts.host_git_config and scrub-gitconfig.sh are profile-level features and
+    were inert with no git binary, so they cannot depend on pack selection. Lands at SF-5).
+    EDGE CASE 17 RESOLVED EARLY, 2026-09-07, ahead of SF-4 rather than at it. The plan deferred the
+    host-compile-versus-build-stage-compile choice to /build; the pick is the SECOND option -- the
+    host invocation runs THROUGH the build stage, so there is one emitter and toolchain skew is
+    impossible by construction. Decided on evidence plus a Codex adversarial pass (4 sections,
+    verdict: reject the version-assertion form of option A, adopt option B), following 01.3's
+    precedent for recording a Codex pass. MEASURED FIRST: the same script run host-side (yq 4.53.6,
+    bash 5.3.15) and inside the built mediator image (yq 4.47.2, bash 5.2.37) against the same
+    inputs with COMPILED_AT fixed produced BYTE-IDENTICAL output -- so the divergence is latent,
+    not active. Option A was rejected on mechanism rather than on divergence: the host yq is
+    Homebrew-managed and can only be asserted, SF-6's CI runner already ships 4.53.6 against this
+    repo's v4.47.2 pin, and a GLOBAL assertion would reach the mediator's own stage-1 --validate
+    call (entrypoint.sh:180), turning an emitter concern into a fatal runtime startup failure.
+    The measurement's scope is also narrower than the decision: packs: [] today, so SF-3's emitter
+    surface has never been compared across the two versions. Four SF-4 obligations recorded on the
+    plan: the wrapper-versus-inner-implementation call, REPO_ROOT's BASH_SOURCE derivation versus
+    the /usr/local/bin copy path, the final image still COPYing the COMMITTED policy/resolved/
+    rather than the stage's output (Dockerfile:117 -- Contract 4 already requires this and the
+    Dockerfile predates it), and --output type=local being UNVERIFIED on the pinned Docker Desktop,
+    to be established before it is built on. ONE Codex recommendation DECLINED with its reason
+    recorded rather than dropped: a structural drift comparison. With one emitter the skew it
+    hedged against is gone, and a byte comparison is strictly stronger -- it catches a hand-reordered
+    committed artifact, which is exactly what SC-6 forbids and what a structural compare would pass.
+    SF-2 complete 2026-09-07: the profile schema extension (Contract 2) and all four build-refusal
+    gates. Profiles gained `package_repository` (snapshot URL, suite, signed_by, 40-hex fingerprint),
+    `authorization` with EXACTLY ONE of classify/waiver -- default and oauth-mount classify
+    git-push and infrastructure-apply, the two test profiles carry a recorded waiver because a
+    test-scoped profile is never run unattended against anything real -- and `mounts.build_cache`
+    as false | true | per-agent map. A SHARED cache is not expressible in the schema at all, which
+    is how R2.10's cross-agent write channel is closed: by the shape, not by a check on a value.
+    Four gates in scripts/compile-policy.sh, all exit 3: T27 (five accepted_risk fields, the same
+    list scripts/stage-oauth-mount.sh validates at bootstrap, plus mount_mode == ro), R2.8's
+    fail-closed mount-key allowlist, R7.6 in BOTH directions (runtime egress without
+    runtime_install, and runtime_install without either a reason or the egress it claims), and
+    SC-3 project-mount containment. Gates run BEFORE the zero-pack refusal, or the R7.6 gate would
+    be unreachable on the only input it exists for -- probed, not reasoned: a profile selecting a
+    pack with registry egress exits 3, not 2.
+    EVERY GATE WAS PROBED, 35 probes, all removed afterwards. Positive controls first: --profile
+    oauth-mount PASSES T27, and all three committed resolved artifacts are still `--check` current
+    (so the new profile fields did not leak into the emitted schema). Then the negatives: each of
+    the five accepted_risk fields deleted in turn, mount_mode rw, an unknown mounts key, both and
+    neither authorization branches, an empty classify list, a build_cache map naming a non-agent,
+    a `shared` string, an unresolvable pack name, a `../etc` traversal name, a missing
+    package_repository, a suite URL with no snapshot timestamp, a short key id, and eight SC-3
+    paths including the two that must PASS (a sibling, and a name-prefix sibling that a naive
+    prefix test would call an ancestor).
+    2 architectural deviations recorded, both operator-ratified before writing (3: the SC-3 gate
+    is built in the compiler at exit 3 rather than host-side in lint-policy.sh per Edge Case 18 --
+    written LEXICALLY rather than with realpath, which removes the premise that confined it to the
+    host; 4: exit codes 2 and 3 pulled from SF-4, because a refusal gate cannot be built without
+    the code that expresses a refusal. Exit 4 stays with SF-4's drift check).
+    CODEX ADVERSARIAL PASS, 2026-09-08, following 01.3's and Edge Case 17's precedent for
+    recording one. 11 findings; 6 FIXED, 5 DECLINED with their reasons rather than dropped. The
+    fixes are one shape: the gates asked yq what a field PRINTS, not what it IS.
+    FIXED. (1) SC-3 was string-comparable only, so `<root>/./policy`, `<root>/../<root>/policy`,
+    `<root>//policy` and `<root>/workspace/../scripts` all walked past it -- HIGH, and the gate
+    now normalises `.`, `..` and `//` lexically first (normalise_abs), still without realpath, so
+    Deviation 3's compile-stage premise holds. A symlink still needs the filesystem and stays
+    SF-7's. (2) yq renders `[]` and `{}` as two-character STRINGS, so `-n` accepted them: an
+    accepted_risk record of five empty lists passed T27, which is precisely the hollow record
+    R4.17 exists to prevent. scalar_nonblank now checks the tag and rejects blank-only text too.
+    (3) Same bypass on runtime_install_reason, in both the compiler and lint-policy.sh.
+    (4) `packs` was length-checked, and yq reports length 0 for missing, `""` and `{}` alike --
+    three malformed shapes read as zero-pack profiles and skipped every pack gate. Now tag-checked
+    as !!seq. (5) A missing or scalar `auth_mode` died inside yq's own `keys` with exit 1, wearing
+    the USAGE code and none of this script's error format; require_tag guards every structural
+    traversal (auth_mode, mounts, authorization, classify, package_repository.apt). (6) The
+    build_cache agent-key check used `grep -x` -- a REGEX -- and then interpolated the key into an
+    unquoted yq path: `[c]odex` matched the agent `codex` and then failed yq's lexer at exit 1.
+    Now `grep -Fx` and a quoted path.
+    DECLINED, each with the reason recorded. (a) Pack-manifest `mounts` entries are not gated by
+    R2.8 here: Contract 1 never defines an entry's shape, and inventing one at SF-2 pre-empts the
+    composition that consumes it. SF-3's, recorded. (b) `package_repository.apt.url` accepts any
+    https host ending in a snapshot timestamp -- the URL is not the trust anchor, the FINGERPRINT
+    is, and it is asserted at build (SF-5); a host allowlist is SF-5's call. (c) Quoted `"true"`
+    passing a boolean check: yq renders it identically, the profiles are version-controlled and
+    reviewed, and the tag work needed to close it buys nothing a reviewer does not already see.
+    (d) The plan's Edge Case 18 still describing the lint-policy.sh home is what Deviation 3
+    RECORDS; /build does not edit plan prose. (e) The exit-code comment claiming 4 for --check
+    drift was the one real doc defect in that group and is corrected in place rather than argued
+    with -- the header now says exit 4 is not built and --check still exits 1.
+    ALL 35 ORIGINAL PROBES RE-RUN after the fixes, plus 23 new ones written from Codex's own
+    reproductions. Every positive control still passes, all three committed artifacts are still
+    `--check` current, and `--validate` on the committed default still passes.
+    NOT DONE, and deliberately: profiles/default.yaml keeps `packs: []` though SF-2's text says
+    the list becomes populated. The schema accepts, resolves and gates a populated list, but
+    composition is SF-3's and the compiler still refuses a non-zero list -- populating it now
+    would make the default profile uncompilable. Operator decision: not a deviation, a sequencing
+    note. SF-3 populates it.
+    The SC-3 gate is a NO-OP on every profile as they stand: all four carry the literal
+    placeholder `mounts.project.path: <host path>` and the real bind comes from
+    compose/overrides/<profile>.yaml, so the gate warns rather than judging. SF-7 Phase A must
+    assert the mount that actually exists against `docker inspect`, not treat Phase B's exit 3 as
+    SC-3 coverage.
+    SF-3 complete 2026-09-08: pack composition in the compiler. profiles/default.yaml and
+    profiles/oauth-mount.yaml both select language-runtimes (operator decision -- identical pack
+    sets means SF-5 installs one package set and SF-7's T14 exercises one image set).
+    CRITERION 4 / T14's ZERO IS PROVED, not asserted: with COMPILED_AT fixed, the ONLY difference
+    between the zero-pack and pack-loaded artifacts is the two-line compiled_from.packs block --
+    every agent's allow_fqdns and allow_cidrs is byte-identical. The provenance entry carries the
+    manifest's sha256, which is what makes compiled_from a record rather than a list of names.
+    EDGE CASE 17's UNMEASURED HALF IS NOW MEASURED. That edge case recorded that "SF-3's emitter
+    surface -- populated compiled_from.packs, stable key order, sorted lists -- has never been
+    compared across the two yq versions at all". It has now: the same inputs compiled on the host
+    (yq v4.53.6, darwin/arm64) and inside the rebuilt mediator image (yq v4.47.2, linux/arm64)
+    with COMPILED_AT fixed produced BYTE-IDENTICAL output. SF-4's byte-wise drift check has no
+    known divergence to trip over on the surface SF-3 adds.
+    TWO DECISIONS WERE REFERRED TO CODEX BY THE OPERATOR before any code was written (following
+    01.3's and Edge Case 17's precedent), and ONE WAS ESCALATED past it. Codex returned
+    adopt-with-modification on both referrals and both modifications were taken -- see Deviations 5
+    and 6. The escalation is the allow_cidrs residual (Edge Case 21): Contract 3 composes pack
+    CIDRs, the shipped mediator render REFUSES a non-empty allow_cidrs at start, and both are
+    correct as built. Resolved as compose-and-warn rather than refuse-at-build, because
+    validate_resolved has never refused a BASE-supplied non-empty allow_cidrs either and a
+    pack-scoped build refusal would give one field two behaviours.
+    41 PROBES, ALL REMOVED AFTERWARDS, positive controls first. Two defects were found BY PROBING
+    rather than by reading: (1) the deny_* rejection checked the document root and `egress` only,
+    so a manifest declaring deny_cidrs under `egress.runtime` sailed through -- a key that must not
+    appear ANYWHERE is now searched recursively; (2) the recursive form then read a match at the
+    document ROOT as no match, because a root match's rendered path is the empty string -- so the
+    gate counts matches and renders paths separately. Also probed: composition into all three
+    agents without flattening, sorted emission, dedup of an identical base/pack tuple, the exit-3
+    upgrade collision, CIDR normalisation and dedup (bare and /32 forms collapse), all six
+    deferred-surface refusals, pack-name and duplicate-selection rejection, the four
+    pack-supplied-hostname checks named against the MANIFEST rather than the artifact, and four
+    validate_resolved checks on the provenance block.
+    3 architectural deviations recorded (5: pack mounts/env/credentials refused rather than
+    composed, Contract 3 overriding SF-3's prose, with three SEPARATE landing points -- SF-5 for
+    mounts, no contract for env, no contract plus R8's bar on baking secrets for credentials;
+    6: upgrade collision refused, with the recorded reason narrowed after Codex showed the renderer
+    never reads `upgrade`, so an OR would be a contradictory record and not a live widening;
+    7: every list sorted LC_ALL=C, which regenerates all three committed artifacts).
+    THE THREE REGENERATED ARTIFACTS ARE ORDERING-ONLY, PROVED: each file's sorted content is
+    byte-identical to the committed version's, so nothing was added, dropped or altered. The
+    mediator image was REBUILT and its stage-1 --validate accepts the populated artifact, and
+    tests/acceptance/verify-egress-mediator.sh was RE-RUN against the reordered artifact rather
+    than assumed unaffected: 77/77, all phases passed.
+    packs/README.md carried the same contradiction as SF-3's prose (it listed mounts, env and
+    credentials among what the compiler reads) and was corrected in the same commit.
+    CODEX ADVERSARIAL PASS ON SF-3, 2026-09-08, run at operator request after the two SF-3
+    commits. SEVEN findings, ALL SEVEN confirmed by reproduction and ALL SEVEN FIXED -- none
+    declined, unlike SF-2's pass (6 of 11 fixed) and Edge Case 17's. Deviation 8 records it.
+    THE SHARPEST FINDING IS A REGRESSION SF-3 ITSELF INTRODUCED. The composition accumulator
+    encodes entries as fqdn|port|upgrade|source, one per line. Pack-supplied ports and upgrade
+    values were shape-checked before append; BASE-supplied ones were not, because that branch
+    predates the encoding. A base entry whose port is the block scalar "443|false\nevil.example.com
+    |443" emitted a SECOND, WELL-FORMED, ALLOWED destination the base allowlist never contained --
+    exit 0, and validate_resolved accepted the artifact. Reproduced before fixing, re-run after.
+    Generalises: introducing an internal encoding retroactively makes every value flowing into it
+    security-relevant, including values that were safe under the previous representation.
+    SECOND SILENT-IN-THE-PERMISSIVE-DIRECTION FINDING: egress_exclusions written as a MAP makes
+    yq iterate the map's values, so every exclusion lapses -- including the R10.3 auto-updater
+    exclusion default.yaml carries. It did fail, 400 lines later, with "startup_check.offline must
+    be true or false, found 'null'", naming neither field nor cause. Now shape-checked at itself,
+    with agent/fqdn/reason each required and agent checked against the base allowlist's agent set.
+    The other five: the exclusion comparison was not case-folded although SF-3 had begun folding
+    allow entries (an uppercase profile fqdn silently excluded nothing); the three deferred-surface
+    refusals ran BEFORE the R7.6 gate so a pack tripping both was told to fix the wrong thing --
+    and the note above claimed an ordering the code did not have, now made true; validate_resolved
+    checked the provenance block by RENDERED TEXT so `name: null` passed PACK_RE, now tag-checked
+    with YAML-ambiguous pack names refused at the producer; `exclusions` was sorted without -u,
+    contradicting Deviation 7's own claim; and the collision-source lookup built an ERE from a key
+    containing a pipe, making it an alternation, now an awk field comparison.
+    12 NEW PROBES written from Codex's reproductions, run with the original 41: 53 PROBES, 0
+    FAILURES. Emitter output is BYTE-IDENTICAL before and after all seven fixes, so no committed
+    artifact moves; all three stay --check current, oauth-mount compiles, lint-policy exits 0, the
+    mediator image was REBUILT and its stage-1 --validate still accepts the populated artifact, and
+    Edge Case 17's host/image byte-identity still holds. Two of the twelve initially failed for
+    PROBE defects, not code defects -- a splice that truncated the profile at egress_exclusions,
+    and a sequencing error leaving the wrong pack selected -- both fixed rather than accepted.
+    SF-4 complete 2026-09-08: build-stage relocation and the drift check. The mediator Dockerfile
+    is now FIVE stages -- base (debian + yq, shared so there is ONE yq), compile (emits, refuses
+    nothing), artifact (FROM scratch, the host's extraction target), drift (the gate), runtime.
+    EDGE CASE 17's FOURTH OBLIGATION IS DISCHARGED FIRST, not during: `--output type=local` was
+    UNVERIFIED on the pinned Docker Desktop, so it was probed with a throwaway three-stage context
+    before anything was built on it -- server 28.3.2, buildx v0.25.0-desktop.1, the FROM scratch
+    stage's file landed 0644 with stage-generated content. Probe removed.
+    Obligation 1 (wrapper versus inner implementation) taken in the form the plan called its
+    DEFAULT READING, so no host-surface deviation: scripts/compile-policy-build.sh is new and
+    Contract 6's shipped CLI is untouched. Obligation 2 (BASH_SOURCE/REPO_ROOT) handled by laying
+    the inputs out under /src with the script at /src/scripts/. Obligation 3 (the final image
+    still COPYing the COMMITTED artifact) closed: `COPY --from=drift /out/`.
+    THE DRIFT GATE IS A SEPARATE STAGE FROM THE EXTRACTION TARGET, and that is Deviation 10 rather
+    than a detail. The two halves of Contract 4 are in direct conflict if they share a stage: the
+    wrapper exists to REGENERATE the committed artifact when inputs changed, which is exactly the
+    condition a gate refuses. So `artifact` depends on `compile` alone and `runtime` copies the
+    policy OUT OF `drift` -- which is what makes fail-on-drift mechanical rather than a step
+    someone could reorder away. PROVED, not asserted: a hand-edited policy/resolved/default.yaml
+    fails a plain `docker build` at the drift stage with exit code 4, and the wrapper regenerates
+    that same hand-edited artifact successfully.
+    A FORK THE PLAN DID NOT ANTICIPATE, resolved by operator decision before any code was written
+    (Deviation 9). The image copies ALL FOUR committed artifacts and entrypoint.sh:65 picks one by
+    MEDIATOR_PROFILE at runtime -- but test-fixtures and test-selfcheck are compiled from
+    policy/allowlist.test.yaml, which SF-4's OWN ratified .dockerignore lines deliberately exclude,
+    while compose/overrides/test-egress.yaml:42 runs the mediator on test-fixtures. So the stage
+    cannot recompile them and cannot drop them. Resolved as carry-through, with the branch written
+    on FILE PRESENCE rather than profile name: an artifact whose declared base is absent and is not
+    a `.test.yaml` fixture FAILS THE BUILD, so the hole cannot open silently for a shipped profile.
+    Two alternatives were put to the operator and declined -- admitting the .test bases (contradicts
+    a Gate 4-ratified decision) and an ARG-selected profile (breaks one-image-serves-every-profile).
+    ONE DEFECT WAS FOUND BY PROBING RATHER THAN BY READING, and it is the SF-3 lesson repeating:
+    passing --allowlist/--denylist explicitly made the compiler emit a DIFFERENT re-verification
+    hint in the artifact header, tripping the new drift gate on identical policy. The rule that
+    survives both branches is "reproduce the invocation the artifact records, no more" -- the flags
+    are passed only where they differ from the compiler's defaults.
+    Exit code 4 built (Contract 6's last code). A MISSING committed artifact under --check also
+    exits 4, not 1: the invocation is well formed, and absent is the limiting case of different.
+    17 PROBES, all passing, all removed: 6 on the compiler's exit codes (0/4/4/1 plus both test
+    artifacts still --check current), 7 on compile-stage.sh host-side (base absent for a shipped
+    profile -> 2; .test bases ADMITTED -> all three compiled AND still byte-identical to committed,
+    which also proves the fixtures reproducible; emitted-with-no-committed -> 4; committed-with-
+    nothing-emitted -> 4; content drift -> 4; compiled_at-only -> 0; usage -> 1), and 4 end-to-end
+    (image policy byte-identical to committed for all three, stage-1 --validate still runs off
+    /usr/local/bin/mediator-compile-policy, a drifted build fails at exit 4, the wrapper leaves a
+    clean tree on a clean tree and regenerates a hand-edit).
+    BOTH EXISTING HARNESSES RE-RUN, which is this sub-feature's standing obligation:
+    verify-egress-mediator.sh 77/77 ALL PHASES PASSED against the rebuilt image, and
+    verify-pod-topology.sh ALL CHECKS PASSED. lint-policy.sh exits 0.
+    The README entry point is amended to `up --build` HERE rather than deferred (operator decision):
+    SF-4 is what makes the old command wrong -- a cached image reuses the policy compiled into it,
+    so a profile switch would appear to work while the pod enforced the previous policy. Only the
+    entry point and the recompile-and-commit procedure landed; packs, CI and the AGENT_BASE_DIGEST
+    bootstrap stay SF-5's and SF-6's. policy/resolved/README.md gained the drift contract and the
+    refresh procedure, and its stale "compiled_from.packs is present and empty" claim -- left by
+    SF-3 -- was corrected in the same pass.
+    TWO SMALLER BEHAVIOUR CHANGES, recorded rather than left to be discovered. (1) The wrapper does
+    NOT rewrite an artifact when only compiled_at would move, so `git status` stays a usable answer
+    to "did the policy actually change?"; compiled_at now records when the policy last CHANGED.
+    (2) /etc/mediator/policy no longer contains policy/resolved/README.md, because the copy is now
+    the compile stage's *.yaml output rather than the whole directory. No consumer reads it.
+    A BASH 3.2 DEFECT FOUND AFTER THE FIRST COMMIT, same class as the one commit 38ef066 measured
+    for SF-3, and found by RUNNING /bin/bash rather than by reading: scripts/compile-policy-build.sh
+    expanded "${BUILD_ARGS[@]}" under set -u, which bash 3.2.57 -- the /bin/bash on this host --
+    kills with "unbound variable" whenever the array is empty, i.e. whenever compose/pins.env is
+    absent. Latent while pins.env exists, fatal on a fresh clone that has not made one. Fixed with
+    the ${arr[@]+"${arr[@]}"} idiom and re-probed both ways under /bin/bash. The absent-pins run is
+    also a free proof that the Dockerfile's ARG defaults agree with pins.env: same byte output.
+    TWO MESSAGES THAT PROMISED SOMETHING THE WRAPPER CANNOT DO, corrected in the same pass. `emit`
+    enumerates policy/resolved/*.yaml, so compile-policy-build.sh REFRESHES existing artifacts and
+    cannot bootstrap a new profile's first one -- entrypoint.sh's not-found message said otherwise,
+    and the wrapper's header now states the limit. An error message that lies is a defect here.
+    21 PROBES total after the follow-up (17 plus 4 under /bin/bash 3.2).
+    TWO OBLIGATIONS RECORDED ON DEVIATION 9 FOR SF-7, because SF-4 narrows what was true before it.
+    (1) Fixture drift is now host-side --check ONLY: the build's gate compares the carried-through
+    artifacts against the copy they were made from, so it is trivially satisfied, and neither
+    harness nor lint-policy runs --check on them. SF-7 Phase C must, with their .test bases.
+    (2) Contract 5's "the mediator image copies policy/, profiles/, packs/" is stale for the
+    RUNTIME stage -- only the compile stage sees profiles/ and packs/ now. A narrowing, but Phase
+    A's image-contents assertion must be written to it or it fails on a correct image.
+    CODEX ADVERSARIAL PASS ON SF-4, 2026-09-08, at operator request after the two SF-4 commits,
+    following SF-2's and SF-3's precedent. FIVE findings, ALL FIVE reproduced independently before
+    being accepted (Codex ran sandboxed with no Docker socket, so its two build-dependent
+    directions were re-probed here against real builds) and ALL FIVE FIXED.
+    THE HIGH FINDING DEFEATS THE WHOLE SUB-FEATURE, and it is SF-3's lesson a third time: a value
+    that was safe as data became security-relevant the moment it was made a BRANCH PREDICATE.
+    emit decided carry-through from the artifact's OWN compiled_from.allowlist -- missing, and
+    ending in .test.yaml. So the artifact chose its own branch. ONE spoofed provenance line added
+    to a hand-edited policy/resolved/default.yaml sent the SHIPPED profile down the copy path, and
+    the drift gate then compared the copy against the file it was copied from and PASSED. Proved
+    end to end before fixing: `docker build` exited 0 and `docker run` showed the tampered
+    `provisional: false` in /etc/mediator/policy/default.yaml. That is exactly the edit the gate
+    exists to catch, and exactly what Deviation 9's own text claimed was impossible. Fixed by
+    moving the predicate out of the file the gate protects: the carried-through profile set and
+    both fixture base paths are now CONSTANTS in compile-stage.sh, the artifact must agree with
+    them AND name its own profile in compiled_from.profile, and a carried artifact is run through
+    --validate (the mediator's own stage-1 check) since nothing else looks at one.
+    THE MEDIUM: scripts/compile-policy-build.sh SOURCED compose/pins.env (`set -a; . file`), making
+    a Compose data file executable shell during a policy refresh -- appending a line to it ran that
+    line on the host, reproduced. Compose parses --env-file as KEY=VALUE and never as shell, so
+    sourcing was never the format's contract; the four keys are now read with sed.
+    The three LOW: `drift` on an empty output directory exited 2 rather than Contract 6's 4 (an
+    empty emit against committed artifacts is the most complete drift there is) -- fixed with
+    nullglob so the second loop reports it; --help printed a hardcoded line range that stopped
+    before the LIMIT paragraph commit 2c837cf had just added, so the help was already stale on
+    arrival -- now found by shape, not by line number; and images/bootstrap-auth.sh's exit-4
+    remediation still sent operators to the direct compiler rather than the one-emitter refresh.
+    NONE DECLINED, matching SF-3's pass (7 of 7 fixed) rather than SF-2's (6 of 11).
+    9 NEW PROBES from the reproductions, run with the originals: 30 probes, 0 failures. Two REAL
+    builds re-run as controls -- the spoofed-provenance attack now fails at exit 2 naming the
+    profile, and plain content drift still fails at exit 4 -- plus a clean rebuild, lint 0, all
+    three artifacts --check current, verify-egress-mediator.sh 77/77 ALL PHASES PASSED and
+    verify-pod-topology.sh ALL CHECKS PASSED against the rebuilt image.
+    SF-5 complete 2026-09-08: build-time OS packages, package-manager removal and the per-agent
+    build cache. THREE PLAN CONTRADICTIONS/GAPS WERE SURFACED BEFORE ANY CODE WAS WRITTEN and
+    resolved by operator decision, following SF-2/SF-3/SF-4's precedent of ratifying deviations
+    ahead of writing rather than recording them after.
+    DEVIATION 11 IS THE ONE THAT DECIDED WHETHER SF-5 WAS BUILDABLE AT ALL. Contract 5 says two
+    incompatible things: its re-plan preamble and the Files-to-Modify table keep the agent context
+    at `../images`, while its own YAML block, its consequences bullets ("the agent images copy
+    packs/ and profiles/", "images/.dockerignore no longer applies") and its rejected-alternative
+    paragraph all assume the solution root. Mechanism, not taste, settles it -- packs/ and
+    profiles/ sit OUTSIDE images/, a build stage can only read its own context, and a
+    .dockerignore selects WITHIN a context and cannot admit a path outside one, so the table's
+    "extend only if a pack input must reach it" names an operation that does not exist. Agents now
+    build with `context: ..` and `dockerfile: images/Dockerfile`; the root .dockerignore gained
+    `!images` ABOVE the trailing-deny block (so mediator/identity and references stay denied); and
+    images/.dockerignore was DELETED rather than left inert, because Docker resolves .dockerignore
+    at the context root. The root file's own now-false claim that "both files are needed" was
+    corrected in the same commit.
+    DEVIATION 12: PACK_SET_HASH IS NOT SHIPPED. Edge Case 4 and the Files-to-Modify table both
+    name it, but it has NO PRODUCER -- the entry point is `up --build` and Compose interpolates
+    build args only from the environment and pins.env, neither of which anything computes a
+    pack-set hash into. A hand-maintained hash that is not recomputed reports "unchanged" exactly
+    when it has changed, which is the stale-cache failure Edge Case 4 exists to prevent. The
+    `pack-plan` stage's `COPY packs/ profiles/` carries the property instead, keyed by BuildKit on
+    file content, and cannot go stale. SF-7 Phase D observes the rebuild by image ID.
+    DEVIATION 13: MEASURED, NOT ASSUMED. Contract 1, Edge Case 8 and the manifest itself all claim
+    "every package carries a SHA-256, apt items included". `apt-get install --no-install-recommends
+    python3 python3-venv git` against the pinned snapshot resolves to 40 PACKAGES; three are
+    declared. The other 37 ride the chain that makes the declared hashes worth anything one link
+    earlier -- gpgv over InRelease requiring the full 40-character primary fingerprint, and the
+    per-.deb hashes in the Packages index that signature covers. Recorded as a residual in
+    packs/README.md rather than claimed away, the same posture the Approach takes on R7.19.
+    THE TRUST ANCHOR WAS VERIFIED, NOT COPIED, and the mechanism was PROBED before it was built
+    on. gpgv is present in node:22-slim and gpg is NOT, so one `gpgv --status-fd 1` invocation
+    proves the signature and names the primary key in a single step -- its VALIDSIG last field is
+    B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8, exactly the fingerprint profiles/default.yaml pins.
+    images/keyrings/debian-archive.gpg was extracted from the base image's own keyring and then
+    re-verified against the live snapshot InRelease through the committed copy. git's pin was
+    derived the same way SF-1 derived the python hashes -- InRelease verified, Packages.xz checked
+    against the SIGNED index hash, git's .deb SHA-256 read from it -- and the run REPRODUCED SF-1's
+    python3/python3-venv values exactly, which is a free cross-check on both.
+    ONE PLAN ASSUMPTION WAS FALSIFIED BY MEASUREMENT: `Acquire::Check-Valid-Until=false`, the usual
+    snapshot.debian.org workaround, is NOT used and its absence is deliberate. This snapshot's
+    InRelease carries no Valid-Until field at all, so apt has nothing to reject; setting the flag
+    would disable a real check for a problem this repository does not have.
+    THREE DEFECTS WERE FOUND BY BUILDING RATHER THAN BY READING. (1) snapshot.debian.org serves
+    over HTTP/2 and drops streams mid-transfer -- the 7,152,820-byte git .deb truncated at ~1.7 MB
+    on two of three hand-fetches with PROTOCOL_ERROR. Fixed with bounded `Acquire::Retries=5` on an
+    idempotent transfer; what is retried is the transfer, never the verification, and 3/3 then
+    succeeded with the hash matching. (2) node:22-slim ships no `xz`, and the pinned Node archive
+    is a .tar.xz -- xz-utils added to agent-base's install line. (3) apt's `_apt` sandbox user
+    cannot read the root-owned download directory; `APT::Sandbox::User=root` silences a warning
+    that was otherwise noise on every build.
+    THE REMOVAL LIST IS WIDER THAN THE PLAN NAMES, and the additions were found by INSPECTING A
+    BUILT IMAGE, not by reading. The plan names pip, ensurepip and the bundled npm tree.
+    node:22-slim also ships `corepack` (installs yarn and pnpm on demand) and a complete
+    `yarn v1.22.22` at /opt with two symlinks already on PATH; and python3-venv pulls
+    python3-pip-whl and python3-setuptools-whl, which are HOW `python3 -m venv` bootstraps a
+    working pip -- so removing ensurepip alone left the capability entirely intact and T15's claim
+    would have been false as shipped. Operator decision: remove all of them.
+    /var/lib/dpkg/status IS KEPT ON PURPOSE. Condition 3 says "no binary", not "no database", and
+    SF-6's SBOM attestation reads it. The removal script ASSERTS its retention, so a future
+    broadening of the list cannot take it out silently.
+    THE REMOVAL SCRIPT ASSERTS ITS OWN END STATE AND EXITS 3 IF IT IS UNTRUE, because a path that
+    moves between base-image versions turns an `rm -rf` into a silent no-op -- the same
+    silent-in-the-permissive-direction shape SF-3's Codex pass found twice. It checks 13 binaries
+    off PATH, the direct npm-cli.js/npx-cli.js/corepack.js paths, /usr/share/python-wheels, and
+    that `import ensurepip` and `python3 -m pip` both FAIL.
+    ALL THREE IMAGES BUILT AND VERIFIED INDEPENDENTLY of the script's own claim. Present at their
+    pins: node v22.23.2, Python 3.11.2, go1.23.4, git 2.39.5, claude 2.1.260, codex-cli 0.152.1,
+    agy 1.1.26. Absent: apt, apt-get, dpkg, dpkg-query, npm, npx, corepack, yarn, yarnpkg, pip,
+    pip3 -- and the four direct paths. dpkg database retained (146/146/149 packages). THE RISK
+    THAT MATTERED WAS CHECKED: `claude --version` and `codex --version` still work after their own
+    installer was deleted from under them.
+    THE BUILD CACHE PATH IS A DESIGN DECISION, not a detail. /build-cache is TOP-LEVEL rather than
+    /home/agent/.cache, because a named volume mounted INSIDE another volume (01.2 puts
+    /home/agent on the state volume) is created root-owned and would be unwritable by the agent it
+    exists for. Creating it in the image as agent:agent is what seeds that ownership onto a fresh
+    volume -- PROVED by writing to one as uid 1000. Edge Case 14 asks which volume T23 is asserted
+    against and the answer is recorded: the DEDICATED volume, never 01.2's state volume, which
+    would pass without the option existing at all.
+    THE HARNESS EXTENSION IS THE DISTINCTNESS CHECK, NOT THE MOUNT ENTRY. /build-cache travels
+    01.4's existing EXPECT_EXTRA_MOUNTS route, which alone would pass equally well if all three
+    agents shared one volume -- so the real assertion is new and lives after the per-agent loop,
+    because the property is a relationship BETWEEN agents that no per-agent check can see. PROBED
+    BOTH DIRECTIONS with a throwaway project, removed afterwards: three agents resolved to three
+    distinct volumes (positive), a synthetic shared volume failed the same logic (negative), and
+    cross-agent isolation was confirmed by writing a marker into claude's cache and failing to
+    find it in codex's.
+    BOTH EXISTING HARNESSES RE-RUN, this feature's standing obligation since SF-4:
+    verify-pod-topology.sh ALL CHECKS PASSED (including the new build-cache check and the mount-set
+    equality that proves the default profile is unaffected) and verify-egress-mediator.sh 77/77,
+    0 failures, ALL PHASES PASSED, both against the rebuilt images. The 77 was OBSERVED here, not
+    inherited from SF-4's record: the first run's captured output held only its last 22 lines, so
+    the harness was re-run with full capture rather than have the count asserted from memory. lint-policy.sh exits 0 and all three committed
+    artifacts are still --check current. `oauth-mount --check` exits 4 and that is PRE-EXISTING,
+    attributed rather than assumed: no oauth-mount artifact has ever been committed, and SF-4
+    established that a missing artifact under --check exits 4 because absent is the limiting case
+    of different.
+    THE PER-PROFILE IMAGE IS A SEAM WITH NO CALLER YET, recorded rather than implied. The agent
+    build takes a PROFILE build arg (D10's per-profile image) and compose interpolates it from
+    AGENT_PROFILE, defaulting to `default`. NOTHING SETS IT: no override fragment passes a profile
+    to the agent build, so layering compose/overrides/oauth-mount.bootstrap.yaml builds agent
+    images for the DEFAULT profile's pack set. That is harmless exactly because SF-3's operator
+    decision gave both shipped profiles identical pack sets, and it would stop being harmless the
+    moment a profile selected different packs. SF-6's scripts/build.sh is the per-profile build
+    that drives the seam -- the Files-to-Modify table already puts per-profile image builds there.
+    The interpolation is AGENT_PROFILE and deliberately not PROFILE, which is a common shell
+    variable; a stray host value would otherwise select a pack set. The failure would at least be
+    LOUD -- pack-plan.sh refuses an unresolvable profile at exit 2 rather than compiling an empty
+    plan -- but a build that fails on the operator's ambient environment is still a bad seam.
+    ONE MORE PACKAGE RIDES THE SIGNED CHAIN RATHER THAN A MANIFEST HASH, and SF-5 is what moved
+    it: agy's `jq`. apt-pinned.sh makes the pinned snapshot the image's ONLY apt source, so jq now
+    comes from the snapshot instead of the rolling archive -- strictly more reproducible than
+    before, still not manifest-pinned. Three packages are hash-declared (python3, python3-venv,
+    git); jq and every transitive dependency are covered by the signature and the signed index.
+    Recorded on Deviation 13 so the count stays honest.
+    DEVIATION 11's IMPACT WAS CORRECTED AFTER REVIEW, before the sub-feature closed. Its first
+    draft said SF-7 Phase A "covers both build contexts rather than one" -- but the whole point of
+    the deviation is that there is now ONE context, shared, and it legitimately contains
+    images/mediator/, mediator/config/, policy/ and scripts/compile-policy.sh because the mediator
+    build needs them. None is a secret and the trailing-deny block still keeps mediator/identity/
+    and references/ out, but Contract 5's "the agent images never copy policy/, mediator/ or any
+    identity path" is no longer separable at the context level and must be asserted against the
+    built IMAGE -- which is what Contract 5 already says Phase A does. The tempting wrong reading,
+    written down because it was TRUE before this deviation and is FALSE after it: "the context no
+    longer contains control-plane paths, so the agent images cannot have them."
+    CODEX ADVERSARIAL PASS ON SF-5, 2026-09-09, at operator request after the two SF-5 commits,
+    following SF-2's, SF-3's and SF-4's precedent. FIVE findings, ALL FIVE REPRODUCED HERE before
+    being accepted and ALL FIVE FIXED. None declined -- matching SF-3's pass (7/7) and SF-4's
+    (5/5) rather than SF-2's (6 of 11).
+    HIGH 1, AND IT DEFEATS THE TRUST ANCHOR THIS SUB-FEATURE IS BUILT ON. The fingerprint
+    assertion was `case "$status" in *"VALIDSIG "*" ${FPR}"*)` -- a SUBSTRING match over gpgv's
+    whole status output. GOODSIG carries the key's USER ID as free text, so a substituted keyring
+    whose UID contains the literal string "VALIDSIG filler <pinned-fingerprint>" satisfied the glob
+    while the actual VALIDSIG line named a completely different key. Reproduced: ACCEPTED, with the
+    real signature by key AAAA... against a pin of B8B8... The same glob also ignored EXPKEYSIG and
+    REVKEYSIG, which ACCOMPANY a VALIDSIG rather than replacing it. Now parsed BY FIELD -- VALIDSIG
+    field 12 is the PRIMARY key fingerprint, which is what the profile pins; field 3 is the signing
+    subkey and does NOT satisfy it, confirmed by control.
+    THE FIX'S OWN FIRST DRAFT WAS WRONG IN THE MIRROR DIRECTION, and the build caught it -- worth
+    recording because it is the same class of error pointing the other way. It gated on gpgv's EXIT
+    STATUS and rejected on ERRSIG/NO_PUBKEY. MEASURED: this InRelease carries THREE signatures --
+    the bookworm key we pin plus two Debian keys deliberately NOT in our single-key keyring -- so
+    gpgv exits 2 with ERRSIG/NO_PUBKEY for those two even when our key gives a clean GOODSIG plus
+    VALIDSIG. apt behaves the same way: a multi-signed index is trusted when ANY held key validates
+    it. So the exit status is deliberately NOT the gate, and only BADSIG/EXPKEYSIG/REVKEYSIG -- the
+    statuses that impugn OUR key, the keyring holding exactly one -- are fatal. Both directions
+    controlled against the REAL index: wrong pinned fingerprint exits 2, correct one exits 0.
+    HIGH 2 IS SF-3's LESSON REPEATING A SECOND TIME IN THIS FEATURE, and it is worse than the
+    report claimed. The plan files are whitespace-delimited and pack-install.sh re-splits them with
+    `read -r name version sha`, but no scalar was checked for whitespace. A single YAML BLOCK
+    SCALAR in one `version` or `url` emitted a SECOND well-formed record the writer never intended.
+    REPRODUCED with a throwaway pack declaring ONE apt item and ONE archive: the plan came out with
+    TWO of each, including `go 1.23.4 https://evil.example.com/go.tar.gz`. A second probe proved
+    the injected record ALSO BYPASSES require_https AND the archive-name allowlist -- it emitted
+    `totally-unknown-archive 0.0.1 http://plaintext.evil.example.com/payload.tar.gz` past both,
+    because those checks ran against the ORIGINAL field and never against the split records. With
+    the name `node` or `go` and a matching checksum -- both attacker-controlled, since the attacker
+    wrote the manifest -- that is a tarball unpacked over /usr/local, i.e. arbitrary code in every
+    agent image, from a manifest that READS as declaring one entry. Generalises exactly as SF-3
+    recorded it: introducing an internal encoding retroactively makes every value flowing into it
+    security-relevant. Fixed with require_token on every field that becomes part of a record.
+    MEDIUM 3 HAD TWO HALVES; ONE FIXED, ONE RECORDED AS A RESIDUAL. The fixed half: pack-plan.sh
+    demanded package_repository.apt UNCONDITIONALLY, so a zero-pack profile died at
+    "package_repository.apt must be !!map, found !!null" -- contradicting profiles/default.yaml's
+    own stated contract, "Required only when `packs` above is non-empty". test-selfcheck and
+    test-fixtures are correct as written and deliberately omit the block; they now resolve to an
+    empty plan and exit 0. The RESIDUAL half: MEDIATOR_PROFILE (runtime) and the agent build's
+    PROFILE arg can diverge -- `MEDIATOR_TEST_PROFILE=test-selfcheck` gives the mediator that
+    profile while all three agents build `default`. Inert today because the two shipped profiles
+    have identical pack sets and the test profiles are zero-pack, and the harness in question tests
+    egress rather than packages. NOT fixed here by decision: unifying them is the per-profile build
+    that Files-to-Modify assigns to SF-6's scripts/build.sh, and inventing a second mechanism at
+    SF-5 would be the thing SF-6 then has to undo. Recorded so it is a scheduled decision and not
+    a discovery.
+    MEDIUM 4: THE VERIFIER'S OWN FAILURE MODE. remove-package-managers.sh claims "no package
+    manager reachable" but proved it with an ALLOWLIST OF NAMES. Reproduced: `pnpm` and `pipx`
+    planted in a container, script exits 0 claiming success, both still run. Two changes -- the
+    inventory widened to 21 binaries, and the Python check moved from `python3 -m pip --version`
+    failing to importlib find_spec, because a pip that is PRESENT BUT BROKEN also fails the old
+    check and would have passed it vacuously. Re-probed with four installers planted OUTSIDE the
+    removal list: all four named, exit 3; clean image still exit 0.
+    LOW 5: `.packs[]` entries were not individually tag-checked, and yq renders the YAML scalars
+    `true`, `null` and `0755` as text that satisfies the pack-name regex -- so a boolean would have
+    been used to build a directory path. scripts/compile-policy.sh already refuses YAML-ambiguous
+    pack names at the producer; the second reader has now caught up. Probed: `packs: [true]` exits
+    2 naming !!bool.
+    ONE PROBE DEFECT, NOT A CODE DEFECT, fixed rather than accepted -- the same bookkeeping SF-3's
+    pass recorded. The first injection probe left both packs selected, so the duplicate-package
+    gate fired correctly and masked the finding; re-run with only the probe pack selected.
+    FOUR CODEX CLAIMS WERE CHECKED AND HELD, recorded so the pass's negative results are not lost:
+    the declared-package checksum ORDER is correct (fresh per-package directory, hash, then install
+    from the local file); `find -print -quit` cannot pick a stale .deb because that directory is
+    rm -rf'd each iteration; the .dockerignore trailing denies do win over `!images`; and the
+    build-cache fragment renders three distinct named volumes.
+    EVERYTHING RE-RUN AFTER THE FIXES. All three images rebuilt and re-inspected: no manager
+    reachable, node v22.23.2 / Python 3.11.2 / go1.23.4 / git 2.39.5 present, dpkg database
+    retained (146/146/149). Positive control that the default profile still resolves to the same
+    2 apt items and 2 archives. lint-policy.sh exits 0 and all THREE committed artifacts are
+    --check current. BOTH HARNESSES RE-RUN AGAINST THE REBUILT IMAGES: verify-pod-topology.sh ALL
+    CHECKS PASSED and verify-egress-mediator.sh 77/77, 0 failures, phases A-G, ALL PHASES PASSED.
+    Codebase assessment still ABSENT; refresh skipped with a warning, as at SF-1..SF-4.
+    SF-6 IS SPLIT. SF-6a complete 2026-09-09 (commit f63abbd); SF-6b outstanding, so the
+    checklist item stays [ ] and the count stays 5/7. The split point is the published digest:
+    SF-6a is everything writable without one -- .github/workflows/agent-sandbox-image.yml (this
+    repository's FIRST workflow, D21), scripts/build.sh, the compose profile seam and the docs.
+    SF-6b is the FROM flip to ghcr.io/...@sha256:<digest>, AGENT_BASE_DIGEST in compose/pins.env
+    and the three build args, and cannot be written until the workflow has run once (Edge Case
+    11). Operator decision 2026-09-09, two questions: sequence as two commits with the PUSH
+    handed to the operator rather than run here, and publish the GHCR package PUBLIC so the
+    operator bootstrap needs no docker login (the repo is public; the base is Debian/Node + git
+    and holds no secrets).
+    SF-6 COMPLETE 2026-09-09. SF-6b landed; the checklist item is [x] and the count is 6/7.
+    THE PUSH HAPPENED and the bootstrap is closed. Branch pushed (f305afc..bdabf72, 24 commits);
+    workflow run 34376295042 GREEN ON THE FIRST RUN, both jobs, no fixes -- publish-base 45s on
+    ubuntu-24.04-arm (the runner label resolved, which was the top first-run risk) and
+    policy-drift 16s on x86. AGENT_BASE_DIGEST=sha256:213d56ab12d0f4bb945f3a7f2b808c4e2b52fe18d
+    24d9624c23e59d09006f9b3, confirmed three independent ways (manifest export, both tag pushes,
+    the summary step) and NOT confused with the log's "SHA256 digest of uploaded artifact
+    f670aa..." which is the attestation artifact upload.
+    THE PACKAGE WAS ALREADY PUBLIC -- no action was needed for the visibility step. GitHub
+    inherited the public repository's visibility. Proved anonymously with a token from GHCR's
+    unauthenticated token endpoint: manifest fetch returns HTTP 200. So the operator bootstrap
+    needs no docker login, which is what the operator chose. The gh token has no packages scope
+    and it turned out not to matter.
+    R10.7 IS SATISFIED FOR THE PUBLISHED BASE, verified rather than asserted. The pinned index is
+    application/vnd.oci.image.index.v1+json over exactly ONE linux/arm64 image manifest plus one
+    attestation manifest, and that manifest's layers are https://spdx.dev/Document (4,165,960
+    bytes) and https://slsa.dev/provenance/v1 (119,577 bytes). Deviation 15's single-architecture
+    claim is the published shape, not a prediction.
+    D21 IS NOW LOAD-BEARING. images/Dockerfile's agent stages consume the base by digest, so
+    BuildKit skips the unreferenced local agent-base stage and a local build PULLS the attested
+    base. Proved by layer comparison: the built claude image's first 17 layers are byte-for-byte
+    the published base's 17, with 6 added on top. Negative control also run -- with
+    AGENT_BASE_DIGEST absent from the pins file the build fails at 'failed to parse stage name
+    "...agent-sandbox-base@": invalid reference format', exit 1, with no fallback to a tag.
+    Deviation 17: the SKEL_MARKER test hook moved from agent-base to agent-packs. It STOPPED
+    WORKING when the base went to the registry -- verify-pod-topology.sh's --build-arg reached a
+    stage BuildKit no longer builds and the run failed with new_file='' (the preserved half still
+    passing, which is what made the failure informative). Found by running the harness, not by
+    reading. The constraint it exposes outlives the fix: a build argument only has effect in a
+    stage that is still built locally. A test-only affordance also had no business in the
+    CI-published supply-chain artifact.
+    Re-verified after SF-6b: lint-policy.sh exit 0, verify-pod-topology.sh 61 PASS 0 FAIL ALL
+    CHECKS PASSED, verify-egress-mediator.sh 77 PASS 0 FAIL ALL PHASES PASSED, and both the
+    default and the zero-pack test-fixtures profiles building clean through scripts/build.sh.
+    SF-7 (acceptance harness) is the only sub-feature left; the feature's Test Command cannot run
+    until it exists, so 01.5 stays [~].
+    SF-7 IS SPLIT. SF-7a complete 2026-09-09 (phases A-C); SF-7b outstanding (phases D-H), so
+    the checklist item stays [ ] and the count stays 6/7. The split point is the POD: A-C are the
+    host-side half plus the assertions that read a built image, and need no bring-up; D-H bring
+    the pod up, rebuild images and assert mounts and registry reach. Following SF-6a/SF-6b's
+    precedent for splitting a sub-feature at a mechanical boundary rather than a size guess.
+    tests/acceptance/verify-pack-composition.sh: 72 PASS 0 FAIL, PHASES A-C PASSED. The script
+    ANNOUNCES D-H as not-yet-built rather than omitting them silently -- a harness reporting
+    "ALL PHASES PASSED" with five phases missing is the same silent-in-the-permissive-direction
+    shape SF-3's and SF-5's Codex passes each found twice.
+    THIS IS WHERE THE THROWAWAY PROBES BECOME PERMANENT. SF-2, SF-3, SF-4 and SF-5 ran 35, 53,
+    30 and 21 probes and REMOVED every one. The 72 assertions here are the surviving half
+    re-expressed to run on every invocation, including the specific reproductions those Codex
+    passes produced: the four SC-3 normalisation forms (`/./`, `/../<root>/`, `//`,
+    `/workspace/../`), the accepted_risk field holding an empty list that yq renders as the
+    two-character string `[]`, the deny_cidrs nested under egress.runtime that a root-only
+    search missed, and both SC-3 positive controls (a sibling, and a NAME-PREFIX sibling that a
+    naive prefix test would call a descendant).
+    THE EXPECT HELPER CHECKS THE EXIT CODE AND THE MESSAGE, and that is not belt-and-braces:
+    SF-2's Codex pass found a gate that died inside yq "wearing the USAGE code and none of this
+    script's error format". A code-only assertion would have passed it.
+    ONE PROBE DEFECT, NOT A CODE DEFECT, found by running and fixed rather than accepted -- the
+    same bookkeeping SF-3's and SF-5's passes recorded. The pack-supplied wildcard probe asserted
+    validate_resolved's "exact names only" message, but the entry is refused at the MANIFEST
+    reader (R5.4) before composition, so it never reaches the second reader. Exit code 2 was
+    right and the message was the wrong reader's; the probe now names the reader that actually
+    fires, which is exactly what a code-only assertion would have hidden.
+    FOUR RECORDED SF-7 OBLIGATIONS DISCHARGED HERE, one deliberately re-homed.
+    (1) SF-4 Deviation 9's first obligation: fixture drift was host-side --check ONLY, run by
+    nothing. Phase C now runs --check on test-fixtures and test-selfcheck WITH their .test bases,
+    and both are current. (2) SF-4 Deviation 9's second: Contract 5's "the mediator image copies
+    policy/, profiles/, packs/" is stale for the RUNTIME stage, so Phase A asserts the shape the
+    image actually has -- /etc/mediator/policy holds exactly the committed *.yaml set and NOT
+    policy/resolved/README.md, and no /src, profiles/, packs/ or base policy file survived into
+    it. Written to Contract 5's text this would fail on a correct image. (3) SF-5 Deviation 11's
+    correction: "the agent images never copy policy/, mediator/ or any identity path" is asserted
+    against the built IMAGES, because the shared context legitimately contains those paths now.
+    (4) The Gate 4 operator decision: the CA private key is asserted absent from the build context
+    BY NAME, and the assertion first checks the key EXISTS on the host -- otherwise it passes on a
+    machine that never issued a CA, which is an assertion that proves nothing.
+    RE-HOMED, RECORDED RATHER THAN DROPPED: SF-2's note that "SF-7 Phase A must assert the mount
+    that actually exists against docker inspect". That needs a running container and therefore
+    belongs with the bring-up phases; it lands at SF-7b Phase G, where docker inspect on running
+    containers already is. What Phase B does assert is the LIMIT: every shipped profile still
+    carries a non-absolute project path, so the SC-3 gate warns rather than judging, and that
+    warning cannot now disappear silently.
+    THE BUILD CONTEXT IS ENUMERATED, NOT REASONED ABOUT. A `FROM scratch` stage COPYing the whole
+    context, extracted with --output type=local -- the mechanism SF-4 verified on this Docker
+    Desktop before building the artifact stage on it. It applies the REAL .dockerignore rather
+    than the harness's reading of one. Measured: 484 KB, no *.key and no mediator/identity path
+    anywhere, references/ absent, and both .test.yaml BASES absent -- which is the premise
+    Deviation 9's carry-through rests on and had never been asserted.
+    C6 IS THE ONE CHECK THAT PERTURBS A COMMITTED FILE, and it has to: the drift gate compares the
+    compile stage's output against the copy in the BUILD CONTEXT and there is nowhere else to
+    point it. Guarded three ways -- the run REFUSES to start if policy/resolved/default.yaml is
+    dirty, the file is saved before the edit, and the restore is in the EXIT trap so an interrupt
+    mid-build still restores. Both directions controlled: a drifted artifact fails a plain
+    `docker build --target drift`, and the restored tree passes the same build. Verified after
+    the run: `git status` shows only the two intended files, no probe pack, no probe profile.
+    DEVIATION 18 RECORDED AND OPERATOR-RATIFIED BEFORE ANY CODE WAS WRITTEN, following SF-2..SF-6's
+    precedent. The Test Strategy's Phase D and Phase E rows describe a shape this build does not
+    have, on four counts: the loaded/unloaded roles are INVERTED as built (SF-3 gave default the
+    pack; test-fixtures is packs: []), the two artifacts do not share a base so the byte-identical
+    assertion is unreachable that way, Phase E's stated reason for a second committed artifact is a
+    false premise post-SF-4 (the drift gate reads the WORKING TREE, not git), and Phase D names
+    PACK_SET_HASH (never shipped, Deviation 12) and the pre-SF-4 refresh command. Phase E now
+    rides Phase D's single mutation window and both are SF-7b's. ONE QUESTION WAS ESCALATED PAST
+    the operator to the advisor and its answer taken: whether to toggle packs on one base, drop the
+    zero assertion, or add a fifth profile. Toggle-on-one-base, for the reason above.
+    ALSO LANDED HERE, from the Files-to-Modify table's one row with no sub-feature owner:
+    verify-egress-mediator.sh's control-plane mount assertion now names packs/. It became control
+    plane when the compiler began composing pack manifests into the resolved allowlist -- an agent
+    that can write a pack.yaml writes its own egress entries at the next build.
+    BOTH EXISTING HARNESSES RE-RUN, this feature's standing obligation since SF-4, and the second
+    one was MODIFIED here so its re-run is not a formality: lint-policy.sh exit 0,
+    verify-pod-topology.sh 61 PASS 0 FAIL ALL CHECKS PASSED, verify-egress-mediator.sh 77 PASS
+    0 FAIL ALL PHASES PASSED with the extended packs/ pattern firing. Codebase assessment still
+    ABSENT; refresh skipped with a warning, as at SF-1..SF-6.
+    SF-7a REVIEW PASS, same day, before reporting. ONE REAL DEFECT, and it is the
+    silent-in-the-permissive-direction shape this feature's Codex passes found four times --
+    this time in the HARNESS rather than in what it tests. Phase A's image-contents searches ran
+    `docker run --entrypoint sh` with no --user, and ALL FOUR IMAGES DECLARE A NON-ROOT USER
+    (the agents `agent`, the mediator `13:13`), so `find /` ran unprivileged: Permission denied
+    on every root-only directory went to the 2>/dev/null, and the trailing `exit 0` forced
+    success. A control-plane file under a 0700 path was INVISIBLE and the assertion passed.
+    REPRODUCED BEFORE FIXING rather than inferred from the USER field: a planted
+    /root/hidden/allowlist.base.yaml was found as root and NOT found as `agent`, in the same
+    container. Fixed with --user 0 on all three invocations. The general point is recorded in
+    the script: inspecting an IMAGE's contents is not the same question as what the RUNTIME user
+    can reach, and only the first is being asked in Phase A. Re-run after the fix: still 72 PASS
+    0 FAIL -- the assertions were true all along, they were simply not proving it.
+    TWO ACCURACY CORRECTIONS in the same pass, because this project records counts as evidence.
+    (1) The probe-count attribution said "SF-2, SF-3, SF-4 and SF-5 ran 35, 41, 30 and 21". The
+    35 and 41 are the PRE-Codex-pass counts (58 and 53 after), 21 is SF-4's INTERMEDIATE count
+    (30 after its pass), and SF-5 recorded no total at all -- so the sentence gave SF-4's old
+    number to SF-5. Now 58, 53 and 30, with SF-5's absence stated. (2) C6's `docker build
+    --target drift` passes only MEDIATOR_BASE_DIGEST, so YQ_VERSION and YQ_SHA256_* fall to the
+    Dockerfile's ARG defaults. SF-4 measured those defaults as agreeing with pins.env, so this
+    builds the same emitter the pod does today; the dependency is now recorded in the script
+    rather than left to be discovered if they diverge.
+    HISTORICAL, SF-6a: THE PUSH WAS THE BLOCKER FOR SF-6b. Nothing in SF-6a has been exercised by a CI run: the
+    ubuntu-24.04-arm runner label, the GHCR push, the attestation emission and the arm64 build
+    are all unverified until this branch is pushed. Resume: push, read AGENT_BASE_DIGEST off the
+    run summary, set the package public, then /build SF6 again.
+    3 deviations recorded, all three operator-ratified before writing. 14: the GHCR namespace is
+    ottawacloudconsulting/agentic-ai, not the plan's OCC-github/agentic-ai -- the latter is this
+    workstation's directory name and has no GitHub owner behind it. 15: the published base is
+    linux/arm64 ONLY -- pins.env carries one GIT_SHA256, images/apt-pinned.sh hashes whatever
+    apt-get download fetches for the container's dpkg arch, and that hash is the arm64 .deb, so
+    an amd64 runner fails at the checksum rather than subtly; multi-arch is a pins.env change,
+    not a runner-label change. 16: AGENT_PROFILE now selects the mediator's runtime profile as
+    well as the agents' pack set, closing the divergence SF-5's review pass recorded and
+    assigned here -- one line on egress-mediator, probed in both directions against the harness
+    override.
+    EDGE CASE 13 RESOLVED, AND IT DOES NOT HOLD. It recorded local buildx attestation as
+    UNVERIFIED and pre-committed to a fallback. MEASURED: `docker buildx build --sbom=true
+    --load` returns "Attestation is not supported for the docker driver" on the pinned Docker
+    Desktop (buildx v0.25.0-desktop.1, BuildKit v0.23.2). Fallback taken -- scripts/build.sh
+    records image identity only, R10.7's SBOM half stays with the CI-published agent-base. What
+    build.sh records is an image ID (config-blob sha256), NOT a registry manifest digest, and is
+    labelled as such; a never-pushed image has no manifest digest.
+    A REAL BUG WAS FOUND BY BECOMING SF-5's MISSING CALLER, and fixed here on operator
+    decision. `bash scripts/build.sh --profile test-fixtures` died at "pack-install: repo.env is
+    incomplete", exit 2, in the agent-packs stage. SF-5's Codex finding 3 -- the zero-pack profile
+    refused for a missing package_repository -- was applied to the PRODUCER only: pack-plan.sh's
+    zero-pack branch truncated repo.env and exited, leaving apt-items.txt, archives.txt and
+    packs.txt ABSENT, while pack-install.sh still demanded APT_URL/APT_SUITE/APT_FINGERPRINT
+    unconditionally and would have died at `wc -l < packs.txt` immediately after. It survived
+    because SF-5's own review recorded the agent build's PROFILE arg as "a seam with no caller" --
+    the fix was verified through pack-plan.sh in isolation, never through a build, and
+    scripts/build.sh is the first caller. Reached 2 of the 4 shipped profiles (test-fixtures,
+    test-selfcheck); default and oauth-mount were never affected. Fixed on both sides: the empty
+    plan is now a COMPLETE plan (all four files written empty) and pack-install returns early on
+    an empty packs.txt before the field check, since that check is right for a plan that installs
+    something and wrong for one that installs nothing.
+    VERIFIED AT SF-6a, not asserted.
+    AFTER THE ZERO-PACK FIX, both directions were controlled rather than the fix being observed
+    to stop erroring. test-fixtures builds exit 0 and its image has go ABSENT, python3 ABSENT and
+    no /usr/local/go, with node and git present from agent-base; default's image has go and
+    python3 present. That is D10's per-profile image property demonstrated for the first time --
+    the two profiles produce genuinely different images, not the same image under two tags.
+    Full re-run after the fix: lint-policy.sh exit 0, verify-pod-topology.sh ALL CHECKS PASSED,
+    verify-egress-mediator.sh 77 PASS / 0 FAIL ALL PHASES PASSED.
+    TWO WORKFLOW CORRECTIONS from the review pass, both before any push. `id-token: write` was
+    removed: it was there on the belief that buildx's provenance attestation signs through the
+    OIDC token, which is false -- BuildKit writes an UNSIGNED in-toto statement, and the string
+    ACTIONS_ID_TOKEN appears nowhere in docker/build-push-action's src or dist, only in that
+    repository's own CI. A permission granting nothing to a job already holding packages: write
+    is widening for free, and the rationale was a lying comment. And the run summary called the
+    published digest a "multi-platform index" one paragraph after Deviation 15 established it is
+    single-architecture; it is an index over ONE platform manifest plus the attestation
+    manifests. The drift gate was probed in BOTH directions with the
+    compile and drift stages force-rebuilt: clean tree exits 0 ("all emitted artifacts match
+    their committed copies"), one perturbed byte in policy/resolved/default.yaml exits 4 and
+    fails the build; tree restored and confirmed clean. build.sh run end to end, its four
+    recorded IDs matching `docker images` independently. After the compose change -- the one
+    thing here that alters runtime behaviour -- lint-policy.sh exit 0, verify-pod-topology.sh ALL
+    CHECKS PASSED, verify-egress-mediator.sh 77 PASS / 0 FAIL, ALL PHASES PASSED. Action SHAs
+    resolved from the GitHub API rather than recalled; workflow YAML parsed and its job, runner
+    and trigger fields read back.
+    Notes: Re-planned 2026-09-07 against 01.3 as built; plan approved 2026-09-07 and **Gate 4
+    CLOSED the same day** -- all three open items resolved by operator decision (supersedes the
+    prior approval). Ready to build. The plan defined a compiler CLI incompatible with the one 01.3 shipped -- adopting it
+    would have broken the README, both harnesses and the mediator's own stage-1 self-check -- and
+    scheduled a build-context change 01.3 had already made. Contract 6 now extends the shipped CLI
+    and keeps the exit-code contract as the real addition; SF-4 shrank accordingly. Also picks up
+    the RFC 6761 special-use-TLD warning the Gate 2 refresh assigns here. Sub-feature count
+    unchanged. Three checklist items need the operator: the test command's scope, the exit-code
+    change against existing callers, and the .dockerignore allowlist extension.
+    SF-7b COMPLETE 2026-09-09. Phases D-H; the checklist item is [x] and the count is 7/7.
+    verify-pack-composition.sh: 109 PASS 0 FAIL, ALL PHASES PASSED.
+    EXECUTION ORDER IS NOT LETTER ORDER, and that is mechanism. F, G and H need a pod running
+    the LOADED profile; D and E then REMOVE the pack and rebuild, which is the only way to
+    observe R7.5's no-residue property on the profile that actually carries the pack. Running
+    D/E first would leave the pod unloaded and force a third bring-up. Order: up, F, G, H, D, E,
+    restore.
+    TWO REAL DEFECTS IN THE DOCUMENTED ENTRY POINT, both found by Phase D being the FIRST THING
+    IN THIS PROJECT'S HISTORY TO RUN IT. The two sibling harnesses sidestep `up` entirely --
+    verify-pod-topology.sh uses `compose run -d` per agent, verify-egress-mediator.sh starts the
+    mediator by name -- so a command that had been amended twice (01.3, and SF-4's `--build`)
+    had never once been executed. The general point outlives both fixes: A DOCUMENTED COMMAND
+    THAT NO TEST RUNS IS NOT A TESTED COMMAND.
+    DEFECT 1, DEVIATION 19: `up --build` failed 3 OF 3 with "failed to set up container
+    networking: Address already in use". Measured, not inferred: the mediator declares
+    ipv4_address 172.31.{10,20,30}.2 and there is no depends_on, so `up` starts all four
+    services in parallel and Docker's IPAM offers .2 -- the mediator's own address -- to
+    whichever agent asks first. The agents' command is `<agent> --version`, so they exit almost
+    at once and a SEQUENTIAL bring-up succeeds purely on timing, which is exactly why every
+    earlier harness passed. Fixed with an ip_range reserving the low half of each subnet; the
+    /24 stays because the listener certificates' iPAddress SANs are written against it. 3/3
+    failing before, 3/3 clean after.
+    DEFECT 2, DEVIATION 20, AND IT IS THE SECURITY-RELEVANT ONE: `up --build` rebuilds the
+    mediator image and then reports the container `Running`. The pod goes on enforcing the
+    policy compiled into the PREVIOUS image. Measured: image ID CHANGED, container not
+    recreated, live compiled_from.packs still 1 against a committed artifact of 0 -- an operator
+    edits policy, recompiles, runs the documented command, sees success, and the old allowlist
+    is still in force. Same failure SF-4's amendment named, one layer up: SF-4 fixed the stale
+    IMAGE, this fixes the stale CONTAINER.
+    REFERRED TO CODEX BY THE OPERATOR and the verdict taken, following SF-3's and Edge Case 17's
+    precedent. Codex was asked to CHALLENGE the diagnosis rather than pick from the menu.
+    Verdict: amend the entry point to `up --build --force-recreate`, UNCONDITIONALLY rather than
+    only inside the refresh procedure -- scoping it to the refresh would re-create the
+    "hidden second step" failure SF-4 had already removed. It ruled out mounting or reloading
+    the policy as a different and larger design (the repo compiles in a build stage behind a
+    drift gate on purpose), and ruled out a mediator-only recreate as too narrow, because a
+    pack-set change must also shed the AGENTS' package residue -- which is what Phase E asserts.
+    It also checked the cost: named state and audit volumes survive recreation; what is lost is
+    in-flight connections and transient /run and /tmp state, now stated in the README.
+    THREE THINGS THE HARNESS HAD TO LEARN ABOUT THE POD, none of them deviations. (1) The agents
+    do not stay up -- their command is `<agent> --version` -- so every live-agent assertion runs
+    in a `compose run -d ... sleep` container, the pattern both siblings already use. (2) Those
+    containers are RECYCLED after Phase D's rebuild; without that, Phase E's residue check would
+    inspect the OLD image and report no change, a false PASS in the permissive direction.
+    (3) `set -e` killed the first run silently on a command substitution whose last command was
+    a non-matching `grep -q && echo` -- no FAIL line, exit 1, which is the worst shape a harness
+    failure can have.
+    THREE PROBE DEFECTS, NOT CODE DEFECTS, each fixed rather than accepted -- the same
+    bookkeeping SF-3's and SF-5's passes recorded. The snapshot-URL assertion compared raw
+    strings where images/pack-install.sh:50 compares `${APT_URL%/}`, so it failed on a CORRECT
+    pair; the T15 residual asserted verdict `denied` where the mediator emits `deny`; and
+    SF-7a's wildcard probe named the wrong reader. All three were caught only because `expect`
+    asserts the MESSAGE as well as the exit code.
+    WHAT PHASE E PROVES, and it is Deviation 18's mechanism: with COMPILED_AT fixed, the loaded
+    and unloaded compiles of the SAME profile against the SAME bases are byte-identical outside
+    compiled_from, and compiled_from.packs is the only thing that moved (1 to 0). The residue
+    half is asserted on the container rebuilt from the profile with the pack REMOVED -- go,
+    python3 and /usr/local/go gone, node and git still present because they come from
+    agent-base and not from the pack. A mount delta is deliberately NOT asserted: Deviation 5
+    refuses pack-supplied mounts, so it cannot exist.
+    SF-2's RE-HOMED OBLIGATION IS DISCHARGED IN PHASE G: the project mount that actually exists,
+    read off `docker inspect` on a running container, with every bind source resolved through
+    the filesystem and required to be neither the solution root, nor inside it, nor an ancestor
+    of it. That is the SYMLINK half the compiler's lexical gate cannot reach and that SF-2's
+    Codex pass explicitly left to SF-7.
+    T23's WRITE half is new here: verify-pod-topology.sh checks that the build caches are
+    DISTINCT; this writes a marker into claude's cache as the agent user (which must SUCCEED --
+    the image seeds agent:agent ownership) and requires it to be absent from codex's.
+    FEATURE COMPLETE 2026-09-09. The composite Test Command ran for the FIRST time -- it could
+    not run before SF-7 existed -- and passed end to end, exit 0:
+      verify-pack-composition.sh   109 PASS 0 FAIL  ALL PHASES PASSED
+      verify-pod-topology.sh        61 PASS 0 FAIL  ALL CHECKS PASSED
+      verify-egress-mediator.sh     77 PASS 0 FAIL  ALL PHASES PASSED
+    247 assertions, 0 failures. lint-policy.sh exit 0. The two pre-existing harnesses were the
+    ones at risk -- SF-7b changed compose/compose.yaml, which both of them drive -- so their
+    passing is a regression check and not a formality. 20 architectural deviations recorded
+    across the feature; /design refresh is worth running to consolidate them.
+
+[x] Feature 01.6: Per-agent workload identity
+    Plan: .project/sandboxed-agent-containerization/milestones/01-sandboxed-pod/plans/per-agent-workload-identity.md
+    Sub-features: 4/4 complete
+    Notes: Created 2026-09-04 by /milestone revision -- split out of 01.3. Closes R8.8 with the
+    strongest identity form each agent's client supports; carries T34 and the Milestone 03
+    brokering gate. Ordered after 01.3; may land before or after 01.4 and 01.5.
+    Planned 2026-09-09, Gate 4 approved. Four sub-features. Decisions taken at plan time: required-mode
+    clientca= on the claude front listener only (the DELAYED_AUTH gap 01.3 handed over is closed by
+    design, not fixed -- per-agent listeners give optional mode no consumer); the M03 brokering gate is
+    listener+mtls ALONE, so claude only, even on a positive SF-1; identity_source is rendered from a new
+    profile field client_auth in the same renderer pass as clientca=, per listener. A first-draft defect
+    was caught and fixed before approval: annotating idsrc on the front layer never reaches the verdict
+    line, because the front->inner cache_peer hop is a new master transaction -- which is why agent and
+    layer are already re-derived per layer. Header propagation was rejected as agent-forgeable; the
+    mechanism taken is topological (inner binds 127.0.0.1, cache_peer_access admits only that agent's
+    front). Named regression surface: verify-egress-mediator.sh:105 hardcodes identity_source ==
+    "listener" on EVERY verdict assertion, and :341-343 is a placeholder pass 01.3 wrote to be inverted
+    here. client_auth is required-not-defaulted, so all four profiles carrying a listeners: block and
+    both resolved artifacts move in one commit or compile-policy-build.sh refuses the image build
+    (R5.14). verify-auth-state.sh is excluded from the Test Command -- its Phase D costs the operator
+    their host codex login -- and is run once by hand at the end of SF-2 instead.
+    SF-1 complete 2026-09-09: criterion 1 is POSITIVE for BOTH codex and agy -- each sends a proxy
+    credential from proxy-URL userinfo, preemptively, codex on the plain transport and agy on TLS
+    (and on plain). SF-3 therefore takes its positive branch for both agents, and the
+    identity_source enumeration ships all three values. The header form and the userinfo form
+    collapse into one mechanism: neither client exposes a credential knob, both construct
+    Proxy-Authorization from the URL, so IC5's Proxy URL row is the only agent-side surface that
+    changes. Two fixture defects were found and fixed en route, each of which produced a convincing
+    wrong answer (an expired reused throwaway CA behind a generate-if-absent guard; Go ServeTLS
+    advertising h2 over ALPN to a CONNECT proxy) -- both recorded. Decision 4 is unchanged: the M03
+    brokering gate stays listener+mtls alone, so claude only. One mediator-side question is handed
+    to SF-3: P8 measured proxy_auth on a plain http_port, and https_port with proxy_auth is still
+    unmeasured on this Squid build, so agy's mediator side is verified before its profile flips.
+    SF-2 complete 2026-09-09, built whole rather than split. Client-certificate enforcement is LIVE for
+    claude and verified against a running mediator before commit: a cert-less client is refused with
+    "tlsv13 alert certificate required", a certificate-bearing one is accepted, a claude verdict line
+    reads identity_source: listener+mtls, and T34's literal case (a same-CA CN=codex certificate on
+    claude's listener) returns 403 with the ERR_MEDIATOR_IDENTITY page and an audit line carrying
+    control=identity, reason=subject_mismatch, identity_source=listener -- the last-wins annotation
+    override confirmed on a real line. FOUR deviations recorded, all operator-confirmed. Deviation 1 is
+    the consequential one: the cascade warm-up cannot traverse an mtls front (the mediator holds no
+    client key and cache_peer_access admits only that agent's real front), so it is SKIPPED for claude
+    and claude's first request after a mediator start may be answered 500 and retried; the three
+    alternatives were rejected on identity grounds and the reasoning is in the code. Deviation 2
+    corrects the plan: a cert-less refusal is not literally silent -- it emits one anonymous
+    proxy_internal event -- so the harness asserts no VERDICT line, and SF-4's docs must say the same.
+    Deviation 3: three resolved artifacts, not two, and the two test-scoped ones are carried through the
+    image build rather than recompiled by it, so they need a host recompile in the same commit.
+    Deviation 4: a sixth pre-existing assertion broke (the control-plane mount check flags */mediator*
+    and *.key, which the client secret trips). Deviation 5, found in the post-commit check the plan
+    itself required ("verified at SF-2 rather than assumed"): verify-pack-composition.sh breaks too --
+    it runs compose up, so the new file: secret source is required, and its Phase G SC-3 check fails
+    any agent bind resolving inside the solution root, which mediator/identity/clients/ is. Seven
+    shipped assertions broken in total, against Decision 8's five; the two extras share one root
+    cause -- three harnesses each hold their own "is this mount control plane" predicate and
+    generated trust material under mediator/ trips all three. Deviation 6, found by the operator
+    running verify-auth-state.sh by hand as the plan required: that harness holds its OWN mount-set
+    equality helper behind four call sites, and both claude call sites failed. Fixed the same way.
+    EIGHT shipped assertions broken against Decision 8's five. The find matters beyond the fix --
+    verify-auth-state.sh is excluded from the Test Command by design, so the completion gate would
+    have closed green with two latent failures in it; a cheap mount-set-only mode of that harness in
+    the composite is a /design refresh candidate. Everything else in that run passed on SF-2's
+    account: the full AUTH_MODE matrix (T24), claude's eight authentication cells, the git-config
+    scrub and both persistence phases. Its Phase D failure is NOT SF-2 -- "refresh token was already
+    used", the accepted_risk.rotation the harness banner warns about, meaning sf3_codex-state holds a
+    refresh token a previous Phase D already rolled; it needs a fresh host codex login and a reseed.
+    Test Command NOT yet run -- it is the feature-completion
+    gate and SF-3 and SF-4 are outstanding. verify-auth-state.sh is the operator's to run by hand at
+    this point, per the plan: it costs the host codex login and is excluded from the Test Command.
+    SF-3 complete 2026-09-09, positive branch for BOTH agents, verified against a running mediator.
+    The mediator half SF-1 handed over was measured FIRST and recorded as P9
+    (docs/records/mediator-selection.md): `https_port` with `proxy_auth` PASSES on this Squid build,
+    `basic_ncsa_auth` is in the shipped image and takes `openssl passwd -apr1` hashes. A live codex
+    allow line reads identity_source: listener+proxy_auth, a credential-less client on either
+    listener is refused 407, and agy's credential is refused on codex's listener (T34, credential
+    form). verify-egress-mediator.sh and verify-pod-topology.sh both pass end to end.
+    P9 also produced TWO plan corrections, both recorded: a proxy_auth refusal is 407 and NEVER 403,
+    so the control=identity / ERR_MEDIATOR_IDENTITY route Interface Contract 3 describes is
+    unreachable on this path (Deviation 7); and a proxy_auth ACL that misses HALTS ACL evaluation on
+    its line, so SF-2's "annotate the override on the miss path" mtls idiom does not transpose --
+    measured idsrc=- on the 407. The shape that works is baseline-then-upgrade (Deviation 8).
+    FIVE deviations, all operator-confirmed. Deviation 10 is the consequential one and it is
+    architectural: images/entrypoint.sh ships inside the CI-published, digest-pinned GHCR base
+    (D21), so the credential-splice edit reached NO local build -- found by building, when all three
+    agents rebuilt and the splice had not happened. SF-3 is the FIRST change to a base-image file
+    since the digest pin landed 2026-09-09, so no precedent existed; the entrypoint COPY and
+    ENTRYPOINT were MOVED (not duplicated) from agent-base to agent-packs, following the precedent
+    SKEL_MARKER set at 01.5 SF-6b for this exact failure mode. Two consequences for SF-4's docs:
+    the published base no longer carries an ENTRYPOINT and is not independently runnable, and
+    images/bootstrap-auth.sh was deliberately LEFT in agent-base carrying the same latent trap.
+    Deviation 9 widens SF-2's warm-up skip to agy -- the mediator holds hashes, not plaintext, so it
+    cannot authenticate to its own front; agy's first request after a start may be 500 and retried.
+    Test Command NOT yet run -- it is the feature-completion gate and SF-4 is outstanding.
+    verify-auth-state.sh is again the operator's to run by hand: SF-3 changes codex's and agy's
+    mount sets and their runtime proxy environment, and that harness asserts both.
+    FOUND AT THE SF-3 BUILD, NOT CAUSED BY IT, AND IT WILL GATE SF-4: verify-pack-composition.sh
+    Phase G's SC-3 assertion is NON-DETERMINISTIC. It failed on codex, then on agy, then on claude
+    across four runs of an unchanged tree, and passed on two others. The offending bind is the same
+    every time and is NOT a credential: it is `../workspace`, the default profile's project mount,
+    which compose/overrides/default.yaml binds by design (01.3 SF-4) and which IS inside the
+    solution root. The assertion resolves each bind source with `cd $(dirname) && pwd -P`; Docker
+    Desktop reports that source sometimes as `/Users/.../workspace` and sometimes as
+    `/host_mnt/Users/.../workspace`, and on the `/host_mnt` form the `cd` fails, `real` falls back
+    to `$src`, and the check passes VACUOUSLY. So the FAILING runs are the correct verdict and the
+    passing ones are the bug -- Phase G and the shipped default override contradict each other, and
+    the contradiction has been masked by a path-prefix accident since Phase G landed (01.5 SF-7b,
+    commit 681217b). CORRECTED after reading the requirement rather than the harness: SC-3 reads "a
+    fully compromised agent cannot modify the egress policy, the mount set, or the enforcement
+    point" (REQUIREMENTS.md:61). It does NOT say "no bind inside the solution root". workspace/ is a
+    git-ignored scratch directory holding no policy, no mediator config and no compose file, so
+    writing to it cannot modify any of the three things SC-3 names. Phase G's predicate is therefore
+    OVER-BROAD against SC-3 rather than the default override being in violation of it -- and the
+    correct predicate already exists in verify-egress-mediator.sh, which enumerates the actual
+    control-plane paths (policy/, mediator/, profiles/, packs/, the tree itself) and passes. Same
+    root cause SF-2's Deviation 5 named: three harnesses each carry their own "is this mount control
+    plane" predicate. The fix is to narrow Phase G to that predicate. NOT done here -- it is
+    pre-existing, outside SF-3's scope, and it touches a security assertion, so it is the operator's
+    call and not a harness patch made in passing.
+    Everything else in the Test Command is green on SF-3's account: pod-topology ALL CHECKS PASSED,
+    egress-mediator green end to end, lint-policy OK, and pack-composition 109 PASS / 0 FAIL on the
+    runs where the prefix accident went the other way.
+    SF-4 complete 2026-09-09, verified against a running mediator before commit: verify-egress-
+    mediator.sh 99 PASS / 0 FAIL, ALL PHASES PASSED, with the new Phase H green on all ten of its
+    assertions. The SC-3 non-determinism SF-3 handed over was RATIFIED AND FIXED FIRST, as a
+    standalone commit ahead of the build (bdd872d): Phase G's predicate is now the enumerated
+    control plane verify-egress-mediator.sh has always used, and a second defect was found while
+    fixing it -- the `real` fallback could never fire, because an assignment's exit status is its
+    trailing `basename`'s, so on the /host_mnt path form `real` became `/<basename>`, matched no
+    branch, and the check passed vacuously. Both halves fixed; the predicate is now shared by two
+    of the three harnesses that carried their own.
+    ONE deviation, Deviation 12, operator-confirmed before the edit: Interface Contract 4's
+    amendment text is applied in a THREE-form shape rather than verbatim. The contract was drafted
+    before SF-1 ran and says codex and agy carry a network-derived identity whose T34 case is
+    structural only; SF-1 came back positive for both and SF-3 built the credential form, so the
+    verbatim text would have put a statement in REQUIREMENTS.md contradicted by the shipped code,
+    the shipped harness and P9. T34 now names cryptographic, credential and structural forms and
+    splits its method across them. R8.8 unchanged, Decision 4 unchanged -- the M03 brokering gate
+    is still listener+mtls alone, so claude alone.
+    Phase H asserts T34's literal case (a same-CA CN=codex certificate on claude's front listener,
+    refused 403 with ERR_MEDIATOR_IDENTITY, one audit line reading control=identity /
+    reason=subject_mismatch / identity_source=listener, and EXACTLY ONE verdict line for the
+    attempt -- no inner line) and its structural case (enumeration off the RENDERED shipped
+    Compose config, not compose.yaml, so an override cannot pass it vacuously). The destination is
+    claude's OWN allowlisted host deliberately: a non-allowlisted one would be refused whether or
+    not the identity rule existed, which would also have made Decision 3's ordering constraint
+    untested.
+    Docs corrected against what was built rather than what was planned: the mediator/identity
+    revocation forecast said "at most six" client certificates, real count is four certificates
+    under this CA (credentials are not CA-bound at all, in either direction); README's R12.2 said
+    identity_source is "listener on every line at this feature", which SF-2 and SF-3 made false,
+    and now carries the three refusals that do not look like an allowlist denial (the handshake
+    refusal with NO audit line, the 407 with no error-page route, the cold-peer 500 on first use);
+    and the published base image's missing ENTRYPOINT is documented where local builds are
+    described, with SF-3's Deviation 10 trap named -- a file baked into the digest-pinned base
+    reaches no local build, and bootstrap-auth.sh still carries it.
+    Completed 2026-09-09. TEST COMMAND GREEN END TO END on the second run: 269 PASS / 0 FAIL,
+    exit 0, pack-composition and pod-topology both green, egress-mediator ALL PHASES PASSED,
+    lint-policy OK. The FIRST run failed 1/269 and the failure was a THIRD assertion defect of the
+    same class, pre-existing and found here rather than caused here: the SF-2 assertion that
+    proves client-certificate verification is on read its outcome with an unanchored
+    `grep -q "200"`, and OpenSSL's per-run 16-hex-digit error prefix came up 200067BE on that run.
+    The harness reported a cert-less client ACCEPTED while printing the `tlsv13 alert certificate
+    required` transcript that refuted it, and the adjacent no-verdict-line assertion passed. Fixed
+    by anchoring to the status line (6eeead0), verified against the exact failing transcript, and
+    scoped to that one call site on the operator's call.
+    RESIDUAL, open and deliberate: ELEVEN sibling call sites in verify-egress-mediator.sh carry the
+    same unanchored `grep -q "200"|"403"|"407"` idiom, including one Phase H added at SF-4. Each can
+    produce the same intermittent false verdict whenever a probe keeps stderr and OpenSSL's random
+    prefix contains the digits. A re-run makes any of them go green without fixing anything, which
+    is what makes the class expensive to diagnose twice. The fix is one `http_status` helper and
+    twelve call sites; it is a /design refresh or a standalone fix candidate, not carried here.
+    THREE assertion defects of one shape were found across this feature (Phase G's vacuous pass,
+    the mount-set predicate duplicated across three harnesses, this one). The pattern is worth
+    naming at the refresh: assertions that read a substring where they mean a field, in harnesses
+    that each re-implement the same predicate.

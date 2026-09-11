@@ -1,0 +1,218 @@
+# The `terraform` use-case profile (Feature 02.3 SF-3, Acceptance Criterion 6):
+# `default` plus the `terraform` pack. Everything below this point is `default`'s
+# content unchanged, except `packs` and `name` -- SC-6 is measured by switching
+# AGENT_PROFILE between this file and `default` and reading the mediator's live
+# `compiled_from.packs`.
+#
+# This is a schema/contract file, not itself interpreted by `docker compose`
+# -- compose/overrides/terraform.yaml is its hand-authored Compose counterpart.
+
+name: terraform
+
+packs:
+  - language-runtimes           # unchanged from `default` -- T14's rule (Decision 4) is measured
+                                # against exactly this base
+  - terraform                   # packs/terraform/pack.yaml -- the pack this profile adds. No base
+                                # agent carries a HashiCorp host, so T14's "gained" set is this
+                                # pack's egress.runtime in full (Decision 4)
+
+# R7.18 -- the repository pack `apt` items are sourced from. Required only when `packs` above is
+# non-empty; declared here regardless so the schema is complete rather than grown at SF-5.
+#
+# A SNAPSHOT, NOT A SUITE. `suite: bookworm` plus name=version resolves today and fails in six
+# months: Debian rotates the archive and drops superseded versions, and SC-8 measures precisely
+# the clean rebuild that happens later. The timestamped snapshot URL is stable in time.
+#
+# `fingerprint` is asserted at build (SF-5), so a key substitution fails the build rather than
+# silently signing with something else. The value below is the Debian Archive Automatic Signing
+# Key (12/bookworm), taken from the base image's own /usr/share/keyrings/ and verified against
+# the snapshot's InRelease -- see packs/README.md, "How these hashes were obtained".
+#
+# `signed_by` is `images/keyrings/` and NOT `images/agent-base/keyrings/`: there is no
+# images/agent-base/ directory (01.2 Deviation 1 made the agent images one multi-stage
+# Dockerfile), and the path must resolve inside the AGENT build context, which is `images/`.
+# The file itself is committed at SF-5, where the install step that reads it is built.
+package_repository:
+  apt:
+    url: https://snapshot.debian.org/archive/debian/20260901T000000Z/
+    suite: bookworm
+    signed_by: images/keyrings/debian-archive.gpg
+    fingerprint: B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8
+
+# R12.7 -- actions classified as irreversible or high-impact require human authorization even in
+# otherwise unattended operation. EXACTLY ONE of `classify` or `waiver` is required; the compiler
+# refuses both and neither (exit 2). Requiring the waiver as the explicit alternative is what
+# stops the field from being quietly omitted for a year.
+#
+# SHAPE ONLY AT THIS MILESTONE. Nothing enforces the classification yet -- T37 is 02.5's, and
+# this is recorded as a residual rather than presented as satisfying R12.7. A field validated
+# for shape and exercised by nothing drifts, so the landing point is named rather than implied.
+authorization:
+  classify:
+    - git-push                 # leaves the pod and rewrites shared history
+    - infrastructure-apply     # Milestone 03's terraform apply; irreversible against real accounts
+  # waiver: <recorded reason this profile waives R12.7>
+
+# R4.12 defaults -- "the safest mode that agent supports". The enum is PER AGENT and the agents
+# are asymmetric; Interface Contract 1 of the 01.4 plan is the authoritative matrix, and
+# bootstrap-auth implements exactly those seven cells and exits 2 on any other rather than
+# degrading to a working-but-different mode.
+auth_mode:
+  claude: oauth-interactive    # apikey | oauth-interactive | oauth-token
+                               # no oauth-mount: the host credential is macOS-Keychain-resident
+                               # and not portable to a Linux container (R4.8)
+  codex: oauth-interactive     # apikey | oauth-interactive | oauth-mount
+                               # no oauth-token: no OAuth env-var equivalent exists
+  agy: apikey                  # apikey ONLY, by decision (D9) -- an agy OAuth relationship
+                               # reopens the unresolved Antigravity ToS question and R5.13
+                               # permanently bars interception for it. R4.12 wants an API-key
+                               # OR an OAuth configuration per agent, not both.
+
+mounts:
+  project:
+    path: <host path>          # operator-supplied. This profile's Compose override binds a
+                                # git-ignored `workspace/` directory, NOT `..` -- binding the
+                                # solution tree would put the policy files, the mediator config
+                                # and the identity material inside the agents' own writable mount
+                                # (01.3 SF-4). The comment previously said `..`; corrected here.
+    mode: rw                   # :ro where the agent only reviews (R2.7). Default is rw;
+                                # T2's read-only fixture comes from a test-only override,
+                                # not from changing this
+  # R2.10, PER-AGENT where enabled. Three accepted shapes, and the compiler refuses anything
+  # else (exit 2): `false` (off for every agent, the default), `true` (on for every agent, each
+  # with its own volume), or a map keyed by agent -- {claude: true, codex: false, agy: false} --
+  # keyed exactly like `auth_mode` and `listeners` and refused if it names an agent the base
+  # allowlist does not. A SINGLE SHARED cache is not expressible in this schema at all, which is
+  # how R2.10's cross-agent write channel is closed: by the shape, not by a check on a value.
+  build_cache: false
+  #
+  # `mounts` IS A CLOSED SET (R2.8, T21). Only `project`, `build_cache` and `host_git_config`
+  # may appear -- an unrecognised key is a REFUSAL (exit 3), never a warning and never ignored.
+  # A profile asking for `ssh_auth_sock: true` that is silently ignored is indistinguishable
+  # from one correctly refused, right up to the day the key is implemented. The oauth-mount
+  # credential source is deliberately NOT a `mounts` key: it is declared under `oauth_mount`
+  # and mounted only by a one-shot bootstrap fragment (R4.15).
+  host_git_config: false        # R2.9, :ro with credential.helper stripped. When true, run
+                                # `bash scripts/scrub-gitconfig.sh` BEFORE `up` and layer
+                                # compose/overrides/host-gitconfig.yaml -- the scrubbed artifact
+                                # is what is mounted, never the operator's own file
+
+# `oauth_mount` is DELIBERATELY ABSENT from this profile (01.4 Interface Contract 3), not omitted
+# by oversight: it is required only when an agent's auth_mode is oauth-mount, and this profile has
+# none. A profile that enables the mode declares it with this shape:
+#
+#   oauth_mount:
+#     codex:
+#       host_dir: <a dedicated directory, NEVER a credential file -- R4.14>
+#       accepted_risk:              # R4.17. 01.5's compiler refuses the build if absent (T27)
+#         file: <the credential this directory holds>
+#         mount_mode: ro            # the only permitted value (R4.13)
+#         revocation_path: <documented procedure>
+#         blast_radius: <stated consequence on container compromise>
+#         rotation: <SF-3's measured result for this provider>
+#
+# The directory is mounted only by compose/overrides/oauth-mount.bootstrap.yaml, for a one-shot
+# `run --rm`, and never at steady state (R4.15).
+#
+# profiles/oauth-mount.yaml is that profile, built at 01.4 SF-4: this file with auth_mode.codex
+# set to oauth-mount and the block above populated. scripts/stage-oauth-mount.sh reads its
+# accepted_risk record and stages it alongside the credential, and bootstrap-auth.sh refuses to
+# copy a credential from a source that does not carry it. See README.md, "Codex oauth-mount".
+
+limits:                         # R1.10, applied per agent container
+  cpus: "2.0"
+  memory: 4g
+  pids: 512
+
+# Per-agent proxy listener surface (01.3 criterion 6). The three listeners are NOT identical,
+# because the agents' HTTP clients are not: 01.1 SF-2 established that `codex` rejects an
+# `https://`-scheme proxy URL at URL-parse time and must be given plain HTTP CONNECT, while
+# `claude` and `agy` both reach an `https://` listener. `scheme` and `tls` are two spellings of
+# one fact and the compiler refuses them if they disagree.
+#
+# `client_auth` (01.6) is the listener's authentication mode, and it is PROFILE DATA rather
+# than renderer code: the mediator renders `clientca=` (mtls) or `auth_param basic` plus an
+# `acl <name> proxy_auth <identity>` (proxy_auth) from this field, refuses to start on a value it
+# does not know, and derives the audit line's `identity_source` from the same field in the same
+# pass -- so the annotation cannot say a listener authenticates when it does not. It is required,
+# not defaulted; an absent key is a compile error. `mtls` demands `tls: true`.
+#
+# The form is the strongest each agent's client actually supports, and it is non-uniform because
+# the clients are. `claude` presents a client certificate. `codex` and `agy` cannot -- 01.1 SF-2
+# measured that `codex` rejects an `https://`-scheme proxy URL at parse time and never reaches a
+# TLS listener, and that `agy` reaches the CertificateRequest stage with nothing to offer -- but
+# 01.6 SF-1 measured that BOTH send a proxy credential, preemptively, from userinfo in their
+# proxy URL. So both carry `proxy_auth`.
+#
+# `proxy_auth` is a BEARER secret, not a cryptographic binding: readable in the agent's own
+# environment and `/proc`, and on `codex-net` it crosses the proxy hop in the clear because that
+# hop is plain HTTP by construction. It buys a revocable per-agent token and a stronger audit
+# line; it does NOT buy passage through the Milestone 03 credential-brokering gate, which stays
+# `listener+mtls` alone (01.6 Decision 4).
+listeners:
+  claude: {scheme: https, tls: true,  port: 3128, client_auth: mtls}
+  codex:  {scheme: http,  tls: false, port: 3128, client_auth: proxy_auth}
+  agy:    {scheme: https, tls: true,  port: 3128, client_auth: proxy_auth}
+
+# D5's third control, per agent. PROPOSALS for confirmation, not measurements -- sized to sit
+# comfortably above an interactive agent session and well below a runaway loop. No traffic has
+# been observed to derive them from; docs/records/egress-discovery.md is the first data that
+# could inform them and it was taken under `sbx` with UDP and ICMP invisible to the capture.
+# Adjustable at build time under DD-12 without gate re-approval.
+#
+# `connections_per_minute` was DROPPED at the 01.3 SF-6 build, not omitted by oversight. Squid
+# 6.13 has no per-client connection-rate directive at all (docs/records/mediator-selection.md,
+# P3): `maxconn` bounds concurrency and `delay_pools` bounds bytes, and neither bounds
+# connections per unit time. The two options were an external_acl_type token-bucket helper --
+# a stateful interpreter process inside the enforcement point -- or dropping the field. The
+# field was dropped, because a policy key that silently enforces nothing is worse than an
+# absent one, and it is the same failure shape as the SNI fallback SF-1 found. The compiler
+# now REFUSES an artifact that declares it. D5's control 3 therefore ships as two of its three
+# ceilings; the gap is recorded in the feature plan (Deviation 4) as a residual against D5.
+rate_limits:
+  claude: {max_concurrent: 16, bytes_per_second: 2000000}
+  codex:  {max_concurrent: 16, bytes_per_second: 2000000}
+  agy:    {max_concurrent: 16, bytes_per_second: 2000000}
+
+# Entries present in policy/allowlist.base.yaml that this profile deliberately does NOT grant.
+# The compiler drops them from the resolved allowlist and copies the reason into the artifact,
+# so the decision is auditable rather than silent (01.3 criterion 12).
+egress_exclusions:
+  - agent: agy
+    fqdn: antigravity-cli-auto-updater-974169037036.us-central1.run.app
+    reason: >-
+      R10.3 is a MUST: agent auto-updaters are disabled so a pinned build stays pinned. Allowing
+      the updater to reach its manifest is the opposite. agy has no flag or env var that disables
+      the check (docs/records/agent-verification.md), so default-deny is the only mechanism left
+      and the entry is simply not copied through. 01.3 SF-8 Phase C asserts agy still starts,
+      runs a task and exits normally with this host denied, and records the updater's actual
+      write target; if agy hard-fails without it the recorded fallback is to allow it with an
+      explicit residual against R10.3.
+
+# The mediator's two-stage startup self-check (R9.5, 01.3 SF-7). Stage 1 validates the resolved
+# policy and aborts on corruption (T17); stage 2 proves the enforcement point actually enforces,
+# by driving one allowed and one denied destination through the rendered proxy. `offline: true`
+# skips stage 2 only, and the skip is recorded on the audit line at every start.
+#
+# `denied` is a link-local address so the check fails on POLICY rather than on resolution --
+# an unresolvable name would pass the check for the wrong reason.
+startup_check:
+  allowed: {agent: claude, fqdn: api.anthropic.com, port: 443}
+  denied:  {ip: 169.254.169.254, port: 443}
+  offline: false
+
+exports:                        # R9.9 -- export toggles only; recording is not disableable
+  egress_audit_log: true
+  agent_action_log: true
+  resolved_policy: true
+  image_digest_sbom: true
+
+# R7.14, D18, Interface Contract 5 -- MCP inventory. No real server ships in this
+# feature (Decision 9): the empty lists ARE the explicit "none", not an omission.
+# T29-T32 are exercised through a harness-mounted test inventory
+# (compose/overrides/test-mcp.yaml), never through this file.
+mcp:
+  registry: none
+  servers: []
+  plugins: []
+  skills: []

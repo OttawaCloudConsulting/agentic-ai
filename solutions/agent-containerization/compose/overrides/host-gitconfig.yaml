@@ -1,0 +1,42 @@
+# Optional host git configuration (R2.9, T22, criterion 6). Layered ONLY when the profile
+# sets `mounts.host_git_config: true` -- profiles/default.yaml leaves it false, so T21's
+# "only the project directory and the state volume" assertion is unaffected by this feature.
+#
+#   bash scripts/scrub-gitconfig.sh          # REQUIRED FIRST -- see below
+#   docker compose -f compose/compose.yaml \
+#                  -f compose/overrides/default.yaml \
+#                  -f compose/overrides/host-gitconfig.yaml up
+#
+# What is mounted is compose/generated/gitconfig.d/ -- the SCRUBBED artifact -- and never
+# the operator's own ~/.gitconfig. R2.9 requires credential.helper to be removed FIRST, and
+# this fragment is the reason that ordering is literal rather than conventional: there is no
+# unfiltered copy of the operator's config anywhere inside the container for a compromised
+# agent to read. Run the scrub before every `up`; a stale artifact is the operator's own
+# config from whenever they last ran it.
+#
+# The mount target is /run/gitconfig, under 01.2's `/run` tmpfs, following the precedent
+# 01.3 set with /run/secrets: host-derived material that must not persist onto the state
+# volume belongs somewhere that vanishes with the container.
+#
+# GIT_CONFIG_GLOBAL is set HERE and nowhere else -- not in compose.yaml, not in any image
+# (Interface Contract 4). The variable and its target appear and disappear together. Set
+# unconditionally it would point at an absent path under the default profile, and every
+# `git config --global` the agent ran would fail or land on tmpfs and vanish at restart.
+#
+# Consequence the operator sees, stated rather than left to be discovered: the global config
+# is :ro, so `git config --global` WRITES FAIL inside the container. That is correct under
+# R2.3 and R2.9 -- see README.md, "Host git configuration".
+
+x-gitconfig: &gitconfig
+  volumes:
+    - ../compose/generated/gitconfig.d:/run/gitconfig:ro
+  environment:
+    GIT_CONFIG_GLOBAL: /run/gitconfig/.gitconfig
+
+services:
+  claude:
+    <<: *gitconfig
+  codex:
+    <<: *gitconfig
+  agy:
+    <<: *gitconfig

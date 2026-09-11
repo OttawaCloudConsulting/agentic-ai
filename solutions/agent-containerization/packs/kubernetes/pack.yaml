@@ -1,0 +1,67 @@
+# Kubernetes pack (Feature 02.3 SF-5, Decision 6).
+#
+# Binaries only, no runtime reach. The cluster API endpoint belongs to the operator and cannot be
+# declared statically, so this pack ships `kubectl` and `helm` with empty runtime egress and a
+# `kubeconfig` credential. A cluster is reached by loading a SEPARATE, per-cluster egress-only
+# pack (`packs/k8s-cluster-<name>/`, not shipped here) that names the cluster's hosting party
+# under R14.1 before it can be loaded. See packs/README.md and this pack's blast_radius for the
+# split; see docs/records/third-party-assessments.md's Kubernetes posture entry for the recorded
+# constraint (public-FQDN cluster endpoints only, criterion 14).
+
+name: kubernetes
+description: kubectl and helm, no runtime egress -- cluster reach is a separate per-cluster pack
+schema: 1
+
+blast_radius: |                  # R7.11
+  A compromised agent under this profile can run `kubectl` and `helm` against whatever cluster the
+  mounted `kubeconfig` authenticates to, at that credential's granted RBAC scope, and can invoke
+  arbitrary `helm` charts and `kubectl exec`/`cp` operations within that scope. This pack alone
+  grants NO network reach to any cluster: `egress.runtime` is empty, so the mediator denies every
+  cluster connection attempt until a per-cluster egress pack (Decision 6) is also loaded. Loading
+  this pack without a cluster pack gives the agent working binaries and a credential with nothing
+  reachable to point them at. The `kubeconfig` reaches all three agents, under the same rule that
+  gives all three a pack's egress (Decision 1) -- one kubeconfig compromise exposes the whole RBAC
+  scope to every agent, not one agent's slice of it. No host mount is granted.
+
+needs_write_access: false        # R7.3
+
+packages:
+  apt:
+    repository: profile          # R7.18 -- resolves to profiles.<p>.package_repository
+    items: []                    # both binaries are self-contained; no apt item needed
+  archives:
+    # linux_arm64, matching A1/R11.1's single-architecture constraint.
+    #
+    # kubectl ships as a BARE BINARY, not an archive -- dl.k8s.io serves the executable directly
+    # at this path, with no wrapping tar/zip. `images/pack-install.sh`'s kubectl case installs it
+    # with a straight `install`, not an unpack step. Hash taken from the matching
+    # `kubectl.sha256` file dl.k8s.io publishes alongside the binary, fetched over https -- see
+    # packs/README.md, "How these hashes were obtained".
+    - {name: kubectl, version: "1.31.2", url: "https://dl.k8s.io/release/v1.31.2/bin/linux/arm64/kubectl", sha256: bb9fd6e5a92c2e2378954a2f1a8b4ccb2e8ba5a3635f870c3f306a53b359f971}
+    - {name: helm, version: "3.16.2", url: "https://get.helm.sh/helm-v3.16.2-linux-arm64.tar.gz", sha256: 1888301aeb7d08a03b6d9f4d2b73dcd09b89c41577e80e3455c113629fc657a4}
+
+egress:
+  runtime:
+    allow_fqdns: []               # Decision 6 -- the shipped pack reaches nothing at runtime
+    allow_cidrs: []
+  build:
+    allow_fqdns:                 # R10.4 -- build-time only, never enters resolved policy
+      - {fqdn: dl.k8s.io, port: 443}
+      - {fqdn: get.helm.sh, port: 443}
+
+runtime_install: false           # R7.6 -- no runtime egress at all, so no installation channel to declare
+runtime_install_reason: null
+
+mounts: []                       # R7.3 -- kubeconfig arrives as a credential, not a mount; caches
+                                  # and state live under /home/agent
+env: []                          # R7.3 -- no non-secret configuration this pack needs
+credentials:                     # R7.3 -- Decision 1: secret, never in an image layer (R8.1)
+  - name: kubeconfig
+    delivery: {path_env: KUBECONFIG}
+    description: "Dedicated, scoped kubeconfig with one context (token or client-certificate auth only -- no exec/auth-provider plugin, Decision 6). Never the operator's ~/.kube/config"
+    blast_radius: "R8.4 -- whatever RBAC scope the context's credential grants against the target cluster, for every agent under the `kubernetes` profile (Decision 1 -- one kubeconfig, three containers, same rule that gives every agent a pack's egress). Readable by the holding agent from its own filesystem (KUBECONFIG points at a mounted secret file, not an environment value, but the file itself is agent-readable)"
+    revocation: "R7.12 -- independent of every other credential. Revoke or rotate the context's credential at the cluster (delete the ServiceAccount token / client certificate), independent of every other credential in this inventory. Rotation is a Compose secret-file swap plus --force-recreate, no rebuild (Interface Contract 3)"
+third_parties: []                 # R14.1 -- empty is correct: egress.runtime is empty, so no
+                                   # third party is reached by THIS pack. A per-cluster egress pack
+                                   # (Decision 6) carries its own third_parties record before it
+                                   # can be loaded

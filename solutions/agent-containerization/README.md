@@ -1,0 +1,963 @@
+# Sandboxed Agent Containerization
+
+Research and design options for running agentic coding agents (Claude Code, OpenAI Codex, Google Antigravity) inside a fully sandboxed container with a minimal blast radius.
+
+**Status:** Gate 3 (Milestone Review) in progress. Gates 1 (Scope) and 2 (Design) are ratified — see
+[`prd.md`](prd.md) and [`.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md`](.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md).
+Milestone 01 (Sandboxed Pod) is complete: pod topology, hardened runtime, egress mediation and
+per-agent authentication all ship. Milestone 02 (Proven and Composable) is building; Feature 02.1
+(audit completeness), Feature 02.2 (adversarial boundary validation — see
+["Adversarial boundary validation (02.2)"](#adversarial-boundary-validation-022) below) and
+Feature 02.3 (tool packs, use-case profiles and MCP inventory — see
+["Tool packs, use-case profiles and MCP inventory (02.3)"](#tool-packs-use-case-profiles-and-mcp-inventory-023)
+below) are complete, with SC-1/SC-2/SC-3 demonstrated from inside the real agent containers under
+every shipped profile. **This pod is not yet cleared for real work** — Feature 02.4
+(reproducibility and onboarding) and 02.5 (containment, response and the authorization gate) are
+still building. See [`progress.txt`](progress.txt) for current gate/feature state.
+
+**Entry point** (requires Docker Desktop; builds the pod cold on first run):
+
+```bash
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
+```
+
+This is the only entry point — no wrapper script. `--env-file` is required: Compose interpolates
+version pins from it into the image builds, and without it the build fails.
+
+`--build` and `--force-recreate` are both load-bearing, and each fixes one half of the same
+failure: **the pod enforcing policy that is no longer the policy on disk.** The resolved egress
+allowlist is compiled by a build stage and baked into the mediator image, so a cached image
+reuses the policy compiled into it (`--build`), and a container that is not recreated keeps
+running the previous image even after a new one is built (`--force-recreate`). Without either,
+a policy change appears to succeed while the mediator continues to enforce the old allowlist.
+Recreation preserves the named state and audit volumes; it does drop in-flight proxy
+connections and anything under `/run` or `/tmp`.
+
+**`--build` is required, not a convenience** (Feature 01.5 SF-4). The mediator's egress policy is
+compiled by a *build stage*, so a run that reuses a cached image also reuses the policy that was
+current when that image was built. Switching profiles changes only the Compose files, so without
+`--build` a profile switch would appear to work while the pod kept enforcing the previous policy. The pod starts with no
+default route and no route to the internet (Feature 01.3 adds the egress mediator).
+
+**Date of research:** 2026-09-02. Agent tooling in this space moves fast; re-verify version-specific claims before building.
+
+## Contents
+
+| Document | Purpose |
+|---|---|
+| [`REQUIREMENTS.md`](REQUIREMENTS.md) | Numbered, prioritised requirements with provenance, success criteria, non-goals, open questions, and an acceptance test matrix |
+| [`docs/OPTIONS_ANALYSIS.md`](docs/OPTIONS_ANALYSIS.md) | The three architectural options, comparison matrix, and recommendation |
+| [`docs/RESEARCH_FINDINGS.md`](docs/RESEARCH_FINDINGS.md) | Verified per-agent reference: install shape, native sandbox, egress controls, auth/state paths, required domains, known gaps. Cited. |
+| [`docs/STANDARDS_MAPPING.md`](docs/STANDARDS_MAPPING.md) | What CIS and the Five Eyes agentic AI guidance say, how it maps to our requirements, and five gaps it exposes |
+| [`references/README.md`](references/README.md) | Directory of all 94 source URLs by topic, each link-checked, with a one-line note on what it covers |
+
+## Requirements This Addresses
+
+| # | Requirement | Requirement IDs | Design coverage |
+|---|---|---|---|
+| 1 | Containerize agentic AI development/coding agents | R1, R3 | All three options |
+| 2 | Access limited to specific local directories, mounted | R2 | Options analysis — "Filesystem scoping" |
+| 3 | Latest Claude Code, Google Antigravity, OpenAI Codex | R3 | Research findings — one section per agent |
+| 4 | Persist memory and authentication state across restarts | R4 | Options analysis — "Auth and state persistence" |
+| 5 | Blacklist of IP addresses, CIDR ranges, and FQDNs | R5 | Options analysis — "Egress policy"; see the caveat below |
+| 6 | AWS CLI, authenticated via IAM Identity Center (SSO) | R6 | Requirements only — not yet reflected in the options analysis |
+| 7 | Loadable tools that vary per use case | R7 | Requirements only — not yet reflected in the options analysis |
+
+## Three Findings That Change the Brief
+
+Read these before the options document — each one invalidates a common assumption.
+
+1. **Antigravity ships a headless CLI.** Since Antigravity 2.0 (May 2026), Google ships `agy`, a single Go binary with a documented headless mode. Containerizing the desktop GUI is the wrong approach. Separately, `gemini-cli` was shut off on 2026-06-18 and returns HTTP 410 — `agy` is its replacement.
+
+2. **All three agents now ship their own egress controls.** Claude Code has `sandbox.network.*` plus the `@anthropic-ai/sandbox-runtime` wrapper; Codex has a built-in policy proxy (`features.network_proxy`). The container's job is to be the boundary these controls cannot disable, not to reinvent them.
+
+3. **Both vendor reference firewalls leak DNS.** Anthropic's and OpenAI's `init-firewall.sh` scripts permit UDP/53 to any destination. OpenAI documents the consequence directly: code in an untrusted repository can exfiltrate data over DNS. Any design chosen here must own DNS resolution.
+
+## Caveat on Requirement 5
+
+A denylist alone cannot deliver a minimal blast radius. An agent that is compromised or prompt-injected exfiltrates to any host that is *not* on the list, and the list can never be complete. Every serious implementation surveyed — Anthropic, OpenAI, Docker, iron-proxy, SlicerVM — is default-deny with an allowlist.
+
+The recommendation is therefore: **default-deny allowlist as the primary control, with the denylist layered on top** as an independent second control for known-bad indicators, RFC1918 and link-local ranges, and the cloud metadata endpoint. All three options support both, with deny taking precedence over allow. Requirement 5 is met — it is just not the only control.
+
+## Bring-Up
+
+One ordered sequence, top to bottom. Each step depends on the one before it.
+
+**1. Prerequisites.** macOS 26 on Apple silicon, Docker Desktop, and `git` (via the Xcode
+command-line tools). Docker Desktop cannot be installed by script — install it manually from
+https://www.docker.com/products/docker-desktop/ before continuing.
+
+**2. Clone and enter the solution directory.**
+
+```bash
+git clone <repository-url>
+cd agentic-ai/solutions/agent-containerization
+```
+
+**3. Install host CLI dependencies.**
+
+```bash
+bash scripts/install-deps.sh
+```
+
+Checks for (and installs if missing) `docker`, `openssl`, `curl`, `jq`, `yq`. `sbx` is a discovery
+tool (D17), not a runtime dependency this pod needs — pass `--with-sbx` if you want it installed
+too, then `sbx login`.
+
+**4. Issue the proxy-hop trust material.** The Compose `secrets:` have `file:` sources pointing
+into `mediator/identity/`, which is generated and git-ignored — the project fails to start if the
+certificates do not exist. The listener certificates carry an `iPAddress` SAN for the mediator's
+static address on that agent's network, so the `--ip` values below must match
+`compose/compose.yaml`'s `ipam` blocks. See `mediator/identity/README.md` for the lifecycle,
+renewal and revocation paths.
+
+```bash
+bash scripts/issue-identity.sh ca
+bash scripts/issue-identity.sh listener claude --ip 172.31.10.2
+bash scripts/issue-identity.sh listener codex  --ip 172.31.20.2
+bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2
+bash scripts/issue-identity.sh client     claude
+bash scripts/issue-identity.sh credential codex
+bash scripts/issue-identity.sh credential agy
+bash scripts/issue-identity.sh status
+```
+
+**`codex` needs a certificate too, and it is not a proxy hop.** Its hop *is* plain HTTP CONNECT —
+it rejects an `https://`-scheme proxy URL at parse time (`docs/records/agent-verification.md`) —
+but its single listener also peeks at the ClientHello, and Squid loads no signing context on a
+peeking port without `tls-cert=`: it parses cleanly and then silently declines to bump, at which
+point the SNI control enforces nothing. The certificate is never presented on an allowed path
+(peek+splice hands the origin's own chain through untouched) and `codex` neither trusts nor
+validates it. The mediator refuses to start without it. See the feature plan's Deviation 5.
+
+**5. Bring the pod up.** This is the only entry point — no wrapper script.
+
+```bash
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
+```
+
+`--env-file` is required: Compose interpolates version pins from it into the image builds, and
+without it the build fails. `--build` and `--force-recreate` are both load-bearing — see the entry
+point note above.
+
+**6. Authenticate each agent.** See ["First-run authentication"](#first-run-authentication) below
+for the per-agent commands (`claude` paste-back, `codex` device code, `agy`'s `GEMINI_API_KEY`).
+
+**7. Verify.**
+
+```bash
+bash scripts/issue-identity.sh status
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml logs egress-mediator | grep startup_check
+```
+
+See ["The startup self-check"](#the-startup-self-check) below for what a passing result looks
+like.
+
+### The project mount must not be this solution tree
+
+**This is a security property, not a style note.** The default profile binds a dedicated,
+git-ignored `workspace/` directory at `/workspace`, and a real profile should bind the operator's
+own project directory. It must not bind this checkout.
+
+This tree holds the control plane — `policy/`, `mediator/config/`, `mediator/identity/` — and the
+project mount is read-write. An agent that could write to it could rewrite `allowlist.base.yaml` or
+the mediator's configuration templates, and the next `docker compose build` would compile
+agent-authored policy into the enforcement point. The running mediator is not exposed to this: it
+reads its policy from its own image layer and its Compose secrets, never from a path any agent can
+write. The exposure is the *next build*, which is why the fix is the default binding rather than a
+warning, and why the acceptance harness asserts no agent's mount set contains a control-plane path.
+
+### First-run authentication
+
+`AUTH_MODE` is set per agent from the profile's `auth_mode` block. It has **no default in the
+image** — an unset value is an error, not a fallback, because a default would pick an
+authentication mode on your behalf and could pick a less safe one than R4.12 mandates.
+
+**Headless means no browser inside the container**, not "no terminal". R4.9 defines the headless
+path by enumeration — paste-back code, device code, or a pre-minted token — and two of those three
+need a terminal by construction. See the T24 amendment in `REQUIREMENTS.md`.
+
+Seven cells are supported, and the agents are **not** symmetric:
+
+| Agent | `apikey` | `oauth-interactive` | `oauth-token` | `oauth-mount` |
+|---|---|---|---|---|
+| `claude` | `ANTHROPIC_API_KEY` | **default** — paste-back | `CLAUDE_CODE_OAUTH_TOKEN` (one-year) | unsupported (Keychain-resident) |
+| `codex` | `OPENAI_API_KEY` | **default** — device code | unsupported (no env equivalent) | `auth.json` copy-in |
+| `agy` | **default** — `GEMINI_API_KEY` | not offered (D9) | unsupported | not offered (D9) |
+
+An unsupported cell **exits 2 and names the supported set**. It never quietly falls back to a
+different mode — that would defeat "the default is the safest mode that agent supports".
+
+Containers **start unauthenticated** rather than failing: the start-time pass warns and continues.
+Authenticate with an explicit one-shot invocation, which is where the strict exit codes apply:
+
+```bash
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml \
+  run --rm claude bash /usr/local/bin/bootstrap-auth claude
+```
+
+Open the printed URL **on the host** and paste the code back. Exit codes: `0` authenticated (or
+already was — re-running is a no-op), `2` unsupported cell or unset `AUTH_MODE`, `3` credential
+absent, `4` a provider endpoint the mediator refuses — the message names the FQDN.
+
+**Codex uses device code, and must.** `bootstrap-auth` runs `codex login --device-auth`. Plain
+`codex login` starts a callback server on `localhost:1455` *inside* the container and hands your
+browser `redirect_uri=http://localhost:1455/auth/callback` — but your browser is on the host, where
+nothing is listening: the pod publishes no ports and the agent networks are `internal: true`. The
+provider authorizes and the flow then strands on a callback that can never arrive. Device code
+needs no port at all, and is one of the three paths R4.9 counts as headless.
+
+The **callback forward** is the documented alternative for operators who want it: publish
+`127.0.0.1:1455:1455` (fallback 1457) via a layerable fragment. It is not the default — opening a
+host port the headless path does not need is the wrong default under R2.8.
+
+**`agy`'s `GEMINI_API_KEY` comes from the host shell, never a file.** Compose wires no
+`GEMINI_API_KEY` (`images/bootstrap-auth.sh:215`) — it is not in `pins.env`, not in any Compose
+`environment:` block, and not written to the state volume. Set it in your host shell (`read -rs
+GEMINI_API_KEY` if you want it off your terminal history) and pass it through at invocation time:
+
+```bash
+export GEMINI_API_KEY=...   # host shell only, never committed or logged
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml \
+  run --rm -e GEMINI_API_KEY agy bash /usr/local/bin/bootstrap-auth agy
+```
+
+Or, against an already-running container: `docker compose ... exec -e GEMINI_API_KEY agy bash
+/usr/local/bin/bootstrap-auth agy`. An unset key passes through empty and `bootstrap-auth` exits
+`3` naming it. **`agy` needs a paid-tier API key** — see `docs/records/third-party-assessments.md`
+for the free-tier limitation this works around.
+
+**On exit 4:** the OAuth endpoints must be in the allowlist, and an allowlist edit is **inert until
+the policy is recompiled and the mediator image rebuilt** — the mediator reads its policy from its
+own image layer, not from a bind mount:
+
+```bash
+# add the FQDN to policy/allowlist.base.yaml, then BOTH of:
+bash scripts/compile-policy-build.sh    # recompile through the build stage; review the diff, commit it
+docker compose --env-file compose/pins.env -f compose/compose.yaml build egress-mediator
+```
+
+Skipping the first step does not silently ship stale policy — since 01.5 SF-4 the second step
+**fails** with `compile-stage: DRIFT`, because the build compiles the policy itself and refuses to
+produce an image whose policy differs from the committed, reviewed artifact.
+
+**Revocation (R12.6).** `docs/records/credential-inventory.md` carries every credential an agent can
+obtain, its lifetime and its documented revocation path. The `oauth-token` cell mints a **one-year**
+token — record it there and revoke it when it is no longer needed.
+
+### Codex `oauth-mount` (optional, one-shot)
+
+`oauth-mount` copies your **host** Codex OAuth credential into the pod's state volume, once. It
+is codex's only host-credential mode and no other agent has one: claude's credential is
+macOS-Keychain-resident and not portable to a Linux container, and `agy` is API-key-only by
+decision.
+
+**Read this before you use it.** Codex **rolls** its refresh token — measured, not assumed
+(`docs/records/agent-verification.md`, 01.4 SF-3). The container's first refresh mints a new token
+onto the volume and leaves your host `~/.codex/auth.json` holding the previous one. Treat it as a
+**one-shot bootstrap that costs you your host codex login**: expect to run `codex login` on the
+host again. The cost is deferred, not immediate — the refresh trigger is the access token's own
+10-day expiry, so a pod you bootstrap and then leave alone may never pay it.
+
+```bash
+# 1. Stage. HOST-SIDE, and required first -- like the git-config scrub, the filtering happens
+#    before the material crosses the boundary.
+bash scripts/stage-oauth-mount.sh --profile oauth-mount
+
+# 2. Bootstrap. ONE-SHOT: `run --rm`, never `up`.
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml \
+  -f compose/overrides/default.yaml \
+  -f compose/overrides/oauth-mount.bootstrap.yaml \
+  run --rm codex bash /usr/local/bin/bootstrap-auth codex
+
+# 3. Steady state. The bootstrap fragment is NOT layered -- the credential source is absent
+#    from the running pod entirely.
+CODEX_AUTH_MODE=oauth-mount docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
+```
+
+What is mounted is `compose/generated/oauth-src/` — a **dedicated directory** holding exactly two
+staged files — and never your `~/.codex`, which is a 54-entry directory of sessions, archived
+sessions and global state. The staging script strips `OPENAI_API_KEY` from the credential on the
+way through. That is a **test-validity control before it is a security one**: your host
+`auth.json` carries both an OAuth token set and a raw API key, and mounted as-is codex could
+authenticate off the key while the OAuth path was broken. `bootstrap-auth` refuses a source that
+still carries it.
+
+The mount is `:ro`, which is the only real control — Docker Desktop's VirtioFS fakes file
+ownership, so `0600` means nothing inside the container. `bootstrap-auth` reads the actual mount
+options from `/proc/self/mountinfo` and refuses anything but read-only.
+
+**The risk record is not paperwork.** `profiles/oauth-mount.yaml` carries
+`oauth_mount.codex.accepted_risk` with five fields — `file`, `mount_mode`, `revocation_path`,
+`blast_radius`, `rotation` (R4.17). The staging script validates them and writes them into the
+staged directory as `accepted-risk.yaml`; `bootstrap-auth` **exits 3 if that record is absent or
+incomplete**. So a host credential can only cross the boundary from a directory whose operator
+recorded what crossing costs. Feature 01.5 moves the same refusal to build time.
+
+**Why "one-shot" is structural, not advice.** Steady state never layers the bootstrap fragment, so
+there is no source to copy from. Two failures stop being possible rather than being guarded
+against: a re-copy on every start clobbering the token the container just refreshed, and an agent
+**deleting its own credential** to force a re-copy — where the guard's condition would be exactly
+what the agent controls. On an emptied volume at steady state, `bootstrap-auth` exits `3` naming
+the bootstrap command, and because the entrypoint runs under `set -e` that **fails the container
+start**. Re-bootstrapping is a deliberate act.
+
+Skipping step 1 is fail-closed rather than silent: Compose creates the missing source directory
+empty, and `bootstrap-auth` exits `3` — at the *risk record*, which is the first thing it checks
+after the mount mode, saying the directory carries no `accepted-risk.yaml`.
+
+**The browser-redirect alternative.** If you want plain `codex login` (callback on `localhost:1455`)
+instead of device code, layer `compose/overrides/codex-callback.yaml` and invoke the CLI directly —
+`bootstrap-auth` hard-codes `--device-auth` on purpose:
+
+```bash
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml \
+  -f compose/overrides/codex-callback.yaml \
+  run --rm --service-ports codex codex login
+```
+
+**Not exercised.** The fragment was verified only as far as `docker compose config` renders it at
+SF-4 — the flow itself has not been run, and the device-code path is what SF-2 actually measured.
+`--service-ports` is required because `run` publishes nothing without it.
+
+That publishes `127.0.0.1:1455:1455` — a host-side publish so your browser can reach *into* the
+container. It gives the container no route *out*: `internal: true` is untouched and egress still
+goes through the mediator or nowhere.
+
+### Host git configuration (optional, default off)
+
+`profiles/default.yaml` sets `mounts.host_git_config: false`, so nothing below happens unless you
+opt in. When you do, **the scrub runs on the host, before `up`** — that ordering is R2.9's, not a
+convenience:
+
+```bash
+bash scripts/scrub-gitconfig.sh          # writes compose/generated/gitconfig.d/.gitconfig
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml \
+  -f compose/overrides/default.yaml \
+  -f compose/overrides/host-gitconfig.yaml up --build --force-recreate
+```
+
+What gets mounted is the **scrubbed artifact**, never your own `~/.gitconfig`. The scrub removes
+`credential.helper` (in every subsection), `include.path` and every `includeIf` section. The
+includes go because an include is a *pointer*: removing only the literal helper key would satisfy
+R2.9 in letter and defeat it in fact, since the included file could re-introduce a helper from a
+path this solution never mounted. Because the filtering happens before the mount, there is no
+unfiltered copy inside the container for a compromised agent to read — the control is that the
+material is not there, not that something declines to use it.
+
+Re-run the scrub whenever your gitconfig changes; the artifact is a snapshot, and
+`compose/generated/` is git-ignored.
+
+**Behaviour change you will see:** the mount is `:ro` and `GIT_CONFIG_GLOBAL` points into it, so
+**`git config --global` writes fail inside the container.** That is correct under R2.3 and R2.9,
+and it is stated here rather than left to be discovered. Without the fragment, `GIT_CONFIG_GLOBAL`
+is unset and git behaves normally, reading `~/.gitconfig` on the state volume like any container.
+
+### Language toolchains, and the installers that are not there
+
+The agent images carry Node, Python and Go, installed at **build time** from the pack the profile
+selects (`packs/language-runtimes/pack.yaml`). They carry **no package manager at all** — not
+`apt`, not `npm`, not `pip`, not `yarn` or `corepack`. That is R7.19, and it is deliberate.
+
+```bash
+node --version     # v22.23.2
+python3 --version  # Python 3.11.2
+go version         # go1.23.4
+git --version      # git version 2.39.5
+npm --version      # command not found -- by design
+```
+
+**Two consequences you will hit, and neither is a bug:**
+
+- `python3 -m venv <dir>` fails. Use `python3 -m venv --without-pip <dir>`.
+- A `package.json` cannot be installed inside the container. Vendor dependencies into the project
+  mount from the host.
+
+Even where an installer survives — one you vendor in, or `go install` using the toolchain that has
+to stay for `go build` — it has nowhere to reach: the reference pack grants **no registry egress**,
+so the attempt is denied at the mediator and the denial lands in the audit log. See
+`packs/README.md` for which layer refuses what, and why a filesystem refusal leaves no audit line
+while a mediator denial does.
+
+### Adding or removing a pack
+
+A pack is a directory under `packs/` holding a `pack.yaml`; a profile selects packs by name. Both
+the egress policy and the installed package set are derived from that selection, by two separate
+readers — the policy compiler in the mediator's build, and `images/pack-plan.sh` in the agents'.
+
+```bash
+# 1. Edit the profile's `packs:` list.
+$EDITOR profiles/default.yaml
+
+# 2. Recompile the resolved policy and COMMIT it. The build refuses to proceed on a
+#    committed artifact that disagrees with its inputs (exit 4), so this is not optional.
+bash scripts/compile-policy-build.sh
+git diff policy/resolved/default.yaml     # review before committing
+git add policy/resolved/default.yaml && git commit
+
+# 3. Rebuild. `--build` and `--force-recreate` are both required, not decorative -- see "Bring-Up".
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
+```
+
+Removing a pack is the same three steps with the name deleted. **The rebuild is what removes the
+packages** — recompiling the policy alone leaves the previous image in place, with the removed
+pack's binaries still in it. Editing any file under `packs/` or `profiles/` invalidates the
+agent build's `COPY` layer, so a changed pack set always produces a different image.
+
+Every `apt` item a manifest declares is verified against its recorded SHA-256 before installation,
+and the snapshot repository's `InRelease` is checked with `gpgv` against the full key fingerprint
+the profile pins. `packs/README.md` records precisely what that covers and what it does not.
+
+### Changing the allowlist (R12.3)
+
+A new third-party host follows this chain, in order:
+
+1. **Record the third party first, if it's pack-declared.** A new `egress.runtime` host added to
+   a pack's `packs/<pack>/pack.yaml` needs a matching `third_parties[]` entry whose `record` field
+   points at an anchor (`id="..."`) in an assessment document such as
+   `docs/records/third-party-assessments.md`. `scripts/lint-policy.sh` and `scripts/compile-policy.sh`
+   (R14.1) both refuse a pack manifest with runtime egress and an empty or unresolved
+   `third_parties` list — a host with no assessment record never reaches policy compilation. Edits
+   to the three core agents' `policy/allowlist.base.yaml` (not pack-declared) carry no equivalent
+   schema field; document the source and evidence in the file's own comments, per the
+   discovery-capture convention already there.
+2. **Edit** the manifest (`policy/allowlist.base.yaml` or the pack's `pack.yaml`).
+3. **Recompile:** `bash scripts/compile-policy-build.sh` — review the diff in `policy/resolved/`
+   before committing.
+4. **The drift gate.** The mediator's build stage recompiles the policy itself and refuses to
+   produce an image whose baked-in policy differs from the committed `policy/resolved/` artifacts
+   (`compile-stage: DRIFT`).
+5. **Rebuild the mediator** (see "Bring-Up" step 5 — `--build --force-recreate`, both required).
+6. **Re-validate** the affected profile(s):
+   `BOUNDARY_PROFILES="<profile>" bash tests/acceptance/validate-boundary.sh`.
+
+The change lands on `main` by pull request, reviewed by the **security reviewer** role. There is
+no schema field enforcing this and no CODEOWNERS file — `main` carries no branch protection, so
+this is a documented procedure, not a mechanism.
+
+### Updating an agent version (R10.6)
+
+1. Bump the relevant pin in `compose/pins.env` (or, for `agy`, note that it has no version flag —
+   its install script always resolves the latest manifest entry at build time; see
+   `docs/records/agent-verification.md` for what that means for pinning).
+2. Update `docs/records/agent-verification.md`'s version table. `check_pin_agreement()` in
+   `tests/acceptance/verify-pod-topology.sh` enforces the pins/record agreement.
+3. For `agy` specifically: resolve the manifest URL and SHA-512 by hand, since there is no version
+   flag to pin against.
+4. Rebuild (`--build --force-recreate`).
+5. **Re-verify the policy:** `BOUNDARY_SHADOW_RUN=1 bash tests/acceptance/validate-boundary.sh` —
+   a version bump can change an agent's outbound host set.
+6. If the shadow run surfaces a host not already on the allowlist, amend it through the
+   "Changing the allowlist" procedure above.
+
+### The image build pipeline, and the profile that selects it
+
+`AGENT_PROFILE` is the single selector for the whole pod (01.5 SF-6). It picks the pack set the
+three agent images are built with **and** the resolved policy the mediator enforces at runtime.
+Unset, both are `default`.
+
+```bash
+# Build one profile's images and record what was built.
+bash scripts/build.sh --profile default
+```
+
+`scripts/build.sh` drives the same Compose files the entry point drives — a second build path
+would eventually record identity for images nobody runs — then tags the agent images
+`sandboxed-agent/<agent>:<profile>` and writes `.build-scratch/build/<profile>.images.txt`.
+Compose's own `:local` tag is reused by every profile, so without the second tag a build for one
+profile silently replaces another's — and `:local` is left pointing at whichever profile was built
+last. The documented entry point carries `--build`, which re-establishes it for the profile being
+started; a bare `up -d` after building a different profile would run the other profile's images.
+That is the same class of mismatch `AGENT_PROFILE` closes for policy, and `--build` is what closes
+it here.
+
+**What it records is an image ID, not a registry digest.** A locally built image that was never
+pushed has no manifest digest — the recorded value is the sha256 of its config blob. It is stable
+and comparable across rebuilds on the same host, which is what a per-profile artifact needs to be,
+but it is not the same kind of identifier as `MEDIATOR_BASE_DIGEST`.
+
+**No local SBOM, and the reason is measured rather than assumed.** Docker Desktop's default
+`docker` driver cannot carry a build attestation:
+
+```
+ERROR: failed to build: Attestation is not supported for the docker driver.
+```
+
+The two ways around it both cost more than they buy: a `docker-container` builder drops the
+attestation again on `--load`, and exporting an OCI tarball instead would produce an SBOM for an
+image Compose could not then run. Adding a third-party scanner would mean more supply chain, not
+less. So SBOM emission stays with the CI-published base image, and `scripts/build.sh` records
+identity only. Turning on the containerd image store makes `--sbom=true` available and is the one
+change that would revisit this.
+
+#### CI: `.github/workflows/agent-sandbox-image.yml`
+
+The repository's first workflow, at the **repository root** rather than in this directory. Two
+independent jobs:
+
+- **`policy-drift`** — rebuilds the resolved policy from its committed inputs through the
+  mediator's `drift` build stage and fails if the result differs from the committed
+  `policy/resolved/*.yaml`. One build covers every committed artifact, not one per profile. Runs
+  on every push and pull request. This is the CI half of a gate that already fails the *local*
+  build; it is a second net, not the first one.
+- **`publish-base`** — builds the profile-independent `agent-base` stage and pushes it to
+  `ghcr.io/ottawacloudconsulting/agentic-ai/agent-sandbox-base` with an SBOM and a provenance
+  attestation. Never runs on a pull request: `packages: write` on a fork PR is a registry write
+  granted to an untrusted contributor.
+
+`publish-base` does not depend on `policy-drift` — the base image is profile-independent and
+carries no policy, so a drifted artifact says nothing about its correctness.
+
+**It builds `linux/arm64` only.** `compose/pins.env` carries one `GIT_SHA256`, and
+`images/apt-pinned.sh` hashes the `.deb` that `apt-get download` fetches for the container's own
+architecture. That hash is the arm64 one, because the pod's target is Docker Desktop on Apple
+silicon. An amd64 runner does not fail subtly — it fails at the checksum comparison. Publishing a
+second architecture would mean inventing a pin nothing has verified.
+
+Branch builds are tagged by branch name and by full commit SHA; **nothing is tagged `latest`**, so
+there is no mutable tag for a consumer to drift onto. The published digest is reported in the run
+summary, and `compose/pins.env` consumes it as `AGENT_BASE_DIGEST`.
+
+#### What a local build now pulls, and the first-publish bootstrap
+
+`images/Dockerfile`'s agent stages build `FROM ghcr.io/…/agent-sandbox-base@sha256:<digest>`. The
+`agent-base` stage is still in that file — it is the *definition* CI builds and publishes — but
+BuildKit skips a stage nothing references, so a local build **pulls the attested base rather than
+rebuilding it**. That is the point of D21: the image you run is the image CI built and attested,
+not a local re-derivation of it. The package is public, so no `docker login ghcr.io` is needed.
+
+**The published base carries no `ENTRYPOINT` and is not independently runnable.** `docker run` on
+it starts the image's default shell and no agent. The entrypoint's `COPY` and the `ENTRYPOINT`
+itself live in the `agent-packs` stage, moved there at 01.6 SF-3 — and that move is worth knowing
+about before you edit anything under `images/`. A file baked into `agent-base` is inside the
+digest-pinned published image, so **editing it reaches no local build at all**: the pin is
+satisfied, the stage is skipped, and every agent rebuilds carrying the old copy with no error
+anywhere. The symptom is a change that is present in the file and absent from the container.
+`images/bootstrap-auth.sh` is still in `agent-base` and carries the same trap; anything moved out of
+it follows the precedent `SKEL_MARKER` set at 01.5 SF-6b — **move**, never duplicate, or the two
+copies drift silently. Republish the base when a file genuinely belongs to it, and re-pin
+`AGENT_BASE_DIGEST`.
+
+`AGENT_BASE_DIGEST` has **no default**. Unset, the `FROM` expands to `…agent-sandbox-base@` and the
+build fails with `invalid reference format` rather than resolving to a mutable tag — the same
+discipline the agent pins use. Every build also prints
+`WARN: InvalidDefaultArgInFrom … results in empty or invalid base image name`; that is BuildKit
+describing the designed behaviour, not a defect, and it is documented at the `ARG` rather than
+suppressed, because `# check=skip=` is file-wide and would hide a future real one.
+
+**The bootstrap is a chicken-and-egg, and it is resolved by hand on purpose.** The `FROM` pins a
+digest that does not exist until the workflow has run once. So the first publish comes from the
+working branch, and its digest is copied from the run summary into `compose/pins.env` as a
+reviewed commit:
+
+```bash
+# 1. Push the branch. The workflow builds and publishes agent-base.
+git push
+
+# 2. Read the digest from the run. `gh run view` takes a run ID, not --workflow,
+#    so the ID comes from `gh run list`. The -o form avoids matching the traced
+#    echo line, which carries ANSI escapes.
+gh run view "$(gh run list --workflow=agent-sandbox-image.yml --limit 1 \
+      --json databaseId --jq '.[0].databaseId')" --log \
+  | grep -o 'AGENT_BASE_DIGEST=sha256:[0-9a-f]\{64\}'
+
+# 3. Edit compose/pins.env, review the diff, commit it.
+$EDITOR compose/pins.env
+```
+
+Publishing is not automatic on every push in the sense that matters: the workflow runs, but nothing
+consumes the new image until a human moves the digest. A rebuild of the base does not change what
+the pod runs — only that committed line does.
+
+The workflow pins its actions by commit SHA rather than by tag. Every other supply-chain input
+here is pinned by digest or checksum, and `publish-base` holds `packages: write`: an action
+consumed by a movable tag would be a write path into the registry that no pin covers.
+
+### Per-agent build cache (optional, default off)
+
+`profiles/default.yaml` sets `mounts.build_cache: false`. To give each agent a dedicated cache
+volume at `/build-cache`, layer the fragment:
+
+```bash
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml \
+  -f compose/overrides/default.yaml \
+  -f compose/overrides/build-cache.yaml up --build --force-recreate
+```
+
+One volume **per agent**, never shared — a shared cache is a write channel between two containers
+that the mediator never sees, which is what R2.10 forbids. The profile schema cannot express a
+shared cache at all, and `verify-pod-topology.sh` asserts that the volumes backing `/build-cache`
+are distinct across agents. To enable it for only some agents, delete the others from the fragment.
+
+### Backing up the state volumes
+
+The per-agent state volumes hold OAuth refresh tokens once an agent authenticates. R8.7 says that
+material stays out of version control *and* out of backups. This solution enforces the first half
+(`.gitignore`, plus the absence of any export path it creates) and **cannot enforce the second**:
+Docker Desktop stores every named volume inside one VM disk image, so there is no per-volume
+exclusion to make. The exclusion is therefore a host procedure, and it is yours to run:
+
+```bash
+tmutil addexclusion ~/Library/Containers/com.docker.docker/Data
+tmutil isexcluded  ~/Library/Containers/com.docker.docker/Data   # expect: [Excluded]
+```
+
+**Recorded residual:** an operator who does not run this has agent refresh tokens inside a Time
+Machine backup, and nothing in this solution can detect that. Note also that the exclusion is
+all-or-nothing — it covers *every* Docker volume on the machine, not only this pod's.
+
+### When an agent's egress is refused
+
+Every attempt that reaches the mediator produces one JSON line on the audit trail, allow and deny
+alike (R9.1). That line is the **authoritative** denial record — the operator surface R12.2 asks
+for — and it is where diagnosis starts:
+
+```bash
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml logs egress-mediator | grep '"verdict":"deny"' | jq .
+```
+
+```json
+{"ts":"2026-09-07T15:55:53.392Z","agent":"codex","identity_source":"listener",
+ "dest_host":"collector.example.com","dest_port":443,"resolved_ip":null,"verdict":"deny",
+ "control":"allowlist","reason":"host_not_allowlisted",
+ "policy":"policy/resolved/default.yaml","sni":null,"method":"CONNECT","http_status":200}
+```
+
+`control` names the refusing control and `reason` says which of its cases fired:
+
+| `control` | `reason` | What to do |
+|---|---|---|
+| `allowlist` | `host_not_allowlisted` / `port_not_allowlisted` | Add the host to `policy/allowlist.base.yaml` under that agent, then `bash scripts/compile-policy-build.sh`, commit the refreshed artifact, and rebuild the mediator image |
+| `allowlist` | `sni_does_not_match_connect_host` | The ClientHello named a different host than the CONNECT line. This is the domain-fronting refusal — investigate before allowlisting anything |
+| `allowlist` | `agent_has_no_allowlist` | That agent has no allowed names at all in the compiled artifact |
+| `denylist` | `fqdn_on_denylist` / `resolved_address_on_denylist` | Deny wins. Edit `policy/denylist.base.yaml` only if the range is genuinely not the one R5.6 requires |
+| `ratelimit` | `concurrency_ceiling_exceeded` | Raise `rate_limits.<agent>.max_concurrent` in `profiles/default.yaml` — but a ceiling hit repeatedly is a signal first |
+| `method` | `method_not_connect` | Something spoke plain HTTP through the proxy. The mediator tunnels TLS and never handles a plaintext request |
+| `identity` | `subject_mismatch` | A client certificate valid under the mediator CA, but carrying **another agent's** subject, was presented (T34). Present the certificate issued for this listener's agent, or use that agent's own network. `claude` only — it is the one agent that presents a certificate |
+
+`identity_source` says **how strongly** the line's `agent` value is attributed, and since 01.6 it
+takes three values: `listener+mtls` (`claude` verified a client certificate), `listener+proxy_auth`
+(`codex` or `agy` presented its own proxy credential), and `listener` (network-derived — the agent
+was identified by the network its connection arrived on and nothing stronger was verified on that
+connection). The field exists so a network-derived attribution is never read later as a
+cryptographic one. See `docs/records/workload-identity.md`.
+
+**A `listener` value on a `claude` line is not a downgrade — it is the T34 refusal.** No certificate
+was accepted on that connection, so the attribution falls back to the network and the line says so.
+
+**What the agent itself sees depends on which listener refused it.** `claude` and `agy` reach a
+non-bumping front listener, so a verdict decided before the CONNECT is accepted comes back as a
+403 whose body names the destination, the control and the policy path. `codex`'s listener peeks at
+the ClientHello and therefore accepts the CONNECT first, so *every* refusal reaches it as a
+terminated connection with no body — as does any post-ClientHello refusal on the other two. The
+mediator never mints a certificate for the destination to deliver an error through, which is the
+capability the architecture rules out. **Diagnosis of which destination was refused is the audit
+line, always.**
+
+#### Three refusals that do NOT look like the above
+
+These are the identity path's, added at 01.6. Each has a symptom an operator will otherwise
+misread.
+
+**1. `claude` gets nothing at all, and there is no audit line.** Its front listener requires a
+client certificate at the TLS handshake, so a `claude` container that has lost its key pair — a
+missing or unreadable Compose secret, a rotation where the mediator was restarted but the agent was
+not — is refused **before Squid has a request to log**. Nothing on the audit trail names the
+attempt: there is one anonymous `proxy_internal` event carrying no agent, no destination and no
+verdict, and that is all. Silence here looks exactly like an agent that made no request. The
+populated surface is the mediator's own cache log. The entrypoint tails it to stderr, so it is
+already in the container's logs — where an operator looks first — and it is also on disk:
+
+```bash
+# already streamed into the mediator's container logs
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml logs egress-mediator | tail -50
+
+# or read the file directly
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml exec egress-mediator \
+  tail -50 /var/log/mediator/squid-cache.log
+```
+
+Check the agent holds its pair (`/run/secrets/claude-client.crt`, `.key`) and restart the agent, not
+only the mediator.
+
+**2. `codex` or `agy` is answered `407`, never `403`, and gets no error page.** Their listeners
+verify a proxy credential, and a credential that is missing, wrong, or belongs to the *other* agent
+is refused by Squid's own challenge. A `proxy_auth` ACL that misses halts ACL evaluation on its
+line, so no `deny_info` page and no `control=identity` verdict is reachable on that path — a `407`
+is the whole signal. Re-issue with `bash scripts/issue-identity.sh credential <agent> --force` and
+restart **both** the mediator and that agent.
+
+**3. The first request after a mediator start may be answered `500`.** Expected, bounded, and
+recorded: the mediator cannot warm the cascade peer for an authenticating front listener, because
+reaching it means authenticating to it and the mediator holds neither `claude`'s private key nor
+either credential's plaintext. Squid marks the peer dead at start and revives it about a second
+later. It affects `claude` and `agy`. Retry once; a `500` that persists is a real fault.
+
+### The startup self-check
+
+The mediator refuses to start on a policy that does not validate (stage 1, not skippable) and, by
+default, proves the enforcement path before serving (stage 2): one allowed and one denied
+destination driven through the rendered proxy from a loopback listener. Both stages record their
+result:
+
+```bash
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml logs egress-mediator | grep startup_check
+```
+
+On a host with no working internet, stage 2 will fail a pod that is otherwise correct. Set
+`startup_check.offline: true` in `profiles/default.yaml` and recompile — the skip is written to the
+audit trail at every start, so a pod running without a proven path out says so in its own record.
+
+### Correlating the egress and action trails (T35)
+
+The egress trail (`egress-mediator`'s `egress-audit.log`) and the action trail (each
+`<agent>-action-audit` volume, written by that agent's recorder — 02.1) carry no shared session
+id: the mediator never sees inside the TLS tunnel it splices (D4), so it cannot learn a session id
+the agent's own client assigns. The two trails join on `agent` plus a time window instead, using
+the recorder's clock (never the agent's own transcript timestamps, which are a claim the agent
+makes about itself, not evidence) and a slack of at least one second plus the recorder's poll
+interval, to cover the ms/second timestamp-precision difference between the two trails and the
+one-poll-interval shipping delay.
+
+```bash
+# 1. Pick a session id from one agent's action trail.
+SESSION=<session_id from an action-audit.log line>
+
+# 2. That session's window, from the RECORDER's ts (never the transcript's own).
+WINDOW="$(docker exec <project>-<agent>-recorder-1 cat /var/log/actions/action-audit.log \
+  | jq -s --arg s "$SESSION" '
+      map(select(.session_id == $s)) | {min: (map(.ts) | min), max: (map(.ts) | max)}')"
+
+# 3. The egress (and DNS) lines for that agent, in the window widened by the slack.
+docker exec <project>-egress-mediator-1 cat /var/log/mediator/egress-audit.log \
+  | jq -c --argjson w "$WINDOW" --arg agent "<agent's resolved identity>" '
+      def norm: sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
+      ($w.min | norm) as $lo | ($w.max | norm) as $hi |
+      select(.verdict != null and .agent == $agent
+             and ((.ts | norm) >= ($lo - 2) and (.ts | norm) <= ($hi + 2)))'
+```
+
+`fromdateiso8601` does not accept a fractional-second suffix, so the recipe strips it first —
+egress timestamps carry milliseconds, action-trail and DNS timestamps do not. Two concurrent
+`run --rm` sessions of the *same* agent are not separable this way: they share one identity and
+one egress listener, so the join can only narrow to "this agent, this window," not to one session
+among several running at once (recorded limitation, `docs/records/agent-action-log.md`).
+
+### The audit sink: layout, exports and retention (02.1)
+
+Two independent trails, neither able to produce the other. The **egress trail**
+(`egress-audit.log`, 01.3) is written by the mediator and covers network attempts only, allow and
+deny alike. The **action trail** — one `<agent>-action-audit` volume per agent, written by that
+agent's own recorder — covers tool invocations, file modifications and privilege-change evidence,
+sourced from the agent's own session transcript (D20). A recorder has no network route and a
+read-only mount of its agent's state volume; its worst case is writing a false line into its own
+agent's action log, which that agent could already do. See "Correlating the egress and action
+trails (T35)" above for how the two join.
+
+**D20's limitation stands regardless of the sink.** The record is complete as written and
+tamper-evident once shipped, but a compromised agent can still write a false line before the next
+poll ships it — the poll interval is the tamper-evidence window, stated by `RECORDER_POLL_SECONDS`.
+Detection is **pull-based**, the same posture the egress trail takes (R9.6): nothing here pushes an
+alert, so review is an operator action, triggered by the same signal as an unnoticed blocked
+attempt — investigate when something looks wrong, not on a fixed cadence.
+
+**Four exports, each with one channel**, toggled per profile (`exports:` in the resolved policy;
+missing resolves to all four `true`):
+
+| Export | Channel | Disabling it stops... | Disabling it does NOT stop... |
+|---|---|---|---|
+| `egress_audit_log` | mediator's `egress-audit.log`/`dns-audit.log` relay | that relay | recording — the file write continues; only the relay copy is gone |
+| `agent_action_log` | each recorder's stdout relay | that relay, and its redaction with it | recording to the `<agent>-action-audit` volume, which continues unconditionally |
+| `resolved_policy` | `scripts/export-artifacts.sh`'s copy into `exports/<profile>/` | that file export | the resolved artifact itself, which stays on `policy/resolved/` regardless |
+| `image_digest_sbom` | same exporter, the digest/SBOM file | that file export | the digest/SBOM data, which is computed at build time independent of export |
+
+A disabled export never disables recording (D11) — every one of the four gates a **copy** leaving
+the container or the host, never the thing being copied. Verified per toggle by
+`tests/acceptance/verify-audit-completeness.sh` Phase E (T36): both trails keep gaining lines,
+the disabled channel is absent, the other three are unaffected, and the mediator's
+`export_config` event names the disabled toggle `false`.
+
+**R8.6 — credential values in a transcript.** A tool call that echoes a secret (SF-1 measured this
+for `codex` and `agy`'s proxy password, landing verbatim in their own transcripts) lands in the
+action trail too, because the sink is transcript-faithful by design (Decision 8): it holds nothing
+the agent's own state volume did not already hold, which keeps the tamper-evidence byte comparison
+exact. **Redaction happens only on the `agent_action_log` relay** — the one channel that leaves the
+host — via `images/recorder/recorder.sh`'s proxy-URL-userinfo and known-token-prefix patterns; a
+redacted relay line carries a `redacted` count. `agy`'s whole-file snapshot mode ships a hash and
+size only, never file content, so its transcript's credential values never reach the sink or the
+relay at all — a structural property, not a redaction outcome. See
+`docs/records/credential-inventory.md` for the finding and `verify-audit-completeness.sh` Phase F
+for the assertions.
+
+**Retention (R4.10, SHOULD).** Action-log contents are plaintext conversation history, the same
+sensitivity class as the state volumes' session transcripts they are sourced from. `exports/` is
+git-ignored (SF-4), so no export copy is ever committable. The `<agent>-action-audit` volumes
+themselves carry no retention automation — they are excluded from host backups under the same
+`tmutil` procedure as the state volumes ("Backing up the state volumes" above), since Docker
+Desktop's single-VM-disk-image storage makes a per-volume exclusion impossible either way.
+
+`prd.md` and `progress.txt` exist at this directory's root. The architecture document exists at
+`.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md` — **not** at
+`docs/ARCHITECTURE_AND_DESIGN.md` as an earlier version of this note (and the architecture
+document's own file tree) stated; the path discrepancy itself is recorded as a finding for
+`/project`, not fixed here. Dockerfiles (`images/`) and Compose files (`compose/`) exist as of
+Feature 01.2.
+
+Feature 01.3 is **complete**: the three agent-facing listeners and the three egress controls, the
+closed DNS forwarder, the audit writer, the denial surface and the two-stage startup self-check.
+Its acceptance harness is `tests/acceptance/verify-egress-mediator.sh` — 77 assertions across
+phases A–G, driven against fixtures the harness owns and reaching no third-party host:
+
+```bash
+bash tests/acceptance/verify-egress-mediator.sh
+```
+
+Feature 01.4 is **complete**: the `AUTH_MODE` dispatcher and its seven supported cells, the
+pre-mount git-config scrub, the `oauth-mount` bootstrap boundary, the refresh-token rotation
+record and the credential inventory. Its acceptance harness is
+`tests/acceptance/verify-auth-state.sh` — phases A–E covering T24, T22, T25 and T9. Unlike
+01.3's harness it iterates **live provider credentials**, so read its header before running it:
+it seeds its own state volumes from the operator's, and its phase D forces a codex refresh,
+which rolls the refresh token and costs the host `codex login`.
+
+The feature's test command is composite — the two earlier harnesses must still pass, and only
+one Compose project can hold the agent subnets at a time, so bring any running pod down
+(**without** `-v`) first:
+
+```bash
+bash tests/acceptance/verify-auth-state.sh \
+  && bash tests/acceptance/verify-pod-topology.sh \
+  && bash tests/acceptance/verify-egress-mediator.sh
+```
+
+### Adversarial boundary validation (02.2)
+
+Feature 02.2 is **complete**: `tests/acceptance/validate-boundary.sh` runs the six R12.8
+scenarios and T1–T8 as recorded adversarial acceptance **from inside each real agent
+container**, per agent — not the mediator-image smoke checks 01.2/01.3 ran. Every row records
+the three-part R12.8 verdict (blocked / logged / attributable) as one JSON line. T16 joins every
+mediated destination (T3/T4/T6/T7) against the live audit trail; SC-1, SC-2 and SC-3 are
+demonstrated as the aggregate over the run's own recorded rows, each against the `prd.md`
+measurement it maps to. Raw TCP, agent-to-agent direct connections and ICMP are structurally
+invisible to the mediator's log — recorded as a residual (`prd.md:209`), not a gap. The
+`provisional` marker on `policy/allowlist.base.yaml` is resolved (`false`) following a live
+shadow run under the built mediator, D17's required second source. Full results, the
+six-scenario × three-agent table and the `provisional` resolution are in
+[`docs/records/boundary-validation.md`](docs/records/boundary-validation.md).
+
+```bash
+bash tests/acceptance/verify-pack-composition.sh \
+  && bash tests/acceptance/verify-pod-topology.sh \
+  && bash tests/acceptance/verify-egress-mediator.sh \
+  && bash tests/acceptance/verify-audit-completeness.sh \
+  && bash tests/acceptance/verify-tool-packs.sh \
+  && bash tests/acceptance/verify-mcp-inventory.sh \
+  && BOUNDARY_PROFILES="default terraform kubernetes github" bash tests/acceptance/validate-boundary.sh \
+  && bash scripts/lint-policy.sh
+```
+
+This unattended composite spends no model tokens. Two phases are live and gated off by default —
+`BOUNDARY_LIVE_INJECT=1` (the injected-instructions repository scenario) and
+`BOUNDARY_SHADOW_RUN=1` (the `provisional` shadow run) — each run once by the operator against
+their own authenticated state volumes and recorded manually; see the harness's own printed
+instructions and `docs/records/boundary-validation.md`.
+
+`BOUNDARY_PROFILES` (default: `default`) re-runs every phase in `validate-boundary.sh` once per
+named profile — see ["Tool packs, use-case profiles and MCP inventory (02.3)"](#tool-packs-use-case-profiles-and-mcp-inventory-023)
+below for what that adds and costs.
+
+### Tool packs, use-case profiles and MCP inventory (02.3)
+
+Feature 02.3 is **complete**. Three named use-case profiles ship, each `default` plus one pack:
+
+| Profile | Pack | Adds | Credential |
+|---|---|---|---|
+| `terraform` | `packs/terraform/` | `terraform` CLI, `registry.terraform.io` + `releases.hashicorp.com` runtime egress | none |
+| `kubernetes` | `packs/kubernetes/` | `kubectl` + `helm`, no runtime egress (cluster reach needs a separate, not-shipped, per-cluster egress pack) | `kubeconfig` (`KUBECONFIG`) |
+| `github` | `packs/github-cli/` | `gh` CLI, `api.github.com` + `github.com` runtime egress (already present for `codex` under every profile, from the 01.1 base — `github` extends it to `claude` and `agy`) | GitHub PAT (`GH_TOKEN`) |
+
+**Switching profiles:**
+
+```bash
+# 1. Stage the pack's credential(s) first, if it declares any (terraform declares none).
+#    Path shape: compose/generated/credentials/<profile>/<pack>/<credential-name>, mode 0600.
+mkdir -p compose/generated/credentials/github/github-cli
+printf '%s' "$YOUR_FINE_GRAINED_PAT" > compose/generated/credentials/github/github-cli/github-token
+chmod 0600 compose/generated/credentials/github/github-cli/github-token
+
+# 2. Bring the profile up. AGENT_PROFILE selects both the agent images' PROFILE build arg and
+#    the mediator's MEDIATOR_PROFILE -- compose.yaml binds MEDIATOR_PROFILE to
+#    ${AGENT_PROFILE:-default} by default, so one variable drives both.
+AGENT_PROFILE=github docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/github.yaml up --build --force-recreate
+
+# 3. Switch back.
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
+```
+
+`compose/generated/credentials/` is git-ignored. **Rotation is a file swap plus
+`--force-recreate` — no rebuild** (R8.5): the secret is a Compose `file:` source, never baked
+into an image layer. **Revocation is independent per credential** (R7.12) — see
+`docs/records/credential-inventory.md`, Tables A/B, rows S2/S3, for the exact revoke-at-provider
+steps and blast radius. A credential reaches all three agent containers under a profile that
+loads its pack, the same rule that gives every agent a pack's egress — stated as blast radius,
+not a per-agent scoping this architecture builds.
+
+`scripts/check-profile-compose.sh --profile <name>` asserts a profile's hand-authored
+`compose/overrides/<name>.yaml` before `build.sh` builds it: the rendered secret set equals
+exactly the credentials the profile's packs declare, and every other rendered field — hardening,
+mounts, limits — equals `default`'s. **Residual:** `docker compose up --build` does not run this
+check itself (R12.9 bars a wrapper on that entry point) — a hand-edited override that drifts is
+caught at the next `build.sh` or `validate-boundary.sh` run, not at `up` time.
+
+**MCP inventory.** Every profile carries an `mcp:` block (`servers`, `plugins`, `skills`), baked
+into the image and enforced at start by `images/mcp-gate.js`. No shipped profile inventories a
+real server — every profile ships `servers: [], plugins: [], skills: [], registry: none`, the
+explicit empty. Two things follow from an image-baked, start-time gate:
+
+- **A refusal looks like this**, on the agent's own start (exit 3, before the agent CLI runs),
+  naming the file and the entry:
+  ```
+  mcp-gate: REFUSED uninventoried server '<name>' in <file> (R7.14, T29)
+  mcp-gate: DRIFT '<name>' in <file>: baseline <hash> != live <hash> (R7.14, T29)
+  ```
+- **Migration note.** The gate does not grandfather. If a state volume or a project repository
+  already carries an MCP server, plugin or skill entry from before this gate landed, the *next*
+  start of that agent refuses. Before upgrading past this feature: enumerate what each agent's
+  capability-declaration files currently hold (`docs/records/mcp-inventory.md` records the
+  per-agent file set this project measured) and either add each entry to the profile's `mcp:`
+  block (rebuild) or remove it from the volume/repository. This deliberately differs from the
+  auth bootstrap's warn-don't-block start posture (01.4 Deviation 2) — an unreviewed capability
+  declaration is the R7.17 persistence path an uninventoried entry exploits, and there is no safe
+  default to warn-and-continue into.
+- **Recorded gap (T32):** a *write* to a capability-declaration file from inside a running agent
+  container is never blocked — `srt` is not installed and D14 disables every native sandbox, so
+  the compensating control is the *next start's* gate, not the write itself. A proposed amendment
+  to the register's T32 text is recorded in `docs/records/mcp-inventory.md`.
+
+Full per-agent measurement, the gate's design and limitations, and the T29–T32 results are in
+[`docs/records/mcp-inventory.md`](docs/records/mcp-inventory.md).
+
+Still not produced:
+
+- Reproducibility, provenance and onboarding — Feature 02.4
+- Containment, response and the authorization gate — Feature 02.5
+- AWS access (R6) — Milestone 03
+
+Note that requirements R6 (AWS access) and R7 (loadable tool packs) were added after the options analysis was written. The three options remain valid — both requirements are orthogonal to the choice of enforcement architecture — but the options analysis does not yet evaluate them per option.

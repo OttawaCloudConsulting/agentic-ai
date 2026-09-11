@@ -1,0 +1,62 @@
+# GitHub CLI pack (Feature 02.3 SF-4, Decision 7).
+#
+# The overlap case Decision 4 records: `codex`'s base already carries `github.com` and
+# `api.github.com` with `upgrade: false` (allowlist.base.yaml:80-87), so `codex` gains nothing
+# loading this pack while `claude` and `agy` gain both hosts. Ships `gh` operations against the
+# GitHub API; git-over-HTTPS wiring through the token is not built (Decision 7, flagged for
+# Revise).
+
+name: github-cli
+description: GitHub CLI (gh), runtime egress to api.github.com and github.com
+schema: 1
+
+blast_radius: |                  # R7.11
+  A compromised agent under this profile can run `gh` against every repository the token's fine-
+  grained PAT scope covers -- reading and, depending on the scope granted, writing issues, pull
+  requests, releases and repository content -- and can download and execute arbitrary `gh`
+  extensions the token's identity is permitted to install, over the allowlisted github.com/
+  api.github.com destinations. The pack grants no host mount. The credential itself is one token
+  shared by all three agent containers (Decision 1) -- a single compromise exposes the whole
+  scope to every agent, not one agent's slice of it.
+
+needs_write_access: false        # R7.3
+
+packages:
+  apt:
+    repository: profile          # R7.18 -- resolves to profiles.<p>.package_repository
+    items: []                    # gh ships as a self-contained tarball; no apt item needed
+                                  # (unlike Terraform, which needs `unzip` for its zip archive)
+  archives:
+    # linux_arm64, matching A1/R11.1's single-architecture constraint. Hash taken from
+    # gh_2.100.0_checksums.txt, the SIGNED-adjacent checksums file GitHub publishes alongside
+    # the release, fetched over https -- see packs/README.md, "How these hashes were obtained".
+    - {name: gh, version: "2.100.0", url: "https://github.com/cli/cli/releases/download/v2.100.0/gh_2.100.0_linux_arm64.tar.gz", sha256: ea4e7a581a32ccad6cc7923cb1576ac5859ba4b9a16ab22eb8f8a96e78e2e961}
+
+egress:
+  runtime:
+    allow_fqdns:                 # Decision 7 -- gh API operations
+      - {fqdn: api.github.com, port: 443, upgrade: false}
+      - {fqdn: github.com, port: 443, upgrade: false}
+    allow_cidrs: []
+  build:
+    allow_fqdns:                 # R10.4 -- build-time only, never enters resolved policy
+      - {fqdn: snapshot.debian.org, port: 443}
+      - {fqdn: github.com, port: 443}
+      - {fqdn: release-assets.githubusercontent.com, port: 443}
+
+runtime_install: true            # R7.6 -- github.com serves source; gh extensions install from it
+runtime_install_reason: "gh extension install and `gh repo clone`/`gh api` traffic reach github.com and api.github.com directly -- this IS the installation/fetch channel R7.6 requires be declared, not a package-registry npx-equivalent"
+
+mounts: []                       # R7.3 -- gh config and cache live under /home/agent
+env:                              # R7.3 -- Decision 7: the update notifier off (R5.11)
+  - name: GH_NO_UPDATE_NOTIFIER
+    value: "1"
+    reason: "R5.11 -- without this, gh periodically checks github.com for a newer release and prints a notice. The check itself would reach an allowlisted host, so it is not a leak, but it is unreviewed background traffic on every run that this pack's own allowlist accepts; disabling it keeps the pack's traffic limited to operations the agent actually invoked. No other telemetry switch is documented for this release -- gh ships no analytics collection to suppress"
+credentials:                     # R7.3 -- Decision 1: secret, never in an image layer (R8.1)
+  - name: github-token
+    delivery: {env: GH_TOKEN}
+    description: "Fine-grained GitHub personal access token, scoped to named repositories only -- never an account-wide classic PAT"
+    blast_radius: "R8.4 -- full access to every repository and permission the token's fine-grained scope grants, for as long as the token is valid. Readable by the agent process from its own environment (edge case 12), same as the provider API keys in credential-inventory.md's Table A"
+    revocation: "R7.12 -- revoke at https://github.com/settings/personal-access-tokens, independent of every other credential in this inventory. Rotation is a Compose secret-file swap plus --force-recreate, no rebuild (Interface Contract 3)"
+third_parties:                   # R14.1 -- required non-empty because egress.runtime is non-empty
+  - {party: GitHub, record: "docs/records/third-party-assessments.md#r141-github"}
