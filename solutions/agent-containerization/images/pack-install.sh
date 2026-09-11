@@ -13,7 +13,8 @@ KEYRING="${2:?usage: pack-install.sh <plan-dir> <keyring>}"
 die() { echo "pack-install: $*" >&2; exit 2; }
 
 [ -f "$PLAN/repo.env" ] || die "no plan at $PLAN (expected repo.env)"
-for f in apt-items.txt archives.txt packs.txt pack-env.txt pack-credentials.txt; do
+for f in apt-items.txt archives.txt packs.txt pack-env.txt pack-credentials.txt \
+         mcp-inventory.claude.json mcp-inventory.codex.json mcp-inventory.agy.json; do
   [ -f "$PLAN/$f" ] || die "no plan at $PLAN (expected $f)"
 done
 
@@ -25,6 +26,16 @@ done
 # and read-only: this is image code on the read-only root filesystem, not agent-writable
 # state.
 mkdir -p /opt/agent-pack
+
+# --- MCP inventory, all three agents' files (02.3 SF-6, Interface Contract 2) ----
+# This stage (agent-packs) is shared by all three per-agent stages, so all three
+# per-agent files land here, root-owned and read-only. Each per-agent Dockerfile
+# stage then promotes its own to the fixed name /opt/agent-pack/mcp-inventory.json
+# and removes the other two, so no image ships an inventory for an agent it is not.
+for mcp_agent in claude codex agy; do
+  install -m 0444 -o root -g root "$PLAN/mcp-inventory.$mcp_agent.json" "/opt/agent-pack/mcp-inventory.$mcp_agent.json"
+done
+
 install -m 0444 -o root -g root "$PLAN/pack-env.txt" /opt/agent-pack/env
 install -m 0444 -o root -g root "$PLAN/pack-credentials.txt" /opt/agent-pack/credentials
 

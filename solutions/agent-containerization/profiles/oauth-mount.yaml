@@ -170,3 +170,9 @@ exports:
   agent_action_log: true
   resolved_policy: true
   image_digest_sbom: true
+
+mcp:
+  registry: none
+  servers: []
+  plugins: []
+  skills: []

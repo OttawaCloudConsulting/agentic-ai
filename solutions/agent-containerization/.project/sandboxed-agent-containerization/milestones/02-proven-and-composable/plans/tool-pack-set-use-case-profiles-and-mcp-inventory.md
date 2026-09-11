@@ -500,7 +500,7 @@ path `compose/generated/credentials/...` is checked against the harnesses' conta
     record it.
   - Harness Phase G: the R7.8 hardening comparison across all four profiles.
   - Composite green.
-- [ ] **SF-6: MCP measurement, inventory schema and compile-time enforcement (T30, T31).**
+- [x] **SF-6: MCP measurement, inventory schema and compile-time enforcement (T30, T31).**
   - **Measure first**, following 02.1 SF-1's pattern. For each agent, record the
     capability-declaration files and plugin and skill directories: path, write model (rewritten by
     the agent, by our entrypoint, or append-only), format, and how an entry is keyed. Resolve the

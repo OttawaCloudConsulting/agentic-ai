@@ -21,6 +21,8 @@
 #   packs.txt           "<name> <sha256-of-manifest>"   -- provenance, for the build log
 #   pack-env.txt         02.3 Interface Contract 2: "NAME<TAB>value"
 #   pack-credentials.txt 02.3 Interface Contract 2: "pack-<pack>-<cred><TAB>env|path_env<TAB>VAR"
+#   mcp-inventory.<agent>.json   02.3 SF-6, Interface Contract 2: one file per agent, filtered
+#                                 from the profile's mcp: block by that agent's membership
 #
 # SF-3's LESSON IS APPLIED HERE DELIBERATELY. Every traversal is TAG-checked, not
 # text-checked. `yq` renders a missing key, an empty sequence and an empty map in ways
@@ -111,6 +113,37 @@ mkdir -p "$OUT"
 : > "$OUT/packs.txt"
 : > "$OUT/pack-env.txt"
 : > "$OUT/pack-credentials.txt"
+
+# --- MCP inventory, per agent (02.3 SF-6, Interface Contract 5) ----------------
+# Profile-level, independent of the pack set -- runs whether or not the profile selects
+# any pack, because every profile carries an explicit mcp: block (compile-policy.sh
+# refuses an absent one). This is the SECOND reader (Contract 5); scripts/compile-policy.sh
+# already validated the full field set and T30's transport/enforcement_point pairing, so
+# this checks only the shape it directly consumes before rendering -- SF-3's lesson: no
+# credit here for a check that ran in a different process on a manifest that could, in
+# principle, reach this stage by a path the compiler never saw.
+#
+# THE AGENT SET IS FIXED, not read from a file this script has no argument for: every
+# image and entrypoint in this solution already hardcodes exactly claude, codex and agy
+# (images/Dockerfile, images/entrypoint.sh). A fourth agent is a schema change to more
+# than this script.
+require_tag '.mcp' "$PROFILE_FILE" '!!map' 'mcp'
+for mcp_key in registry servers plugins skills; do
+  tag="$(tag_of ".mcp.$mcp_key" "$PROFILE_FILE")"
+  [ "$tag" != '!!null' ] || die "mcp.$mcp_key is missing"
+done
+require_tag '.mcp.servers' "$PROFILE_FILE" '!!seq' 'mcp.servers'
+require_tag '.mcp.plugins' "$PROFILE_FILE" '!!seq' 'mcp.plugins'
+require_tag '.mcp.skills'  "$PROFILE_FILE" '!!seq' 'mcp.skills'
+
+for mcp_agent in claude codex agy; do
+  MCP_AGENT="$mcp_agent" yq -o=json '{
+      "registry": .mcp.registry,
+      "servers":  [(.mcp.servers  // [])[] | select(.agents[] == env(MCP_AGENT))],
+      "plugins":  [(.mcp.plugins  // [])[] | select(.agents[] == env(MCP_AGENT))],
+      "skills":   [(.mcp.skills   // [])[] | select(.agents[] == env(MCP_AGENT))]
+    }' "$PROFILE_FILE" > "$OUT/mcp-inventory.$mcp_agent.json"
+done
 
 # --- the pack list -------------------------------------------------------------
 # Read FIRST, because whether a repository is required depends on it.

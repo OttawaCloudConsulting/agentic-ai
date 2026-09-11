@@ -463,6 +463,183 @@ if [[ "$(yq eval 'has("egress_exclusions")' "$PROFILE_FILE")" == "true" ]]; then
   done
 fi
 
+# ---- mcp: R7.14 inventory, R7.16 registry gate, T30 transport/enforcement_point pairing ------
+# 02.3 SF-6, Interface Contract 5. The block is REQUIRED and explicit on every profile -- an
+# absent `mcp:` is an input error (exit 2), the same posture as `exports` (02.1 SF-4): a resolved
+# artifact says nothing was omitted, not that MCP was never considered. `servers`, `plugins` and
+# `skills` default to an empty list only in the sense that an empty list IS the explicit "none";
+# the key itself is never optional.
+[[ "$(yq eval 'has("mcp")' "$PROFILE_FILE")" == "true" ]] \
+  || invalid "$REL_PROFILE: field 'mcp' is missing (R7.14). Every profile carries an explicit mcp: block -- 'registry: none, servers: [], plugins: [], skills: []' if it inventories nothing"
+require_tag "$PROFILE_FILE" '.mcp' '!!map' "$REL_PROFILE: field 'mcp' must be a mapping"
+for MK in registry servers plugins skills; do
+  [[ "$(yq eval ".mcp | has(\"$MK\")" "$PROFILE_FILE")" == "true" ]] \
+    || invalid "$REL_PROFILE: field 'mcp.$MK' is missing"
+done
+require_tag "$PROFILE_FILE" '.mcp.servers' '!!seq' "$REL_PROFILE: field 'mcp.servers' must be a list"
+require_tag "$PROFILE_FILE" '.mcp.plugins' '!!seq' "$REL_PROFILE: field 'mcp.plugins' must be a list"
+require_tag "$PROFILE_FILE" '.mcp.skills'  '!!seq' "$REL_PROFILE: field 'mcp.skills' must be a list"
+
+MCP_SRV_N="$(yq eval '.mcp.servers | length' "$PROFILE_FILE")"
+
+# R7.16: a registry is required whenever servers is non-empty; `none` is only valid when it is
+# empty. `registry` is either the scalar `none` or a map naming type/url/pinned.
+MCP_REG_TAG="$(yq eval '.mcp.registry | tag' "$PROFILE_FILE" 2>/dev/null)" || MCP_REG_TAG="(unreadable)"
+if ((MCP_SRV_N > 0)); then
+  if [[ "$MCP_REG_TAG" == "!!str" ]]; then
+    [[ "$(yq eval '.mcp.registry' "$PROFILE_FILE")" != "none" ]] \
+      || invalid "$REL_PROFILE: mcp.servers is non-empty but mcp.registry is 'none'. R7.16 requires a declared, pinned registry for every inventoried server"
+    invalid "$REL_PROFILE: mcp.registry must be 'none' or a mapping {type, url, pinned}, found scalar '$(yq eval '.mcp.registry' "$PROFILE_FILE")'"
+  fi
+  [[ "$MCP_REG_TAG" == "!!map" ]] \
+    || invalid "$REL_PROFILE: mcp.registry must be 'none' or a mapping {type, url, pinned}, found $MCP_REG_TAG"
+  for RK in type url pinned; do
+    scalar_nonblank "$PROFILE_FILE" ".mcp.registry.$RK" >/dev/null \
+      || invalid "$REL_PROFILE: mcp.registry.$RK is missing, empty or blank (R7.16 -- installed only from a declared, pinned registry)"
+  done
+else
+  [[ "$MCP_REG_TAG" == "!!str" && "$(yq eval '.mcp.registry' "$PROFILE_FILE")" == "none" ]] \
+    || invalid "$REL_PROFILE: mcp.servers is empty, so mcp.registry must be the literal 'none' -- an empty inventory names no registry to pin"
+fi
+
+declare -A SEEN_MCP_SERVER_NAMES=()
+for ((m = 0; m < MCP_SRV_N; m++)); do
+  MS=".mcp.servers[$m]"
+  require_tag "$PROFILE_FILE" "$MS" '!!map' "$REL_PROFILE: mcp.servers[$m] must be a mapping"
+  MNAME="$(scalar_nonblank "$PROFILE_FILE" "$MS.name")" \
+    || invalid "$REL_PROFILE: mcp.servers[$m].name is missing, empty or blank"
+  if [[ -n "${SEEN_MCP_SERVER_NAMES[$MNAME]+x}" ]]; then
+    invalid "$REL_PROFILE: mcp.servers declares '$MNAME' twice"
+  fi
+  SEEN_MCP_SERVER_NAMES[$MNAME]=1
+
+  # agents: non-empty subset of the base allowlist's keys (Interface Contract 5).
+  require_tag "$PROFILE_FILE" "$MS.agents" '!!seq' "$REL_PROFILE: mcp.servers[$m] ('$MNAME').agents must be a list"
+  MAG_N="$(yq eval "$MS.agents | length" "$PROFILE_FILE")"
+  ((MAG_N > 0)) \
+    || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').agents is empty. A server inventoried for no agent is not inventoried"
+  for ((a = 0; a < MAG_N; a++)); do
+    MAG="$(yq eval "$MS.agents[$a]" "$PROFILE_FILE")"
+    grep -Fxq "$MAG" <<< "$ALLOW_AGENTS" \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').agents[$a] '$MAG' is not an agent the base allowlist keys"
+  done
+
+  scalar_nonblank "$PROFILE_FILE" "$MS.version" >/dev/null \
+    || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').version is missing, empty or blank"
+
+  # artifact: either the literal n/a note for a remote server, or {path, sha256}.
+  MART_TAG="$(yq eval "$MS.artifact | tag" "$PROFILE_FILE" 2>/dev/null)" || MART_TAG="(unreadable)"
+  if [[ "$MART_TAG" == "!!map" ]]; then
+    scalar_nonblank "$PROFILE_FILE" "$MS.artifact.path" >/dev/null \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').artifact.path is missing, empty or blank"
+    MASHA="$(yq eval "$MS.artifact.sha256" "$PROFILE_FILE")"
+    [[ "$MASHA" =~ ^[0-9a-f]{64}$ ]] \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').artifact.sha256 '$MASHA' is not a 64-character lowercase hex digest"
+  elif [[ "$MART_TAG" == "!!str" ]]; then
+    scalar_nonblank "$PROFILE_FILE" "$MS.artifact" >/dev/null \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').artifact is blank"
+  else
+    invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').artifact must be a string note or a mapping {path, sha256}, found $MART_TAG"
+  fi
+
+  # T30 -- transport and enforcement_point, enforced as a pair.
+  MTRANS="$(yq eval "$MS.transport" "$PROFILE_FILE")"
+  case "$MTRANS" in
+    stdio|http|sse) : ;;
+    *) invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').transport must be one of stdio, http or sse, found '$MTRANS' (R7.15, T30)" ;;
+  esac
+  MENF="$(yq eval "$MS.enforcement_point" "$PROFILE_FILE")"
+  if [[ "$MTRANS" == "stdio" ]]; then
+    [[ "$MENF" == "none" ]] \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME') is transport 'stdio' but enforcement_point is '$MENF', not 'none'. A stdio server is a subprocess of the agent and reaches no network enforcement point (R7.15, T30)"
+  else
+    [[ "$MENF" == "mediator" ]] \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME') is transport '$MTRANS' but enforcement_point is '$MENF', not 'mediator'. An http/sse server's traffic must cross the mediator to be covered (R7.15, T30)"
+  fi
+
+  # egress: required shape always present; entries required only for http/sse (composed into the
+  # per-agent allowlist below, under the same checks and collision rule packs use).
+  require_tag "$PROFILE_FILE" "$MS.egress" '!!map' "$REL_PROFILE: mcp.servers[$m] ('$MNAME').egress must be a mapping"
+  for EGK in allow_fqdns allow_cidrs; do
+    [[ "$(yq eval "$MS.egress | has(\"$EGK\")" "$PROFILE_FILE")" == "true" ]] \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').egress.$EGK is missing"
+  done
+  MEGN="$(yq eval "$MS.egress.allow_fqdns | length" "$PROFILE_FILE")"
+  if [[ "$MTRANS" == "stdio" ]]; then
+    ((MEGN == 0)) \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME') is transport 'stdio' but declares $MEGN egress.allow_fqdns entr(y|ies). A subprocess's own traffic inherits the agent's proxy environment; a stdio server does not compose its own egress entries"
+  fi
+  for ((g = 0; g < MEGN; g++)); do
+    MFQDN="$(yq eval "$MS.egress.allow_fqdns[$g].fqdn" "$PROFILE_FILE")"
+    MPORT="$(yq eval "$MS.egress.allow_fqdns[$g].port" "$PROFILE_FILE")"
+    [[ "$MFQDN" != *"*"* ]] \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').egress.allow_fqdns[$g].fqdn '$MFQDN' is a wildcard; exact names only (R5.4)"
+    [[ "${#MFQDN}" -le 253 && "$MFQDN" =~ $FQDN_RE ]] \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').egress.allow_fqdns[$g].fqdn '$MFQDN' is not a valid hostname"
+    [[ "$MPORT" =~ ^[0-9]+$ ]] \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').egress.allow_fqdns[$g].port must be an integer, found '$MPORT'"
+  done
+  MEGC="$(yq eval "$MS.egress.allow_cidrs | length" "$PROFILE_FILE")"
+  ((MEGC == 0)) \
+    || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').egress.allow_cidrs has $MEGC entr(y|ies). No requirement names an MCP CIDR entry, and the mediator refuses a non-empty allow_cidrs at start regardless"
+
+  # mounts/env/credentials: present and correctly typed. No shipped or fixture server populates
+  # these; deeper validation (Interface Contract 1's name regexes, reserved-name gate) is not
+  # built here because no requirement or Interface Contract text asks for it yet -- flagged for a
+  # future SF if a server needs one, rather than built speculatively (over-engineering gate).
+  for LK in mounts env credentials; do
+    require_tag "$PROFILE_FILE" "$MS.$LK" '!!seq' "$REL_PROFILE: mcp.servers[$m] ('$MNAME').$LK must be a list"
+  done
+
+  MWRITE="$(yq eval "$MS.needs_write_access" "$PROFILE_FILE")"
+  [[ "$MWRITE" == "true" || "$MWRITE" == "false" ]] \
+    || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').needs_write_access must be true or false, found '$MWRITE'"
+
+  MTIER="$(yq eval "$MS.risk_tier" "$PROFILE_FILE")"
+  case "$MTIER" in
+    read-only|write|irreversible) : ;;
+    *) invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').risk_tier must be one of read-only, write or irreversible, found '$MTIER'" ;;
+  esac
+
+  require_tag "$PROFILE_FILE" "$MS.capability_baseline" '!!map' "$REL_PROFILE: mcp.servers[$m] ('$MNAME').capability_baseline must be a mapping"
+  MCFG="$(yq eval "$MS.capability_baseline.config_sha256" "$PROFILE_FILE")"
+  [[ "$MCFG" =~ ^[0-9a-f]{64}$ ]] \
+    || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').capability_baseline.config_sha256 '$MCFG' is not a 64-character lowercase hex digest"
+  require_tag "$PROFILE_FILE" "$MS.capability_baseline.tools" '!!seq' \
+    "$REL_PROFILE: mcp.servers[$m] ('$MNAME').capability_baseline.tools must be a list (recorded for review; not machine-checked)"
+done
+unset SEEN_MCP_SERVER_NAMES
+
+# plugins and skills share one shape: {name, agents, version, sha256, risk_tier}.
+for MPK in plugins skills; do
+  MPN="$(yq eval ".mcp.$MPK | length" "$PROFILE_FILE")"
+  for ((p = 0; p < MPN; p++)); do
+    MP=".mcp.$MPK[$p]"
+    require_tag "$PROFILE_FILE" "$MP" '!!map' "$REL_PROFILE: mcp.$MPK[$p] must be a mapping"
+    MPNAME="$(scalar_nonblank "$PROFILE_FILE" "$MP.name")" \
+      || invalid "$REL_PROFILE: mcp.$MPK[$p].name is missing, empty or blank"
+    require_tag "$PROFILE_FILE" "$MP.agents" '!!seq' "$REL_PROFILE: mcp.$MPK[$p] ('$MPNAME').agents must be a list"
+    MPAG_N="$(yq eval "$MP.agents | length" "$PROFILE_FILE")"
+    ((MPAG_N > 0)) \
+      || invalid "$REL_PROFILE: mcp.$MPK[$p] ('$MPNAME').agents is empty"
+    for ((a = 0; a < MPAG_N; a++)); do
+      MPAG="$(yq eval "$MP.agents[$a]" "$PROFILE_FILE")"
+      grep -Fxq "$MPAG" <<< "$ALLOW_AGENTS" \
+        || invalid "$REL_PROFILE: mcp.$MPK[$p] ('$MPNAME').agents[$a] '$MPAG' is not an agent the base allowlist keys"
+    done
+    scalar_nonblank "$PROFILE_FILE" "$MP.version" >/dev/null \
+      || invalid "$REL_PROFILE: mcp.$MPK[$p] ('$MPNAME').version is missing, empty or blank"
+    MPSHA="$(yq eval "$MP.sha256" "$PROFILE_FILE")"
+    [[ "$MPSHA" =~ ^[0-9a-f]{64}$ ]] \
+      || invalid "$REL_PROFILE: mcp.$MPK[$p] ('$MPNAME').sha256 '$MPSHA' is not a 64-character lowercase hex digest"
+    MPTIER="$(yq eval "$MP.risk_tier" "$PROFILE_FILE")"
+    case "$MPTIER" in
+      read-only|write|irreversible) : ;;
+      *) invalid "$REL_PROFILE: mcp.$MPK[$p] ('$MPNAME').risk_tier must be one of read-only, write or irreversible, found '$MPTIER'" ;;
+    esac
+  done
+done
+
 # ---- packs: every selected name must resolve to a manifest --------------------------------
 # The tag, not the length: `yq '.packs | length'` returns 0 for a missing key, for `packs: ""`
 # and for `packs: {}` alike, so a length test reads three malformed shapes as a zero-pack profile
@@ -1032,6 +1209,27 @@ trap 'rm -f "$TMP" "$TMP.cmp" 2>/dev/null || true' EXIT
         [[ "${#PFQDN}" -le 253 && "$PFQDN" =~ $FQDN_RE ]] \
           || invalid "$REL_PF: egress.runtime.allow_fqdns[$i].fqdn '$PFQDN' is not a valid hostname; it would be interpolated into the mediator's Lua policy (01.3 SF-5)"
         ENTRIES+="$(lower "$PFQDN")|${PPORT}|${PUPG}|${REL_PF}"$'\n'
+      done
+    done
+
+    # MCP http/sse servers compose their own declared egress into the listed agents' allowlists
+    # (D18, Decision 8), under the same checks and the same collision rule as a pack's runtime
+    # entries -- already validated above (shape, hostname, port), so this reads rather than
+    # re-checks. `upgrade` is not a field MCP servers declare (Interface Contract 5); every
+    # composed entry is `upgrade: false`. Source is `mcp:<server>` so a collision names it, and is
+    # cut before emit exactly like a pack's source (`cut -d'|' -f1-3` below).
+    for ((k = 0; k < MCP_SRV_N; k++)); do
+      MS=".mcp.servers[$k]"
+      MTRANS_K="$(yq eval "$MS.transport" "$PROFILE_FILE")"
+      [[ "$MTRANS_K" == "http" || "$MTRANS_K" == "sse" ]] || continue
+      MNAME_K="$(yq eval "$MS.name" "$PROFILE_FILE")"
+      MAGENTS_K="$(yq eval "$MS.agents[]" "$PROFILE_FILE")"
+      grep -Fxq "$agent" <<< "$MAGENTS_K" || continue
+      MFQ_N="$(yq eval "$MS.egress.allow_fqdns | length" "$PROFILE_FILE")"
+      for ((i = 0; i < MFQ_N; i++)); do
+        MFQDN_K="$(yq eval "$MS.egress.allow_fqdns[$i].fqdn" "$PROFILE_FILE")"
+        MPORT_K="$(yq eval "$MS.egress.allow_fqdns[$i].port" "$PROFILE_FILE")"
+        ENTRIES+="$(lower "$MFQDN_K")|${MPORT_K}|false|${REL_PROFILE}#mcp:${MNAME_K}"$'\n'
       done
     done
 

@@ -250,6 +250,11 @@ FROM agent-packs AS claude
 # Which agent this stage is, for the entrypoint's bootstrap-auth invocation.
 ENV AGENT_NAME=claude
 
+# Promote this agent's MCP inventory to the fixed name the gate reads (02.3 SF-6,
+# Interface Contract 2), and drop the other two -- this image ships only claude's.
+RUN mv /opt/agent-pack/mcp-inventory.claude.json /opt/agent-pack/mcp-inventory.json \
+    && rm -f /opt/agent-pack/mcp-inventory.codex.json /opt/agent-pack/mcp-inventory.agy.json
+
 ARG CLAUDE_VERSION
 ARG CLAUDE_SOURCE
 RUN test -n "$CLAUDE_VERSION" || (echo "CLAUDE_VERSION build arg is required (see compose/pins.env)" >&2 && exit 1)
@@ -276,6 +281,11 @@ FROM agent-packs AS codex
 
 # Which agent this stage is, for the entrypoint's bootstrap-auth invocation.
 ENV AGENT_NAME=codex
+
+# Promote this agent's MCP inventory to the fixed name the gate reads (02.3 SF-6,
+# Interface Contract 2), and drop the other two -- this image ships only codex's.
+RUN mv /opt/agent-pack/mcp-inventory.codex.json /opt/agent-pack/mcp-inventory.json \
+    && rm -f /opt/agent-pack/mcp-inventory.claude.json /opt/agent-pack/mcp-inventory.agy.json
 
 ARG CODEX_VERSION
 ARG CODEX_SOURCE
@@ -312,6 +322,11 @@ FROM agent-packs AS agy
 
 # Which agent this stage is, for the entrypoint's bootstrap-auth invocation.
 ENV AGENT_NAME=agy
+
+# Promote this agent's MCP inventory to the fixed name the gate reads (02.3 SF-6,
+# Interface Contract 2), and drop the other two -- this image ships only agy's.
+RUN mv /opt/agent-pack/mcp-inventory.agy.json /opt/agent-pack/mcp-inventory.json \
+    && rm -f /opt/agent-pack/mcp-inventory.claude.json /opt/agent-pack/mcp-inventory.codex.json
 
 ARG AGY_VERSION
 ARG AGY_URL
