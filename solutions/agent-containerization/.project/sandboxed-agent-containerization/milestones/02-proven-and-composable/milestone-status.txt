@@ -11,7 +11,7 @@
 [~] Feature 02.2: Adversarial boundary validation
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/adversarial-boundary-validation.md
     Sub-features: 3/6 complete
-    Notes: Started 2026-09-10. Deviation 2 recorded (SF-2, in_agent_authed + proxy-leg TLS flags).
+    Notes: Started 2026-09-10. Deviation 2 recorded (SF-2, in_agent_authed + proxy-leg TLS flags). SF-4 harness/fixture/record committed 2026-09-11 (Phase 8, BOUNDARY_LIVE_INJECT=1 gate); live injected-repo session against real state volumes deferred by operator choice -- SF-4 left [ ] pending that run, see docs/records/boundary-validation.md.
 
 [~] Feature 02.3: Tool pack set, use-case profiles and MCP inventory
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/tool-pack-set-use-case-profiles-and-mcp-inventory.md
