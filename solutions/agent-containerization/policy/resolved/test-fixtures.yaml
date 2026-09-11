@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check --profile test-fixtures --allowlist policy/allowlist.test.yaml --denylist policy/denylist.test.yaml
 schema: 1
 profile: test-fixtures
-compiled_at: 2026-09-10T19:37:52Z
+compiled_at: 2026-09-11T15:45:02Z
 compiled_from:
   allowlist: policy/allowlist.test.yaml
   denylist: policy/denylist.test.yaml
@@ -22,6 +22,7 @@ agents:
       - {fqdn: claude-only.fixture.lab, port: 443, upgrade: false}
       - {fqdn: denied-by-fqdn.fixture.lab, port: 443, upgrade: false}
       - {fqdn: neighbour.fixture.lab, port: 443, upgrade: false}
+      - {fqdn: rotating.fixture.lab, port: 443, upgrade: false}
     allow_cidrs: []
     limits: {max_concurrent: 16, bytes_per_second: 2000000}
   codex:
