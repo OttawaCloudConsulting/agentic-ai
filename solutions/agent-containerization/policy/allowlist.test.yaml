@@ -36,6 +36,10 @@ agents:
       # It resolves to the same address as an allowed name, so the refusal cannot be an
       # address deny wearing an FQDN's name either.
       - {fqdn: denied-by-fqdn.fixture.lab, port: 443, upgrade: false}
+      # SF-3 CDN-rotation scenario (Decision 5). Resolves to .20 at first, then the harness
+      # sed-swaps the fixture resolver to answer .21 -- the criterion-10 /32 deny -- between
+      # attempts. The allowlist entry itself never changes; only the resolved address does.
+      - {fqdn: rotating.fixture.lab, port: 443, upgrade: false}
     allow_cidrs: []
   codex:
     allow_fqdns:

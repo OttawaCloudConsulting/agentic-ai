@@ -238,7 +238,7 @@ the R13.2/D21 amendments land, not this feature's to do.
   route, WAN connect fails) — each per agent, against the existing `test-egress.yaml` fixture
   topology, recording the three-part verdict with the raw-socket residual named where it applies.
   Composite green.
-- [ ] **SF-3: DNS exfiltration and CDN rotation under address change.** **T4** DNS exfil per agent
+- [x] **SF-3: DNS exfiltration and CDN rotation under address change.** **T4** DNS exfil per agent
   through the stub resolver to the controlled authoritative server — both `exfil.fixture.lab`
   (default-deny) and data encoded under an **allowlisted parent** (`<data>.allowed.fixture.lab`,
   whose exact-match refusal is the D3 property, not merely default-deny) — asserting no query

