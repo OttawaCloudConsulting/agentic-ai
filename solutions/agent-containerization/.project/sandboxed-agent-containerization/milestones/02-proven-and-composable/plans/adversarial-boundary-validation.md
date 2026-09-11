@@ -253,7 +253,7 @@ the R13.2/D21 amendments land, not this feature's to do.
   blocked, appears in the egress trail, and is attributable, and that the resulting action lines
   appear in the 02.1 sink. Record the exercised-vs-not injection sources, including the stdio MCP
   blind spot (Acceptance Criterion 6). Operator runs it once at SF close; recorded.
-- [ ] **SF-5: `provisional` resolution via a shadow run under the built mediator (live, gated,
+- [x] **SF-5: `provisional` resolution via a shadow run under the built mediator (live, gated,
   unknown outcome).** Run all three agents one at a time under the **default** profile (real
   upstream — `test-fixtures` is `offline: true`) against the operator's volumes, deliberately
   exercising the single-source hosts (claude → `api.anthropic.com`; codex → `chatgpt.com` and a
@@ -464,3 +464,9 @@ at build time without gate re-approval.
 - **Originally planned:** The plan (Decision 3) says the suite drives T1–T8 "from real agent containers via `start_agents`/`in_agent`," with no distinction from SF-1's plain `in_agent`.
 - **Why necessary:** Measured live 2026-09-10/11 against the actual images: `inject_proxy_credential` (`images/entrypoint.sh`) splices the codex/agy proxy credential into `HTTPS_PROXY`/`HTTP_PROXY` as an `export` inside the entrypoint's own process (PID 1) — a fresh `docker exec` session does not attach to that process and sees the credential-free URL from compose `environment:` instead, which would 407 every codex/agy probe under plain `in_agent`. Separately, claude's proxy URL is `https://` (a TLS-wrapped CONNECT hop): its listener's mTLS requirement is on that proxy-TLS session, not on the destination TLS session inside the CONNECT tunnel, so `curl --cert/--key` (destination-leg flags) failed with `tlsv13 alert certificate required` where `--proxy-cert/--proxy-key` succeeds. `-k`/`--proxy-insecure` are needed because the mediator does not terminate destination TLS (peek+splice) and the harness's own throwaway fixture PKI is untrusted by design — the same non-verification `verify-egress-mediator.sh`'s `openssl s_client` probes rely on.
 - **Impact:** None on the mediator, policy, or any shipped file — confined to how the test harness authenticates its own probes. `in_agent` (SF-1's plain form) is unchanged and still used for the raw-socket/no-mediator rows (T5, ICMP, A2A-direct), where no proxy credential or TLS is involved.
+
+### Deviation 3: the `provisional` flip recompiled four resolved profiles, not one
+- **What changed:** `scripts/compile-policy-build.sh` recompiled `policy/resolved/default.yaml`, `github.yaml`, `kubernetes.yaml`, and `terraform.yaml`.
+- **Originally planned:** Interface Contract 6 says only `policy/resolved/default.yaml` recompiles on the flip.
+- **Why necessary:** The contract was written before 02.3 added the `github`/`kubernetes`/`terraform` profiles. Every non-test profile compiles from `policy/allowlist.base.yaml`, so all four carry the same `provisional` value; `policy/allowlist.test.yaml`'s two resolved artifacts are unaffected (own marker), matching the contract's stated exemption.
+- **Impact:** None beyond the expected scope widening — correct behavior given the profile set that exists today, not a defect in the flip itself. Carried for the milestone's consolidation pass to correct Interface Contract 6's file list.

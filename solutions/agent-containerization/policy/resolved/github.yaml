@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check --profile github
 schema: 1
 profile: github
-compiled_at: 2026-09-11T00:13:16Z
+compiled_at: 2026-09-11T15:09:24Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
@@ -11,7 +11,7 @@ compiled_from:
   packs:
     - {name: github-cli, path: packs/github-cli/pack.yaml, sha256: 8951adbd79975b067cf2f9b54bc7d1238bc9a1c3ed1e820cc709aa54aea8e5a8}
     - {name: language-runtimes, path: packs/language-runtimes/pack.yaml, sha256: 3db75d16933588a9e52c6ec1e5eaec1f51a91a5c69631173be09be50943b982e}
-provisional: true
+provisional: false
 pins: agent-verification.md
 
 agents:

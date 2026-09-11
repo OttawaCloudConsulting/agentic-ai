@@ -3,7 +3,7 @@
 # Verify with: bash scripts/compile-policy.sh --check --profile terraform
 schema: 1
 profile: terraform
-compiled_at: 2026-09-10T22:33:52Z
+compiled_at: 2026-09-11T15:09:25Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
@@ -11,7 +11,7 @@ compiled_from:
   packs:
     - {name: language-runtimes, path: packs/language-runtimes/pack.yaml, sha256: 3db75d16933588a9e52c6ec1e5eaec1f51a91a5c69631173be09be50943b982e}
     - {name: terraform, path: packs/terraform/pack.yaml, sha256: eead32ebcf5139aeb6706ec65e5f26ff7b255b0241fa0e2b8906691942e91c45}
-provisional: true
+provisional: false
 pins: agent-verification.md
 
 agents:

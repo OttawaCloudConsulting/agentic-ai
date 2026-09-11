@@ -33,9 +33,10 @@ for cidr in 169.254.0.0/16 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; 
     || fail "$DENYLIST missing required range $cidr"
 done
 
-# --- allowlist.base.yaml carries provisional: true ---
-[[ "$(yq eval '.provisional' "$ALLOWLIST")" == "true" ]] \
-  || fail "$ALLOWLIST must carry provisional: true (D17)"
+# --- allowlist.base.yaml carries provisional: false (flipped 2026-09-11, Feature 02.2 SF-5 --
+# every single-source entry cross-validated against the built mediator's own trail) ---
+[[ "$(yq eval '.provisional' "$ALLOWLIST")" == "false" ]] \
+  || fail "$ALLOWLIST must carry provisional: false (D17, post-SF-5)"
 
 # --- keyed per agent; every agent key exposes both allow_fqdns and allow_cidrs ---
 AGENTS="$(yq eval '.agents | keys | .[]' "$ALLOWLIST")"

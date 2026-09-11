@@ -2,16 +2,18 @@
 # (R5.8, D17). Keyed per agent — never a union; three separate discovery runs share this one
 # seeding pass and one cross-validation pass (see the plan's Approach section for why).
 #
-# provisional: true until every entry has agreement between two independent sources. Several do
-# not yet -- see each entry's `source` list and docs/records/egress-discovery.md for the full
-# discussion of why. Consumers of this file MUST NOT treat "provisional" as "safe to promote"
-# without reading that record first.
+# provisional was true until every entry had agreement between two independent sources. Flipped
+# to false 2026-09-11 (Feature 02.2 SF-5): the four entries that carried a single source alone
+# (claude's api.anthropic.com; codex's chatgpt.com, api.github.com, github.com) were each
+# corroborated by a second, independent source -- the built mediator's own egress trail under a
+# live shadow run on the default profile. See docs/records/boundary-validation.md's `provisional`
+# resolution section (Decision 7) for the run and the per-host verdicts.
 #
 # Blind spot (sbx, and by extension this capture method): sbx's proxy fully intercepts only
 # HTTP/HTTPS. UDP and ICMP are blocked outright and invisible to the capture -- a legitimate UDP
 # dependency in any of these three agents would not appear here and would surface later as a
-# novel failure. This is why cross-validation is mandatory and why the file stays provisional.
-provisional: true
+# novel failure. This is why cross-validation was mandatory before the flip above.
+provisional: false
 pins: agent-verification.md            # the SF-2 pins this capture was taken against (R10.6)
 sources: [sbx-discovery-capture, agent-verbose-log]
 

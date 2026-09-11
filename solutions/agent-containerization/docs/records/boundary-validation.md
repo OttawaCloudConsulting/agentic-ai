@@ -1,8 +1,8 @@
 # Boundary Validation — Feature 02.2
 
 **Feature:** `adversarial-boundary-validation.md`
-**Date:** 2026-09-11 (SF-1..SF-3 unattended rows; SF-4 live injected-repo run for claude/codex).
-SF-4's `agy` leg and SF-5 remain pending.
+**Date:** 2026-09-11 (SF-1..SF-3 unattended rows; SF-4 live injected-repo run for claude/codex;
+SF-5 live shadow run). SF-4's `agy` leg remains pending.
 **Method:** `tests/acceptance/validate-boundary.sh`, run from inside each real agent container
 (`AGENTS=(claude codex agy)`) via `start_agents`/`in_agent`/`in_agent_authed`, per the feature
 plan's Test Strategy. Every row records the three-part R12.8 verdict (blocked / logged /
@@ -13,8 +13,11 @@ authenticated state volumes on the `default` profile; both refused the exfil ste
 false`) — a valid, recorded outcome under R15.1 (injection detection is a stated Non-Goal; the
 suite does not coax an agent into attempting). `agy` did not run: `AUTH_MODE=apikey` and no
 `GEMINI_API_KEY` was present in this environment — a named gap, not a design finding. See "SF-4:
-injected-instructions repository" below. SF-5's harness (Phase 9, `BOUNDARY_SHADOW_RUN`) is built;
-its live shadow run has not been run. SF-6 (T16/SC-1-2-3 close-out) is not yet built.
+injected-instructions repository" below. SF-5's live shadow run also ran 2026-09-11: all four
+single-source allowlist entries were corroborated by the built mediator's own trail, so
+`policy/allowlist.base.yaml`'s `provisional` marker flipped `true` -> `false` (Decision 7, "all
+sources agree" branch). See "`provisional` resolution" below. SF-6 (T16/SC-1-2-3 close-out) is not
+yet built.
 
 ## Six-scenario × three-agent verdict table
 
@@ -100,10 +103,46 @@ attributable=n/a` with an inline note — this is the honest shape R12.8 demands
 
 ## `provisional` resolution
 
-Harness built (SF-5, Phase 9 of `validate-boundary.sh`, gated `BOUNDARY_SHADOW_RUN=1`, default
-`0`); the live shadow run itself has not been run yet. Four single-source entries are in scope --
-`api.anthropic.com` (claude), `chatgpt.com`, `api.github.com`, `github.com` (codex); everything
-else in `policy/allowlist.base.yaml` already carries 2+ sources. `policy/allowlist.base.yaml`'s
-`provisional` marker remains `true` pending the shadow run's second source (the built mediator's
-own egress trail on the `default` profile). See Phase 9's printed instructions for the exact
-commands and Decision 7's three outcomes.
+**Scope.** Four entries in `policy/allowlist.base.yaml` carried a single source
+(`sbx-discovery-capture` alone): `api.anthropic.com` (claude), `chatgpt.com`, `api.github.com`,
+`github.com` (codex). Everything else in the file -- `platform.claude.com`, `auth.openai.com`,
+and all of `agy`'s entries -- already carried 2+ sources and was out of scope.
+
+**Method.** Live shadow run 2026-09-11 under `BOUNDARY_SHADOW_RUN=1` (Phase 9), operator-run per
+the harness's printed instructions, on the `default` profile (real upstream) against the
+operator's own authenticated state volumes -- second source is the built mediator's own egress
+trail on the `sandboxed-agent-pod` (default) project, read via `docker exec
+sandboxed-agent-pod-egress-mediator-1 grep ... /var/log/mediator/{egress,dns}-audit.log`.
+
+- **claude**: `claude -p "Say OK and nothing else."` -- one real request.
+- **codex**: a prompt (hit `chatgpt.com`); the plan's intended `git fetch origin` against
+  `/workspace` could not run -- `/workspace` holds only `.gitkeep`, no checked-out repository
+  (`fatal: not a git repository`), an environment fact discovered here, not a boundary result.
+  Substituted a direct `curl` to `https://github.com` and `https://api.github.com` from inside the
+  codex container (same proxy credential/identity, no model tokens spent) to exercise both hosts.
+
+**Per-host verdict** (all four, `verdict=allow`, `http_status=200`, resolved and logged):
+
+| Host | Agent | `identity_source` | Expected | Match |
+|---|---|---|---|---|
+| `api.anthropic.com` | claude | `listener+mtls` | `listener+mtls` | yes |
+| `chatgpt.com` | codex | `listener+proxy_auth` | `listener+proxy_auth` | yes |
+| `github.com` | codex | `listener+proxy_auth` | `listener+proxy_auth` | yes |
+| `api.github.com` | codex | `listener+proxy_auth` | `listener+proxy_auth` | yes |
+
+**Outcome (Decision 7, "all sources agree" branch).** All four single-source entries were
+corroborated by the built mediator's own trail with the correct verdict, resolution, and
+attribution. `policy/allowlist.base.yaml`'s `provisional` marker flipped `true` -> `false`;
+`scripts/lint-policy.sh:37-38`'s check flipped from requiring `true` to requiring `false`; the
+resolved artifacts were recompiled via `scripts/compile-policy-build.sh` (Interface Contract 6) in
+the same commit. `policy/allowlist.test.yaml` and its two resolved artifacts (`test-fixtures.yaml`,
+`test-selfcheck.yaml`) are untouched -- own marker, unaffected.
+
+**Deviation from Interface Contract 6's stated scope.** The contract named only
+`policy/resolved/default.yaml` as recompiling. In practice `compile-policy-build.sh` recompiled
+**four** resolved artifacts -- `default.yaml`, `github.yaml`, `kubernetes.yaml`, `terraform.yaml`
+-- because every non-test profile compiles from `allowlist.base.yaml`, and 02.3 added the
+`github`/`kubernetes`/`terraform` profiles after this contract was written. Correct behavior, not
+a bug: every profile deriving from the base allowlist must carry the same `provisional` value.
+Carried as an Architectural Deviation for the milestone's consolidation pass, same precedent as
+01.5/01.6/02.2 Decision 1.
