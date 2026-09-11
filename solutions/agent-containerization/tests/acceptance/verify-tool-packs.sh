@@ -197,6 +197,12 @@ command -v docker >/dev/null 2>&1 || { echo "verify-tool-packs: docker is requir
 grep -n '^AGENT_BASE_DIGEST=' compose/pins.env >/dev/null \
   || { echo "verify-tool-packs: AGENT_BASE_DIGEST not found in compose/pins.env" >&2; exit 1; }
 AGENT_BASE_DIGEST="$(sed -n 's/^AGENT_BASE_DIGEST=//p' compose/pins.env | tail -n1)"
+# NODE_BASE_DIGEST has no default either (02.4 SF-1) -- BuildKit parses every FROM in
+# the file before pruning to --target, so pack-plan/agent-base's FROM lines still need
+# it even though --target agent-packs never builds those stages.
+grep -n '^NODE_BASE_DIGEST=' compose/pins.env >/dev/null \
+  || { echo "verify-tool-packs: NODE_BASE_DIGEST not found in compose/pins.env" >&2; exit 1; }
+NODE_BASE_DIGEST="$(sed -n 's/^NODE_BASE_DIGEST=//p' compose/pins.env | tail -n1)"
 
 B_TMP="$(mktemp -d)"
 B_CREDS_DIR="$B_TMP/credentials"
@@ -222,7 +228,8 @@ expect 0 "ok -- secret set matches the manifests, no other drift from default" \
   bash scripts/check-profile-compose.sh --profile default
 
 if docker build -f images/Dockerfile --target agent-packs \
-     --build-arg "AGENT_BASE_DIGEST=${AGENT_BASE_DIGEST}" --build-arg PROFILE=sf7-probe \
+     --build-arg "AGENT_BASE_DIGEST=${AGENT_BASE_DIGEST}" \
+     --build-arg "NODE_BASE_DIGEST=${NODE_BASE_DIGEST}" --build-arg PROFILE=sf7-probe \
      -t "$B_IMAGE" . > "$B_TMP/build.log" 2>&1; then
   pass "B: agent-packs image builds for a profile carrying a pack env + credential"
 else

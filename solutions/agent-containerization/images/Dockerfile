@@ -37,7 +37,11 @@
 # real one.
 ARG AGENT_BASE_DIGEST
 
-FROM node:22-slim AS pack-plan
+# node:22-slim resolved by INDEX digest (multi-platform, Edge Case 8), consumed at both
+# FROMs below. No default, for the same reason AGENT_BASE_DIGEST has none (02.4 SF-1).
+ARG NODE_BASE_DIGEST
+
+FROM node:22-slim@${NODE_BASE_DIGEST} AS pack-plan
 
 ARG YQ_VERSION=v4.47.2
 ARG YQ_SHA256_ARM64=05df1f6aed334f223bb3e6a967db259f7185e33650c3b6447625e16fea0ed31f
@@ -75,13 +79,7 @@ RUN bash /usr/local/bin/pack-plan "${PROFILE}" /src /out
 
 # ==================================================================================
 # agent-base -- profile-INDEPENDENT. This is the stage SF-6 publishes to GHCR.
-FROM node:22-slim AS agent-base
-
-# `xz-utils` is 01.5 SF-5's addition to this line: node:22-slim ships no `xz`, and the
-# Node archive the reference pack pins is a .tar.xz. Found by building, not by reading.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl bubblewrap iproute2 xz-utils \
-    && rm -rf /var/lib/apt/lists/*
+FROM node:22-slim@${NODE_BASE_DIGEST} AS agent-base
 
 COPY images/keyrings/debian-archive.gpg /usr/local/share/keyrings/debian-archive.gpg
 COPY --chmod=0755 images/apt-pinned.sh /usr/local/bin/apt-pinned
@@ -99,6 +97,12 @@ COPY --chmod=0755 images/remove-package-managers.sh /usr/local/bin/remove-packag
 # without a git binary; making them depend on which packs a profile happens to select
 # would let a profile pass every gate and still mount a file nothing can read.
 #
+# `ca-certificates curl bubblewrap iproute2 xz-utils` moved onto the same pinned snapshot
+# as `git` (02.4 SF-1b): each republish previously drew these five from the rolling
+# archive, so the fingerprint (Decision 4) would show drift with no recorded cause.
+# `xz-utils` is 01.5 SF-5's addition: node:22-slim ships no `xz`, and the Node archive the
+# reference pack pins is a .tar.xz. Found by building, not by reading.
+#
 # The pins are build args rather than profile fields BECAUSE this stage is
 # profile-independent: it is what CI publishes, and a stage that read a profile would
 # make the published base vary per profile, contradicting D10. compose/pins.env carries
@@ -110,9 +114,31 @@ ARG SNAPSHOT_SUITE=bookworm
 ARG SNAPSHOT_FINGERPRINT=B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8
 ARG GIT_VERSION=1:2.39.5-0+deb12u3
 ARG GIT_SHA256=435176549a9f5c8bbadaa126b64a036b38ea34ad9f3eb128dc40b8407a5b5620
+ARG CA_CERTIFICATES_VERSION=20230311+deb12u1
+ARG CA_CERTIFICATES_SHA256=0d5f444f594e48c1e16a41d8fc628a09b24c658916a1274025c2330f2a802bed
+ARG CURL_VERSION=7.88.1-10+deb12u15
+ARG CURL_SHA256=880d20cb636d2c36b2f57c58ab284b442a1680365b488d3e696c147c4d84ef25
+ARG BUBBLEWRAP_VERSION=0.8.0-2+deb12u1
+ARG BUBBLEWRAP_SHA256=d044ba1d7961d835669035fcd1e11121f1dc960a1a2e1c6489a93ea44e083557
+ARG IPROUTE2_VERSION=6.1.0-3
+ARG IPROUTE2_SHA256=58fad55c5a29be6c1e6301d0c572f2ac5e5962ff244e7da3784c1b29ffc6c6bf
+ARG XZ_UTILS_VERSION=5.4.1-1+deb12u1
+ARG XZ_UTILS_SHA256=c75a1418753c03c3f8c544222381102da317bc42b251a12f46ad0227964a8830
+# ca-certificates + curl bootstrapped UNPINNED from node:22-slim's default (plain-HTTP,
+# already-trusted) sources first -- apt-pinned.sh needs both to fetch and TLS-verify the
+# snapshot's InRelease over https, and neither exists in node:22-slim (measured: only
+# gpgv and apt-get ship). The pinned re-run below replaces both with the exact pinned
+# .debs, so nothing unpinned survives into the final layer.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
 RUN bash /usr/local/bin/apt-pinned \
       /usr/local/share/keyrings/debian-archive.gpg \
       "${SNAPSHOT_URL}" "${SNAPSHOT_SUITE}" "${SNAPSHOT_FINGERPRINT}" \
+      "ca-certificates=${CA_CERTIFICATES_VERSION}=${CA_CERTIFICATES_SHA256}" \
+      "curl=${CURL_VERSION}=${CURL_SHA256}" \
+      "bubblewrap=${BUBBLEWRAP_VERSION}=${BUBBLEWRAP_SHA256}" \
+      "iproute2=${IPROUTE2_VERSION}=${IPROUTE2_SHA256}" \
+      "xz-utils=${XZ_UTILS_VERSION}=${XZ_UTILS_SHA256}" \
       "git=${GIT_VERSION}=${GIT_SHA256}"
 
 # node:22-slim ships a uid/gid-1000 `node` user. Rename it to `agent`

@@ -161,7 +161,14 @@ done
 # Installing the verified local files pulls their dependency closure from the pinned
 # snapshot. The declared packages are installed from the bytes this script hashed --
 # not re-fetched afterwards.
-apt-get install -y -qq --no-install-recommends "${APT_OPTS[@]}" "$debs"/*.deb
+#
+# --allow-downgrades: a caller (e.g. TLS bootstrap) may have already installed a NEWER
+# version of a package this call also pins, from whatever default sources were live at
+# that moment (02.4 SF-1, ca-certificates measured newer than the 2026-09-01 bookworm
+# snapshot). The pin is authoritative either direction -- apt's default refusal to
+# downgrade would silently leave the bootstrap version in the image instead of failing
+# loud, which is the one failure mode this script exists to prevent.
+apt-get install -y -qq --no-install-recommends --allow-downgrades "${APT_OPTS[@]}" "$debs"/*.deb
 
 apt-get clean
 rm -rf /var/lib/apt/lists/*

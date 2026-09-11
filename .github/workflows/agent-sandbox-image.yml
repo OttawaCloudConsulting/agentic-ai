@@ -142,7 +142,7 @@ jobs:
           # CI invocation locally with the variable unset: it failed; with it set, it builds.
           # The ARG still gets NO DEFAULT -- that is Edge Case 11's contract and the reason
           # an unset digest must never resolve to a tag.
-          for a in SNAPSHOT_URL SNAPSHOT_SUITE SNAPSHOT_FINGERPRINT GIT_VERSION GIT_SHA256 AGENT_BASE_DIGEST; do
+          for a in SNAPSHOT_URL SNAPSHOT_SUITE SNAPSHOT_FINGERPRINT GIT_VERSION GIT_SHA256 AGENT_BASE_DIGEST NODE_BASE_DIGEST; do
             v="$(sed -n "s/^[[:space:]]*${a}=//p" compose/pins.env | tail -n 1)"
             v="${v%\"}"; v="${v#\"}"; v="${v%\'}"; v="${v#\'}"
             [ -n "$v" ] || { echo "compose/pins.env does not define ${a}" >&2; exit 1; }
@@ -193,6 +193,7 @@ jobs:
             GIT_VERSION=${{ env.GIT_VERSION }}
             GIT_SHA256=${{ env.GIT_SHA256 }}
             AGENT_BASE_DIGEST=${{ env.AGENT_BASE_DIGEST }}
+            NODE_BASE_DIGEST=${{ env.NODE_BASE_DIGEST }}
 
       # The digest is this job's actual product. It goes to the run summary because the
       # operator has to COPY it into compose/pins.env by hand -- a deliberate, reviewed

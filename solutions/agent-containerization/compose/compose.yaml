@@ -188,6 +188,9 @@ services:
         SQUID_VERSION: ${SQUID_VERSION}
         UNBOUND_VERSION: ${UNBOUND_VERSION}
         DNSDIST_VERSION: ${DNSDIST_VERSION}
+        SNAPSHOT_URL: ${MEDIATOR_SNAPSHOT_URL}
+        SNAPSHOT_SUITE: ${MEDIATOR_SNAPSHOT_SUITE}
+        SNAPSHOT_FINGERPRINT: ${MEDIATOR_SNAPSHOT_FINGERPRINT}
         YQ_VERSION: ${YQ_VERSION}
         YQ_SHA256_ARM64: ${YQ_SHA256_ARM64}
         YQ_SHA256_AMD64: ${YQ_SHA256_AMD64}
@@ -401,6 +404,7 @@ services:
         # substitutes empty, and images/Dockerfile's FROM then dies on `...@`, which is
         # the intended end state -- pins.env is where the value lives.
         AGENT_BASE_DIGEST: ${AGENT_BASE_DIGEST}
+        NODE_BASE_DIGEST: ${NODE_BASE_DIGEST}
     image: sandboxed-agent/claude:local
     networks:
       - claude-net
@@ -477,6 +481,7 @@ services:
         # substitutes empty, and images/Dockerfile's FROM then dies on `...@`, which is
         # the intended end state -- pins.env is where the value lives.
         AGENT_BASE_DIGEST: ${AGENT_BASE_DIGEST}
+        NODE_BASE_DIGEST: ${NODE_BASE_DIGEST}
     image: sandboxed-agent/codex:local
     networks:
       - codex-net
@@ -542,6 +547,7 @@ services:
         # substitutes empty, and images/Dockerfile's FROM then dies on `...@`, which is
         # the intended end state -- pins.env is where the value lives.
         AGENT_BASE_DIGEST: ${AGENT_BASE_DIGEST}
+        NODE_BASE_DIGEST: ${NODE_BASE_DIGEST}
     image: sandboxed-agent/agy:local
     networks:
       - agy-net

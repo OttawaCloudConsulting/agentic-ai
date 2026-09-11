@@ -135,10 +135,6 @@ RUN bash /src/scripts/compile-stage.sh drift /out /src/policy/resolved
 # ==================================================================================
 FROM base AS runtime
 
-ARG SQUID_VERSION=6.13-2+deb13u2
-ARG UNBOUND_VERSION=1.22.0-2+deb13u3
-ARG DNSDIST_VERSION=1.9.16-0+deb13u1
-
 # `squid-openssl`, not `squid`: the OpenSSL-linked build is what supplies
 # `ssl_bump peek`/`splice` and `https_port`, and it is the package SF-1 verified.
 #
@@ -160,12 +156,47 @@ ARG DNSDIST_VERSION=1.9.16-0+deb13u1
 #     client's EDNS client-subnet and cookie reach the upstream verbatim.
 #
 # Neither is redundant -- each closes exactly what the other cannot.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      "squid-openssl=${SQUID_VERSION}" \
-      "unbound=${UNBOUND_VERSION}" \
-      "dnsdist=${DNSDIST_VERSION}" \
-      ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+#
+# 02.4 SF-1c: moved onto a DATED trixie snapshot via the same apt-pinned.sh mechanism
+# images/Dockerfile uses for agent-base, rather than the live rolling trixie archive.
+# Version pins alone do not survive a point release superseding the pinned version in
+# place; a dated snapshot makes a future clean rebuild fail loudly (T18) instead of
+# drifting silently. Trixie's archive signing key differs from bookworm's, hence the
+# separate keyring. DNSDIST_VERSION corrected from 1.9.16-0+deb13u1, which measurement
+# during SF-1c planning found does not exist in Debian's trixie archive at any point
+# checked (live or snapshots back to 2026-08-15) -- 1.9.15-0+deb13u1 is the version
+# that was actually resolving from the live archive default in every prior build.
+ARG SNAPSHOT_URL=https://snapshot.debian.org/archive/debian/20260910T203409Z/
+ARG SNAPSHOT_SUITE=trixie
+ARG SNAPSHOT_FINGERPRINT=04B54C3CDCA79751B16BC6B5225629DF75B188BD
+ARG SQUID_VERSION=6.13-2+deb13u2
+ARG SQUID_SHA256=31aecf295fdb7c8b888b0771a4e9faa08a2189a989ed34011b11544fe5bc0fa2
+ARG UNBOUND_VERSION=1.22.0-2+deb13u3
+ARG UNBOUND_SHA256=75e99348ad28af5ecebc58572f7df7a277ad2c453ba34ebf955ba4fdd7e7da4e
+ARG DNSDIST_VERSION=1.9.15-0+deb13u1
+ARG DNSDIST_SHA256=9840a1f60c51713473638e2a766ab14f813f6b9980df362bdf739b933bb7a502
+ARG CA_CERTIFICATES_VERSION=20250419
+ARG CA_CERTIFICATES_SHA256=ef590f89563aa4b46c8260d49d1cea0fc1b181d19e8df3782694706adf05c184
+COPY images/keyrings/debian-archive-trixie.gpg /usr/local/share/keyrings/debian-archive-trixie.gpg
+COPY --chmod=0755 images/apt-pinned.sh /usr/local/bin/apt-pinned
+# ca-certificates + curl + gpgv bootstrapped UNPINNED from the base image's default
+# (plain-HTTP, already-trusted) sources -- apt-pinned.sh needs all three to fetch and
+# verify the snapshot's InRelease, and NONE exist in debian:trixie-slim (measured; unlike
+# node:22-slim, which ships gpgv). The pinned re-run below replaces this ca-certificates
+# with the exact pinned .deb; curl and gpgv are removed afterward because the runtime
+# image has no other use for either.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gpgv \
+    && rm -rf /var/lib/apt/lists/* \
+    && bash /usr/local/bin/apt-pinned \
+      /usr/local/share/keyrings/debian-archive-trixie.gpg \
+      "${SNAPSHOT_URL}" "${SNAPSHOT_SUITE}" "${SNAPSHOT_FINGERPRINT}" \
+      "squid-openssl=${SQUID_VERSION}=${SQUID_SHA256}" \
+      "unbound=${UNBOUND_VERSION}=${UNBOUND_SHA256}" \
+      "dnsdist=${DNSDIST_VERSION}=${DNSDIST_SHA256}" \
+      "ca-certificates=${CA_CERTIFICATES_VERSION}=${CA_CERTIFICATES_SHA256}" \
+    && apt-get purge -y --auto-remove curl gpgv \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /usr/local/bin/apt-pinned
 
 # Runtime uid/gid. The `proxy` user (13:13) ships with the Squid package and owns
 # its packaged directories, so using it avoids a second identity owning the same
