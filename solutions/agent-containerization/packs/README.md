@@ -73,6 +73,11 @@ reaches `policy/resolved/`. Conflating the two is exactly how a pack would silen
 runtime registry reach — the pack fetches Go from `go.dev` at build, and an agent then reaches
 `go.dev` at runtime for the rest of the image's life.
 
+Non-pack build-time fetch hosts (registries, Debian archives, npm, GitHub releases, the `agy`
+bucket) are declared separately in `images/build-allowlist.yaml`, statically checked by
+`tests/acceptance/verify-reproducibility.sh` phase B (R10.4) — not compiled, not enforced at
+build time, see `docs/records/reproducibility.md` for the recorded finding.
+
 ### Every *declared* package carries a checksum, `apt` items included
 
 R7.3 is a MUST and says "checksums" without qualification. The argument that a signed `Release`

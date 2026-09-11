@@ -17,7 +17,7 @@ still building. See [`progress.txt`](progress.txt) for current gate/feature stat
 
 **Entry point** (requires Docker Desktop; builds the pod cold on first run):
 
-```
+```bash
 docker compose --env-file compose/pins.env \
   -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
 ```
@@ -82,19 +82,44 @@ The recommendation is therefore: **default-deny allowlist as the primary control
 
 ## Bring-Up
 
-Two things must happen before `docker compose up`, and both are ordering, not preference.
+One ordered sequence, top to bottom. Each step depends on the one before it.
 
-**1. Issue the proxy-hop trust material.** The Compose `secrets:` have `file:` sources pointing
+**1. Prerequisites.** macOS 26 on Apple silicon, Docker Desktop, and `git` (via the Xcode
+command-line tools). Docker Desktop cannot be installed by script — install it manually from
+https://www.docker.com/products/docker-desktop/ before continuing.
+
+**2. Clone and enter the solution directory.**
+
+```bash
+git clone <repository-url>
+cd agentic-ai/solutions/agent-containerization
+```
+
+**3. Install host CLI dependencies.**
+
+```bash
+bash scripts/install-deps.sh
+```
+
+Checks for (and installs if missing) `docker`, `openssl`, `curl`, `jq`, `yq`. `sbx` is a discovery
+tool (D17), not a runtime dependency this pod needs — pass `--with-sbx` if you want it installed
+too, then `sbx login`.
+
+**4. Issue the proxy-hop trust material.** The Compose `secrets:` have `file:` sources pointing
 into `mediator/identity/`, which is generated and git-ignored — the project fails to start if the
 certificates do not exist. The listener certificates carry an `iPAddress` SAN for the mediator's
-static address on that agent's network, so the addresses below must match `compose/compose.yaml`'s
-`ipam` blocks. See `mediator/identity/README.md` for the lifecycle, renewal and revocation paths.
+static address on that agent's network, so the `--ip` values below must match
+`compose/compose.yaml`'s `ipam` blocks. See `mediator/identity/README.md` for the lifecycle,
+renewal and revocation paths.
 
 ```bash
 bash scripts/issue-identity.sh ca
 bash scripts/issue-identity.sh listener claude --ip 172.31.10.2
 bash scripts/issue-identity.sh listener codex  --ip 172.31.20.2
 bash scripts/issue-identity.sh listener agy    --ip 172.31.30.2
+bash scripts/issue-identity.sh client     claude
+bash scripts/issue-identity.sh credential codex
+bash scripts/issue-identity.sh credential agy
 bash scripts/issue-identity.sh status
 ```
 
@@ -106,12 +131,30 @@ point the SNI control enforces nothing. The certificate is never presented on an
 (peek+splice hands the origin's own chain through untouched) and `codex` neither trusts nor
 validates it. The mediator refuses to start without it. See the feature plan's Deviation 5.
 
-**2. Bring the pod up with the profile override layered on.**
+**5. Bring the pod up.** This is the only entry point — no wrapper script.
 
 ```bash
 docker compose --env-file compose/pins.env \
-  -f compose/compose.yaml -f compose/overrides/default.yaml up -d --build
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
 ```
+
+`--env-file` is required: Compose interpolates version pins from it into the image builds, and
+without it the build fails. `--build` and `--force-recreate` are both load-bearing — see the entry
+point note above.
+
+**6. Authenticate each agent.** See ["First-run authentication"](#first-run-authentication) below
+for the per-agent commands (`claude` paste-back, `codex` device code, `agy`'s `GEMINI_API_KEY`).
+
+**7. Verify.**
+
+```bash
+bash scripts/issue-identity.sh status
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml logs egress-mediator | grep startup_check
+```
+
+See ["The startup self-check"](#the-startup-self-check) below for what a passing result looks
+like.
 
 ### The project mount must not be this solution tree
 
@@ -172,6 +215,23 @@ The **callback forward** is the documented alternative for operators who want it
 `127.0.0.1:1455:1455` (fallback 1457) via a layerable fragment. It is not the default — opening a
 host port the headless path does not need is the wrong default under R2.8.
 
+**`agy`'s `GEMINI_API_KEY` comes from the host shell, never a file.** Compose wires no
+`GEMINI_API_KEY` (`images/bootstrap-auth.sh:215`) — it is not in `pins.env`, not in any Compose
+`environment:` block, and not written to the state volume. Set it in your host shell (`read -rs
+GEMINI_API_KEY` if you want it off your terminal history) and pass it through at invocation time:
+
+```bash
+export GEMINI_API_KEY=...   # host shell only, never committed or logged
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml \
+  run --rm -e GEMINI_API_KEY agy bash /usr/local/bin/bootstrap-auth agy
+```
+
+Or, against an already-running container: `docker compose ... exec -e GEMINI_API_KEY agy bash
+/usr/local/bin/bootstrap-auth agy`. An unset key passes through empty and `bootstrap-auth` exits
+`3` naming it. **`agy` needs a paid-tier API key** — see `docs/records/third-party-assessments.md`
+for the free-tier limitation this works around.
+
 **On exit 4:** the OAuth endpoints must be in the allowlist, and an allowlist edit is **inert until
 the policy is recompiled and the mediator image rebuilt** — the mediator reads its policy from its
 own image layer, not from a bind mount:
@@ -219,7 +279,7 @@ docker compose --env-file compose/pins.env \
 # 3. Steady state. The bootstrap fragment is NOT layered -- the credential source is absent
 #    from the running pod entirely.
 CODEX_AUTH_MODE=oauth-mount docker compose --env-file compose/pins.env \
-  -f compose/compose.yaml -f compose/overrides/default.yaml up -d
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
 ```
 
 What is mounted is `compose/generated/oauth-src/` — a **dedicated directory** holding exactly two
@@ -283,7 +343,7 @@ bash scripts/scrub-gitconfig.sh          # writes compose/generated/gitconfig.d/
 docker compose --env-file compose/pins.env \
   -f compose/compose.yaml \
   -f compose/overrides/default.yaml \
-  -f compose/overrides/host-gitconfig.yaml up -d
+  -f compose/overrides/host-gitconfig.yaml up --build --force-recreate
 ```
 
 What gets mounted is the **scrubbed artifact**, never your own `~/.gitconfig`. The scrub removes
@@ -344,8 +404,9 @@ bash scripts/compile-policy-build.sh
 git diff policy/resolved/default.yaml     # review before committing
 git add policy/resolved/default.yaml && git commit
 
-# 3. Rebuild. `--build` is required, not decorative -- see "Bring-Up".
-docker compose --env-file compose/pins.env   -f compose/compose.yaml -f compose/overrides/default.yaml up -d --build
+# 3. Rebuild. `--build` and `--force-recreate` are both required, not decorative -- see "Bring-Up".
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
 ```
 
 Removing a pack is the same three steps with the name deleted. **The rebuild is what removes the
@@ -356,6 +417,48 @@ agent build's `COPY` layer, so a changed pack set always produces a different im
 Every `apt` item a manifest declares is verified against its recorded SHA-256 before installation,
 and the snapshot repository's `InRelease` is checked with `gpgv` against the full key fingerprint
 the profile pins. `packs/README.md` records precisely what that covers and what it does not.
+
+### Changing the allowlist (R12.3)
+
+A new third-party host follows this chain, in order:
+
+1. **Record the third party first, if it's pack-declared.** A new `egress.runtime` host added to
+   a pack's `packs/<pack>/pack.yaml` needs a matching `third_parties[]` entry whose `record` field
+   points at an anchor (`id="..."`) in an assessment document such as
+   `docs/records/third-party-assessments.md`. `scripts/lint-policy.sh` and `scripts/compile-policy.sh`
+   (R14.1) both refuse a pack manifest with runtime egress and an empty or unresolved
+   `third_parties` list — a host with no assessment record never reaches policy compilation. Edits
+   to the three core agents' `policy/allowlist.base.yaml` (not pack-declared) carry no equivalent
+   schema field; document the source and evidence in the file's own comments, per the
+   discovery-capture convention already there.
+2. **Edit** the manifest (`policy/allowlist.base.yaml` or the pack's `pack.yaml`).
+3. **Recompile:** `bash scripts/compile-policy-build.sh` — review the diff in `policy/resolved/`
+   before committing.
+4. **The drift gate.** The mediator's build stage recompiles the policy itself and refuses to
+   produce an image whose baked-in policy differs from the committed `policy/resolved/` artifacts
+   (`compile-stage: DRIFT`).
+5. **Rebuild the mediator** (see "Bring-Up" step 5 — `--build --force-recreate`, both required).
+6. **Re-validate** the affected profile(s):
+   `BOUNDARY_PROFILES="<profile>" bash tests/acceptance/validate-boundary.sh`.
+
+The change lands on `main` by pull request, reviewed by the **security reviewer** role. There is
+no schema field enforcing this and no CODEOWNERS file — `main` carries no branch protection, so
+this is a documented procedure, not a mechanism.
+
+### Updating an agent version (R10.6)
+
+1. Bump the relevant pin in `compose/pins.env` (or, for `agy`, note that it has no version flag —
+   its install script always resolves the latest manifest entry at build time; see
+   `docs/records/agent-verification.md` for what that means for pinning).
+2. Update `docs/records/agent-verification.md`'s version table. `check_pin_agreement()` in
+   `tests/acceptance/verify-pod-topology.sh` enforces the pins/record agreement.
+3. For `agy` specifically: resolve the manifest URL and SHA-512 by hand, since there is no version
+   flag to pin against.
+4. Rebuild (`--build --force-recreate`).
+5. **Re-verify the policy:** `BOUNDARY_SHADOW_RUN=1 bash tests/acceptance/validate-boundary.sh` —
+   a version bump can change an agent's outbound host set.
+6. If the shadow run surfaces a host not already on the allowlist, amend it through the
+   "Changing the allowlist" procedure above.
 
 ### The image build pipeline, and the profile that selects it
 
@@ -489,7 +592,7 @@ volume at `/build-cache`, layer the fragment:
 docker compose --env-file compose/pins.env \
   -f compose/compose.yaml \
   -f compose/overrides/default.yaml \
-  -f compose/overrides/build-cache.yaml up -d
+  -f compose/overrides/build-cache.yaml up --build --force-recreate
 ```
 
 One volume **per agent**, never shared — a shared cache is a write channel between two containers
@@ -801,11 +904,11 @@ chmod 0600 compose/generated/credentials/github/github-cli/github-token
 #    the mediator's MEDIATOR_PROFILE -- compose.yaml binds MEDIATOR_PROFILE to
 #    ${AGENT_PROFILE:-default} by default, so one variable drives both.
 AGENT_PROFILE=github docker compose --env-file compose/pins.env \
-  -f compose/compose.yaml -f compose/overrides/github.yaml up -d --build --force-recreate
+  -f compose/compose.yaml -f compose/overrides/github.yaml up --build --force-recreate
 
 # 3. Switch back.
 docker compose --env-file compose/pins.env \
-  -f compose/compose.yaml -f compose/overrides/default.yaml up -d --build --force-recreate
+  -f compose/compose.yaml -f compose/overrides/default.yaml up --build --force-recreate
 ```
 
 `compose/generated/credentials/` is git-ignored. **Rotation is a file swap plus

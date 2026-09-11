@@ -12,7 +12,15 @@
 # Phase C (SF-2): T45 -- the pinned AGENT_BASE_DIGEST carries an SBOM and SLSA
 # provenance naming a github.com Actions run, and that run's own metadata is
 # checked against criterion 1's five facts.
-# Phase D lands in SF-3.
+# Phase D (SF-3): T39 -- docker compose is the only entry point. No committed script
+# under scripts/ or images/ invokes the real pod (compose/compose.yaml +
+# compose/pins.env) with up/start/run, except scripts/run-shadow-run-sf5.sh -- a named,
+# recorded exception: it is a live boundary-verification harness (02.2 SF-5), not an
+# operator bring-up path, and R12.9 bars a wrapper on the entry point, not test tooling
+# that deliberately drives the real pod for measurement. README `up` invocations all use
+# the one canonical form, every README `docker compose` line carries `--env-file
+# compose/pins.env`, and the README's identity commands and listener IPs agree with
+# mediator/identity/README.md and compose/compose.yaml's ipam blocks.
 #
 # Requires: yq (mikefarah/yq), git, docker (buildx), jq, curl.
 set -euo pipefail
@@ -352,6 +360,102 @@ else
     rm -f "$RUN_TMP"
   fi
 fi
+
+# ---------------------------------------------------------------------------
+# Phase D (SF-3) -- T39: docker compose is the only entry point.
+# ---------------------------------------------------------------------------
+phase D "entry point -- docker compose is the only entry point"
+
+README_FILE="$ROOT/README.md"
+IDENTITY_README="$ROOT/mediator/identity/README.md"
+COMPOSE_FILE="$ROOT/compose/compose.yaml"
+
+# D.1 -- No committed script under scripts/ or images/ invokes the real pod
+# (a line referencing compose/compose.yaml) with up/start/run, except the one
+# named, recorded exception above (02.2 SF-5's live shadow-run harness).
+WRAPPER_VIOLATIONS=0
+while IFS= read -r -d '' f; do
+  rel="${f#"$ROOT"/}"
+  grep -q 'compose/compose\.yaml' "$f" 2>/dev/null || continue
+  hits="$(grep -nE '(docker compose|COMPOSE\[@\])' "$f" 2>/dev/null \
+    | grep -E '\b(up|start|run)\b' \
+    | grep -vE ':[[:space:]]*(#|echo|printf)' || true)"
+  [ -n "$hits" ] || continue
+  if [ "$rel" = "scripts/run-shadow-run-sf5.sh" ]; then
+    note "D: $rel invokes docker compose up/run against the real pod -- recorded exception (02.2 SF-5 live boundary-verification harness, not an operator entry point)"
+  else
+    fail "D: $rel invokes docker compose against the real pod with up/start/run -- R12.9 bars a wrapper on the entry point"
+    WRAPPER_VIOLATIONS=$((WRAPPER_VIOLATIONS + 1))
+  fi
+done < <(find "$ROOT/scripts" "$ROOT/images" -name '*.sh' -print0 2>/dev/null)
+[ "$WRAPPER_VIOLATIONS" -eq 0 ] && pass "D: no unrecorded wrapper script invokes the real pod with up/start/run"
+
+# D.2/D.3 -- README docker compose invocations, extracted from ```bash fenced
+# blocks with backslash-continuation lines joined into one logical line each.
+JOINED_CMDS="$(awk '
+  /^```bash/ { infence=1; buf=""; next }
+  /^```/ { if (infence && buf != "") print buf; infence=0; buf=""; next }
+  infence {
+    line=$0
+    if (sub(/\\[[:space:]]*$/, "", line)) { buf = buf line " " }
+    else { buf = buf line; print buf; buf="" }
+  }
+' "$README_FILE")"
+
+DOCKER_LINES="$(printf '%s\n' "$JOINED_CMDS" | grep -n 'docker compose' || true)"
+
+BAD_ENV=0
+BAD_UP=0
+if [ -n "$DOCKER_LINES" ]; then
+  while IFS=: read -r n line; do
+    case "$line" in
+      *"--env-file compose/pins.env"*) ;;
+      *) fail "D: README.md docker compose invocation missing --env-file compose/pins.env: ${line}"; BAD_ENV=$((BAD_ENV + 1)) ;;
+    esac
+    if printf '%s' "$line" | grep -qE '\bup\b'; then
+      if printf '%s' "$line" | grep -qE 'up[[:space:]]+--build[[:space:]]+--force-recreate([[:space:]]*$|[[:space:]]+#)'; then
+        :
+      else
+        fail "D: README.md docker compose 'up' invocation is not the canonical '--build --force-recreate' form: ${line}"
+        BAD_UP=$((BAD_UP + 1))
+      fi
+    fi
+  done <<< "$DOCKER_LINES"
+fi
+[ "$BAD_ENV" -eq 0 ] && pass "D: every README docker compose invocation carries --env-file compose/pins.env"
+[ "$BAD_UP" -eq 0 ] && pass "D: every README docker compose 'up' invocation uses the canonical --build --force-recreate form"
+
+# D.4 -- README identity commands superset the mediator/identity/README.md issuance list.
+normalize() { sed -E 's/--ip .*$/--ip X/' | tr -s ' '; }
+ISSUANCE_CMDS="$(awk '
+  /^\*\*Issuance\.\*\*/ { f=1; next }
+  f && /^```bash/ { c=1; next }
+  f && c && /^```/ { exit }
+  f && c { print }
+' "$IDENTITY_README")"
+
+README_NORMALIZED="$(normalize < "$README_FILE")"
+MISSING_ID=0
+while IFS= read -r cmd; do
+  [ -z "$cmd" ] && continue
+  norm_cmd="$(printf '%s' "$cmd" | normalize)"
+  printf '%s\n' "$README_NORMALIZED" | grep -qF "$norm_cmd" \
+    || { fail "D: README.md is missing an identity command from mediator/identity/README.md's issuance list: $cmd"; MISSING_ID=$((MISSING_ID + 1)); }
+done <<< "$ISSUANCE_CMDS"
+[ "$MISSING_ID" -eq 0 ] && pass "D: README identity commands agree with mediator/identity/README.md's issuance list"
+
+# D.5 -- README listener --ip values equal compose.yaml's mediator addresses.
+NET_LINE="$(grep -m1 'MEDIATOR_AGENT_NETWORKS' "$COMPOSE_FILE" || true)"
+IP_MISMATCH=0
+for agent in claude codex agy; do
+  compose_ip="$(printf '%s' "$NET_LINE" | grep -oE "${agent}=[0-9.]+" | cut -d= -f2)"
+  readme_ip="$(grep -oE "listener ${agent}[[:space:]]+--ip [0-9.]+" "$README_FILE" | grep -oE '[0-9.]+$' | head -1)"
+  if [ -z "$compose_ip" ] || [ -z "$readme_ip" ] || [ "$compose_ip" != "$readme_ip" ]; then
+    fail "D: README listener --ip for $agent ('${readme_ip:-<absent>}') does not match compose.yaml's mediator address ('${compose_ip:-<absent>}')"
+    IP_MISMATCH=$((IP_MISMATCH + 1))
+  fi
+done
+[ "$IP_MISMATCH" -eq 0 ] && pass "D: README listener --ip values agree with compose.yaml's mediator addresses"
 
 echo
 echo "=== Results: $PASSED passed, $FAILED failed ==="

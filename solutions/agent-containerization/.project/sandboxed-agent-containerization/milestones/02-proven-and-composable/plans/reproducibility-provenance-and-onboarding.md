@@ -341,7 +341,7 @@ the repin.
   - Phase C: T45 per Decision 2 — SBOM, provenance, run API.
   - SF-2 closes with phase C failing **only** on `head_branch` (and the label), and that expected
     red is recorded. Every other T45 assertion must pass against the SF-1 branch digest.
-- [ ] **SF-3: Onboarding and procedures.**
+- [x] **SF-3: Onboarding and procedures.**
   - README Bring-Up rewritten as one ordered sequence: prerequisites → `install-deps.sh` → the
     eight identity commands → the one `up` form → first-run auth for three agents.
   - The status paragraph is corrected to current state without lifting the R12.8 notice. It is

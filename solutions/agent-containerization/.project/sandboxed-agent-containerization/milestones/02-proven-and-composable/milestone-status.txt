@@ -22,7 +22,7 @@
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 2/6 complete
+    Sub-features: 3/6 complete
     Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
     node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
     bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
@@ -53,6 +53,30 @@
     Found and fixed while building phase B: yq v4.53.6 rejects `[]?.fqdn // empty`
     (`lexer: invalid input text "empty"`) -- rewritten as `[].fqdn` per pack file, since every
     shipped pack.yaml already declares a non-empty egress.build.allow_fqdns.
+    SF-3 (2026-09-11): README Bring-Up rewritten as one ordered 1-7 sequence (prerequisites,
+    clone, install-deps.sh, all eight issue-identity.sh commands including the three previously
+    missing -- client claude, credential codex, credential agy -- canonical up, first-run auth,
+    verify). Normalized every documented `docker compose ... up` invocation in README.md to the
+    one canonical `--build --force-recreate` form (found and fixed: two conflicting forms at the
+    entry point/Bring-Up and in "Adding or removing a pack", plus `-d` on four more layered-
+    fragment invocations -- oauth-mount steady state, host-gitconfig, build-cache, the two
+    `github` profile switches). Added `agy`'s `GEMINI_API_KEY` delivery path (`exec -e`/`run --rm
+    -e`, host shell only, paid-tier note) -- corrected the plan's cited `bootstrap-auth.sh:43` to
+    the actual `:215`. Added "Changing the allowlist" (R12.3, reviewer role, corrected from the
+    plan's assumption that R14.1's third_parties record applies to `policy/allowlist.base.yaml` --
+    it only applies to pack manifests, verified against `lint-policy.sh`/`compile-policy.sh`) and
+    "Updating an agent version" (R10.6, citing `check_pin_agreement()` in
+    `verify-pod-topology.sh`, not a standalone script as the plan assumed). `install-deps.sh`
+    gained `--with-sbx` (sbx no longer checked by default, D17/R11.3). `packs/README.md` gained a
+    one-line pointer to `images/build-allowlist.yaml`. `verify-reproducibility.sh` gained phase D
+    (T39): no unrecorded wrapper script invokes the real pod with up/start/run (one recorded
+    exception -- `scripts/run-shadow-run-sf5.sh`, 02.2 SF-5's live boundary-verification harness);
+    every README `docker compose` line carries `--env-file`; identity commands and listener IPs
+    agree with `mediator/identity/README.md` and `compose.yaml`. Found and fixed: the top-level
+    entry-point code fence was untagged (plain ``` ```, not ` ```bash `), which silently excluded
+    it from phase D's scan -- retagged, and a negative control (an injected `up -d`) confirmed
+    the check then catches it. Standalone run: 19 passed, 1 failed (phase C's pre-existing
+    EXPECTED RED, unaffected by SF-3).
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md

@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # Checks for (and installs if missing) the host CLI tools this solution's scripts depend on:
-# docker, openssl, curl, jq, yq, sbx. macOS and Linux only -- no Windows.
+# docker, openssl, curl, jq, yq. macOS and Linux only -- no Windows.
+# sbx is a discovery tool (D17), not a runtime dependency -- pass --with-sbx to install it.
 set -euo pipefail
+
+WITH_SBX=0
+for arg in "$@"; do
+  case "$arg" in
+    --with-sbx) WITH_SBX=1 ;;
+    *) printf 'install-deps: unknown argument %s\n' "$arg" >&2; exit 1 ;;
+  esac
+done
 
 OS="$(uname -s)"
 
@@ -84,7 +93,13 @@ check_simple openssl openssl
 check_simple curl curl
 check_simple jq jq
 check_simple yq yq
-check_sbx
 
-log ""
-log "Dependency check complete. If sbx was just installed, authenticate with: sbx login"
+if [[ "$WITH_SBX" -eq 1 ]]; then
+  check_sbx
+  log ""
+  log "Dependency check complete. If sbx was just installed, authenticate with: sbx login"
+else
+  log ""
+  log "Dependency check complete. sbx not checked (discovery tool, not a runtime dependency)."
+  log "Run 'bash scripts/install-deps.sh --with-sbx' to install it, then 'sbx login'."
+fi
