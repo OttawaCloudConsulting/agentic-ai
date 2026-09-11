@@ -21,6 +21,7 @@ record past the next agent version bump (R10.6).
 - [R14.1 + R14.2 — Google (Gemini API / Antigravity `agy`)](#r141--r142--google-gemini-api--antigravity-agy)
 - [R14.3 — Antigravity ToS Monitoring Owner](#r143--antigravity-tos-monitoring-owner)
 - [R14.1 — HashiCorp](#r141--hashicorp)
+- [R14.1 — GitHub](#r141--github)
 - [Summary Table](#summary-table)
 
 ---
@@ -136,6 +137,25 @@ record past the next agent version bump (R10.6).
 
 ---
 
+## R14.1 — GitHub
+
+<a id="r141-github"></a>
+
+| Field | Value |
+|---|---|
+| Party | GitHub, Inc. (a Microsoft subsidiary) |
+| Role on the traffic path | Placed by `packs/github-cli/pack.yaml` (Feature 02.3 SF-4). `github.com` and `api.github.com` serve `gh` CLI operations (repository content, issues, pull requests, releases) at runtime, both `runtime_install: true` destinations under R7.6 because `github.com` also serves source and `gh extension install` traffic. `codex`'s base already carries both hosts (`allowlist.base.yaml:80-87`); this pack widens reach only for `claude` and `agy` (Decision 4's overlap case) |
+| What it can observe | Whatever the fine-grained PAT's scope permits `gh` to read or write — repository content, issue/PR text, metadata — plus connection metadata common to any HTTPS destination. This is a genuine content-carrying party, not a binary-fetch-only one like HashiCorp: a `gh issue view` or `gh pr create` call sends and receives the operator's actual repository content, not just package-resolution metadata |
+| Stated retention | **Not published for this specific traffic.** GitHub's general Privacy Statement states data is retained "as needed to fulfill contractual obligations, comply with legal requirements, resolve disputes, and enforce agreements," with no fixed period, and does not separately address API (`api.github.com`) request logs |
+| Deletion terms | **Not published for this traffic.** The general statement describes account-level data-subject rights (access, correction, deletion requests under applicable law), which is a different mechanism than API request-log retention for an org's own repositories accessed via a PAT |
+| Breach-notification path | **Not confirmed for this specific route.** GitHub's general security practices reference incident response, but no fixed notification-window commitment specific to API/CLI traffic was found in what was checked |
+| Assessment status | **Incomplete** |
+| Resulting constraint on use | Unlike HashiCorp, this party **does** receive real repository content by design — that is the pack's purpose. The mitigation is scope, not avoidance: the credential is a fine-grained PAT limited to named repositories (Interface Contract 1), never an account-wide classic token, and its blast radius is bounded to that scope (`packs/github-cli/pack.yaml`'s `blast_radius`). `GH_NO_UPDATE_NOTIFIER=1` (the pack's `env`) suppresses an unreviewed background check; it does not change what `gh`'s invoked operations themselves send. Git-over-HTTPS wiring through the token is **not built** (Decision 7), so `git push`/`git fetch` traffic does not additionally cross this party through this pack |
+| Date | 2026-09-10 |
+| Source | [GitHub General Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) · [gh_2.100.0_checksums.txt](https://github.com/cli/cli/releases/download/v2.100.0/gh_2.100.0_checksums.txt) |
+
+---
+
 ## Summary Table
 
 | Party | R14.1 status | R14.2 applicable | Primary constraint |
@@ -145,3 +165,4 @@ record past the next agent version bump (R10.6).
 | OpenAI | Complete | Yes — pinning present but weaker guarantee, training opt-out confirmed off | Pin to full named-snapshot model ID, not bare alias |
 | Google | Incomplete (breach-notification, tier unconfirmed) | Yes — pinning moderate, training opt-out tier-dependent | **Confirm `GEMINI_API_KEY` is billed (paid tier) before real use** |
 | HashiCorp | Incomplete (retention, deletion, breach-notification not published for this infrastructure) | No (not a model provider) | Checksum-verified binary source only, no credential or workspace content sent; `CHECKPOINT_DISABLE=1` suppresses the unrelated telemetry call |
+| GitHub | Incomplete (retention, deletion, breach-notification not published for API/CLI traffic) | No (not a model provider) | Real repository content crosses this party by design; mitigation is PAT scope (fine-grained, named repositories), not avoidance |

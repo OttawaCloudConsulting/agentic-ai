@@ -1,0 +1,47 @@
+# Hand-authored Compose counterpart of profiles/github.yaml (R12.9, Feature
+# 02.3 SF-4, Decision 2). Unlike compose/overrides/terraform.yaml, the github-cli
+# pack DOES declare a credential (Interface Contract 1's `github-token`), so this
+# carries the `secrets:` block Interface Contract 3 shapes. `scripts/check-profile-
+# compose.sh --profile github` asserts the secret-set delta from `default` equals
+# exactly {pack-github-cli-github-token} on every agent, and every other rendered
+# field matches.
+#
+# mounts.project.path in profiles/default.yaml is a placeholder for the
+# operator's own project directory -- see compose/overrides/terraform.yaml's
+# comment for why this binds `../workspace`, never `..`.
+
+x-limits: &limits
+  cpus: "2.0"
+  mem_limit: 4g
+  pids_limit: 512
+
+secrets:
+  pack-github-cli-github-token:
+    file: ${PACK_CREDENTIALS_DIR:-../compose/generated/credentials}/github/github-cli/github-token
+
+services:
+  egress-mediator:
+    cpus: "1.0"
+    mem_limit: 1g
+    pids_limit: 256
+
+  claude:
+    <<: *limits
+    volumes:
+      - ../workspace:/workspace:rw
+    secrets:
+      - pack-github-cli-github-token
+
+  codex:
+    <<: *limits
+    volumes:
+      - ../workspace:/workspace:rw
+    secrets:
+      - pack-github-cli-github-token
+
+  agy:
+    <<: *limits
+    volumes:
+      - ../workspace:/workspace:rw
+    secrets:
+      - pack-github-cli-github-token

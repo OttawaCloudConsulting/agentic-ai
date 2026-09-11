@@ -19,13 +19,16 @@ is what SF-4 builds against.
 |---|---|
 | Environment-delivered | Yes — three API keys and one long-lived OAuth token |
 | Volume-persisted | Yes — OAuth refresh tokens, per agent |
-| Secret-mounted | **Not yet populated.** See the note below — this row is present so its emptiness is visible rather than an omission |
+| Secret-mounted | Yes — the `claude` mTLS client key (Feature 01.6), and the `github` profile's `github-token` Compose secret (Feature 02.3 SF-4) |
 
-**The secret-mounted path is empty, and the CA certificate is not a counterexample.** `claude` and
-`agy` mount `mediator-ca.crt` at `/run/secrets`. That is a **public** key, mounted so the agent can
-validate the proxy hop; it authenticates the mediator to the agent and grants its holder nothing.
-The per-agent mTLS client **key** — the first real credential on this path — arrives with Feature
-01.6 (R8.8), which 01.3 deferred. Until then this path has no members.
+**The CA certificate is not a counterexample; the mTLS client key is the first real member.**
+`claude` and `agy` mount `mediator-ca.crt` at `/run/secrets`. That is a **public** key, mounted so
+the agent can validate the proxy hop; it authenticates the mediator to the agent and grants its
+holder nothing. `claude`'s mTLS client **key**, built and verified at Feature 01.6 (R8.8), is the
+credential that populates this path — see Table A row S1, corrected below; the earlier text here
+recorded it as not-yet-arrived, which 01.6 has since made stale. 02.3 SF-4 adds a second member,
+`github-token`, delivered the same way (a Compose `file:` secret, per-profile), and 02.3 SF-5 adds
+a third (`kubeconfig`).
 
 ## Row index
 
@@ -43,7 +46,8 @@ Table B carries controls, revocation, review trigger and the 02.5 column, keyed 
 | V1 | `claude` | Volume-persisted | `oauth-interactive` (default) | OAuth refresh token + 8 h access token | `.credentials.json` on `claude-state`, mode `0600` | Refresh token **~28 days from the original login and not extended by a refresh**; access token 8 h. Measured — see `agent-verification.md`, 01.4 SF-3 | Mints access tokens for the operator's Anthropic session until the family expires. Bounded at ~28 days from login, which is the outer limit on how long a stolen volume is useful unaided. Not in the environment, but readable from the volume by the agent that owns it |
 | V2 | `codex` | Volume-persisted | `oauth-interactive` (default) | OAuth refresh token + 10-day access token + 1 h `id_token` | `.codex/auth.json` on `codex-state`, mode `0600` | Refresh token **not stated** by the provider — `auth.json` carries no expiry for it; access token 10 days. Measured — same record | As V1, for the ChatGPT session, and **worse in one respect: no stated refresh-token expiry**, so nothing bounds it the way V1's 28 days bounds claude. The 10-day access token is itself a long-lived bearer credential on the volume |
 | V3 | `codex` | Volume-persisted | `oauth-mount` (**built, 01.4 SF-4**) | Same as V2 — the credential type is identical; only its provenance differs | Copied from the operator's host `~/.codex/auth.json` into `codex-state` during a one-shot bootstrap | Same as V2 | Same as V2 **plus two measured host-side consequences.** SF-3: codex rolls its refresh token, so the container's first refresh supersedes the host's copy. SF-5, measured by replay (`docs/records/agent-verification.md`, "Refresh-token replay"): **the superseded copy still redeems** — two runs refreshed successfully from the same parent token — so the host login is *not* lost, and, far more importantly, **rotation is not a revocation mechanism**: a refresh token captured from this volume stays valid after the legitimate client refreshes past it. Age is not mitigation; only explicit revocation at the provider ends it. Recorded in `profiles/oauth-mount.yaml`'s `accepted_risk.rotation`. The host file also carries `OPENAI_API_KEY` alongside the OAuth set; `scripts/stage-oauth-mount.sh` strips it and `bootstrap-auth.sh` refuses a source that still carries it, so E2's blast radius is not silently added to this row |
-| S1 | all | Secret-mounted | — | **Not yet populated** | `/run/secrets` — per-agent mTLS client key | — | Arrives with Feature 01.6 (R8.8). Recorded as absent, not omitted |
+| S1 | `claude` | Secret-mounted | — | mTLS client certificate + private key | `/run/secrets/claude-client.crt`, `/run/secrets/claude-client.key` (`compose.yaml`) | No stated expiry — locally issued by `scripts/issue-identity.sh`, valid until the operator rotates it | Authenticates `claude`'s proxy hop to the mediator (client-cert handshake). Grants no external access on its own — it is presented only to the mediator's own listener, never to a third party. **Corrected 2026-09-10 (Feature 02.3 SF-4): this row previously read "Not yet populated... Arrives with Feature 01.6," which Feature 01.6 has since built.** `codex` and `agy` use `proxy_auth` (a bearer credential, tracked separately below), not mTLS — this row is `claude`-only, not "all" |
+| S2 | `claude`, `codex`, `agy` | Secret-mounted | — | `github-token`: fine-grained GitHub PAT | `/run/secrets/pack-github-cli-github-token`, mapped to `GH_TOKEN` (Feature 02.3 SF-4, `packs/github-cli/pack.yaml`) | Operator-set at the PAT's creation; no lifetime enforced by this architecture | Full access to whatever repositories and permissions the fine-grained scope names, for every agent under the `github` profile (Decision 1 — one token, three containers, same rule that gives every agent a pack's egress). Readable by the holding agent from its own environment, same class as E1–E4 |
 
 ### Table B — controls, revocation, review trigger
 
@@ -56,7 +60,8 @@ Table B carries controls, revocation, review trigger and the 02.5 column, keyed 
 | V1 | **R4.3** — `claude-state` is claude's alone; no volume is shared between agents. **R4.7** — the volume is handled as secret material. **R8.5** — revocable without an image rebuild. **R8.7** — the volume is excluded from backups leaving the trust boundary (`tmutil` procedure in `README.md`) and no credential path is committable (`.gitignore`). Bounded additionally by the measured ~28-day family expiry | Delete `.credentials.json` from the volume to remove the container's copy, **and** revoke the session at the Anthropic account to invalidate it provider-side. Local deletion alone leaves a valid refresh token in any copy of the volume | As E1 | *(empty by design — 02.5)* |
 | V2 | As V1, on `codex-state`. **No lifetime bound applies** — unlike V1 there is no stated refresh-token expiry, so the compensating controls carry the whole weight | `codex logout` removes the stored credentials in-container (verified present in 0.152.1), **and** revoke the session at the OpenAI account. Same caveat as V1 | As E1 | *(empty by design — 02.5)* |
 | V3 | As V2, plus the three structural controls SF-4 built and verified: the host source is mounted `:ro` (R4.13, asserted from `/proc/self/mountinfo` rather than trusted from the fragment) as a **dedicated directory** rather than the credential file (R4.14); **only during the one-shot bootstrap** — at steady state there is no host mount at all (R4.15), so an agent that deletes its own credential finds no source to re-copy from and **fails its next container start**; and the R4.17 record must be present in the staged directory or the copy is refused (exit 3) | As V2. The host side turned out **not** to need re-establishing: SF-5 measured that the superseded host copy still redeems (see V3's blast-radius column), so `codex login` on the host keeps working. The revocation path is therefore the only thing that retires a leaked copy — `codex logout` is local removal, not revocation | As E1 | *(empty by design — 02.5)* |
-| S1 | — | — | — | *(not yet applicable — 01.6)* |
+| S1 | Locally issued, never leaves the pod's `mediator/identity/` tree (git-ignored). Presented only to the mediator's own listener — no external party ever sees it | Reissue via `scripts/issue-identity.sh` and restart the affected container; the superseded cert/key stop being accepted the moment the mediator's listener config is rebuilt | Rotate on any suspected compromise of the `claude-state` volume or the identity tree itself | *(empty — this credential authenticates the internal proxy hop, not an external account; Feature 02.5's T26 scope is external-account credentials)* |
+| S2 | **R8.5** — revocable at GitHub without an image rebuild (the token is a Compose secret, never baked into a layer, R8.1). **R7.12** — independent of every other credential; revoking it does not touch V1–V3, E1–E4 or S1. Scoped to named repositories only (fine-grained PAT), never account-wide | Revoke at `https://github.com/settings/personal-access-tokens`. Rotation is a Compose secret-file swap plus `--force-recreate` — no rebuild | Same class of trigger as E1–E4: any suspected exposure via the transcript sink (see R8.6 below) or a container compromise under the `github` profile | *(empty by design — 02.5)* |
 
 ## R8.6 — transcript-level credential exposure (02.1 SF-1)
 
@@ -68,13 +73,15 @@ credential values. Measured against the same live sessions as `agent-action-log.
 | P1 | `codex` | `printenv HTTPS_PROXY` returns `http://codex:<plaintext>@172.31.20.2:3128`. The value appears verbatim in the on-volume rollout JSONL (both the tool-call record and the model's echoed confirmation) | Decision 8 default: the sink stays faithful (it holds nothing the agent's own volume did not already hold). Redaction applies only on the `agent_action_log` stdout export relay (proxy-URL userinfo pattern, `images/recorder/recorder.sh`'s `redact_for_relay`), **built and verified in SF-5** (`tests/acceptance/verify-audit-completeness.sh` Phase F) |
 | P2 | `agy` | `printenv HTTPS_PROXY` returns `https://agy:<plaintext>@172.31.30.2:3128`. The value appears 3× raw inside the whole-file-rewritten SQLite `.db` | **No relay mitigation needed.** `RECORDER_MODE=snapshot` (Architectural Deviation 2) ships `{sha256, size}` only, never file content, so the plaintext inside the `.db` structurally cannot reach the sink or the relay — verified in SF-5 Phase F |
 | — | `claude` | **Not exposed.** claude authenticates the proxy hop via mTLS client certificate; its `HTTPS_PROXY` carries no userinfo, so `printenv` returns a credential-free URL | None needed |
+| P3 | `claude`, `codex`, `agy` (`github` profile) | `printenv GH_TOKEN` (or an echoed tool-call argument carrying it) returns the fine-grained PAT in plaintext, same class as P1/P2 — the credential lands in the container environment via `delivery: {env: GH_TOKEN}` (Interface Contract 1), so any transcript line that echoes the environment or the argument puts it in the faithful sink | **R8.6 (Feature 02.3 SF-4):** the token-prefix redaction family (`recorder.sh`'s `redact_for_relay`) extended to GitHub token formats (`ghp_`, `github_pat_`, `gho_`) alongside the existing provider prefixes. Asserted against a synthetic transcript line carrying a dummy token of each format — no live session spent, following the pattern the existing prefixes already used. Applies to the relay only, same as P1/P2/E1–E4; `$SINK_LOG` stays faithful |
 
-**SF-5 redaction patterns (`recorder.sh`).** Two families, applied ONLY to the relayed copy, never
-to `$SINK_LOG`: proxy-URL userinfo (`://user:<redacted>@`, the P1 pattern above) and known
-provider API-key/token prefixes (`sk-ant-`, `sk-proj-`, `sk-`, `AIza`), in case one is ever echoed
-into a transcript the same way a proxy credential is. Every redacted relay line carries a
-`redacted` count (Decision 8). No such prefix has been observed in a live transcript to date —
-the token-prefix patterns are a defense-in-depth floor, not a second measured finding.
+**SF-5 redaction patterns (`recorder.sh`), extended at 02.3 SF-4.** Three families, applied ONLY to
+the relayed copy, never to `$SINK_LOG`: proxy-URL userinfo (`://user:<redacted>@`, the P1 pattern
+above), known model-provider API-key/token prefixes (`sk-ant-`, `sk-proj-`, `sk-`, `AIza`), and
+(added at SF-4) GitHub token formats (`ghp_`, `github_pat_`, `gho_` — the P3 pattern above). Every
+redacted relay line carries a `redacted` count (Decision 8). No prefix in either family has been
+observed in a live transcript to date — all are a defense-in-depth floor, not a second measured
+finding, same posture as the original SF-5 set.
 
 **Both proxy credentials exercised in this measurement were rotated afterward.** They are locally
 issued (`scripts/issue-identity.sh credential codex|agy`), scoped to this pod's `mediator/identity/`

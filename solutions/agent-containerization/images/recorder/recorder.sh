@@ -66,16 +66,22 @@ jstr() { jq -Rn --arg v "$1" '$v'; }
 
 # 02.1 SF-5 (R8.6, Decision 8): the sink stays faithful -- these patterns run ONLY on the
 # relayed copy that leaves the container via the agent_action_log export, never on $SINK_LOG.
-# Two families: proxy-URL userinfo (the SF-1 P1/P2 finding -- codex and agy splice a plaintext
+# Three families: proxy-URL userinfo (the SF-1 P1/P2 finding -- codex and agy splice a plaintext
 # password into HTTPS_PROXY, and a tool call that echoes it lands the value in the transcript),
-# and known provider API-key/token prefixes, in case one is ever echoed the same way.
+# known model-provider API-key/token prefixes, and (02.3 SF-4) GitHub token formats -- the
+# `github-token` pack credential (packs/github-cli/pack.yaml) lands as GH_TOKEN in the
+# environment the same way E1-E4 do, so it is exposed by the same P1/P2 class finding (P3,
+# docs/records/credential-inventory.md).
 redact_for_relay() {
   printf '%s' "$1" | sed -E \
     -e 's#(://[A-Za-z0-9_.%-]+:)[^@"[:space:]]+(@)#\1<redacted>\2#g' \
     -e 's#sk-ant-[A-Za-z0-9_-]{10,}#<redacted:sk-ant>#g' \
     -e 's#sk-proj-[A-Za-z0-9_-]{10,}#<redacted:sk-proj>#g' \
     -e 's#(^|[^-])sk-[A-Za-z0-9]{20,}#\1<redacted:sk>#g' \
-    -e 's#AIza[A-Za-z0-9_-]{10,}#<redacted:AIza>#g'
+    -e 's#AIza[A-Za-z0-9_-]{10,}#<redacted:AIza>#g' \
+    -e 's#ghp_[A-Za-z0-9]{10,}#<redacted:ghp>#g' \
+    -e 's#github_pat_[A-Za-z0-9_]{10,}#<redacted:github_pat>#g' \
+    -e 's#gho_[A-Za-z0-9]{10,}#<redacted:gho>#g'
 }
 
 emit() {

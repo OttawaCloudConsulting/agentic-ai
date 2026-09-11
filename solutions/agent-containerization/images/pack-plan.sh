@@ -304,7 +304,7 @@ for name in "${PACK_NAMES[@]+"${PACK_NAMES[@]}"}"; do
       seen_archives="$seen_archives $an"
       # Only the archives this build step knows how to unpack.
       case "$an" in
-        node|go|terraform) ;;
+        node|go|terraform|gh) ;;
         *) die "archive '$an' has no install rule in images/pack-install.sh; add one there before declaring it" ;;
       esac
       printf '%s %s %s %s\n' "$an" "$av" "$au" "$as" >> "$OUT/archives.txt"

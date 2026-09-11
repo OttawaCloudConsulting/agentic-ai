@@ -15,7 +15,7 @@
 
 [~] Feature 02.3: Tool pack set, use-case profiles and MCP inventory
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/tool-pack-set-use-case-profiles-and-mcp-inventory.md
-    Sub-features: 3/8 complete
+    Sub-features: 4/8 complete
     Notes: Started 2026-09-10. SF-8 gated on Feature 02.2 reaching [x] (gate-3-review.md: 02.2 before 02.3). SF-1-SF-7 do not consume 02.2 output. Deviation (not recorded, implementation-detail): pack-install.sh COPY moved from agent-base to agent-packs in images/Dockerfile (SF-2) -- agent-base is GHCR-published and digest-pinned (D21), so a local script edit reached nothing until moved, same class of fix as entrypoint.sh (01.6 SF-3). Deviation (not recorded, implementation-detail, SF-3): scripts/check-profile-compose.sh's normalise() stripped `.build.args.MEDIATOR_PROFILE`, which does not exist -- MEDIATOR_PROFILE renders under `.environment`, not `.build.args`. Fixed to del `.environment.MEDIATOR_PROFILE`; the SF-2 script never hit this path because `check-profile-compose.sh --profile default` compares default to itself, where MEDIATOR_PROFILE is identical either way.
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding

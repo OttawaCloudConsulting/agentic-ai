@@ -387,6 +387,159 @@ fi
 
 d_cleanup
 
+# ---------------------------------------------------------------------------
+# Phase E -- SF-4: GitHub CLI pack, R8.2 inspection, overlap case, R8.6 redaction
+# ---------------------------------------------------------------------------
+phase E "GitHub CLI pack -- overlap case, GH_TOKEN delivery, R8.6 redaction"
+
+E_TMP="$(mktemp -d)"
+E_CREDS_DIR="$E_TMP/credentials"
+mkdir -p "$E_CREDS_DIR/github/github-cli"
+E_TOKEN_VALUE="ghp_probeTokenValueNotReal0123456789"
+printf '%s' "$E_TOKEN_VALUE" > "$E_CREDS_DIR/github/github-cli/github-token"
+
+e_cleanup() { rm -rf "$E_TMP"; }
+trap 'cleanup; b_cleanup 2>/dev/null || true; d_cleanup 2>/dev/null || true; e_cleanup' EXIT
+
+# --- the overlap case (Decision 4): codex gains nothing, claude/agy gain both hosts --------
+E_COMPILE_AT="2026-01-01T00:00:00Z"
+COMPILED_AT="$E_COMPILE_AT" bash scripts/compile-policy.sh --profile default --out "$E_TMP/default.yaml"
+COMPILED_AT="$E_COMPILE_AT" bash scripts/compile-policy.sh --profile github  --out "$E_TMP/github.yaml"
+
+GH_RUNTIME="$(yq eval '.egress.runtime.allow_fqdns[].fqdn' packs/github-cli/pack.yaml | LC_ALL=C sort -u)"
+overlap_ok=1
+for a in claude codex agy; do
+  base_set="$(yq eval ".agents.${a}.allow_fqdns[].fqdn" "$E_TMP/default.yaml" | LC_ALL=C sort -u)"
+  gh_set="$(yq eval ".agents.${a}.allow_fqdns[].fqdn" "$E_TMP/github.yaml" | LC_ALL=C sort -u)"
+  gained="$(comm -13 <(printf '%s\n' "$base_set") <(printf '%s\n' "$gh_set") 2>/dev/null || true)"
+  lost="$(comm -23 <(printf '%s\n' "$base_set") <(printf '%s\n' "$gh_set") 2>/dev/null || true)"
+  if [ -n "$lost" ]; then
+    overlap_ok=0
+    echo "      E: agent '${a}' lost entries loading github-cli, expected none:" >&2
+    sed 's/^/        /' <<< "$lost" >&2
+  fi
+  if [ "$a" = "codex" ]; then
+    # codex's base already carries both hosts (allowlist.base.yaml) -- Decision 4's overlap
+    # case: the gained set is empty, not github-cli's full egress.runtime.
+    if [ -n "$gained" ]; then
+      overlap_ok=0
+      echo "      E: agent 'codex' expected to gain nothing (base already carries both hosts), gained:" >&2
+      sed 's/^/        /' <<< "$gained" >&2
+    fi
+  else
+    if [ "$gained" != "$GH_RUNTIME" ]; then
+      overlap_ok=0
+      echo "      E: agent '${a}' gained set does not equal packs/github-cli/pack.yaml's egress.runtime" >&2
+      diff <(printf '%s\n' "$GH_RUNTIME") <(printf '%s\n' "$gained") | sed 's/^/        /' >&2
+    fi
+  fi
+done
+if [ "$overlap_ok" = 1 ]; then
+  pass "E: Decision 4 overlap case -- codex gains nothing, claude/agy gain both github-cli hosts"
+else
+  fail "E: overlap case -- gained/lost set does not match Decision 4's rule"
+fi
+
+# --- GH_TOKEN present under 'github', absent under 'default' and 'terraform' ---------------
+E_PROJECT="sf4-github-$$"
+E_COMPOSE_BASE=(docker compose --env-file compose/pins.env -f compose/compose.yaml -p "$E_PROJECT")
+
+e_stack_down() {
+  local profile="$1" override="$2"
+  AGENT_PROFILE="$profile" "${E_COMPOSE_BASE[@]}" -f "compose/overrides/${override}.yaml" \
+    down -v --remove-orphans >/dev/null 2>&1 || true
+}
+trap 'cleanup; b_cleanup 2>/dev/null || true; d_cleanup 2>/dev/null || true; e_cleanup; e_stack_down default default; e_stack_down terraform terraform; e_stack_down github github' EXIT
+
+# Following Phase D's idiom: agent containers' default command is the interactive agent CLI,
+# which exits immediately under `up -d` with no TTY/session -- only the mediator is brought up
+# as a daemon, and each agent check runs as a one-shot `run --rm`.
+#
+# `build` runs as its OWN step, separate from `run`: this build driver writes its progress to
+# STDOUT (not stderr), so a combined `run --build --rm ... | capture` would splice that progress
+# into the captured value. Building first, then running without `--build`, keeps the captured
+# stdout to exactly what the container printed.
+PACK_CREDENTIALS_DIR="$E_CREDS_DIR" AGENT_PROFILE=github "${E_COMPOSE_BASE[@]}" -f compose/overrides/github.yaml \
+  build egress-mediator claude codex agy >"$E_TMP/e-github-build.log" 2>&1 \
+  || { fail "E: image build failed under profile 'github'"; tail -20 "$E_TMP/e-github-build.log" | sed 's/^/      /'; }
+PACK_CREDENTIALS_DIR="$E_CREDS_DIR" AGENT_PROFILE=github "${E_COMPOSE_BASE[@]}" -f compose/overrides/github.yaml \
+  up -d --force-recreate egress-mediator >"$E_TMP/e-github.log" 2>&1 \
+  || { fail "E: mediator failed to start under profile 'github'"; sed 's/^/      /' "$E_TMP/e-github.log" | tail -20; }
+
+e_gh_ok=1
+for a in claude codex agy; do
+  TOK_OUT="$(PACK_CREDENTIALS_DIR="$E_CREDS_DIR" AGENT_PROFILE=github "${E_COMPOSE_BASE[@]}" -f compose/overrides/github.yaml \
+    run --rm "$a" sh -c 'printf "%s" "$GH_TOKEN"' 2>/dev/null)" || true
+  if [ "$TOK_OUT" != "$E_TOKEN_VALUE" ]; then
+    e_gh_ok=0
+    fail "E: GH_TOKEN not present (or wrong) in '${a}' under profile 'github', got: ${TOK_OUT}"
+  fi
+done
+[ "$e_gh_ok" = 1 ] && pass "E: GH_TOKEN present and correct in every agent under profile 'github'"
+
+GH_VER_OUT="$(PACK_CREDENTIALS_DIR="$E_CREDS_DIR" AGENT_PROFILE=github "${E_COMPOSE_BASE[@]}" -f compose/overrides/github.yaml \
+  run --rm claude sh -c 'GH_NO_UPDATE_NOTIFIER=1 gh --version' 2>/dev/null)" || true
+if grep -qF 'gh version 2.100.0' <<< "$GH_VER_OUT"; then
+  pass "E: gh binary present and reports the pinned version under profile 'github'"
+else
+  fail "E: expected 'gh version 2.100.0', got: ${GH_VER_OUT}"
+fi
+
+e_stack_down github github
+
+AGENT_PROFILE=default "${E_COMPOSE_BASE[@]}" -f compose/overrides/default.yaml \
+  build egress-mediator claude codex agy >"$E_TMP/e-default-build.log" 2>&1 \
+  || { fail "E: image build failed under profile 'default'"; tail -20 "$E_TMP/e-default-build.log" | sed 's/^/      /'; }
+AGENT_PROFILE=default "${E_COMPOSE_BASE[@]}" -f compose/overrides/default.yaml \
+  up -d --force-recreate egress-mediator >"$E_TMP/e-default.log" 2>&1 \
+  || { fail "E: mediator failed to start under profile 'default'"; sed 's/^/      /' "$E_TMP/e-default.log" | tail -20; }
+DEF_TOK_OUT="$(AGENT_PROFILE=default "${E_COMPOSE_BASE[@]}" -f compose/overrides/default.yaml \
+  run --rm claude sh -c 'printf "%s" "${GH_TOKEN:-}"' 2>/dev/null)" || true
+[ -z "$DEF_TOK_OUT" ] \
+  && pass "E: GH_TOKEN absent under profile 'default'" \
+  || fail "E: GH_TOKEN unexpectedly present under 'default': ${DEF_TOK_OUT}"
+e_stack_down default default
+
+AGENT_PROFILE=terraform "${E_COMPOSE_BASE[@]}" -f compose/overrides/terraform.yaml \
+  build egress-mediator claude codex agy >"$E_TMP/e-terraform-build.log" 2>&1 \
+  || { fail "E: image build failed under profile 'terraform'"; tail -20 "$E_TMP/e-terraform-build.log" | sed 's/^/      /'; }
+AGENT_PROFILE=terraform "${E_COMPOSE_BASE[@]}" -f compose/overrides/terraform.yaml \
+  up -d --force-recreate egress-mediator >"$E_TMP/e-terraform.log" 2>&1 \
+  || { fail "E: mediator failed to start under profile 'terraform'"; sed 's/^/      /' "$E_TMP/e-terraform.log" | tail -20; }
+TF_TOK_OUT="$(AGENT_PROFILE=terraform "${E_COMPOSE_BASE[@]}" -f compose/overrides/terraform.yaml \
+  run --rm claude sh -c 'printf "%s" "${GH_TOKEN:-}"' 2>/dev/null)" || true
+[ -z "$TF_TOK_OUT" ] \
+  && pass "E: GH_TOKEN absent under profile 'terraform'" \
+  || fail "E: GH_TOKEN unexpectedly present under 'terraform': ${TF_TOK_OUT}"
+e_stack_down terraform terraform
+
+# --- R8.6: extend the redaction pattern set to GitHub token formats (Decision 8, SF-5's --
+#     pattern), asserted against a synthetic transcript line, so no live session is spent ---
+E_REDACT_FN="$(sed -n '/^redact_for_relay() {/,/^}/p' images/recorder/recorder.sh)"
+if [ -z "$E_REDACT_FN" ]; then
+  fail "E: could not extract redact_for_relay() from images/recorder/recorder.sh"
+else
+  eval "$E_REDACT_FN"
+  e_redact_ok=1
+  for prefix_line in \
+    'ghp_probeTokenValueNotReal0123456789' \
+    'github_pat_11ABCDEFG0probeTokenValueNotReal' \
+    'gho_probeTokenValueNotReal0123456789'; do
+    synth='{"type":"tool_call","proxy":"none","echo":"GH_TOKEN='"$prefix_line"'"}'
+    out="$(redact_for_relay "$synth")"
+    if grep -qF "$prefix_line" <<< "$out"; then
+      e_redact_ok=0
+      echo "      E: token '${prefix_line}' was NOT redacted: $out" >&2
+    elif ! grep -q '<redacted:' <<< "$out"; then
+      e_redact_ok=0
+      echo "      E: token '${prefix_line}' vanished without a <redacted:...> marker: $out" >&2
+    fi
+  done
+  [ "$e_redact_ok" = 1 ] \
+    && pass "E: R8.6 -- ghp_/github_pat_/gho_ token formats are redacted on the relay" \
+    || fail "E: R8.6 -- one or more GitHub token formats were not redacted correctly"
+fi
+
 echo
 echo "=== Results: $PASSED passed, $FAILED failed ==="
 [ "$FAILED" -eq 0 ]

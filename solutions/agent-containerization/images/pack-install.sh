@@ -89,6 +89,7 @@ while read -r name version url sha; do
     node)      f="$tmp/node.tar.xz" ;;
     go)        f="$tmp/go.tar.gz" ;;
     terraform) f="$tmp/terraform.zip" ;;
+    gh)        f="$tmp/gh.tar.gz" ;;
     *)    die "no install rule for archive '$name'" ;;
   esac
 
@@ -135,6 +136,15 @@ while read -r name version url sha; do
       installed="$(CHECKPOINT_DISABLE=1 /usr/local/bin/terraform version | head -1 | awk '{print $2}')"
       [ "$installed" = "v${version}" ] \
         || die "terraform reports ${installed} after installing the pin for ${version}"
+      ;;
+    gh)
+      # The tarball's top level is `gh_<version>_linux_arm64/`, carrying `bin/gh` plus a
+      # LICENSE and man pages this pack does not need. Extract the binary only.
+      tar -xzf "$f" -C "$tmp" "gh_${version}_linux_arm64/bin/gh"
+      install -m 0755 -o root -g root "$tmp/gh_${version}_linux_arm64/bin/gh" /usr/local/bin/gh
+      installed="$(GH_NO_UPDATE_NOTIFIER=1 /usr/local/bin/gh --version | head -1 | awk '{print $3}')"
+      [ "$installed" = "${version}" ] \
+        || die "gh reports ${installed} after installing the pin for ${version}"
       ;;
   esac
   rm -rf "$tmp"

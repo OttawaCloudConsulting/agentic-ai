@@ -466,7 +466,7 @@ path `compose/generated/credentials/...` is checked against the harnesses' conta
   - Harness Phase D: the **SC-6 live switch** `default → terraform → default`, plus `terraform
     version` present and then absent.
   - Composite green.
-- [ ] **SF-4: GitHub CLI pack, `github` profile, token delivery and R8.2 inspection.**
+- [x] **SF-4: GitHub CLI pack, `github` profile, token delivery and R8.2 inspection.**
   - Create `packs/github-cli/pack.yaml` and add a `gh` archive rule.
   - Add the GitHub R14.1 record.
   - Create `profiles/github.yaml` and `compose/overrides/github.yaml`, bootstrap the artifact.
