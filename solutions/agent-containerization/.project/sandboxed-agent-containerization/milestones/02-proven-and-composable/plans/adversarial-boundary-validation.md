@@ -230,7 +230,7 @@ the R13.2/D21 amendments land, not this feature's to do.
   in-container reads — see Interface Contract 3), **T2 + R11.4** per agent (Decision 6, new
   `tests/fixtures/ro-fixture/` and `compose/overrides/test-boundary-ro.yaml`), **T8** policy
   modification from inside, **all three agents**. Composite green.
-- [ ] **SF-2: Network rows from inside real agent containers.** **T3** HTTP/HTTPS exfil to a
+- [x] **SF-2: Network rows from inside real agent containers.** **T3** HTTP/HTTPS exfil to a
   non-allowlisted collector (`curl` via the proxy), **T5** raw TCP (`bash` `/dev/tcp`), **T7**
   metadata `169.254.169.254`, **ICMP** (`python3` — expected result is **EPERM at socket creation**,
   `CAP_NET_RAW` being dropped and `ping_group_range` unset, so no `NET_RAW` is added),
@@ -458,3 +458,9 @@ at build time without gate re-approval.
 - **Originally planned:** `docs/ARCHITECTURE_AND_DESIGN.md` file tree (`:170`) places it at `scripts/validate-boundary.sh`.
 - **Why necessary:** Every acceptance harness — the fixture set, the composite Test Command, `trap cleanup` / `down -v`, and the `start_agents`/`in_agent` helpers this suite reuses — lives under `tests/acceptance/`. Placing it in `scripts/` would isolate it from the fixtures and harnesses it shares helpers with.
 - **Impact:** None on other components; the composite Test Command already references `tests/acceptance/`. Carried for the milestone's consolidation pass to correct the architecture doc's file tree.
+
+### Deviation 2: SF-2 probes source PID1's live proxy env and use proxy-leg TLS flags, not the plan's literal `in_agent`
+- **What changed:** A new `in_agent_authed` wraps `docker exec` for every SF-2 network probe: it re-sources `HTTPS_PROXY`/`HTTP_PROXY` from `/proc/1/environ` inside the target container before running the probe command, and `curl_client_flags` presents claude's client certificate as `--proxy-cert`/`--proxy-key` (not `--cert`/`--key`), with `-k --proxy-insecure` on every mediator-bound probe.
+- **Originally planned:** The plan (Decision 3) says the suite drives T1–T8 "from real agent containers via `start_agents`/`in_agent`," with no distinction from SF-1's plain `in_agent`.
+- **Why necessary:** Measured live 2026-09-10/11 against the actual images: `inject_proxy_credential` (`images/entrypoint.sh`) splices the codex/agy proxy credential into `HTTPS_PROXY`/`HTTP_PROXY` as an `export` inside the entrypoint's own process (PID 1) — a fresh `docker exec` session does not attach to that process and sees the credential-free URL from compose `environment:` instead, which would 407 every codex/agy probe under plain `in_agent`. Separately, claude's proxy URL is `https://` (a TLS-wrapped CONNECT hop): its listener's mTLS requirement is on that proxy-TLS session, not on the destination TLS session inside the CONNECT tunnel, so `curl --cert/--key` (destination-leg flags) failed with `tlsv13 alert certificate required` where `--proxy-cert/--proxy-key` succeeds. `-k`/`--proxy-insecure` are needed because the mediator does not terminate destination TLS (peek+splice) and the harness's own throwaway fixture PKI is untrusted by design — the same non-verification `verify-egress-mediator.sh`'s `openssl s_client` probes rely on.
+- **Impact:** None on the mediator, policy, or any shipped file — confined to how the test harness authenticates its own probes. `in_agent` (SF-1's plain form) is unchanged and still used for the raw-socket/no-mediator rows (T5, ICMP, A2A-direct), where no proxy credential or TLS is involved.
