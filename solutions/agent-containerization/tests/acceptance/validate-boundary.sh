@@ -677,8 +677,67 @@ else
   pass "injected-repo: skipped (BOUNDARY_LIVE_INJECT=0, default) -- SF-1..SF-3 already exercise the mediator's block/log/attribute mechanics unattended; this phase is the live A3 scenario on top of them"
 fi
 
+# ---------------------------------------------------------------------------
+# Phase 9 -- SF-5: `provisional` resolution via a shadow run under the built mediator (live,
+# gated, unknown outcome). Off by default (BOUNDARY_SHADOW_RUN=0) -- Interface Contract 2. Same
+# precedent as Phase 8: the suite does not drive the session itself. This is not one of the six
+# R12.8 scenarios (Interface Contract 1) -- it produces the `provisional` resolution outcome
+# (Interface Contract 7), not a record-file row.
+#
+# The four single-source hosts in policy/allowlist.base.yaml (source: [sbx-discovery-capture]
+# alone, no second corroborating source): claude -> api.anthropic.com; codex -> chatgpt.com,
+# api.github.com, github.com. Every other entry (platform.claude.com, auth.openai.com, all of
+# agy's) already carries 2+ sources and is out of scope for this shadow run.
+# ---------------------------------------------------------------------------
+phase 9 "provisional resolution via shadow run (live, gated -- BOUNDARY_SHADOW_RUN)"
+
+BOUNDARY_SHADOW_RUN="${BOUNDARY_SHADOW_RUN:-0}"
+
+if [ "$BOUNDARY_SHADOW_RUN" = "1" ]; then
+  note "BOUNDARY_SHADOW_RUN=1 -- this phase spends model tokens against the OPERATOR's own"
+  note "authenticated state volumes, on the DEFAULT project (real upstream, profile=default, NOT"
+  note "test-fixtures), not this harness's throwaway one. It does not drive the sessions itself --"
+  note "run each manually, one agent at a time, deliberately exercising the single-source host:"
+  note ""
+  note "  claude: docker compose --env-file compose/pins.env -f compose/compose.yaml \\"
+  note "          -f compose/overrides/default.yaml run --rm claude"
+  note "          -- issue any prompt; claude's own startup/use already reaches api.anthropic.com"
+  note "  codex:  docker compose --env-file compose/pins.env -f compose/compose.yaml \\"
+  note "          -f compose/overrides/default.yaml run --rm codex"
+  note "          -- issue any prompt (reaches chatgpt.com), then 'git fetch' against a real"
+  note "          github.com/api.github.com remote from /workspace"
+  note ""
+  note "  After each session, read that session's mediator egress trail on the DEFAULT project"
+  note "  (find the container: docker ps --filter name=egress-mediator-1 --format '{{.Names}}' --"
+  note "  expect one named <project>-egress-mediator-1 on the default profile, not this harness's"
+  note "  boundary-verify-*):"
+  note "    docker exec <that-container> grep -h 'api.anthropic.com\\|chatgpt.com\\|api.github.com\\|github.com' \\"
+  note "      /var/log/mediator/egress-audit.log /var/log/mediator/dns-audit.log 2>/dev/null"
+  note ""
+  note "  This is the second source (the built mediator's own trail); the first source is each"
+  note "  host's existing 'source: [sbx-discovery-capture]' entry in policy/allowlist.base.yaml."
+  note "  Apply Decision 7's three outcomes, exactly one:"
+  note "    - all four hosts corroborated, verdict=allow, correct identity_source -> flip"
+  note "      provisional: true -> false in policy/allowlist.base.yaml, lint-policy.sh:37-38's"
+  note "      'true' check -> 'false', and recompile policy/resolved/default.yaml via"
+  note "      compile-policy-build.sh -- Interface Contract 6, one coordinated commit, all three"
+  note "      files together (the composite Test Command ends in lint-policy.sh, so a partial"
+  note "      flip fails it)"
+  note "    - any of the four not corroborated -> provisional stays true, record the specific"
+  note "      host(s) as a named gap in docs/records/boundary-validation.md and the allowlist"
+  note "      header, no script changes"
+  note "    - the shadow run surfaces a NEW host neither agent's existing entries name -> amend"
+  note "      allowlist.base.yaml (add the entry, recompile), record the amendment; do not remove"
+  note "      any entry the run happens not to exercise -- one session cannot prove a host unneeded"
+  note "  A design-level disagreement (blocked-but-should-allow, or vice versa) is a design"
+  note "  finding routed to /milestone revision (Decision 9), not a fix here."
+  pass "shadow run: instructions surfaced (BOUNDARY_SHADOW_RUN=1) -- the operator runs, compares, and records this manually"
+else
+  pass "shadow run: skipped (BOUNDARY_SHADOW_RUN=0, default) -- provisional stays true pending the operator's live shadow run"
+fi
+
 echo
-echo "=== SF-1..SF-4 record file: $RECORD_FILE ==="
+echo "=== SF-1..SF-5 record file: $RECORD_FILE ==="
 cat "$RECORD_FILE"
 
 if [ "$FAILED" -eq 0 ]; then
