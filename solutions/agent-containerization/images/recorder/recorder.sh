@@ -66,11 +66,15 @@ jstr() { jq -Rn --arg v "$1" '$v'; }
 
 # 02.1 SF-5 (R8.6, Decision 8): the sink stays faithful -- these patterns run ONLY on the
 # relayed copy that leaves the container via the agent_action_log export, never on $SINK_LOG.
-# Three families: proxy-URL userinfo (the SF-1 P1/P2 finding -- codex and agy splice a plaintext
+# Four families: proxy-URL userinfo (the SF-1 P1/P2 finding -- codex and agy splice a plaintext
 # password into HTTPS_PROXY, and a tool call that echoes it lands the value in the transcript),
-# known model-provider API-key/token prefixes, and (02.3 SF-4) GitHub token formats -- the
+# known model-provider API-key/token prefixes, (02.3 SF-4) GitHub token formats -- the
 # `github-token` pack credential (packs/github-cli/pack.yaml) lands as GH_TOKEN in the
 # environment the same way E1-E4 do, so it is exposed by the same P1/P2 class finding (P3,
+# docs/records/credential-inventory.md) -- and (02.3 SF-5) kubeconfig material. The
+# `kubeconfig` pack credential (packs/kubernetes/pack.yaml) is `path_env`, never `env`, so it
+# never lands in the environment itself; the exposure is one layer down, at the FILE's content,
+# when a tool call echoes a `cat`/`kubectl config view --raw` of it (P4,
 # docs/records/credential-inventory.md).
 redact_for_relay() {
   printf '%s' "$1" | sed -E \
@@ -81,7 +85,11 @@ redact_for_relay() {
     -e 's#AIza[A-Za-z0-9_-]{10,}#<redacted:AIza>#g' \
     -e 's#ghp_[A-Za-z0-9]{10,}#<redacted:ghp>#g' \
     -e 's#github_pat_[A-Za-z0-9_]{10,}#<redacted:github_pat>#g' \
-    -e 's#gho_[A-Za-z0-9]{10,}#<redacted:gho>#g'
+    -e 's#gho_[A-Za-z0-9]{10,}#<redacted:gho>#g' \
+    -e 's#client-key-data:[[:space:]]*[A-Za-z0-9+/=]{10,}#client-key-data: <redacted:kubeconfig>#g' \
+    -e 's#client-certificate-data:[[:space:]]*[A-Za-z0-9+/=]{10,}#client-certificate-data: <redacted:kubeconfig>#g' \
+    -e 's#token:[[:space:]]*[A-Za-z0-9_.-]{10,}#token: <redacted:kubeconfig>#g' \
+    -e 's#-----BEGIN [A-Z ]*(PRIVATE KEY|CERTIFICATE)-----[A-Za-z0-9+/=\\n ]*-----END [A-Z ]*(PRIVATE KEY|CERTIFICATE)-----#<redacted:kubeconfig-pem>#g'
 }
 
 emit() {

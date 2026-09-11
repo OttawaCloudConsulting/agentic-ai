@@ -483,7 +483,7 @@ path `compose/generated/credentials/...` is checked against the harnesses' conta
     dummy token, so no live session is spent. Record in `credential-inventory.md` that `printenv` in
     a `github` session puts `GH_TOKEN` into the faithful sink.
   - Composite green.
-- [ ] **SF-5: Kubernetes pack, `kubernetes` profile, `kubeconfig` delivery, cluster-pack mechanism.**
+- [x] **SF-5: Kubernetes pack, `kubernetes` profile, `kubeconfig` delivery, cluster-pack mechanism.**
   - Create `packs/kubernetes/pack.yaml` and add `kubectl` and `helm` archive rules.
   - Create `profiles/kubernetes.yaml` and `compose/overrides/kubernetes.yaml`, bootstrap the
     artifact.

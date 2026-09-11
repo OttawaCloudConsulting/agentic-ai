@@ -1,0 +1,98 @@
+# The `kubernetes` use-case profile (Feature 02.3 SF-5, Acceptance Criterion 6):
+# `default` plus the `kubernetes` pack. Everything below this point is `default`'s
+# content unchanged, except `packs` and `name`. The shipped pack grants no runtime
+# egress (Decision 6) -- SC-6 here is measured by the pack's binaries and the
+# `kubeconfig` secret appearing and disappearing, not by an egress-allowlist delta.
+#
+# This is a schema/contract file, not itself interpreted by `docker compose`
+# -- compose/overrides/kubernetes.yaml is its hand-authored Compose counterpart, and
+# it DOES carry a `secrets:` block, unlike terraform.yaml's, because this pack
+# declares a credential (Decision 1, Interface Contract 3).
+
+name: kubernetes
+
+packs:
+  - language-runtimes           # unchanged from `default`
+  - kubernetes                  # packs/kubernetes/pack.yaml -- the pack this profile adds.
+                                 # egress.runtime is empty (Decision 6), so no agent gains any
+                                 # allowlist entry loading it; cluster reach needs a separate
+                                 # per-cluster egress pack, not shipped in this profile
+
+# R7.18 -- the repository pack `apt` items are sourced from. Same snapshot as `terraform.yaml`
+# and `github.yaml`; this pack's own apt.items list is empty (kubectl and helm ship as
+# self-contained binaries), but the field is declared here regardless, same reasoning.
+package_repository:
+  apt:
+    url: https://snapshot.debian.org/archive/debian/20260901T000000Z/
+    suite: bookworm
+    signed_by: images/keyrings/debian-archive.gpg
+    fingerprint: B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8
+
+# R12.7 -- see profiles/terraform.yaml's comment; unchanged reasoning.
+authorization:
+  classify:
+    - git-push                 # leaves the pod and rewrites shared history
+    - infrastructure-apply     # Milestone 03's terraform apply; irreversible against real accounts
+  # waiver: <recorded reason this profile waives R12.7>
+
+# R4.12 defaults -- unchanged from `default` / `terraform.yaml` / `github.yaml`.
+auth_mode:
+  claude: oauth-interactive
+  codex: oauth-interactive
+  agy: apikey
+
+mounts:
+  project:
+    path: <host path>          # operator-supplied; this profile's Compose override binds a
+                                # git-ignored `workspace/` directory (see terraform.yaml's comment)
+    mode: rw
+  build_cache: false
+  host_git_config: false
+
+# `oauth_mount` is deliberately absent -- see profiles/terraform.yaml's comment; unchanged.
+
+limits:
+  cpus: "2.0"
+  memory: 4g
+  pids: 512
+
+listeners:
+  claude: {scheme: https, tls: true,  port: 3128, client_auth: mtls}
+  codex:  {scheme: http,  tls: false, port: 3128, client_auth: proxy_auth}
+  agy:    {scheme: https, tls: true,  port: 3128, client_auth: proxy_auth}
+
+rate_limits:
+  claude: {max_concurrent: 16, bytes_per_second: 2000000}
+  codex:  {max_concurrent: 16, bytes_per_second: 2000000}
+  agy:    {max_concurrent: 16, bytes_per_second: 2000000}
+
+egress_exclusions:
+  - agent: agy
+    fqdn: antigravity-cli-auto-updater-974169037036.us-central1.run.app
+    reason: >-
+      R10.3 is a MUST: agent auto-updaters are disabled so a pinned build stays pinned. Allowing
+      the updater to reach its manifest is the opposite. agy has no flag or env var that disables
+      the check (docs/records/agent-verification.md), so default-deny is the only mechanism left
+      and the entry is simply not copied through. 01.3 SF-8 Phase C asserts agy still starts,
+      runs a task and exits normally with this host denied, and records the updater's actual
+      write target; if agy hard-fails without it the recorded fallback is to allow it with an
+      explicit residual against R10.3.
+
+startup_check:
+  allowed: {agent: claude, fqdn: api.anthropic.com, port: 443}
+  denied:  {ip: 169.254.169.254, port: 443}
+  offline: false
+
+exports:
+  egress_audit_log: true
+  agent_action_log: true
+  resolved_policy: true
+  image_digest_sbom: true
+
+# R7.14, D18, Interface Contract 5 -- MCP inventory. No real server ships in this
+# feature (Decision 9): the empty lists ARE the explicit "none".
+mcp:
+  registry: none
+  servers: []
+  plugins: []
+  skills: []

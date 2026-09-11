@@ -90,6 +90,8 @@ while read -r name version url sha; do
     go)        f="$tmp/go.tar.gz" ;;
     terraform) f="$tmp/terraform.zip" ;;
     gh)        f="$tmp/gh.tar.gz" ;;
+    kubectl)   f="$tmp/kubectl" ;;
+    helm)      f="$tmp/helm.tar.gz" ;;
     *)    die "no install rule for archive '$name'" ;;
   esac
 
@@ -145,6 +147,23 @@ while read -r name version url sha; do
       installed="$(GH_NO_UPDATE_NOTIFIER=1 /usr/local/bin/gh --version | head -1 | awk '{print $3}')"
       [ "$installed" = "${version}" ] \
         || die "gh reports ${installed} after installing the pin for ${version}"
+      ;;
+    kubectl)
+      # dl.k8s.io serves the executable directly at this URL -- a bare binary, not an archive
+      # (Decision 6). No unpack step: install it straight from the downloaded file.
+      install -m 0755 -o root -g root "$f" /usr/local/bin/kubectl
+      installed="$(/usr/local/bin/kubectl version --client -o json | sed -n 's/.*"gitVersion": *"\([^"]*\)".*/\1/p' | head -1)"
+      [ "$installed" = "v${version}" ] \
+        || die "kubectl reports ${installed} after installing the pin for ${version}"
+      ;;
+    helm)
+      # The tarball's top-level directory is `linux-arm64`, carrying the `helm` binary plus
+      # LICENSE and README this pack does not need. Extract the binary only.
+      tar -xzf "$f" -C "$tmp" "linux-arm64/helm"
+      install -m 0755 -o root -g root "$tmp/linux-arm64/helm" /usr/local/bin/helm
+      installed="$(/usr/local/bin/helm version --template '{{.Version}}')"
+      [ "$installed" = "v${version}" ] \
+        || die "helm reports ${installed} after installing the pin for ${version}"
       ;;
   esac
   rm -rf "$tmp"

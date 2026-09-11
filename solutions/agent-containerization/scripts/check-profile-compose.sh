@@ -95,8 +95,17 @@ expected_secrets() {
 EXPECTED_SECRETS="$(expected_secrets | LC_ALL=C sort -u)"
 
 secrets_of() {
+  # `docker compose config` normalizes EVERY secret reference -- short-syntax entries in
+  # compose.yaml included -- to the long {source, target} form (measured against Compose
+  # v2.38.2). A bare `yq eval '...secrets[]'` therefore emits each entry as a two-line
+  # mapping, and comm/sort downstream would treat each of those lines as its own set member
+  # rather than as one secret name. Extract just `.source` (falling back to the scalar
+  # itself for a hypothetical short-form render) so this stays one name per line regardless
+  # of which form the installed Compose version renders (Feature 02.3 SF-5 fix).
   local rendered="$1" agent="$2"
-  yq eval ".services.${agent}.secrets[]" "$rendered" 2>/dev/null | LC_ALL=C sort -u
+  yq eval -o=json ".services.${agent}.secrets // []" "$rendered" 2>/dev/null \
+    | jq -r '.[] | if type == "object" then .source else . end' \
+    | LC_ALL=C sort -u
 }
 
 secrets_ok=1

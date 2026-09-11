@@ -540,6 +540,184 @@ else
     || fail "E: R8.6 -- one or more GitHub token formats were not redacted correctly"
 fi
 
+# ---------------------------------------------------------------------------
+# Phase F -- SF-5: Kubernetes pack, KUBECONFIG delivery, cluster-pack mechanism
+# ---------------------------------------------------------------------------
+phase F "Kubernetes pack -- kubectl/helm, KUBECONFIG delivery, cluster-pack mechanism"
+
+F_TMP="$(mktemp -d)"
+F_CREDS_DIR="$F_TMP/credentials"
+mkdir -p "$F_CREDS_DIR/kubernetes/kubernetes"
+F_KUBECONFIG_VALUE="apiVersion: v1
+kind: Config
+clusters: []
+probe-marker: sf5-probe-not-a-real-kubeconfig"
+printf '%s' "$F_KUBECONFIG_VALUE" > "$F_CREDS_DIR/kubernetes/kubernetes/kubeconfig"
+
+f_cleanup() { rm -rf "$F_TMP"; }
+trap 'cleanup; b_cleanup 2>/dev/null || true; d_cleanup 2>/dev/null || true; e_cleanup 2>/dev/null || true; f_cleanup' EXIT
+
+F_PROJECT="sf5-kubernetes-$$"
+F_COMPOSE_BASE=(docker compose --env-file compose/pins.env -f compose/compose.yaml -p "$F_PROJECT")
+
+f_stack_down() {
+  local profile="$1" override="$2"
+  AGENT_PROFILE="$profile" "${F_COMPOSE_BASE[@]}" -f "compose/overrides/${override}.yaml" \
+    down -v --remove-orphans >/dev/null 2>&1 || true
+}
+trap 'cleanup; b_cleanup 2>/dev/null || true; d_cleanup 2>/dev/null || true; e_cleanup 2>/dev/null || true; f_cleanup; f_stack_down kubernetes kubernetes; f_stack_down default default' EXIT
+
+# --- KUBECONFIG resolves to the :ro secret path under 'kubernetes' only -------------------
+PACK_CREDENTIALS_DIR="$F_CREDS_DIR" AGENT_PROFILE=kubernetes "${F_COMPOSE_BASE[@]}" -f compose/overrides/kubernetes.yaml \
+  build egress-mediator claude codex agy >"$F_TMP/f-kubernetes-build.log" 2>&1 \
+  || { fail "F: image build failed under profile 'kubernetes'"; tail -20 "$F_TMP/f-kubernetes-build.log" | sed 's/^/      /'; }
+PACK_CREDENTIALS_DIR="$F_CREDS_DIR" AGENT_PROFILE=kubernetes "${F_COMPOSE_BASE[@]}" -f compose/overrides/kubernetes.yaml \
+  up -d --force-recreate egress-mediator >"$F_TMP/f-kubernetes.log" 2>&1 \
+  || { fail "F: mediator failed to start under profile 'kubernetes'"; sed 's/^/      /' "$F_TMP/f-kubernetes.log" | tail -20; }
+
+f_kc_ok=1
+for a in claude codex agy; do
+  KC_PATH_OUT="$(PACK_CREDENTIALS_DIR="$F_CREDS_DIR" AGENT_PROFILE=kubernetes "${F_COMPOSE_BASE[@]}" -f compose/overrides/kubernetes.yaml \
+    run --rm "$a" sh -c 'printf "%s" "$KUBECONFIG"' 2>/dev/null)" || true
+  if [ "$KC_PATH_OUT" != "/run/secrets/pack-kubernetes-kubeconfig" ]; then
+    f_kc_ok=0
+    fail "F: KUBECONFIG not resolving to the expected secret path in '${a}', got: ${KC_PATH_OUT}"
+    continue
+  fi
+  KC_CONTENT_OUT="$(PACK_CREDENTIALS_DIR="$F_CREDS_DIR" AGENT_PROFILE=kubernetes "${F_COMPOSE_BASE[@]}" -f compose/overrides/kubernetes.yaml \
+    run --rm "$a" sh -c 'cat "$KUBECONFIG"' 2>/dev/null)" || true
+  if [ "$KC_CONTENT_OUT" != "$F_KUBECONFIG_VALUE" ]; then
+    f_kc_ok=0
+    fail "F: KUBECONFIG path in '${a}' does not resolve to the staged content"
+  fi
+  KC_RO_OUT="$(PACK_CREDENTIALS_DIR="$F_CREDS_DIR" AGENT_PROFILE=kubernetes "${F_COMPOSE_BASE[@]}" -f compose/overrides/kubernetes.yaml \
+    run --rm "$a" sh -c 'echo overwritten > "$KUBECONFIG" 2>&1; echo "rc=$?"' 2>/dev/null)" || true
+  if ! grep -qE 'rc=([1-9][0-9]*)' <<< "$KC_RO_OUT"; then
+    f_kc_ok=0
+    fail "F: writing to the mounted kubeconfig secret in '${a}' did not fail as expected (:ro)"
+  fi
+done
+[ "$f_kc_ok" = 1 ] && pass "F: KUBECONFIG resolves to the :ro secret path with the staged content in every agent under 'kubernetes'"
+
+# --- kubectl and helm binaries present and pinned ------------------------------------------
+KUBECTL_OUT="$(PACK_CREDENTIALS_DIR="$F_CREDS_DIR" AGENT_PROFILE=kubernetes "${F_COMPOSE_BASE[@]}" -f compose/overrides/kubernetes.yaml \
+  run --rm claude sh -c 'kubectl version --client -o json' 2>/dev/null)" || true
+if grep -qE '"gitVersion": *"v1\.31\.2"' <<< "$KUBECTL_OUT"; then
+  pass "F: kubectl binary present and reports the pinned version under profile 'kubernetes'"
+else
+  fail "F: expected kubectl gitVersion v1.31.2, got: ${KUBECTL_OUT}"
+fi
+
+HELM_OUT="$(PACK_CREDENTIALS_DIR="$F_CREDS_DIR" AGENT_PROFILE=kubernetes "${F_COMPOSE_BASE[@]}" -f compose/overrides/kubernetes.yaml \
+  run --rm claude sh -c 'helm version --template "{{.Version}}"' 2>/dev/null)" || true
+if [ "$HELM_OUT" = "v3.16.2" ]; then
+  pass "F: helm binary present and reports the pinned version under profile 'kubernetes'"
+else
+  fail "F: expected helm version v3.16.2, got: ${HELM_OUT}"
+fi
+
+f_stack_down kubernetes kubernetes
+
+# --- KUBECONFIG absent under 'default' (which loads no pack declaring it) -----------------
+AGENT_PROFILE=default "${F_COMPOSE_BASE[@]}" -f compose/overrides/default.yaml \
+  build egress-mediator claude codex agy >"$F_TMP/f-default-build.log" 2>&1 \
+  || { fail "F: image build failed under profile 'default'"; tail -20 "$F_TMP/f-default-build.log" | sed 's/^/      /'; }
+AGENT_PROFILE=default "${F_COMPOSE_BASE[@]}" -f compose/overrides/default.yaml \
+  up -d --force-recreate egress-mediator >"$F_TMP/f-default.log" 2>&1 \
+  || { fail "F: mediator failed to start under profile 'default'"; sed 's/^/      /' "$F_TMP/f-default.log" | tail -20; }
+DEF_KC_OUT="$(AGENT_PROFILE=default "${F_COMPOSE_BASE[@]}" -f compose/overrides/default.yaml \
+  run --rm claude sh -c 'printf "%s" "${KUBECONFIG:-}"' 2>/dev/null)" || true
+[ -z "$DEF_KC_OUT" ] \
+  && pass "F: KUBECONFIG absent under profile 'default'" \
+  || fail "F: KUBECONFIG unexpectedly present under 'default': ${DEF_KC_OUT}"
+f_stack_down default default
+
+# --- the cluster-pack mechanism (Decision 6): a per-cluster egress-only pack adds exactly
+#     its FQDN, and is refused without a resolvable third_parties anchor -------------------
+F_CLUSTER_PACK_DIR="packs/sf5-cluster-probe"
+F_CLUSTER_PACK="$F_CLUSTER_PACK_DIR/pack.yaml"
+F_CLUSTER_PROFILE="profiles/sf5-cluster-probe.yaml"
+[ ! -e "$F_CLUSTER_PACK_DIR" ] && [ ! -e "$F_CLUSTER_PROFILE" ] \
+  || { echo "verify-tool-packs: $F_CLUSTER_PACK_DIR or $F_CLUSTER_PROFILE already exists; remove before running" >&2; exit 1; }
+
+f_cluster_cleanup() { rm -rf "$F_CLUSTER_PACK_DIR" "$F_CLUSTER_PROFILE"; }
+trap 'cleanup; b_cleanup 2>/dev/null || true; d_cleanup 2>/dev/null || true; e_cleanup 2>/dev/null || true; f_cleanup; f_cluster_cleanup' EXIT
+
+mkdir -p "$F_CLUSTER_PACK_DIR"
+cat > "$F_CLUSTER_PACK" <<'EOF'
+name: sf5-cluster-probe
+description: probe -- per-cluster egress-only pack, no third_parties yet
+schema: 1
+blast_radius: "probe pack for Phase F's cluster-pack mechanism test"
+needs_write_access: false
+packages:
+  apt: {repository: profile, items: []}
+  archives: []
+egress:
+  runtime:
+    allow_fqdns:
+      - {fqdn: sf5-cluster-probe.example, port: 443, upgrade: false}
+    allow_cidrs: []
+  build: {allow_fqdns: []}
+runtime_install: true
+runtime_install_reason: "probe -- a cluster API can serve arbitrary bytes (Decision 6)"
+mounts: []
+env: []
+credentials: []
+third_parties: []
+EOF
+printf '%s' "$(yq eval '.packs = ["language-runtimes", "kubernetes", "sf5-cluster-probe"] | .name = "sf5-cluster-probe"' profiles/kubernetes.yaml)" > "$F_CLUSTER_PROFILE"
+
+expect 3 "but an empty third_parties" \
+  "F: a per-cluster egress pack with non-empty egress.runtime and empty third_parties is refused (R14.1)" \
+  bash scripts/compile-policy.sh --profile sf5-cluster-probe --out "$(mktemp)"
+
+yq eval -i '.third_parties = [{"party": "Nobody", "record": "docs/records/third-party-assessments.md#sf5-nonexistent-anchor"}]' "$F_CLUSTER_PACK"
+expect 1 "does not resolve -- no id=\"sf5-nonexistent-anchor\" anchor" \
+  "F: a per-cluster egress pack whose third_parties anchor does not resolve is refused by lint-policy.sh" \
+  bash scripts/lint-policy.sh
+
+yq eval -i '.third_parties = [{"party": "HashiCorp", "record": "docs/records/third-party-assessments.md#r141-hashicorp"}]' "$F_CLUSTER_PACK"
+F_CLUSTER_OUT="$(mktemp)"
+if bash scripts/compile-policy.sh --profile sf5-cluster-probe --out "$F_CLUSTER_OUT" >"$F_TMP/f-cluster-compile.log" 2>&1; then
+  F_GAINED="$(yq eval '.agents.claude.allow_fqdns[].fqdn' "$F_CLUSTER_OUT" | LC_ALL=C sort -u)"
+  F_BASE="$(yq eval '.agents.claude.allow_fqdns[].fqdn' policy/resolved/kubernetes.yaml | LC_ALL=C sort -u)"
+  F_NEW="$(comm -13 <(printf '%s\n' "$F_BASE") <(printf '%s\n' "$F_GAINED") 2>/dev/null || true)"
+  if [ "$F_NEW" = "sf5-cluster-probe.example" ]; then
+    pass "F: a per-cluster egress pack with a resolvable third_parties anchor adds exactly its own FQDN"
+  else
+    fail "F: expected the cluster pack to add exactly 'sf5-cluster-probe.example', gained: '${F_NEW}'"
+  fi
+else
+  fail "F: compile-policy.sh refused the cluster probe pack even with a resolvable third_parties anchor"
+  cat "$F_TMP/f-cluster-compile.log" | sed 's/^/      /'
+fi
+rm -f "$F_CLUSTER_OUT"
+f_cluster_cleanup
+
+# ---------------------------------------------------------------------------
+# Phase G -- SF-5: R7.8 hardening comparison across all four shipped profiles
+# ---------------------------------------------------------------------------
+phase G "R7.8 hardening comparison -- default, terraform, github, kubernetes"
+
+# check-profile-compose.sh's (b) check IS the R7.8 hardening comparison (Decision 2):
+# every rendered agent-service field other than `secrets` and the `PROFILE`/
+# `MEDIATOR_PROFILE` build args must equal `default`'s, which covers cap_drop, cap_add,
+# security_opt, read_only, user, privileged, devices, network_mode, pid, ipc and the
+# resource limits named in criterion 7. Fixed at this sub-feature: `secrets_of()` was
+# comparing multi-line yq output line-by-line rather than one secret name per line
+# (Compose v2.38.2 normalizes every secret reference to the long {source, target} form),
+# so a profile carrying any pack credential always reported a false secret-set mismatch
+# and this comparison had never actually passed for 'github'.
+for p in terraform github kubernetes; do
+  if bash scripts/check-profile-compose.sh --profile "$p" >"$F_TMP/g-${p}.log" 2>&1; then
+    pass "G: profile '${p}' -- R7.8 hardening fields and mount/limit shape match 'default' apart from secrets/PROFILE"
+  else
+    fail "G: profile '${p}' diverges from 'default' outside secrets/PROFILE (R7.8)"
+    cat "$F_TMP/g-${p}.log" | sed 's/^/      /'
+  fi
+done
+
 echo
 echo "=== Results: $PASSED passed, $FAILED failed ==="
 [ "$FAILED" -eq 0 ]

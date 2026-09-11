@@ -22,6 +22,7 @@ record past the next agent version bump (R10.6).
 - [R14.3 — Antigravity ToS Monitoring Owner](#r143--antigravity-tos-monitoring-owner)
 - [R14.1 — HashiCorp](#r141--hashicorp)
 - [R14.1 — GitHub](#r141--github)
+- [R14.1 — Kubernetes (posture)](#r141--kubernetes-posture-not-a-filled-record--feature-023-sf-5-decision-6)
 - [Summary Table](#summary-table)
 
 ---
@@ -156,6 +157,39 @@ record past the next agent version bump (R10.6).
 
 ---
 
+## R14.1 — Kubernetes (posture, not a filled record — Feature 02.3 SF-5, Decision 6)
+
+This entry is a **recorded posture**, not a standard filled R14.1 row like HashiCorp's or GitHub's:
+the shipped `packs/kubernetes/pack.yaml` declares `egress.runtime: []`, so it reaches no third
+party at all, and R14.1 applies only to a party actually on the traffic path. There is nothing to
+assess for the shipped pack — no HTTPS destination, no privacy policy, no retention terms.
+
+**What the pack ships and what it does not.** `kubectl` and `helm` are checksum-verified binaries
+from `dl.k8s.io` and `get.helm.sh` (build-time-only egress, `egress.build`, never entering the
+resolved runtime policy). At runtime the pack grants no cluster reach: the cluster API endpoint is
+operator-specific and cannot be declared statically in a shipped, reviewed manifest.
+
+**The split that keeps R14.1 mechanical.** A cluster is reached by loading a *separate*,
+per-cluster egress-only pack (`packs/k8s-cluster-<name>/`, not shipped in this feature). That pack
+carries its own `egress.runtime` (the cluster's API server FQDN, and any Helm repository hosts) and
+its own `third_parties` record naming the party that hosts the cluster (a cloud provider's managed
+Kubernetes service, or the operator's own infrastructure). `lint-policy.sh`'s R14.1 anchor check
+(criterion 3) refuses that pack at load time if its record does not resolve — so the mechanism this
+architecture already has for HashiCorp and GitHub applies unchanged to whatever party actually ends
+up hosting a cluster; there is nothing kubernetes-specific left to build for R14.1 to hold.
+
+**Constraint recorded, not closed (criterion 14).** Reach is **public-FQDN cluster endpoints
+only**. `allow_cidrs` is refused at the mediator render (`policy/denylist.base.yaml` denies RFC1918
+post-resolution regardless), so a `kind` cluster, Docker Desktop's cluster, or any
+private/IP-address-only endpoint is unreachable through this mechanism. The `kubeconfig` credential
+is also constrained to one context using token or client-certificate auth (Decision 6) — an `exec`
+or `auth-provider` credential plugin would invoke a binary this pack's image does not carry, so
+such a kubeconfig fails at first use, not at compile time.
+
+**Date:** 2026-09-10.
+
+---
+
 ## Summary Table
 
 | Party | R14.1 status | R14.2 applicable | Primary constraint |
@@ -166,3 +200,4 @@ record past the next agent version bump (R10.6).
 | Google | Incomplete (breach-notification, tier unconfirmed) | Yes — pinning moderate, training opt-out tier-dependent | **Confirm `GEMINI_API_KEY` is billed (paid tier) before real use** |
 | HashiCorp | Incomplete (retention, deletion, breach-notification not published for this infrastructure) | No (not a model provider) | Checksum-verified binary source only, no credential or workspace content sent; `CHECKPOINT_DISABLE=1` suppresses the unrelated telemetry call |
 | GitHub | Incomplete (retention, deletion, breach-notification not published for API/CLI traffic) | No (not a model provider) | Real repository content crosses this party by design; mitigation is PAT scope (fine-grained, named repositories), not avoidance |
+| Kubernetes (shipped pack) | N/A — no runtime egress, no party on the traffic path | No (not a model provider) | Cluster reach requires a separate per-cluster egress pack, which carries its own R14.1 record before it can be loaded; public-FQDN endpoints only |
