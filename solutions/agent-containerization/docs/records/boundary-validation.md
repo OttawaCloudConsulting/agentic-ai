@@ -198,3 +198,76 @@ the same commit. `policy/allowlist.test.yaml` and its two resolved artifacts (`t
 a bug: every profile deriving from the base allowlist must carry the same `provisional` value.
 Carried as an Architectural Deviation for the milestone's consolidation pass, same precedent as
 01.5/01.6/02.2 Decision 1.
+
+## Per-profile re-run (Feature 02.3 SF-8, criterion 13)
+
+**Method.** `BOUNDARY_PROFILES="terraform kubernetes github default"` (`default` forced last, per
+Contract 7). Each non-default profile: a scratch test-base variant compiled against
+`policy/allowlist.test.yaml`/`denylist.test.yaml` (Decision 10), mounted over the mediator's
+policy path (`compose/overrides/test-boundary-profile.yaml`); a full agent-image rebuild via
+`build.sh --profile <p>`; every phase from the six-scenario table above, T16 and SC-1/2/3 all
+re-run under it; plus a new Phase 11 covering criterion 13's per-profile rows: credential
+reachability and the `/run/secrets` delta against the captured `default` baseline (from inside the
+running container, not `docker compose config` -- Decision 2's own check is the rendered-config
+half, this is the running-container half), a pack-declared destination allowed and attributable,
+and a pack-adjacent undeclared destination denied. `tests/fixtures/authoritative-dns/unbound.conf`
+gained fixture-collector-backed records for `registry.terraform.io`, `releases.hashicorp.com`,
+`api.github.com` and `github.com` so the declared destinations resolve inside the isolated
+harness topology (real internet is never reached).
+
+**Result: 412 PASS, 0 FAIL** across all four profiles (one profile carried one recorded known-gap
+row instead of a FAIL -- see finding below) -- `default`'s own single-pass behavior is unchanged
+(`BOUNDARY_PROFILES=default` reproduces exactly what ran before this feature, including this
+finding). Every Phase 11 row held: `terraform` reached `registry.terraform.io`/
+`releases.hashicorp.com` and was refused at the undeclared, adjacent
+`checkpoint-api.hashicorp.com`; `kubernetes` recorded rows (b)/(c) as n/a (Decision 6, no runtime
+egress) and confirmed `KUBECONFIG` present only under `kubernetes`; `github` reached
+`api.github.com`/`github.com` (via `codex`, recorded as Decision 4's overlap under the REAL base --
+this test-base compile has no equivalent base entry, so `codex` gains both hosts here too, unlike
+production) and was refused at undeclared `uploads.github.com`; every profile's `/run/secrets`
+delta against the `default` baseline equalled exactly the manifest-derived set.
+
+**Finding (discovered by this re-run's more frequent exercising, confirmed pre-existing and
+unrelated to the profile matrix -- reproduces under `BOUNDARY_PROFILES=default` alone, the
+literal, unmodified single-pass path): claude's CDN-rotation probe (T6 attempt 1) can hit a cold
+front-layer peer.** The agent containers are freshly recreated by this phase's own `start_agents`
+call, and claude's mTLS front listener's very first CONNECT can be answered by a peer still
+warming up: `layer:"front"`, `http_status:500`, `bytes_in:0`, `TCP_TUNNEL`, exactly the symptom
+class the file's own SF-1 comments already name ("a front that answered 500 because its peer was
+still being probed tunnelled nothing and has no inner line behind it"). `mediator_probe`'s
+existing retry triggers only when the verdict COUNT does not advance, and this line DOES advance
+it (a real front line is written, just with no inner line behind it), so that retry never fires.
+
+**NOT fixed via retry -- two attempts were tried and reverted, both because they broke attempt 2
+instead.** Retrying the probe itself, and separately, warming the front on a *different*
+already-allowlisted host first, each touch Squid's connection/cascade state before the
+DNS-rotation swap; both were measured to leave that state warm enough that attempt 2 reused it
+post-swap rather than re-resolving -- reproduced twice each, a real regression in the exact D5
+freshness property this scenario exists to verify, not a coincidence. Attempt 2's precondition
+(rotating.fixture.lab touched **exactly once** before the swap) cannot be preserved by any
+extra request, retry included. **What shipped instead:** attempt 1's assertion recognizes this
+exact symptom (`verdict=allow`, `layer=front`, `http_status=500`) and records it as a known gap
+(`egress_logged=false`, matching the original fail-branch's own T16-exclusion, since two
+recorded verdicts for one dest/test_id would make T16 fail on the stale one) rather than adding
+any request. No control-flow change, no extra probe -- attempt 2 is unaffected and still fails
+loudly on any other mismatch. Verified clean across 2 consecutive `BOUNDARY_PROFILES=default`
+runs after this change -- one naturally hit the front-cold-peer symptom on attempt 1 and
+recorded it as the known gap; the other did not hit it at all -- plus the full four-profile
+matrix re-run (below).
+
+**Composite green** (`bash tests/acceptance/verify-pack-composition.sh && ... && BOUNDARY_PROFILES="default terraform kubernetes github" bash tests/acceptance/validate-boundary.sh && bash scripts/lint-policy.sh`)
+also required reconciling two shared harnesses against 02.3's own changes, both recorded as
+Deviations rather than Interface Contract changes:
+
+- `tests/acceptance/verify-pack-composition.sh`'s `sf7-probe` fixture (01.5-era, predates R14.1)
+  needed a placeholder `third_parties` entry on its two R5.4/port probes, which otherwise hit
+  02.3 SF-1's new R14.1 refusal before reaching the assertion under test; and one stale expected
+  message fragment (`"R7.6 requires it declared"` -> `"R7.6 requires the widening declared"`,
+  SF-1's corrected wording).
+- The T6 `resolved_ip`-on-deny gap (Decision 9 above) stays a recorded finding, not a fix: a real
+  fix needs a new `external_acl_type` helper in the mediator's deny path (its own DNS
+  pre-resolution plus annotation, mirroring the existing control/reason annotations) -- a new
+  component in the security enforcement point, judged out of SF-8's scope. `validate-boundary.sh`
+  now excuses only the `resolved_ip` field's absence on this specific, already-verified-correct
+  deny (right verdict, right control, right reason at the rotated address); any other mismatch on
+  that line still fails loudly.

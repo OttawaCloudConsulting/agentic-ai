@@ -531,7 +531,7 @@ path `compose/generated/credentials/...` is checked against the harnesses' conta
     and the gap is recorded per agent. The next start is refused.
   - Record the proposed T32 amendment.
   - Composite green.
-- [ ] **SF-8: `validate-boundary.sh` re-run against every profile, records and close-out.**
+- [x] **SF-8: `validate-boundary.sh` re-run against every profile, records and close-out.**
   - Add `BOUNDARY_PROFILES` to `validate-boundary.sh`, with per-profile scratch variants (Decision
     10, including `--profile-file` if 02.1 did not add it) and the per-profile rows (criterion 13).
   - Run the matrix for `default`, `terraform`, `kubernetes` and `github`, and record it in

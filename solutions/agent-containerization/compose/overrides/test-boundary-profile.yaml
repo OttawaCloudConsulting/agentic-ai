@@ -1,0 +1,19 @@
+# TEST-ONLY override (02.3 SF-8, Decision 10). Mounts validate-boundary.sh's scratch-compiled
+# test-base variant of a shipped, non-default profile (terraform/kubernetes/github) over the
+# mediator's baked policy path -- the same single-file bind-mount mechanism 02.1 SF-4's
+# test-exports.yaml uses for T36 (see that file's comment for the read-only-rootfs rationale).
+#
+# The mount target has to be the path the mediator's entrypoint actually resolves at start,
+# which is /etc/mediator/policy/<MEDIATOR_PROFILE>.yaml. test-egress.yaml (layered alongside
+# this override, ahead of it) sets MEDIATOR_PROFILE: ${MEDIATOR_TEST_PROFILE:-test-fixtures} --
+# validate-boundary.sh exports MEDIATOR_TEST_PROFILE to the real profile name it is compiling
+# a scratch variant FOR (terraform/kubernetes/github), so this mount's own
+# ${AGENT_PROFILE:-default} interpolation (a Compose-side substitution, evaluated from the
+# same exported value) lands on the identical filename.
+#
+# The path is fixed (.build-scratch/boundary/variant.yaml); only its content changes between
+# profiles, same as T36's Phase E precedent.
+services:
+  egress-mediator:
+    volumes:
+      - ../.build-scratch/boundary/variant.yaml:/etc/mediator/policy/${AGENT_PROFILE:-default}.yaml:ro

@@ -110,3 +110,34 @@ a wrapper could interpose, since its `config.toml` is already rewritten by this 
 entrypoint). Proposed for a future milestone, not built here: route through `/milestone` revision
 mode rather than adding an in-session watcher under this feature's scope, per the named-fallback
 convention this feature's Sub-Features section already uses for scope growth.
+
+## T31 assessment (re-verified, Feature 02.3 SF-8)
+
+T31's scope is "no npm/yarn/PyPI/Go-proxy FQDN appears in any resolved artifact, and `npx` is
+absent from every image" — the same npm-registry-widening property Milestone 01 established for
+the base pod, re-verified here against every profile this feature adds (`tests/acceptance/verify-mcp-inventory.sh`
+Phase B, run against `default`, `terraform`, `kubernetes` and `github`'s committed artifacts and
+built images).
+
+**Result: holds on every committed profile.** No `registry.npmjs.org`, `registry.yarnpkg.com`,
+`pypi.org`/`files.pythonhosted.org` or `proxy.golang.org` entry appears in any of the six committed
+resolved artifacts, and `npx` is absent from every built image (`claude`, `codex`, `agy`, across
+all four profiles). None of the three packs this feature ships names a package-registry FQDN:
+Terraform reaches HashiCorp's own release/registry infrastructure (assessed separately, R14.1),
+`kubectl`/`helm` reach nothing at runtime, and `gh` reaches GitHub's API/web hosts, not a package
+registry. Loading any of the three shipped profiles therefore does not reopen the `npx <server>`
+arbitrary-install channel T31 exists to keep closed.
+
+**Recorded residual: `github.com`.** The `github` profile's runtime egress includes `github.com`
+itself (source hosting, not a package registry), which lets an agent `git clone`/`curl` arbitrary
+source from GitHub and run it with `node` (already present in every image). This is **not new** --
+`codex`'s 01.1 base already carries `github.com`/`api.github.com` with `upgrade: false` on every
+profile including `default` (Decision 4's overlap case), so `codex` could already do this before
+02.3 shipped. What `github` changes is scope: it extends the same reach to `claude` and `agy`,
+which had no `github.com` entry under any profile before this feature. This is **not** T31's own
+failure mode -- it is not `npx <server>` against an npm registry, and `lint-policy.sh`'s T31 check
+(package-registry FQDNs specifically) correctly does not flag it -- but it is a real widening of
+what a compromised `claude` or `agy` session can fetch and execute under the `github` profile, and
+it is recorded here rather than left implicit. No stated requirement or acceptance criterion asks
+this to be closed; `github.com`'s presence is inherent to what the GitHub CLI needs to reach for
+API operations that redirect through git's smart-HTTP protocol on the same host.

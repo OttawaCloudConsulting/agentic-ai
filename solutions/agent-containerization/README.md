@@ -6,10 +6,12 @@ Research and design options for running agentic coding agents (Claude Code, Open
 [`prd.md`](prd.md) and [`.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md`](.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md).
 Milestone 01 (Sandboxed Pod) is complete: pod topology, hardened runtime, egress mediation and
 per-agent authentication all ship. Milestone 02 (Proven and Composable) is building; Feature 02.1
-(audit completeness) and Feature 02.2 (adversarial boundary validation — see
-["Adversarial boundary validation (02.2)"](#adversarial-boundary-validation-022) below) are
-complete, with SC-1/SC-2/SC-3 demonstrated from inside the real agent containers. **This pod is
-not yet cleared for real work** — Feature 02.3 (tool packs / use-case profiles), 02.4
+(audit completeness), Feature 02.2 (adversarial boundary validation — see
+["Adversarial boundary validation (02.2)"](#adversarial-boundary-validation-022) below) and
+Feature 02.3 (tool packs, use-case profiles and MCP inventory — see
+["Tool packs, use-case profiles and MCP inventory (02.3)"](#tool-packs-use-case-profiles-and-mcp-inventory-023)
+below) are complete, with SC-1/SC-2/SC-3 demonstrated from inside the real agent containers under
+every shipped profile. **This pod is not yet cleared for real work** — Feature 02.4
 (reproducibility and onboarding) and 02.5 (containment, response and the authorization gate) are
 still building. See [`progress.txt`](progress.txt) for current gate/feature state.
 
@@ -760,7 +762,9 @@ bash tests/acceptance/verify-pack-composition.sh \
   && bash tests/acceptance/verify-pod-topology.sh \
   && bash tests/acceptance/verify-egress-mediator.sh \
   && bash tests/acceptance/verify-audit-completeness.sh \
-  && bash tests/acceptance/validate-boundary.sh \
+  && bash tests/acceptance/verify-tool-packs.sh \
+  && bash tests/acceptance/verify-mcp-inventory.sh \
+  && BOUNDARY_PROFILES="default terraform kubernetes github" bash tests/acceptance/validate-boundary.sh \
   && bash scripts/lint-policy.sh
 ```
 
@@ -770,9 +774,85 @@ This unattended composite spends no model tokens. Two phases are live and gated 
 their own authenticated state volumes and recorded manually; see the harness's own printed
 instructions and `docs/records/boundary-validation.md`.
 
+`BOUNDARY_PROFILES` (default: `default`) re-runs every phase in `validate-boundary.sh` once per
+named profile — see ["Tool packs, use-case profiles and MCP inventory (02.3)"](#tool-packs-use-case-profiles-and-mcp-inventory-023)
+below for what that adds and costs.
+
+### Tool packs, use-case profiles and MCP inventory (02.3)
+
+Feature 02.3 is **complete**. Three named use-case profiles ship, each `default` plus one pack:
+
+| Profile | Pack | Adds | Credential |
+|---|---|---|---|
+| `terraform` | `packs/terraform/` | `terraform` CLI, `registry.terraform.io` + `releases.hashicorp.com` runtime egress | none |
+| `kubernetes` | `packs/kubernetes/` | `kubectl` + `helm`, no runtime egress (cluster reach needs a separate, not-shipped, per-cluster egress pack) | `kubeconfig` (`KUBECONFIG`) |
+| `github` | `packs/github-cli/` | `gh` CLI, `api.github.com` + `github.com` runtime egress (already present for `codex` under every profile, from the 01.1 base — `github` extends it to `claude` and `agy`) | GitHub PAT (`GH_TOKEN`) |
+
+**Switching profiles:**
+
+```bash
+# 1. Stage the pack's credential(s) first, if it declares any (terraform declares none).
+#    Path shape: compose/generated/credentials/<profile>/<pack>/<credential-name>, mode 0600.
+mkdir -p compose/generated/credentials/github/github-cli
+printf '%s' "$YOUR_FINE_GRAINED_PAT" > compose/generated/credentials/github/github-cli/github-token
+chmod 0600 compose/generated/credentials/github/github-cli/github-token
+
+# 2. Bring the profile up. AGENT_PROFILE selects both the agent images' PROFILE build arg and
+#    the mediator's MEDIATOR_PROFILE -- compose.yaml binds MEDIATOR_PROFILE to
+#    ${AGENT_PROFILE:-default} by default, so one variable drives both.
+AGENT_PROFILE=github docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/github.yaml up -d --build --force-recreate
+
+# 3. Switch back.
+docker compose --env-file compose/pins.env \
+  -f compose/compose.yaml -f compose/overrides/default.yaml up -d --build --force-recreate
+```
+
+`compose/generated/credentials/` is git-ignored. **Rotation is a file swap plus
+`--force-recreate` — no rebuild** (R8.5): the secret is a Compose `file:` source, never baked
+into an image layer. **Revocation is independent per credential** (R7.12) — see
+`docs/records/credential-inventory.md`, Tables A/B, rows S2/S3, for the exact revoke-at-provider
+steps and blast radius. A credential reaches all three agent containers under a profile that
+loads its pack, the same rule that gives every agent a pack's egress — stated as blast radius,
+not a per-agent scoping this architecture builds.
+
+`scripts/check-profile-compose.sh --profile <name>` asserts a profile's hand-authored
+`compose/overrides/<name>.yaml` before `build.sh` builds it: the rendered secret set equals
+exactly the credentials the profile's packs declare, and every other rendered field — hardening,
+mounts, limits — equals `default`'s. **Residual:** `docker compose up --build` does not run this
+check itself (R12.9 bars a wrapper on that entry point) — a hand-edited override that drifts is
+caught at the next `build.sh` or `validate-boundary.sh` run, not at `up` time.
+
+**MCP inventory.** Every profile carries an `mcp:` block (`servers`, `plugins`, `skills`), baked
+into the image and enforced at start by `images/mcp-gate.js`. No shipped profile inventories a
+real server — every profile ships `servers: [], plugins: [], skills: [], registry: none`, the
+explicit empty. Two things follow from an image-baked, start-time gate:
+
+- **A refusal looks like this**, on the agent's own start (exit 3, before the agent CLI runs),
+  naming the file and the entry:
+  ```
+  mcp-gate: REFUSED uninventoried server '<name>' in <file> (R7.14, T29)
+  mcp-gate: DRIFT '<name>' in <file>: baseline <hash> != live <hash> (R7.14, T29)
+  ```
+- **Migration note.** The gate does not grandfather. If a state volume or a project repository
+  already carries an MCP server, plugin or skill entry from before this gate landed, the *next*
+  start of that agent refuses. Before upgrading past this feature: enumerate what each agent's
+  capability-declaration files currently hold (`docs/records/mcp-inventory.md` records the
+  per-agent file set this project measured) and either add each entry to the profile's `mcp:`
+  block (rebuild) or remove it from the volume/repository. This deliberately differs from the
+  auth bootstrap's warn-don't-block start posture (01.4 Deviation 2) — an unreviewed capability
+  declaration is the R7.17 persistence path an uninventoried entry exploits, and there is no safe
+  default to warn-and-continue into.
+- **Recorded gap (T32):** a *write* to a capability-declaration file from inside a running agent
+  container is never blocked — `srt` is not installed and D14 disables every native sandbox, so
+  the compensating control is the *next start's* gate, not the write itself. A proposed amendment
+  to the register's T32 text is recorded in `docs/records/mcp-inventory.md`.
+
+Full per-agent measurement, the gate's design and limitations, and the T29–T32 results are in
+[`docs/records/mcp-inventory.md`](docs/records/mcp-inventory.md).
+
 Still not produced:
 
-- Tool pack set, use-case profiles and MCP inventory completeness — Feature 02.3
 - Reproducibility, provenance and onboarding — Feature 02.4
 - Containment, response and the authorization gate — Feature 02.5
 - AWS access (R6) — Milestone 03

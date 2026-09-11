@@ -201,3 +201,23 @@ such a kubeconfig fails at first use, not at compile time.
 | HashiCorp | Incomplete (retention, deletion, breach-notification not published for this infrastructure) | No (not a model provider) | Checksum-verified binary source only, no credential or workspace content sent; `CHECKPOINT_DISABLE=1` suppresses the unrelated telemetry call |
 | GitHub | Incomplete (retention, deletion, breach-notification not published for API/CLI traffic) | No (not a model provider) | Real repository content crosses this party by design; mitigation is PAT scope (fine-grained, named repositories), not avoidance |
 | Kubernetes (shipped pack) | N/A — no runtime egress, no party on the traffic path | No (not a model provider) | Cluster reach requires a separate per-cluster egress pack, which carries its own R14.1 record before it can be loaded; public-FQDN endpoints only |
+
+## T42 — Third-party traffic-path governance (re-inspection, Feature 02.3 SF-8)
+
+T42 requires every party on the agent traffic path to have a record naming what it observes, its
+retention period and its breach-notification path — or, where the assessment could not be
+completed, the resulting constraint on use (R14.1). This re-inspection walks every party this
+feature's packs put on the path and confirms each has one, extending the inspection Feature 02.2's
+SF-6 ran against the base allowlist's four parties (Docker Sandboxes, Anthropic, OpenAI, Google).
+
+| Party | Traffic-path FQDNs | Placed on the path by | Record | T42 result |
+|---|---|---|---|---|
+| HashiCorp | `registry.terraform.io`, `releases.hashicorp.com` | `packs/terraform/pack.yaml` | [R14.1 — HashiCorp](#r141--hashicorp) | Present — retention/deletion/breach-notification not published for this infrastructure, recorded as Incomplete rather than omitted; the constraint (checksum-verified binary source only, no credential or workspace content sent) is stated |
+| GitHub | `api.github.com`, `github.com` | `packs/github-cli/pack.yaml` (and, for `codex` under every profile including `default`, the 01.1 base — Decision 4's overlap) | [R14.1 — GitHub](#r141--github) | Present — retention/deletion/breach-notification not published for API/CLI traffic, recorded as Incomplete; the constraint (PAT scope, not avoidance) is stated |
+| Kubernetes hosting party (any) | none, by the shipped pack | `packs/kubernetes/pack.yaml` declares `egress.runtime: []` — reach requires a separate, not-shipped, per-cluster egress pack | [R14.1 — Kubernetes (posture)](#r141--kubernetes-posture-not-a-filled-record--feature-023-sf-5-decision-6) | N/A by construction, and recorded as such rather than left silent — the shipped pack places no traffic-path party. A future per-cluster pack carries its own T42-inspectable record before it loads (`lint-policy.sh`'s anchor check makes this mechanical, not a review step someone can skip) |
+
+**Result: every party this feature's packs place on the traffic path has an R14.1 record.** Two of
+three are Incomplete in the same sense 02.2's base-allowlist parties are Incomplete — the
+constraint-on-use clause of T42's pass text is what each record supplies in place of a confirmed
+retention/breach-notification figure, and that clause is present in both. No party was found on
+the path with no record at all, which is the failure mode T42 exists to catch.

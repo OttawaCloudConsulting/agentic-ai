@@ -520,7 +520,7 @@ rm -rf "$PROBE_PACK_DIR"
 # unreachable on the only input it exists for.
 make_probe_pack '.egress.runtime.allow_fqdns = [{"fqdn": "registry.npmjs.org", "port": 443}]'
 make_probe_profile default '.packs = ["sf7-probe"]'
-expect 3 "R7.6 requires it declared" \
+expect 3 "R7.6 requires the widening declared" \
   "B: a pack with runtime egress and runtime_install: false is refused (R7.6)" \
   compile_probe
 
@@ -671,7 +671,13 @@ fi
 # reaches the artifact the second reader checks. Written against the wrong reader this
 # probe passed on the exit code and failed on the message, which is the whole reason
 # `expect` requires both.
-make_probe_pack '.egress.runtime.allow_fqdns = [{"fqdn": "*.npmjs.org", "port": 443}] | .runtime_install = true | .runtime_install_reason = "probe"'
+# Both probes below add runtime egress, which R14.1 (02.3) requires a third_parties
+# anchor for -- a placeholder entry against the already-recorded HashiCorp record keeps
+# these two R5.4/port assertions isolated from R14.1's own coverage (probed separately
+# in Phase C's third_parties block).
+PROBE_THIRD_PARTY='.third_parties = [{"party": "HashiCorp", "record": "docs/records/third-party-assessments.md#r141-hashicorp"}]'
+
+make_probe_pack ".egress.runtime.allow_fqdns = [{\"fqdn\": \"*.npmjs.org\", \"port\": 443}] | .runtime_install = true | .runtime_install_reason = \"probe\" | ${PROBE_THIRD_PARTY}"
 make_probe_profile default '.packs = ["sf7-probe"]'
 expect 2 "'*.npmjs.org' is a wildcard" \
   "C: a pack-supplied wildcard FQDN is rejected at the manifest reader (R5.4)" \
@@ -680,7 +686,7 @@ expect 2 "'*.npmjs.org' is a wildcard" \
 # A pack-supplied non-443 port is FLAGGED, not refused -- criterion 3 calls it a design
 # question, and the operator may legitimately need one. The assertion is that the warning
 # is emitted, because a composed entry that changes the port silently is the failure.
-make_probe_pack '.egress.runtime.allow_fqdns = [{"fqdn": "probe.example.com", "port": 8443}] | .runtime_install = true | .runtime_install_reason = "probe"'
+make_probe_pack ".egress.runtime.allow_fqdns = [{\"fqdn\": \"probe.example.com\", \"port\": 8443}] | .runtime_install = true | .runtime_install_reason = \"probe\" | ${PROBE_THIRD_PARTY}"
 expect 0 "uses port 8443, not 443" \
   "C: a pack-supplied non-443 port is flagged and the compile still succeeds" \
   compile_probe
