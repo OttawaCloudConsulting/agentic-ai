@@ -518,7 +518,7 @@ path `compose/generated/credentials/...` is checked against the harnesses' conta
   - Phase B: **T31** across every committed artifact and every built image, with the HashiCorp and
     GitHub assessment recorded.
   - Composite green.
-- [ ] **SF-7: MCP start-time gate (T29) and capability-declaration integrity (T32).**
+- [x] **SF-7: MCP start-time gate (T29) and capability-declaration integrity (T32).**
   - Create `images/mcp-gate.js` and call it from `images/entrypoint.sh`.
   - Create `compose/overrides/test-mcp.yaml`, the test inventory, and the fixture `stdio` script.
   - Harness Phase C, **T29**:

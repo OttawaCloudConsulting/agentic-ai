@@ -61,3 +61,52 @@ server/skill *entry*. SF-7's gate design must decide whether a skill directory's
 existing bundle-level marker (coarser: any change to any skill in the bundle drifts together) or a
 per-directory hash computed fresh (finer, but with no existing image-side precedent to anchor it
 to). Not resolved here — SF-6 records the shape; SF-7 builds the gate.
+
+## SF-7 — the gate, T29/T32
+
+**The gate.** `images/mcp-gate.js`, invoked by `images/entrypoint.sh` after the home seed and the
+R4.5 `config.toml` merge, before anything the agent itself runs. Reads
+`/opt/agent-pack/mcp-inventory.json` (this agent's SF-6 output) and the fixed, per-agent file set
+resolved above. Exit 0: every live `mcpServers`/`mcp_servers` entry it finds is inventoried and its
+canonical (sorted-key JSON) hash matches `capability_baseline.config_sha256`. Exit 3: an
+uninventoried entry, or a hash mismatch — one `mcp-gate: REFUSED ...` or `mcp-gate: DRIFT ...` line
+per finding, both carrying `(R7.14, T29)`. Exit 2: the inventory or a capability-declaration file
+exists but does not parse — fails closed rather than silently skipping a file it cannot read.
+
+**Skill-bundle resolution (closing the item above).** The gate compares the existing bundle-level
+marker (`codex`'s `.codex-system-skills.marker`, `agy`'s `.checksum`) against a single inventory
+entry named for the whole bundle (`codex-system-skills`, `agy-builtin-skills`) — the coarser of the
+two options, chosen because it is the only one with an image-side integrity anchor already in
+place; a per-directory hash would have nothing on the agent's own side to compare against without
+the gate computing and trusting its own first-seen value, which is not an integrity check. `claude`
+carries no bundle marker (its plugin directory is empty in every observed volume), so absent a
+marker the gate falls back to hashing the directory's own sorted file listing — the coarsest
+available baseline, and a recorded limitation: a same-set file rewrite with no name change would
+not drift.
+
+**T29 — verified** (`tests/acceptance/verify-mcp-inventory.sh`, Phase C), against real `claude`,
+`codex` and `agy` containers: an uninventoried server refuses the *next* start (not the one that
+wrote it) at exit 3, naming both the file and the entry; a drifted `codex` `mcp_servers` entry
+refuses with both hashes named; a matching entry passes across two consecutive starts, confirming
+`codex`'s own per-start `config.toml` rewrite (`cli_auth_credentials_store`) produces no false
+drift, because the gate hashes only the `[mcp_servers.<name>]` table's own keys; the skill-bundle
+path is exercised for both `codex` and `agy`.
+
+**T32 — verified, gap confirmed** (Phase D): writing an uninventoried `mcp_servers`/`mcpServers`
+entry from inside a running container always succeeds — nothing in this design intercepts a
+mid-session write to `~/.claude/.claude.json`, `~/.codex/config.toml` or
+`~/.gemini/config/mcp_config.json`. This is the recorded gap: **a running session may already have
+loaded an entry the gate would refuse.** The *next* start is refused, per agent, which is what
+Phase D asserts as the closing half of T32.
+
+**Proposed T32 amendment.** The gap above is a start-time-only enforcement boundary, accepted for
+this feature (Edge Cases table: "Not blocked at write. Refused at the next start. The recorded
+limitation is that a running session may already have loaded it"). Closing it in-session would need
+either a filesystem watch inside each agent's container reacting to a write with a mid-session
+refusal (a new component, and a race against whatever the agent already did with a newly loaded
+server before the watch fires), or the agent CLI itself gating server load against the inventory
+(upstream, out of this project's control for `claude` and `agy`; `codex` is the one candidate where
+a wrapper could interpose, since its `config.toml` is already rewritten by this project's own
+entrypoint). Proposed for a future milestone, not built here: route through `/milestone` revision
+mode rather than adding an in-session watcher under this feature's scope, per the named-fallback
+convention this feature's Sub-Features section already uses for scope growth.

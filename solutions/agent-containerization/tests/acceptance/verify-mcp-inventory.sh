@@ -243,6 +243,228 @@ for anchor in r141-hashicorp r141-github; do
   fi
 done
 
+if ! command -v docker >/dev/null 2>&1; then
+  echo "SKIP: C/D: docker is not available; the mcp-gate.js (T29/T32) live-container phases did not run"
+  echo
+  echo "=== Results: $PASSED passed, $FAILED failed ==="
+  [ "$FAILED" -eq 0 ]
+  exit
+fi
+if ! command -v node >/dev/null 2>&1; then
+  echo "SKIP: C/D: node is not available on the host; fixture baseline hashes cannot be computed"
+  echo
+  echo "=== Results: $PASSED passed, $FAILED failed ==="
+  [ "$FAILED" -eq 0 ]
+  exit
+fi
+
+# ---------------------------------------------------------------------------
+# Scaffolding shared by Phase C and Phase D -- real agent containers, the
+# compose/overrides/test-mcp.yaml scratch-inventory mount (02.3 SF-7).
+# ---------------------------------------------------------------------------
+
+SCRATCH="$ROOT/.build-scratch/mcp"
+mkdir -p "$SCRATCH"
+
+# Computes capability_baseline.config_sha256 with the EXACT canonicalization
+# images/mcp-gate.js uses, by requiring the gate module rather than
+# re-implementing its sort-and-hash rule (which would drift silently if the
+# gate's canonical form ever changed).
+canonical_hash() {
+  node -e '
+    const { canonicalHash } = require(process.argv[1]);
+    const obj = JSON.parse(process.argv[2]);
+    process.stdout.write(canonicalHash(obj));
+  ' "$ROOT/images/mcp-gate.js" "$1"
+}
+
+write_inventory() {
+  local agent="$1" servers="$2" plugins="${3:-[]}" skills="${4:-[]}"
+  printf '{"registry":"none","servers":%s,"plugins":%s,"skills":%s}\n' \
+    "$servers" "$plugins" "$skills" > "$SCRATCH/inventory.$agent.json"
+}
+
+empty_inventory() { write_inventory "$1" '[]'; }
+
+CD_PROJECT="sf7-mcp-gate-$$"
+CD_COMPOSE_BASE=(docker compose --env-file compose/pins.env -f compose/compose.yaml -f compose/overrides/test-mcp.yaml -p "$CD_PROJECT")
+
+cd_cleanup() {
+  "${CD_COMPOSE_BASE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+  rm -rf "$SCRATCH"
+}
+trap 'cd_cleanup' EXIT
+
+run_agent() {
+  local agent="$1"; shift
+  "${CD_COMPOSE_BASE[@]}" run --build --rm --no-deps "$agent" sh -c "$*"
+}
+
+# ---------------------------------------------------------------------------
+# Phase C -- SF-7: T29, the MCP start-time gate
+# ---------------------------------------------------------------------------
+phase C "T29 -- mcp-gate.js refuses an uninventoried server and a drifted one, per real agent"
+
+# --- claude: an uninventoried server in .claude.json is refused, naming file and entry ------
+empty_inventory claude
+run_agent claude 'mkdir -p ~/.claude && cat > ~/.claude/.claude.json <<EOF
+{"projects":{"/workspace":{"mcpServers":{"uninv-server":{"command":"whatever"}}}}}
+EOF
+true' >/dev/null 2>&1 || { fail "C: claude: seeding an uninventoried .claude.json entry (first start) should not itself be refused"; }
+
+C_RC=0
+
+C_OUT="$(run_agent claude 'true' 2>&1)" || C_RC=$?
+if [ "$C_RC" -eq 3 ] && grep -qF "REFUSED uninventoried server 'uninv-server'" <<< "$C_OUT" \
+     && grep -qF '.claude.json' <<< "$C_OUT" && grep -qF '(R7.14, T29)' <<< "$C_OUT"; then
+  pass "C: claude: an uninventoried server in .claude.json refuses the next start (exit 3, names file and entry)"
+else
+  fail "C: claude: expected exit 3 naming 'uninv-server' and '.claude.json', got exit $C_RC:"
+  printf '%s\n' "$C_OUT" | tail -5 | sed 's/^/      /'
+fi
+"${CD_COMPOSE_BASE[@]}" down -v --remove-orphans --timeout 1 >/dev/null 2>&1 || true
+
+# --- codex: a matching entry passes, drifted args refuses, and codex's own per-start ---------
+# config.toml rewrite (ensure_codex_credentials_store) does not produce a false drift.
+CODEX_ORIG_HASH="$(canonical_hash '{"command":"orig"}')"
+write_inventory codex '[{"name":"drift-server","capability_baseline":{"config_sha256":"'"$CODEX_ORIG_HASH"'"}}]'
+
+run_agent codex 'mkdir -p ~/.codex && cat > ~/.codex/config.toml <<EOF
+[mcp_servers.drift-server]
+command = "orig"
+EOF
+true' >/dev/null 2>&1 || { fail "C: codex: seeding a matching config.toml entry (first start) should not itself be refused"; }
+
+CODEX_PASS_RC=0
+
+CODEX_PASS_OUT="$(run_agent codex 'true' 2>&1)" || CODEX_PASS_RC=$?
+if [ "$CODEX_PASS_RC" -eq 0 ]; then
+  pass "C: codex: a matching mcp_servers entry passes the gate"
+else
+  fail "C: codex: expected exit 0 for a matching entry, got exit $CODEX_PASS_RC:"
+  printf '%s\n' "$CODEX_PASS_OUT" | tail -5 | sed 's/^/      /'
+fi
+
+CODEX_PASS2_RC=0
+
+CODEX_PASS2_OUT="$(run_agent codex 'true' 2>&1)" || CODEX_PASS2_RC=$?
+if [ "$CODEX_PASS2_RC" -eq 0 ]; then
+  pass "C: codex: a second start over the same unchanged entry still passes -- codex's own per-start config.toml rewrite (cli_auth_credentials_store) does not produce false drift"
+else
+  fail "C: codex: expected a second unchanged start to still pass (false drift from codex's own rewrite?), got exit $CODEX_PASS2_RC:"
+  printf '%s\n' "$CODEX_PASS2_OUT" | tail -5 | sed 's/^/      /'
+fi
+
+run_agent codex 'sed -i "s/orig/changed/" ~/.codex/config.toml' >/dev/null 2>&1 \
+  || fail "C: codex: could not drift the fixture entry's args"
+
+CODEX_DRIFT_RC=0
+
+CODEX_DRIFT_OUT="$(run_agent codex 'true' 2>&1)" || CODEX_DRIFT_RC=$?
+CODEX_LIVE_HASH="$(canonical_hash '{"command":"changed"}')"
+if [ "$CODEX_DRIFT_RC" -eq 3 ] && grep -qF "DRIFT 'drift-server'" <<< "$CODEX_DRIFT_OUT" \
+     && grep -qF "baseline ${CODEX_ORIG_HASH} != live ${CODEX_LIVE_HASH}" <<< "$CODEX_DRIFT_OUT"; then
+  pass "C: codex: a drifted mcp_servers entry refuses the next start (exit 3, both hashes named)"
+else
+  fail "C: codex: expected exit 3 naming baseline ${CODEX_ORIG_HASH} and live ${CODEX_LIVE_HASH}, got exit $CODEX_DRIFT_RC:"
+  printf '%s\n' "$CODEX_DRIFT_OUT" | tail -5 | sed 's/^/      /'
+fi
+"${CD_COMPOSE_BASE[@]}" down -v --remove-orphans --timeout 1 >/dev/null 2>&1 || true
+
+# --- codex: a skill/plugin directory case (one bundle-level marker, recorded limitation) -----
+write_inventory codex '[]' '[]' '[{"name":"codex-system-skills","sha256":"orig-bundle-hash"}]'
+run_agent codex 'mkdir -p ~/.codex/skills/.system/probe-skill && printf orig-bundle-hash > ~/.codex/skills/.system/.codex-system-skills.marker' >/dev/null 2>&1 \
+  || fail "C: codex: could not seed the skill-bundle fixture"
+
+CODEX_BUNDLE_PASS_RC=0
+run_agent codex 'true' >/dev/null 2>&1 || CODEX_BUNDLE_PASS_RC=$?
+if [ "$CODEX_BUNDLE_PASS_RC" -eq 0 ]; then
+  pass "C: codex: a matching skill-bundle marker passes the gate"
+else
+  fail "C: codex: expected exit 0 for a matching skill-bundle marker, got exit $CODEX_BUNDLE_PASS_RC"
+fi
+
+run_agent codex 'printf changed-bundle-hash > ~/.codex/skills/.system/.codex-system-skills.marker' >/dev/null 2>&1 \
+  || fail "C: codex: could not drift the skill-bundle marker"
+CODEX_BUNDLE_DRIFT_RC=0
+CODEX_BUNDLE_DRIFT_OUT="$(run_agent codex 'true' 2>&1)" || CODEX_BUNDLE_DRIFT_RC=$?
+if [ "$CODEX_BUNDLE_DRIFT_RC" -eq 3 ] && grep -qF "DRIFT 'codex-system-skills'" <<< "$CODEX_BUNDLE_DRIFT_OUT"; then
+  pass "C: codex: a drifted skill-bundle marker refuses the next start (exit 3)"
+else
+  fail "C: codex: expected exit 3 naming 'codex-system-skills' after drifting the bundle marker, got exit $CODEX_BUNDLE_DRIFT_RC:"
+  printf '%s\n' "$CODEX_BUNDLE_DRIFT_OUT" | tail -5 | sed 's/^/      /'
+fi
+"${CD_COMPOSE_BASE[@]}" down -v --remove-orphans --timeout 1 >/dev/null 2>&1 || true
+
+# --- agy: same bundle case, its own marker path -----------------------------------------------
+write_inventory agy '[]' '[]' '[{"name":"agy-builtin-skills","sha256":"agy-orig-hash"}]'
+run_agent agy 'mkdir -p ~/.gemini/antigravity-cli/builtin/skills/probe-skill && printf agy-orig-hash > ~/.gemini/antigravity-cli/builtin/skills/.checksum' >/dev/null 2>&1 \
+  || fail "C: agy: could not seed the skill-bundle fixture"
+
+AGY_BUNDLE_PASS_RC=0
+run_agent agy 'true' >/dev/null 2>&1 || AGY_BUNDLE_PASS_RC=$?
+if [ "$AGY_BUNDLE_PASS_RC" -eq 0 ]; then
+  pass "C: agy: a matching skill-bundle marker passes the gate"
+else
+  fail "C: agy: expected exit 0 for a matching skill-bundle marker, got exit $AGY_BUNDLE_PASS_RC"
+fi
+
+run_agent agy 'printf agy-changed-hash > ~/.gemini/antigravity-cli/builtin/skills/.checksum' >/dev/null 2>&1 \
+  || fail "C: agy: could not drift the skill-bundle marker"
+AGY_BUNDLE_DRIFT_RC=0
+AGY_BUNDLE_DRIFT_OUT="$(run_agent agy 'true' 2>&1)" || AGY_BUNDLE_DRIFT_RC=$?
+if [ "$AGY_BUNDLE_DRIFT_RC" -eq 3 ] && grep -qF "DRIFT 'agy-builtin-skills'" <<< "$AGY_BUNDLE_DRIFT_OUT"; then
+  pass "C: agy: a drifted skill-bundle marker refuses the next start (exit 3)"
+else
+  fail "C: agy: expected exit 3 naming 'agy-builtin-skills' after drifting the bundle marker, got exit $AGY_BUNDLE_DRIFT_RC:"
+  printf '%s\n' "$AGY_BUNDLE_DRIFT_OUT" | tail -5 | sed 's/^/      /'
+fi
+"${CD_COMPOSE_BASE[@]}" down -v --remove-orphans --timeout 1 >/dev/null 2>&1 || true
+
+# ---------------------------------------------------------------------------
+# Phase D -- SF-7: T32, capability-declaration integrity (the write-time gap)
+# ---------------------------------------------------------------------------
+phase D "T32 -- an in-session write to a capability-declaration file always succeeds; only the NEXT start is refused"
+
+for agent in claude codex agy; do
+  empty_inventory "$agent"
+  case "$agent" in
+    claude) write_cmd='mkdir -p ~/.claude && cat > ~/.claude/.claude.json <<EOF
+{"mcpServers":{"t32-server":{"command":"x"}}}
+EOF
+echo T32_WRITE_OK'; decl_file='.claude.json' ;;
+    codex)  write_cmd='mkdir -p ~/.codex && cat > ~/.codex/config.toml <<EOF
+[mcp_servers.t32-server]
+command = "x"
+EOF
+echo T32_WRITE_OK'; decl_file='config.toml' ;;
+    agy)    write_cmd='mkdir -p ~/.gemini/config && cat > ~/.gemini/config/mcp_config.json <<EOF
+{"mcpServers":{"t32-server":{"command":"x"}}}
+EOF
+echo T32_WRITE_OK'; decl_file='mcp_config.json' ;;
+  esac
+
+  D_WRITE_OUT="$(run_agent "$agent" "$write_cmd" 2>&1)"; D_WRITE_RC=$?
+  if [ "$D_WRITE_RC" -eq 0 ] && grep -qF 'T32_WRITE_OK' <<< "$D_WRITE_OUT"; then
+    pass "D: $agent: writing an uninventoried entry to $decl_file mid-session succeeds (the T32 gap: not blocked at write time)"
+  else
+    fail "D: $agent: expected the in-session write to succeed (exit 0), got exit $D_WRITE_RC:"
+    printf '%s\n' "$D_WRITE_OUT" | tail -5 | sed 's/^/      /'
+  fi
+
+  D_NEXT_RC=0
+
+  D_NEXT_OUT="$(run_agent "$agent" 'true' 2>&1)" || D_NEXT_RC=$?
+  if [ "$D_NEXT_RC" -eq 3 ] && grep -qF "REFUSED uninventoried server 't32-server'" <<< "$D_NEXT_OUT"; then
+    pass "D: $agent: the next start is refused (T29 gate catches what T32 could not block at write time)"
+  else
+    fail "D: $agent: expected the next start to be refused (exit 3, naming 't32-server'), got exit $D_NEXT_RC:"
+    printf '%s\n' "$D_NEXT_OUT" | tail -5 | sed 's/^/      /'
+  fi
+
+  "${CD_COMPOSE_BASE[@]}" down -v --remove-orphans --timeout 1 >/dev/null 2>&1 || true
+done
+
 echo
 echo "=== Results: $PASSED passed, $FAILED failed ==="
 [ "$FAILED" -eq 0 ]

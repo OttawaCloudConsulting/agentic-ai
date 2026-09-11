@@ -244,6 +244,13 @@ ENV PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sb
 COPY --chmod=0755 images/entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
+# The MCP start-time gate (02.3 SF-7, Interface Contract 6). Lands here, not in
+# agent-base, for the same reason entrypoint.sh and pack-install.sh do: this is
+# repository code that changes with the feature that uses it, and agent-base is the
+# published, digest-pinned supply-chain artifact (D21). node is on PATH in every
+# agent stage (agent-base is node:22-slim), so no separate runtime is needed.
+COPY --chmod=0755 images/mcp-gate.js /usr/local/lib/mcp-gate.js
+
 # ---------------------------------------------------------------------------
 FROM agent-packs AS claude
 

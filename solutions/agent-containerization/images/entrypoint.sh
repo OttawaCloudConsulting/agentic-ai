@@ -185,8 +185,21 @@ map_pack_credentials() {
   done < "$f"
 }
 
+# 02.3 SF-7, Interface Contract 6 (T29). AFTER seed_home and ensure_codex_credentials_store --
+# both can touch the files the gate reads (the skeleton seed for a fresh volume, the R4.5 merge
+# for codex's config.toml) -- and BEFORE anything the agent itself runs, so an uninventoried or
+# drifted capability declaration refuses the start rather than the session. Fails closed on a
+# missing gate script or inventory file, the same posture as map_pack_credentials.
+run_mcp_gate() {
+  [ -n "${AGENT_NAME:-}" ] || return 0
+  [ -f /opt/agent-pack/mcp-inventory.json ] || return 0
+  [ -x /usr/local/lib/mcp-gate.js ] || [ -f /usr/local/lib/mcp-gate.js ] || return 0
+  node /usr/local/lib/mcp-gate.js --agent "$AGENT_NAME" --inventory /opt/agent-pack/mcp-inventory.json
+}
+
 seed_home
 ensure_codex_credentials_store
+run_mcp_gate
 export_pack_env
 map_pack_credentials
 # BEFORE bootstrap_auth, not after. The splice reads a secret and exports four variables; it
