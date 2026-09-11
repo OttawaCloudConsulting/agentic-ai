@@ -351,7 +351,7 @@ the repin.
   - `verify-reproducibility.sh` **phase D**: no wrapper, a single `up` form, the identity-command
     and IP agreement, and `--env-file` on every README Compose invocation.
   - Documentation-heavy, 3 files.
-- [ ] **SF-4: Promotion to `main` (operator-gated) and repin.**
+- [x] **SF-4: Promotion to `main` (operator-gated) and repin.**
   - `/build` prepares the PR description: scope, the D21 amendment, and what merging publishes.
   - **The operator merges.** Capture the `main` run's digest.
   - Repin `pins.env` with a run/commit/ref comment, through PR per Decision 1.
