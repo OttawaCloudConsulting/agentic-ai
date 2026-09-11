@@ -736,8 +736,63 @@ else
   pass "shadow run: skipped (BOUNDARY_SHADOW_RUN=0, default) -- provisional stays true pending the operator's live shadow run"
 fi
 
+# ---------------------------------------------------------------------------
+# Phase 10 -- SF-6: T16 audit completeness (join every mediated T3/T4/T6/T7 destination against
+# the live audit trail) and the SC-1/SC-2/SC-3 demonstration, aggregated from this run's own
+# RECORD_FILE (Interface Contract 1). Raw TCP/A2A-direct/ICMP are excluded from the T16 join by
+# design -- no mediator sits on those paths; that is the residual recorded above, not an audit
+# gap for T16 to catch.
+# ---------------------------------------------------------------------------
+phase 10 "T16 audit completeness + SC-1/SC-2/SC-3 demonstration"
+
+# T16: every destination this run drove through the mediator (egress_logged=true, mediated
+# test_ids T3/T4/T6/T7) must be present on the live trail with its destination and verdict --
+# blocked attempts included (SC-7, R9.1). T4 (DNS-only) joins against the DNS trail; T3/T6/T7
+# join against the egress trail.
+T16_FAIL=0
+while IFS=$'\t' read -r dest test_id verdict; do
+  [ -n "$dest" ] || continue
+  if [ "$test_id" = "T4" ]; then
+    if dns_audit | grep -qF "$dest"; then
+      pass "T16: $dest (T4, DNS) present on the DNS audit trail"
+    else
+      fail "T16: $dest (T4, DNS) MISSING from the DNS audit trail"
+      T16_FAIL=1
+    fi
+  else
+    got="$(last_verdict "$dest" | jq -r '.verdict // "missing"')"
+    if [ "$got" = "$verdict" ]; then
+      pass "T16: $dest ($test_id) present on the egress trail, verdict=$got"
+    else
+      fail "T16: $dest ($test_id) expected verdict=$verdict on the egress trail, got=$got"
+      T16_FAIL=1
+    fi
+  fi
+done < <(jq -r 'select(.egress_logged == true and (.test_id == "T3" or .test_id == "T4" or .test_id == "T6" or .test_id == "T7")) | [.dest, .test_id, .verdict] | @tsv' "$RECORD_FILE" | sort -u)
+
+if [ "$T16_FAIL" -eq 0 ]; then
+  pass "T16: audit completeness -- every mediated T3/T4/T6/T7 destination is on the trail with its verdict"
+else
+  fail "T16: one or more mediated destinations missing or mismatched on the audit trail"
+fi
+
+# SC-1/SC-2/SC-3 (prd.md Goals row), each demonstrated as the aggregate over this run's own
+# recorded rows -- a single unblocked row for the mapped test_id set fails the criterion.
+sc_check() { # <label> <test_id-regex>
+  local label="$1" filter="$2" bad
+  bad="$(jq -r --arg f "$filter" 'select((.test_id | test($f)) and .blocked != true) | "\(.test_id)/\(.agent)/\(.dest)"' "$RECORD_FILE")"
+  if [ -z "$bad" ]; then
+    pass "$label: every recorded row blocked=true"
+  else
+    fail "$label: unblocked row(s): $bad"
+  fi
+}
+sc_check "SC-1 (host filesystem traversal, T1)" '^T1$'
+sc_check "SC-2 (HTTP/HTTPS/raw TCP/DNS/ICMP exfiltration, T3/T5/T4/T7/ICMP)" '^(T3|T5|T4|T7|ICMP)$'
+sc_check "SC-3 (policy/mount/enforcement-point tampering, T8)" '^T8$'
+
 echo
-echo "=== SF-1..SF-5 record file: $RECORD_FILE ==="
+echo "=== SF-1..SF-6 record file: $RECORD_FILE ==="
 cat "$RECORD_FILE"
 
 if [ "$FAILED" -eq 0 ]; then

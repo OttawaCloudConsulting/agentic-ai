@@ -261,7 +261,7 @@ the R13.2/D21 amendments land, not this feature's to do.
   second source. Apply Decision 7's comparison rule and the coordinated file change for whichever
   outcome holds. Record in `docs/records/boundary-validation.md`. **Named fallback:** if a
   disagreement is a design finding, it routes to `/milestone` revision, not a fix here.
-- [ ] **SF-6: T16, SC-1/2/3 demonstration, record and README close-out.** **T16** against the 02.1
+- [x] **SF-6: T16, SC-1/2/3 demonstration, record and README close-out.** **T16** against the 02.1
   sink (every T3–T7 destination present with its verdict); assemble the **SC-1/SC-2/SC-3**
   demonstration each against its `prd.md` measurement; finalize `docs/records/boundary-validation.md`
   (six-scenario × three-agent table, the stdio-MCP blind-spot row, the raw-socket/ICMP residual, the

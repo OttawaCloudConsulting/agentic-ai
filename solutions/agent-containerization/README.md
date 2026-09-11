@@ -4,10 +4,14 @@ Research and design options for running agentic coding agents (Claude Code, Open
 
 **Status:** Gate 3 (Milestone Review) in progress. Gates 1 (Scope) and 2 (Design) are ratified — see
 [`prd.md`](prd.md) and [`.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md`](.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md).
-Milestone 01 (Sandboxed Pod) is building; Feature 01.2 (pod topology, hardened runtime, minimal
-profile) has produced a runnable pod. **This pod is not for real work yet** — it has no egress
-(Feature 01.3), no authentication (Feature 01.4), and no adversarial acceptance testing (Milestone
-02) until those land. See [`progress.txt`](progress.txt) for current gate/feature state.
+Milestone 01 (Sandboxed Pod) is complete: pod topology, hardened runtime, egress mediation and
+per-agent authentication all ship. Milestone 02 (Proven and Composable) is building; Feature 02.1
+(audit completeness) and Feature 02.2 (adversarial boundary validation — see
+["Adversarial boundary validation (02.2)"](#adversarial-boundary-validation-022) below) are
+complete, with SC-1/SC-2/SC-3 demonstrated from inside the real agent containers. **This pod is
+not yet cleared for real work** — Feature 02.3 (tool packs / use-case profiles), 02.4
+(reproducibility and onboarding) and 02.5 (containment, response and the authorization gate) are
+still building. See [`progress.txt`](progress.txt) for current gate/feature state.
 
 **Entry point** (requires Docker Desktop; builds the pod cold on first run):
 
@@ -736,10 +740,41 @@ bash tests/acceptance/verify-auth-state.sh \
   && bash tests/acceptance/verify-egress-mediator.sh
 ```
 
+### Adversarial boundary validation (02.2)
+
+Feature 02.2 is **complete**: `tests/acceptance/validate-boundary.sh` runs the six R12.8
+scenarios and T1–T8 as recorded adversarial acceptance **from inside each real agent
+container**, per agent — not the mediator-image smoke checks 01.2/01.3 ran. Every row records
+the three-part R12.8 verdict (blocked / logged / attributable) as one JSON line. T16 joins every
+mediated destination (T3/T4/T6/T7) against the live audit trail; SC-1, SC-2 and SC-3 are
+demonstrated as the aggregate over the run's own recorded rows, each against the `prd.md`
+measurement it maps to. Raw TCP, agent-to-agent direct connections and ICMP are structurally
+invisible to the mediator's log — recorded as a residual (`prd.md:209`), not a gap. The
+`provisional` marker on `policy/allowlist.base.yaml` is resolved (`false`) following a live
+shadow run under the built mediator, D17's required second source. Full results, the
+six-scenario × three-agent table and the `provisional` resolution are in
+[`docs/records/boundary-validation.md`](docs/records/boundary-validation.md).
+
+```bash
+bash tests/acceptance/verify-pack-composition.sh \
+  && bash tests/acceptance/verify-pod-topology.sh \
+  && bash tests/acceptance/verify-egress-mediator.sh \
+  && bash tests/acceptance/verify-audit-completeness.sh \
+  && bash tests/acceptance/validate-boundary.sh \
+  && bash scripts/lint-policy.sh
+```
+
+This unattended composite spends no model tokens. Two phases are live and gated off by default —
+`BOUNDARY_LIVE_INJECT=1` (the injected-instructions repository scenario) and
+`BOUNDARY_SHADOW_RUN=1` (the `provisional` shadow run) — each run once by the operator against
+their own authenticated state volumes and recorded manually; see the harness's own printed
+instructions and `docs/records/boundary-validation.md`.
+
 Still not produced:
 
-- Tool-pack manifests and pack composition in the policy compiler — Feature 01.5
-- Per-agent workload identity (client certificates, R8.8, T34) — Feature 01.6
+- Tool pack set, use-case profiles and MCP inventory completeness — Feature 02.3
+- Reproducibility, provenance and onboarding — Feature 02.4
+- Containment, response and the authorization gate — Feature 02.5
 - AWS access (R6) — Milestone 03
 
 Note that requirements R6 (AWS access) and R7 (loadable tool packs) were added after the options analysis was written. The three options remain valid — both requirements are orthogonal to the choice of enforcement architecture — but the options analysis does not yet evaluate them per option.
