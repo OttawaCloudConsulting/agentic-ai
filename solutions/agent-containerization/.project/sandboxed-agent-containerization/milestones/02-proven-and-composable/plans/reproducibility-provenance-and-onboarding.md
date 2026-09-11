@@ -336,7 +336,7 @@ the repin.
     composite.
   - Create `verify-reproducibility.sh` with **phase A** (pins and mutable tags).
   - Size: 4-5 files plus one CI round trip.
-- [ ] **SF-2: `verify-reproducibility.sh` phases B-C, and the declared build allowlist.**
+- [x] **SF-2: `verify-reproducibility.sh` phases B-C, and the declared build allowlist.**
   - Phase B: `images/build-allowlist.yaml` and the static fetch-site check.
   - Phase C: T45 per Decision 2 — SBOM, provenance, run API.
   - SF-2 closes with phase C failing **only** on `head_branch` (and the label), and that expected

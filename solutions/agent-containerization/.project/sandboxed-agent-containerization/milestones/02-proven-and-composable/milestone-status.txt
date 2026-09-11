@@ -22,7 +22,7 @@
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 1/6 complete
+    Sub-features: 2/6 complete
     Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
     node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
     bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
@@ -40,6 +40,19 @@
     composite (verify-pack-composition through lint-policy, plus verify-reproducibility)
     re-run and green end to end. T45/head_branch is expected to still fail until SF-4
     promotes to main -- not yet checked (that's SF-2's phase C).
+    SF-2 (2026-09-11): verify-reproducibility.sh gained phase B (images/build-allowlist.yaml,
+    7 non-pack hosts: registry-1.docker.io, ghcr.io, github.com, snapshot.debian.org,
+    deb.debian.org, registry.npmjs.org, storage.googleapis.com -- extracted mechanically from
+    both Dockerfiles/pins.env and checked against the allowlist union the four shipped packs'
+    egress.build.allow_fqdns) and phase C (T45's digest -> SBOM -> provenance -> run chain, via
+    anonymous `docker buildx imagetools inspect --format '{{json .SBOM}}'/'{{json .Provenance}}'`
+    against ghcr.io, then the public runs API). Ran against the SF-1 branch digest
+    (sha256:f5fd8aa9718aa5ca63520db2cdc436b0554b2ac58182e1b3dfe912c323a045c4, run 34640174753):
+    14 passed, 1 failed -- SF-2's own closing condition (every T45 assertion passes except
+    head_branch, which is 'feature/containerization' not 'main', EXPECTED RED until SF-4).
+    Found and fixed while building phase B: yq v4.53.6 rejects `[]?.fqdn // empty`
+    (`lexer: invalid input text "empty"`) -- rewritten as `[].fqdn` per pack file, since every
+    shipped pack.yaml already declares a non-empty egress.build.allow_fqdns.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md

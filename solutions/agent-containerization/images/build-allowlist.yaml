@@ -1,0 +1,42 @@
+schema: 1
+# Hosts the image builds reach OUTSIDE pack manifests (R10.4, feature 02.4 Decision 5).
+# Pack build hosts stay in each pack's egress.build.allow_fqdns (packs/*/pack.yaml) --
+# tests/acceptance/verify-reproducibility.sh phase B checks every build-time fetch site
+# against the UNION of this file and every pack's declared build hosts, not this file
+# alone. Not compiled, not enforced at build time -- see docs/records/reproducibility.md
+# for the R10.4 finding and its review trigger (Decision 5, tradeoff callout 2).
+hosts:
+  - fqdn: registry-1.docker.io
+    verified_by: digest
+    used_by: [images/Dockerfile, images/mediator/Dockerfile]
+    note: node:22-slim (images/Dockerfile) and debian:trixie-slim (images/mediator/Dockerfile), both pulled by index digest via NODE_BASE_DIGEST / MEDIATOR_BASE_DIGEST.
+
+  - fqdn: ghcr.io
+    verified_by: digest
+    used_by: [images/Dockerfile, .github/workflows/agent-sandbox-image.yml]
+    note: agent-packs FROMs the published agent-base by digest (AGENT_BASE_DIGEST); the publish job also pushes here under packages:write.
+
+  - fqdn: github.com
+    verified_by: sha256
+    used_by: [images/Dockerfile, images/mediator/Dockerfile]
+    note: "yq_linux_${TARGETARCH} release asset, checked against YQ_SHA256_ARM64/YQ_SHA256_AMD64 in compose/pins.env."
+
+  - fqdn: snapshot.debian.org
+    verified_by: gpg
+    used_by: [images/Dockerfile, images/mediator/Dockerfile, images/apt-pinned.sh]
+    note: dated snapshot InRelease/Release.gpg, checked against SNAPSHOT_FINGERPRINT / MEDIATOR_SNAPSHOT_FINGERPRINT in compose/pins.env via images/keyrings/*.gpg.
+
+  - fqdn: deb.debian.org
+    verified_by: gpg
+    used_by: [images/Dockerfile, images/mediator/Dockerfile]
+    note: unpinned bootstrap install of ca-certificates/curl(/gpgv) from the base image's baked-in default sources, needed before apt-pinned can fetch the snapshot over https -- see both Dockerfiles' "bootstrapped UNPINNED" comments. Trusted via the base image's own debian-archive-keyring, not a pinned fingerprint; that gap is the R10.4 finding below.
+
+  - fqdn: registry.npmjs.org
+    verified_by: version-only
+    used_by: [images/Dockerfile]
+    note: "npm install -g pins CLAUDE_VERSION/CODEX_VERSION (compose/pins.env) at the top level only; transitive dependency versions are unpinned (feature plan Decision 6)."
+
+  - fqdn: storage.googleapis.com
+    verified_by: sha512
+    used_by: [images/Dockerfile]
+    note: agy CLI archive (AGY_URL/AGY_SOURCE), checked against AGY_SHA512 in compose/pins.env.
