@@ -10,7 +10,7 @@
 
 [~] Feature 02.2: Adversarial boundary validation
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/adversarial-boundary-validation.md
-    Sub-features: 2/6 complete
+    Sub-features: 3/6 complete
     Notes: Started 2026-09-10. Deviation 2 recorded (SF-2, in_agent_authed + proxy-leg TLS flags).
 
 [~] Feature 02.3: Tool pack set, use-case profiles and MCP inventory
