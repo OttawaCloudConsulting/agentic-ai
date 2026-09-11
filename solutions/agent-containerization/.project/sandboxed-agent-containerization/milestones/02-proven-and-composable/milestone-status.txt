@@ -22,8 +22,24 @@
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 0/6 complete
-    Notes: Started 2026-09-11.
+    Sub-features: 1/6 complete
+    Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
+    node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
+    bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
+    mediator's squid-openssl/unbound/dnsdist/ca-certificates moved onto a dated trixie
+    snapshot via a new keyring, images/keyrings/debian-archive-trixie.gpg (SF-1c).
+    Found and fixed: DNSDIST_VERSION=1.9.16-0+deb13u1 never existed in Debian's trixie
+    archive (live or any snapshot back to 2026-08-15) -- corrected to 1.9.15-0+deb13u1,
+    the version that was actually resolving. apt-pinned.sh gained --allow-downgrades
+    (needed whenever a pinned snapshot version is older than a bootstrap install already
+    on the image from live default sources). verify-reproducibility.sh created with
+    phase A (no FROM resolves to a mutable tag), negative control run and passing.
+    Pushed to feature/containerization; CI run 34640174753 published a new agent-base
+    (branch build, for testing only); AGENT_BASE_DIGEST repinned to
+    sha256:f5fd8aa9718aa5ca63520db2cdc436b0554b2ac58182e1b3dfe912c323a045c4; full 02.3
+    composite (verify-pack-composition through lint-policy, plus verify-reproducibility)
+    re-run and green end to end. T45/head_branch is expected to still fail until SF-4
+    promotes to main -- not yet checked (that's SF-2's phase C).
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md

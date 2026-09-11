@@ -320,12 +320,16 @@ per agent is a mechanism change no criterion asks for.
 Order is load-bearing: pins before the `main` publish, docs before the merge, the clean run after
 the repin.
 
-- [ ] **SF-1: Pin the remaining mutable inputs; branch republish for testing.**
+- [x] **SF-1: Pin the remaining mutable inputs; branch republish for testing.**
   - `NODE_BASE_DIGEST` (the index digest) in `pins.env`, consumed at `images/Dockerfile:40` and
     `:78`. The global ARG has no default, like `AGENT_BASE_DIGEST`.
   - Compose `build.args` for the three agent services pass it, and the workflow's pin-loading loop
     and `build-args` carry it.
-  - The workflow's `sbom:` input pins the syft scanner by digest.
+  - ~~The workflow's `sbom:` input pins the syft scanner by digest.~~ Not applicable as
+    written: the workflow already uses buildx's own `sbom: true` attestation (01.5
+    SF-6b, Edge Case 13), not `docker/buildkit-syft-scanner`. No third-party scanner
+    reference exists to pin. `verify-reproducibility.sh` phase A asserts this fact
+    instead, so a future switch to an external scanner does not silently go unpinned.
   - **SF-1b (kept at Gate 4):** base apt onto the snapshot through `apt-pinned`.
   - **SF-1c (kept at Gate 4):** mediator apt onto a dated trixie snapshot.
   - Push; the branch publishes; repin `pins.env` to the branch digest *for testing*; run the
