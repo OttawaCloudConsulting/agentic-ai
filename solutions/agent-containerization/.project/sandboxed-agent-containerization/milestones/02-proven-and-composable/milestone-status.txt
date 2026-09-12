@@ -92,6 +92,18 @@
     recorded gaps (T6 cold-peer 500, resolved_ip-on-deny) with no new failures. D21 trigger
     amendment drafted in PR #39's description; not yet applied to ARCHITECTURE_AND_DESIGN.md
     (SF-6 records it, applying it is out of this feature's scope). Completed 2026-09-11.
+    SF-5 (2026-09-11, partial): scripts/fingerprint-environment.sh (Contract 5) built and
+    verified against the currently-built default profile's images (dpkg-query is absent from
+    the final agent image per R7.19 condition 3 -- fell back to parsing the retained
+    /var/lib/dpkg/status; npm is likewise stripped -- hashes /usr/local/lib/node_modules
+    content directly instead of running `npm ls`). docs/records/reproducibility.md created
+    with the SF-5 "Clean-environment procedure" runbook only (Stages 1-5); T45/R10.4/R11.2/
+    T18/T39/architecture-edit sections deferred to SF-6 per the plan. NOT closed: the plan's
+    reference commit X must carry this script, so X is a future PR-to-main merge commit (same
+    operator-gated path as SF-4), not the existing SF-4 commit -- surfaced to and confirmed by
+    operator rather than assumed. The physical run itself (Stages 1-5 on a second physical
+    Mac, macOS 26/Apple silicon) is operator-only and has not happened. Sub-feature count
+    stays 4/6 until that run completes and the fingerprint diff + Test Command both pass.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
