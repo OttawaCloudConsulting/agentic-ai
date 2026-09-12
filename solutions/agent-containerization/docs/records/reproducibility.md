@@ -16,11 +16,11 @@ clean-environment session on a **second physical Mac** (macOS 26, Apple silicon)
 and 5 and Decision 3. The run follows this procedure verbatim; a deviation from it is a finding
 (Edge Case 12), not a silent adjustment.
 
-**Reference commit X.** X is the commit on `main` that carries this runbook and
-`scripts/fingerprint-environment.sh` — the second Mac's `git checkout X` must be able to run the
-fingerprint script the procedure calls for. Concretely: X is the merge commit of the PR that lands
-this feature's SF-5 changes on `main` (the same operator-gated promotion path SF-4 used), recorded
-here once merged. It is **not** the SF-4 commit alone, because SF-4 predates this script.
+**Reference commit X = `5b133b25581f6574167bbe578912ab75cd9c1835`.** PR #42
+(`feature/containerization` → `main`, squash-merged) landed this runbook and
+`scripts/fingerprint-environment.sh` on `main` as this commit. It is **not** the SF-4 commit
+(`79e2888`, PR #41) alone, because SF-4 predates this script — the second Mac's
+`git checkout 5b133b2` is the first `main` commit that can run it.
 
 ### Stage 1 — Reference, on the build host
 
