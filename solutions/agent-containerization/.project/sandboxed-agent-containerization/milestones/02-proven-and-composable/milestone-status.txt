@@ -104,6 +104,17 @@
     operator rather than assumed. The physical run itself (Stages 1-5 on a second physical
     Mac, macOS 26/Apple silicon) is operator-only and has not happened. Sub-feature count
     stays 4/6 until that run completes and the fingerprint diff + Test Command both pass.
+    SF-5 run (2026-09-12/13): performed on the second Mac at X. T18 NOT passed -- Test Command
+    passed (6 of 9 scripts by operator attestation), but the fingerprint diff is not clean on any
+    profile. F1: reference recipe omitted AGENT_PROFILE, so the terraform/kubernetes/github
+    references fingerprint default packs, and fingerprint-environment.sh never passes AGENT_PROFILE
+    to its own compose config call. F2: mediator transitive packages float with the live Debian
+    archive (libcom-err2 +b11 -> +b12, verified by a no-cache rebuild). F3: compose_config_sha256
+    depends on the Compose version (second Mac v5.3.1 vs build host v2.38.2; v5.3.1 on the build
+    host reproduces the clean hashes exactly). T39
+    findings F4-F10 (runbook defects and run conduct). R11.1 not discharged. F1's fingerprint-script
+    gaps, F2 and F3 route to /milestone; new references and a factory-reset full re-run are
+    needed. See docs/records/reproducibility.md, SF-5 run results. Sub-feature count stays 4/6.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
