@@ -907,3 +907,44 @@ Paths are relative to the solution root, except the workflow, which is at the **
     `ARCHITECTURE_AND_DESIGN.md`'s snapshot description are stale for a consolidation pass.
   - `images/build-allowlist.yaml` is unchanged in hosts: the security snapshot is also on
     `snapshot.debian.org`.
+
+### Deviation 2: agent-base's security snapshot is later than its main snapshot, and the base records it for pack-install (SF-5c)
+- **What changed:**
+  - `SECURITY_SNAPSHOT_URL` (`compose/pins.env`) is
+    `debian-security/20260910T203409Z`, while `SNAPSHOT_URL` stays at `debian/20260901T000000Z`.
+    The key is committed as `images/keyrings/debian-security-bookworm.gpg`, with primary
+    fingerprint `05AB90340C0C5E797F44A8C8254CF3B5AEC0A8F0`.
+  - `images/apt-pinned.sh` writes `/etc/agent-apt-security-snapshot` (keyring, url, suite and
+    fingerprint on one line) whenever it is given `--security`.
+  - `images/pack-install.sh` reads that file and passes `--security` on its own `apt-pinned` call.
+    If the file is absent, as on a base published before SF-5c, it prints a note and calls without
+    the flag.
+  - The workflow and the three agent services' `build.args` carry the `SECURITY_SNAPSHOT_*` trio.
+- **Originally planned:**
+  - Deviation 1's impact says SF-5c takes "the same form" as the mediator: a security snapshot at
+    the same timestamp as main.
+  - It also says `pack-install.sh` "needs the flag too", but does not say where its parameters
+    come from. Profiles (`package_repository.apt`) are the declared authority for the pack
+    apt source.
+- **Why necessary:**
+  - *Timestamp.* At `20260901T000000Z`, bookworm-security does not yet carry
+    `libssh2-1 1.10.0-3+deb12u1` (first present between 20260905 and 20260910, measured). The
+    published base (`bc8d16b0…`, built 2026-09-11 from the live archive) already has it, so a
+    same-timestamp build dropped that security fix. A local no-cache build showed
+    `libssh2-1 1.10.0-3+b1`.
+  - Moving only the security timestamp leaves every main-archive pin unchanged: `SNAPSHOT_URL`,
+    the five profiles' `package_repository.apt.url` and every pinned `.deb` hash. Main and security
+    are separate archives.
+  - *Plumbing.* `apt-pinned` replaces every apt source on each call. A pack-install call with only
+    the profile's main snapshot would drop the security line for the pack closure and for every
+    later stage (`agy`'s `jq`).
+  - Adding a security field to the profile schema would touch the schema, `compile-policy.sh`,
+    `pack-plan.sh`, five profiles and the composition fixtures. The base's own record touches two
+    files.
+  - Operator decisions, 2026-09-13.
+- **Impact:**
+  - The profile no longer describes the full apt source set for pack installs; agent-base's
+    record does. The URL reconciliation still covers the main archive.
+  - The mediator also writes the record (it calls `apt-pinned --security`). The file is inert
+    there.
+  - Contract 7 and Deviation 1's "same timestamp" wording are stale for a consolidation pass.

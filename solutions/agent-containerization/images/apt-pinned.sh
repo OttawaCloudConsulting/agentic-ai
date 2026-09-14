@@ -159,6 +159,17 @@ fi
 # assuming it (see the agent-packs reconciliation in images/Dockerfile).
 printf '%s\n' "${URL%/}" > /etc/agent-apt-snapshot-url
 
+# The security source is recorded whole -- keyring, url, suite, fingerprint -- because
+# this script REPLACES every source on each call: a later caller that did not pass
+# --security would silently drop it (feature plan Deviation 2). images/pack-install.sh
+# reads it back. Written only when --security is given, so an absent file means this
+# image has no security source.
+if [ -n "$SEC_KEYRING" ]; then
+  printf '%s %s %s %s\n' "$SEC_KEYRING" "$SEC_URL" "$SEC_SUITE" "$SEC_FPR" > /etc/agent-apt-security-snapshot
+else
+  rm -f /etc/agent-apt-security-snapshot
+fi
+
 apt-get update -qq "${APT_OPTS[@]}"
 
 # --- 3. download, verify, then install -------------------------------------------

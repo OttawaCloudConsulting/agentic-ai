@@ -410,7 +410,7 @@ else
       if [ "$run_branch" = "main" ]; then
         pass "C: run $run_id head_branch is 'main'"
       else
-        fail "C: run $run_id head_branch is '$run_branch', expected 'main' (EXPECTED RED until SF-4 promotes feature/containerization and repins -- feature plan criterion 1, SF-2 closing note)"
+        fail "C: run $run_id head_branch is '$run_branch', expected 'main' -- AGENT_BASE_DIGEST pins a non-main (testing-only) publish; repin to a main-triggered run (feature plan criterion 1, Decision 2)"
       fi
     fi
     rm -f "$RUN_TMP"

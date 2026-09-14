@@ -24,12 +24,7 @@ hosts:
   - fqdn: snapshot.debian.org
     verified_by: gpg
     used_by: [images/Dockerfile, images/mediator/Dockerfile, images/recorder/Dockerfile, images/apt-pinned.sh]
-    note: dated snapshot InRelease/Release.gpg, checked against SNAPSHOT_FINGERPRINT / MEDIATOR_SNAPSHOT_FINGERPRINT in compose/pins.env via images/keyrings/*.gpg. The mediator and recorder also use the dated debian-security snapshot (MEDIATOR_SECURITY_SNAPSHOT_*, feature 02.4 Deviation 1), and their bootstrap installs reach both over http (Interface Contract 7), verified by apt against the same committed keyrings.
-
-  - fqdn: deb.debian.org
-    verified_by: gpg
-    used_by: [images/Dockerfile]
-    note: agent-base's unpinned bootstrap install of ca-certificates/curl from node:22-slim's baked-in default sources, needed before apt-pinned can fetch the snapshot over https -- see images/Dockerfile's "bootstrapped UNPINNED" comment. Trusted via the base image's own debian-archive-keyring, not a pinned fingerprint. The mediator and recorder moved off it at 02.4 SF-5b; agent-base moves at SF-5c, and phase B's dead-entry check then requires this entry's removal.
+    note: dated snapshot InRelease/Release.gpg, checked against SNAPSHOT_FINGERPRINT / MEDIATOR_SNAPSHOT_FINGERPRINT in compose/pins.env via images/keyrings/*.gpg. All three images also use the dated debian-security snapshot (SECURITY_SNAPSHOT_* for agent-base, MEDIATOR_SECURITY_SNAPSHOT_* for the mediator and recorder, feature 02.4 Deviation 1), and their bootstrap installs reach both over http (Interface Contract 7), verified by apt against the same committed keyrings. deb.debian.org was removed at 02.4 SF-5c, when agent-base's bootstrap, the last live-archive fetch site, moved onto the snapshot.
 
   - fqdn: registry.npmjs.org
     verified_by: version-only
