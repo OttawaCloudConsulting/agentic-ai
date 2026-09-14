@@ -147,9 +147,15 @@
     documents diff clean with commit/docker_version/compose_version excluded. The normalised render
     pipeline, run by hand with both binaries, gives equal hashes for all four shipped profiles
     (default f5827457, terraform 62452ef4, kubernetes 9cad75c2, github 3cb34c1b) -- and default no
-    longer equals terraform, so the render now distinguishes pack selection (F1). Only default's
-    images were rebuilt; the script-level run for the three pack profiles happens with the SF-5
-    references. pack_roots_sha256 now covers profile.json (schema-1 references were already void).
+    longer equals terraform, so the render now distinguishes pack selection (F1). Non-default
+    propagation (the controls above all used default, which is also the ARG fallback): rebuilt with
+    AGENT_PROFILE=github -> all three images carry {"profile":"github","packs":["github-cli",
+    "language-runtimes"]}; `fingerprint github` exit 0 (compose_config_sha256 3cb34c1b..., matching
+    the hand-run pipeline); symmetric control `fingerprint default` against those images -> exit 4.
+    terraform/kubernetes not rebuilt; their script-level run happens with the SF-5 references.
+    :local agent images are left github-built. No test or image script enumerates /opt/agent-pack
+    (fixed-path reads only, entrypoint.sh:150/170/195), so profile.json breaks nothing there.
+    pack_roots_sha256 now covers profile.json (schema-1 references were already void).
     Mediator dpkg_sha256 still 800c5839... (the F2 drift) -- SF-5b's scope, untouched here.
 
 [~] Feature 02.5: Containment, response and the authorization gate
