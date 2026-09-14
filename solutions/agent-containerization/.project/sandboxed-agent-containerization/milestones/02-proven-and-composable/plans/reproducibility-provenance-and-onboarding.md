@@ -449,7 +449,7 @@ lands before the new reference commit.
     `sf5-ref` lacked, because SF-1c's closure was main-only. Two no-cache rebuilds give identical
     package lists.
   - Size: 3–4 files, local only.
-- [ ] **SF-5c: `agent-base` OS packages from the snapshot (F2); republish and repin
+- [x] **SF-5c: `agent-base` OS packages from the snapshot (F2); republish and repin
   (operator-gated).**
   - `images/Dockerfile:132` bootstrap per Contract 7.
   - Push; branch publish; test repin; composite. Then the SF-4 path: PR to `main`, operator merge,
