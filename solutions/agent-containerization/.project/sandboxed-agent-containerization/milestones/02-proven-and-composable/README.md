@@ -174,6 +174,17 @@ who did not build it.
   identical environment with **no manual steps** (SC-8, R10.1). The rebuild covers the final pack set
   from 02.3, not the 01.5 reference pack. The clean machine is **macOS 26 on Apple silicon**, which is
   where R11.1 (MUST) is discharged as an owned check rather than assumed from the build host.
+  **Revised 2026-09-13 after the first T18 run** (`docs/records/reproducibility.md`, SF-5 run
+  results, findings F1–F3). "Functionally identical" must be measured in a way that holds on a real
+  clean machine:
+  - **every shipped profile is fingerprinted as built for that profile** — its own pack set, not the
+    default one — on both the reference build and the clean run (F1);
+  - **the rebuilt OS package set does not depend on the rebuild date:** every OS package in every
+    image, transitive dependencies included, resolves from a pinned or snapshot source rather than a
+    rolling archive (F2). npm transitive dependencies stay detected by the fingerprint rather than
+    locked, as 02.4's plan decided (Decision 6);
+  - **the comparison does not depend on the host's Docker Desktop or Compose version,** which an
+    operator installs at whatever release is current. Both runs record the versions they used (F3).
 - **T45 published base image provenance:** the image the compose file consumes resolves to a
   CI-published GHCR digest with an SBOM. No profile consumes a mutable tag, and no branch-built image
   is consumed outside testing (D21, R10.2, R10.7).

@@ -2,7 +2,7 @@
 
 **Milestone:** 02 - Proven and Composable
 **Feature:** 02.4: Reproducibility, provenance and onboarding
-**Status:** Planned
+**Status:** Planned (re-planned 2026-09-13)
 **Date:** 2026-09-10
 
 ## Summary
@@ -31,6 +31,11 @@ The onboarding gaps the codebase scan found are fixed as documentation, not new 
 
 R10.4 gets a declared, statically checked build allowlist. R11.2 is assessed, not exercised. Two
 architecture edits are recorded for an authority that may apply them.
+
+**Re-planned 2026-09-13.** The first clean-environment run passed the Test Command but not the
+fingerprint diff. Its three verified causes (F1–F3) and seven run findings (F4–F10) are recorded in
+`docs/records/reproducibility.md`. Decision 8 and SF-5a–SF-5d fix them, as mechanism and as runbook,
+before T18 is re-run. Milestone 02's T18 criterion was clarified to match.
 
 ## Acceptance Criteria
 
@@ -89,6 +94,14 @@ during planning.
      operator-supplied input by design. The CA key is never committed. Each such input is a
      documented command, not an exemption.
    - R11.1 is recorded as discharged by this run.
+   - **Clarified 2026-09-13** (Milestone 02 Gate 3 revision, after the first run):
+     - every shipped profile is fingerprinted as built for that profile, on both the reference build
+       and the clean run;
+     - every OS package in every image, transitive dependencies included, resolves from a pinned or
+       snapshot source, so the package set does not depend on the rebuild date. npm transitive
+       dependencies stay detected rather than locked (Decision 6);
+     - the comparison does not depend on the host's Docker Desktop or Compose version, and both runs
+       record the versions they used.
 5. **T39 — fresh operator, `docker compose` the only entry point (R12.9, R12.1).**
    - Performed in the same session as T18.
    - Statically, no committed script outside `tests/` invokes `docker compose … up|start|run`.
@@ -315,10 +328,66 @@ per agent is a mechanism change no criterion asks for.
   against `mediator/identity/README.md`, and the README IPs against `compose.yaml`. No `all`
   subcommand is added.
 
+### Decision 8 — the SF-5 findings are fixed as mechanism, then T18 is re-run *(re-plan 2026-09-13)*
+
+The first clean-environment run (`docs/records/reproducibility.md`, SF-5 run results) passed the Test
+Command but not the fingerprint diff. All three causes were verified on the build host. Each fix
+below was checked for feasibility during re-planning, not assumed.
+
+- **F1 — each profile is fingerprinted as built for that profile.**
+  - `fingerprint-environment.sh` renders `compose config` with `AGENT_PROFILE="$PROFILE"`.
+  - It refuses with exit 4 when the built agent images were built for a different profile. The
+    images record nothing that names their profile today (`/opt/agent-pack` holds only
+    `credentials/`, `env/` and `mcp-inventory.json`, measured), so the `agent-packs` stage writes
+    `/opt/agent-pack/profile.json` with `PROFILE` and the resolved pack names from `pack-plan`.
+  - `agent-packs` is a local stage on top of `agent-base`, so this needs no republish.
+- **F2 — no OS package in any image comes from a rolling archive.** Three bootstraps install from
+  the image's default live sources today:
+  - `images/mediator/Dockerfile:188`, `ca-certificates curl gpgv`: the verified source of the
+    `libcom-err2` drift;
+  - `images/recorder/Dockerfile:19`, `jq=${JQ_VERSION}`: version-pinned, but its dependencies are
+    live and the version itself can be superseded;
+  - `images/Dockerfile:132` in `agent-base`, `ca-certificates curl`.
+
+  Each bootstrap instead installs from the dated snapshot its stage already pins (Contract 7). The
+  default sources are removed first, and the snapshot is reached over `http://`, `signed-by` the
+  committed keyring. Measured during re-planning:
+  - `debian:trixie-slim` verifies the snapshot index with its built-in `sqv`, and `node:22-slim`
+    with its built-in `gpgv`. Neither needs a bootstrap install to do it;
+  - the trixie snapshot offers `libcom-err2 1.47.2-3+b11`, the reference version.
+
+  `apt-pinned.sh` is unchanged, including its `https://`-only rule: only the source of the tools it
+  needs moves, from the live archive to the snapshot. The `agy` stage's `jq` already comes from the
+  snapshot (it runs after `apt-pinned` made the snapshot the only source) and is untouched.
+
+  The `agent-base` half republishes the base, so it takes the SF-4 path again: CI publish from
+  `main`, repin through PR, operator merge.
+- **F3 — the comparison does not depend on the Compose version.**
+  - Measured with sorted JSON across all four profiles, the only difference between Compose v2.38.2
+    and v5.3.1 is `create_host_path` on bind mounts: v2 emits `true`, v5 omits it.
+  - `compose_config_sha256` becomes the hash of `config --format json`, root-normalised, with
+    renderer-default fields removed (`create_host_path` today) and sorted with `jq -S`.
+  - Measured: the normalised hashes are equal under both versions for all four profiles.
+  - The fingerprint also records `docker_version` and `compose_version`. The comparison excludes
+    them, as it already excludes `commit`.
+- **Runbook (F4–F10).** A revision 2 of the clean-environment procedure goes into the record beside
+  the pre-run version. The pre-run version stays unchanged, because it is what the first run was
+  measured against. Revision 2:
+  - builds each profile with `AGENT_PROFILE` set, and fingerprints built images rather than a running
+    pod (F1, F4);
+  - brings the pod down before the Test Command (F5);
+  - removes only git-ignored identity material at teardown (F6);
+  - captures each Test Command script's output with `2>&1 | tee` (F7);
+  - keeps the operator on the README for every README step (F8);
+  - carries back the Stage 2 output, tool versions included;
+  - documents the session-log cleaning command (F9).
+
 ## Sub-Features
 
 Order is load-bearing: pins before the `main` publish, docs before the merge, the clean run after
 the repin.
+SF-5a–SF-5d (re-plan) land before the SF-5 re-run, and SF-5c's repin
+lands before the new reference commit.
 
 - [x] **SF-1: Pin the remaining mutable inputs; branch republish for testing.**
   - `NODE_BASE_DIGEST` (the index digest) in `pins.env`, consumed at `images/Dockerfile:40` and
@@ -358,7 +427,39 @@ the repin.
   - Phase C goes green, and the full composite is re-run against the `main` digest.
   - Record the D21 proposed amendment text.
   - Little code; the long pole is operator wall-clock.
+- [ ] **SF-5a: Fingerprint v2 (F1, F3).** *(re-plan 2026-09-13)*
+  - `scripts/fingerprint-environment.sh` per Contract 5 revision 2: `AGENT_PROFILE="$PROFILE"` on the
+    render, normalised JSON hash, version fields, profile check (exit 4), `schema: 2`.
+  - `images/Dockerfile` `agent-packs` stage writes `/opt/agent-pack/profile.json`.
+  - Negative controls, run once and recorded:
+    - fingerprinting `github` against default-built images exits 4;
+    - the Compose v2.38.2 and v5.3.1 renders give equal hashes for every shipped profile.
+  - Size: 2 files, local only.
+- [ ] **SF-5b: Mediator and recorder OS packages from the snapshot (F2, local images).**
+  - `images/mediator/Dockerfile` and `images/recorder/Dockerfile` bootstrap per Contract 7. The
+    recorder's `jq` resolves from the snapshot.
+  - `verify-reproducibility.sh` phase B gains the snapshot-first check (Contract 4 addendum), with a
+    negative control.
+  - `images/build-allowlist.yaml`: `deb.debian.org` removed once no fetch site remains. Phase B's
+    dead-entry check enforces this.
+  - Evidence: a no-cache mediator build gives the same package list as the SF-5 reference image
+    (`sandboxed-agent/mediator:sf5-ref`, `libcom-err2 1.47.2-3+b11`).
+  - Size: 3–4 files, local only.
+- [ ] **SF-5c: `agent-base` OS packages from the snapshot (F2); republish and repin
+  (operator-gated).**
+  - `images/Dockerfile:132` bootstrap per Contract 7.
+  - Push; branch publish; test repin; composite. Then the SF-4 path: PR to `main`, operator merge,
+    capture the `main` digest, repin through PR, phase C green.
+  - Little code; the long pole is CI and operator wall-clock, as in SF-4.
+- [ ] **SF-5d: Clean-environment procedure, revision 2 (F1, F4–F10).**
+  - `docs/records/reproducibility.md` gains "Clean-environment procedure — revision 2" per
+    Decision 8. The pre-run procedure stays as written.
+  - Size: 1 file, documentation.
 - [ ] **SF-5: T18 + T39 clean-environment run on a second physical Mac.**
+  - **Re-plan 2026-09-13.** The first run (2026-09-12/13) is recorded and did not pass T18. The
+    re-run follows revision 2 at a new reference commit that carries SF-5a–SF-5d and SF-5c's
+    `main`-pinned `agent-base`: new references for all four profiles, a factory-reset second Mac,
+    and the full Test Command. Its results are added to the record beside the first run's.
   - `scripts/fingerprint-environment.sh`.
   - **Write the runbook first.** Before the run, `docs/records/reproducibility.md` gains a
     "Clean-environment procedure" section. The run follows it, and a deviation from it is a
@@ -406,6 +507,9 @@ the repin.
 
 No sub-feature is oversized. SF-1 is the widest by file count and stays one coherent change: every
 edit serves one republish.
+
+SF-5a, SF-5b and SF-5d (re-plan) are each a single session. SF-5c is small in code and long in
+operator wall-clock, like SF-4. The feature goes from six sub-features to ten.
 
 ## Interface Contracts
 
@@ -472,6 +576,11 @@ preflight `command -v docker jq yq curl`, exit `0` all pass / `1` otherwise.
 There is no skip variable. A network-dependent phase that cannot reach its source fails. That is the
 same reasoning as `retry_cold_peer`: a swallowed result makes the assertion a tautology.
 
+**Addendum (re-plan 2026-09-13, SF-5b).** Phase B also asserts, per Dockerfile, that every
+`apt-get install` runs after either a step that removes the default apt sources and configures the
+dated snapshot (Contract 7), or `apt-pinned`. A negative control, a temporary `apt-get install` placed
+ahead of that step, is refused. It is run once and recorded.
+
 ### 5. `scripts/fingerprint-environment.sh`
 
 ```
@@ -496,6 +605,20 @@ with the checkout root replaced by `<ROOT>` before hashing. The comparison is `d
 <(jq -S 'del(.commit)' clean)`. `commit` is excluded so that a README-only fix between the reference
 and a re-run does not register as a difference, and the record lists both commits.
 
+**Revision 2 (re-plan 2026-09-13, SF-5a).** `schema: 2`. Changes from schema 1:
+
+- `compose_config_sha256` is the sha256 of `AGENT_PROFILE="$PROFILE" docker compose … config
+  --format json`, with the checkout root replaced by `<ROOT>`, renderer-default fields deleted
+  (`del(.. | .create_host_path?)`), and keys sorted with `jq -S`.
+- New fields `docker_version` and `compose_version` are recorded but not compared.
+- Exit `4`: the agent images' `/opt/agent-pack/profile.json` names a different profile from the
+  argument, or is absent.
+- The comparison becomes `diff <(jq -S 'del(.commit, .docker_version, .compose_version)' ref)
+  <(jq -S 'del(.commit, .docker_version, .compose_version)' clean)`.
+
+A schema-1 reference is not comparable with a schema-2 run, so the re-run regenerates all four
+references.
+
 ### 6. README Bring-Up order (the T18/T39 contract)
 
 1. Prerequisites: macOS 26 on Apple silicon, Docker Desktop, `git`.
@@ -508,6 +631,28 @@ and a re-run does not register as a difference, and the record lists both commit
 
 Optional sections (oauth-mount, host gitconfig, pack profiles with staged credentials) follow and
 are not on the T18 path, except that every profile is **built** and fingerprinted.
+
+### 7. Snapshot bootstrap form *(re-plan 2026-09-13)*
+
+Every `apt-get install` that runs before `apt-pinned`, or in an image that never runs it, takes this
+form:
+
+```dockerfile
+# The dated snapshot is the ONLY source, over http, signed-by the committed keyring.
+# apt verifies InRelease (sqv on trixie, gpgv on bookworm) and the per-.deb hashes in the
+# signed Packages index. apt-pinned (https-only) re-verifies the key fingerprint afterwards.
+COPY images/keyrings/<keyring>.gpg /usr/local/share/keyrings/<keyring>.gpg
+RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/* \
+    && printf 'deb [signed-by=/usr/local/share/keyrings/<keyring>.gpg] %s %s main\n' \
+         "$(printf %s "${SNAPSHOT_URL}" | sed 's#^https://#http://#')" "${SNAPSHOT_SUITE}" \
+         > /etc/apt/sources.list.d/bootstrap-snapshot.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends <bootstrap packages> \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+`apt-pinned.sh` replaces this sources file with its own, as it does today. `trusted=yes` is never
+used.
 
 ## Edge Cases
 
@@ -565,12 +710,25 @@ are not on the T18 path, except that every profile is **built** and fingerprinte
       state volumes. They stay valid until the provider revokes them; rotation does not end them
       (01.4 SF-5). After the run:
       - `docker compose down -v`;
-      - delete `mediator/identity/`;
+      - remove the generated identity material with `git clean -fdX mediator/identity/`, which
+        keeps the tracked `README.md` and `.gitignore`. *(Corrected at re-plan: the first run
+        deleted the directory, and a later `verify-reproducibility.sh` exited 2 on the missing
+        README.)*
       - revoke the Claude and Codex sessions the run created at each provider;
       - unset the key;
       - factory-reset Docker Desktop.
 
       The teardown is recorded. The revocation step is the same procedure 02.5's T26 later times.
+17. **A future Compose release renders another default differently** *(re-plan)*. The
+    normalisation removes only the fields measured to differ (`create_host_path`). A new one shows
+    up as a fingerprint diff on a Compose-only field. It is recorded as a finding and added to the
+    normalisation with its measurement, not passed by exception.
+18. **The committed keyrings under `signed-by`** *(re-plan)*. apt must accept the committed keyring
+    files as `signed-by` sources on both apt 3.0 (`sqv`) and apt 2.6 (`gpgv`). Re-planning measured
+    this with the base images' own keyrings, not yet with the committed files. SF-5b and SF-5c
+    verify it at build time. A refusal is fixed in the keyring format, never with `trusted=yes`.
+19. **`http://` snapshot availability** *(re-plan)*. The same availability risk as Edge Case 9, now
+    also on the bootstrap path of all three images.
 
 ## Test Command
 
@@ -604,6 +762,12 @@ gate re-approval.
   Both digests are recorded.
 - **T18:** a clean fingerprint diff for every shipped profile, **and** the Test Command passing on
   the second Mac, plus the step log, which must contain no command absent from the README.
+- **Re-plan negative controls (SF-5a, SF-5b),** each run once and recorded:
+  - fingerprinting a profile against images built for another exits 4;
+  - the Compose v2.38.2 and v5.3.1 renders give equal `compose_config_sha256` for every shipped
+    profile;
+  - an `apt-get install` ahead of the snapshot step is refused by phase B;
+  - a no-cache mediator rebuild gives the SF-5 reference package list.
 - **T39:** the step log with deviations classified as README-fixed or recorded.
 - **R10.6** is walked once as a dry run. Bump nothing; follow the procedure to the point of the
   shadow run, which 02.2 already exercises. This confirms every referenced command exists.
@@ -625,6 +789,8 @@ gate re-approval.
   - T45 chain and results (branch red, `main` green);
   - build allowlist statement and the R10.4 finding with review trigger;
   - the **"Clean-environment procedure" runbook** (SF-5), written before the run;
+  - **Clean-environment procedure, revision 2** (SF-5d), beside the unchanged pre-run procedure;
+  - the SF-5 first-run results and findings (recorded 2026-09-13), and the re-run results;
   - T18 fingerprint diffs with both commits, the second-Mac Test Command output, the
     clean-environment attestation, teardown and revocation, and availability risks;
   - T39 step log and findings;
@@ -660,6 +826,14 @@ Paths are relative to the solution root, except the workflow, which is at the **
 | `docs/records/reproducibility.md` | Create | Per Documentation |
 | `docs/records/agent-verification.md` | Modify | Pointer to the R10.6 procedure |
 | `packs/README.md` | Modify | Pointer to `images/build-allowlist.yaml` |
+| `scripts/fingerprint-environment.sh` | Modify (re-plan) | SF-5a: Contract 5 revision 2 |
+| `images/Dockerfile` | Modify (re-plan) | SF-5a: `agent-packs` writes `/opt/agent-pack/profile.json`. SF-5c: `agent-base` bootstrap per Contract 7 |
+| `images/mediator/Dockerfile` | Modify (re-plan) | SF-5b: bootstrap per Contract 7 |
+| `images/recorder/Dockerfile` | Modify (re-plan) | SF-5b: `jq` from the dated trixie snapshot per Contract 7 |
+| `tests/acceptance/verify-reproducibility.sh` | Modify (re-plan) | SF-5b: phase B snapshot-first check (Contract 4 addendum) |
+| `images/build-allowlist.yaml` | Modify (re-plan) | SF-5b: `deb.debian.org` removed once no fetch site remains |
+| `compose/pins.env` | Modify (re-plan) | SF-5c: `AGENT_BASE_DIGEST` repinned to the new `main` publish |
+| `docs/records/reproducibility.md` | Modify (re-plan) | SF-5d: procedure revision 2. SF-5: re-run results |
 | `.project/.../milestone-status.txt` | Modify (by `/build`) | Sub-feature progress |
 
 ## Dependencies
@@ -675,6 +849,8 @@ Paths are relative to the solution root, except the workflow, which is at the **
   - decide how the repin reaches `main`;
   - provide the **second physical Mac** (macOS 26, Apple silicon) and perform T39 on it;
   - name the R12.3 reviewer role.
+  - *(re-plan)* merge SF-5c's promotion PR and its repin PR;
+  - *(re-plan)* provide the second Mac again, factory-reset, for the SF-5 re-run.
 - **External:**
   - GitHub Actions `ubuntu-24.04-arm` runners;
   - GHCR public package;

@@ -1,5 +1,5 @@
 # Milestone 02: Proven and Composable
-# Status: [ ] pending  5 features, 0 complete
+# Status: [~] in progress  5 features, 3 complete
 
 ## Features
 
@@ -22,7 +22,7 @@
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 4/6 complete
+    Sub-features: 4/10 complete
     Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
     node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
     bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
@@ -115,6 +115,21 @@
     findings F4-F10 (runbook defects and run conduct). R11.1 not discharged. F1's fingerprint-script
     gaps, F2 and F3 route to /milestone; new references and a factory-reset full re-run are
     needed. See docs/records/reproducibility.md, SF-5 run results. Sub-feature count stays 4/6.
+    Milestone revision (2026-09-13, /milestone revision mode, criteria only): 02.4's T18 criterion
+    clarified in README.md after the SF-5 findings -- every profile fingerprinted as built for that
+    profile (F1), OS package set independent of rebuild date (F2), comparison independent of Docker
+    Desktop/Compose version with versions recorded (F3). Feature NOT reset; plan and SF-1-SF-4 kept.
+    Implementation re-plan follows via /plan-feature. Fresh gate-3-review.md generated.
+    Re-plan (2026-09-13, /plan-feature re-plan mode, Gate 4 re-approved): Decision 8 and four new
+    sub-features ahead of the SF-5 re-run -- SF-5a fingerprint v2 (F1 profile-aware render + exit-4
+    profile check via /opt/agent-pack/profile.json, F3 normalised Compose JSON + version fields),
+    SF-5b mediator/recorder OS packages from the dated snapshot (F2, local), SF-5c agent-base from
+    the snapshot with republish + repin (F2, operator-gated), SF-5d clean-environment procedure
+    revision 2 (F1, F4-F10). Contract 5 revision 2, Contract 4 addendum, new Contract 7, Edge Cases
+    16 corrected and 17-19 added. Sub-features 6 -> 10; SF-1-SF-4 remain complete. Status kept [~]
+    rather than reset to [ ]: the re-plan spec covers planned-awaiting-build and pending features
+    only, and 02.4 was already in progress with built sub-features. Prior Gate 4 review preserved as
+    reviews/gate-4-reproducibility-provenance-and-onboarding-review-2026-09-10.md.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
