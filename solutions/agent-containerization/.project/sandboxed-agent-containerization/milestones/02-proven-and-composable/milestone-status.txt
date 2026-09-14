@@ -189,7 +189,8 @@
     dead-entry check forces removal after SF-5c. SF-5c impact (Deviation 1): agent-base and
     pack-install.sh's apt-pinned calls need bookworm-security + --security the same way. Local
     :local mediator and recorder images are now SF-5b builds. Investigation:
-    agents/investigations/02.4-sf5b-snapshot-lacks-security-updates.md (resolved).
+    agents/investigations/02.4-sf5b-snapshot-lacks-security-updates.md (resolved; local only,
+    agents/ is gitignored -- plan Deviation 1 carries the same content).
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md

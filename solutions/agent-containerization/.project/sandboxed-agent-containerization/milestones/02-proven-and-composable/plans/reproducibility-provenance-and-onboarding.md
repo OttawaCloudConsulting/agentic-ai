@@ -444,6 +444,10 @@ lands before the new reference commit.
     dead-entry check enforces this.
   - Evidence: a no-cache mediator build gives the same package list as the SF-5 reference image
     (`sandboxed-agent/mediator:sf5-ref`, `libcom-err2 1.47.2-3+b11`).
+    *As built (Deviation 1):* `libcom-err2` +b11 and OpenSSL 3.5.7 match `sf5-ref`. The remaining
+    3-line diff (`libdbi-perl`, `libexpat1`, `libtdb1`) is exactly the `trixie-security` versions
+    `sf5-ref` lacked, because SF-1c's closure was main-only. Two no-cache rebuilds give identical
+    package lists.
   - Size: 3–4 files, local only.
 - [ ] **SF-5c: `agent-base` OS packages from the snapshot (F2); republish and repin
   (operator-gated).**
