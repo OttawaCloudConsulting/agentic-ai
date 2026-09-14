@@ -348,9 +348,11 @@ backstop, not the ordering.
 **No pack credential is staged for the builds.** None of the compose files gives a `build:` block
 any `secrets:`, and the profile overrides have no `build:` key. The `github` and `kubernetes`
 overrides read their `file:` secrets from `${PACK_CREDENTIALS_DIR:-…}`. Measured on the build host
-(Compose v2.38.2, 2026-09-13): `AGENT_PROFILE=github` with `PACK_CREDENTIALS_DIR` set to an empty
-directory, `docker compose … build --dry-run claude` exits 0. The full no-credential build was not
-run; if it fails on the second Mac, that is a finding. The Test Command's `validate-boundary.sh`
+(Compose v2.38.2, 2026-09-13): with `AGENT_PROFILE=github` and `PACK_CREDENTIALS_DIR` set to an
+empty directory, `docker compose … -f compose/overrides/github.yaml build claude` exits 0
+(`claude Built`). That build reused cached layers, so it shows Compose does not require the
+secret file to build, not a from-scratch build. If a build fails on the second Mac for want of a
+credential, that is a finding. The Test Command's `validate-boundary.sh`
 stages its own dummy files in a `mktemp -d` directory.
 
 ### Stage 1 — Reference, on the build host (revision 2)
@@ -364,11 +366,16 @@ mkdir -p /tmp/sf5-ref
 ( set -euo pipefail
   for p in default terraform kubernetes github; do
     AGENT_PROFILE="$p" docker compose --env-file compose/pins.env -f compose/compose.yaml \
-      -f "compose/overrides/$p.yaml" build > "/tmp/sf5-ref/build.$p.log" 2>&1
+      -f "compose/overrides/$p.yaml" build --no-cache > "/tmp/sf5-ref/build.$p.log" 2>&1
     bash scripts/fingerprint-environment.sh "$p" > "/tmp/sf5-ref/ref.$p.json"
   done )
 jq -r '[.profile, .schema, .commit, .docker_version, .compose_version] | @tsv' /tmp/sf5-ref/ref.*.json
 ```
+
+`--no-cache` makes the reference what a from-scratch build produces, as the second Mac's build is.
+Apt resolves from frozen snapshots, but npm transitive dependencies are not locked (Decision 6), so
+a cached `npm install -g` layer would show up as an `npm_tree_sha256` diff caused by the build
+host's cache. Build the references as close in time to Stage 3 as practical.
 
 The last command must show four rows: `schema` 2, `commit` X₂, each row's `profile` matching its
 file name. Carry the four `ref.<profile>.json` files to the second Mac out-of-band (AirDrop or USB).
@@ -400,7 +407,8 @@ includes the Docker and Compose versions.
    read -rs GEMINI_API_KEY; export GEMINI_API_KEY
    script -q ~/sf5-run/raw-session-1.log bash
    ```
-   A second terminal, if one is used, is recorded the same way to `raw-session-2.log`. The raw logs
+   A second terminal, if one is used, runs the same two lines (`read -rs` first, then `script` to
+   `raw-session-2.log`), so the key is never typed into a recorded shell. The raw logs
    hold the OAuth paste-back code and the device code, so they never leave the second Mac.
 2. **README Bring-Up, step 2** (clone and enter the solution directory), from `~`. Then, as
    instrumentation, inside the solution directory: `git checkout <X2>`.
@@ -434,6 +442,7 @@ includes the Docker and Compose versions.
    ```bash
    bash -c '
    set -uo pipefail
+   : > ~/sf5-run/test-exit.txt
    run() { local name="$1"; shift; echo "=== $name"
            "$@" 2>&1 | tee ~/sf5-run/test."$name".log; local rc=$?
            echo "$name exit=$rc" | tee -a ~/sf5-run/test-exit.txt; return "$rc"; }

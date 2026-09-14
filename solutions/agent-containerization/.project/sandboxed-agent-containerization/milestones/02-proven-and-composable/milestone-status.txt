@@ -232,8 +232,10 @@
     confirms receipt); Stage 2 captured to stage2.txt. Reference commit X2 left as a placeholder:
     a main commit carrying SF-5a-SF-5d and b3e17bb, recorded when the re-run starts; schema-1
     references void. Verified on the build host: build-then-fingerprint interleaved per profile
-    (one shared :local tag); no build: block has secrets and a github build --dry-run with an empty
-    PACK_CREDENTIALS_DIR exits 0 (full no-credential build not run); the tee wrapper stops the chain
+    (one shared :local tag); no build: block has secrets, and a github `build claude` with an empty
+    PACK_CREDENTIALS_DIR exits 0 (cached layers -- shows the secret file is not needed to build);
+    Stage 1 reference builds use --no-cache (npm transitives are unlocked, so a cached layer would
+    fake an npm_tree_sha256 diff); the wrapper truncates test-exit.txt per run; the tee wrapper stops the chain
     and records composite exit=3 on a failing stand-in script; git clean -ndX mediator/identity/
     removes ca/ clients/ credentials/ listeners/ and keeps README.md/.gitignore. The log-cleaning
     command was verified against a synthetic log only. "What closes SF-5" gained a status note.
