@@ -191,6 +191,29 @@
     :local mediator and recorder images are now SF-5b builds. Investigation:
     agents/investigations/02.4-sf5b-snapshot-lacks-security-updates.md (resolved; local only,
     agents/ is gitignored -- plan Deviation 1 carries the same content).
+    SF-5c (2026-09-13, partial -- local half, branch publish and branch composite done; main
+    promotion and repin pending, operator-gated): agent-base bootstrap (ca-certificates, curl) moved
+    off node:22-slim's live sources onto the dated snapshot per Contract 7, main bookworm
+    20260901T000000Z + bookworm-security; images/keyrings/debian-security-bookworm.gpg (byte-identical
+    to node:22-slim's debian-archive-bookworm-security-automatic.gpg, primary 05AB9034...A8F0);
+    SECURITY_SNAPSHOT_* in pins.env, the workflow pin loop/build-args and the three agent services'
+    build.args. deb.debian.org removed from build-allowlist.yaml (phase B dead-entry check). Deviation 2
+    recorded (operator decisions): (a) security snapshot is 20260910T203409Z, LATER than main -- at
+    20260901 a no-cache build downgraded libssh2-1 1.10.0-3+deb12u1 (security upload, present in the
+    published base from the live archive) to +b1; (b) apt-pinned.sh records the security source at
+    /etc/agent-apt-security-snapshot and pack-install.sh passes --security from it (profile schema
+    unchanged; absent record on an older base -> note, main-only, as before). Measured: bookworm-updates
+    @20260901 newer than main for no installed package. Evidence: two no-cache agent-base builds
+    identical; vs published base only libexpat1 deb12u2 -> deb12u3; terraform agent-packs on the local
+    base verifies both InReleases and keeps the security line. Committed 9627782; branch pushed; publish
+    via workflow_dispatch run 34797477156 -> sha256:389f689ee8c807b0e8d3d46ce9ae0fb8ec4bf7d15f3c396075272d66a2a03d07,
+    package list identical to the local build (127). Full Test Command against that digest (working-tree
+    pin only, restored after; shell export does not reach verify-pod-topology.sh, which sources pins.env):
+    all harnesses and lint-policy pass with only the two recorded T6 known gaps; verify-reproducibility
+    24/1, the 1 = phase C head_branch on the branch digest (expected). Remaining: PR to main (operator
+    merges), capture main digest, repin through PR, phase C green. Operator flag, not in scope:
+    CA_CERTIFICATES_VERSION still pins the 2023 bundle (security has 20250419~deb12u1). Sub-feature
+    count stays 6/10.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
