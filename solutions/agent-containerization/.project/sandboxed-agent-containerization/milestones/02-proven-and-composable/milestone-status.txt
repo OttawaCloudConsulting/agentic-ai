@@ -22,7 +22,7 @@
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 7/10 complete
+    Sub-features: 8/10 complete
     Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
     node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
     bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
@@ -222,6 +222,22 @@
     recorded T6 known gaps, same 16 lines as the branch-digest run. Operator flag, not in scope:
     CA_CERTIFICATES_VERSION still pins the 2023 bundle (security has 20250419~deb12u1). Completed
     2026-09-14.
+    SF-5d (2026-09-13): docs/records/reproducibility.md gained "Clean-environment procedure --
+    revision 2 (SF-5d)" after the SF-5 run results; the pre-run procedure is unchanged. Fixes F1
+    (AGENT_PROFILE on every profile build, default included), F4 (build, not up), F5 (pod down,
+    without -v, before the Test Command), F6 (git clean -fdX), F7 (tee wrapper under pipefail, exit
+    codes to test-exit.txt; DD-12 adjustment, same scripts/order/gating), F8 (README steps named by
+    section and step number, only instrumentation written out, no derived copy), F9 (build output
+    to per-profile files; documented log-cleaning command), F10 (teardown only after the build host
+    confirms receipt); Stage 2 captured to stage2.txt. Reference commit X2 left as a placeholder:
+    a main commit carrying SF-5a-SF-5d and b3e17bb, recorded when the re-run starts; schema-1
+    references void. Verified on the build host: build-then-fingerprint interleaved per profile
+    (one shared :local tag); no build: block has secrets and a github build --dry-run with an empty
+    PACK_CREDENTIALS_DIR exits 0 (full no-credential build not run); the tee wrapper stops the chain
+    and records composite exit=3 on a failing stand-in script; git clean -ndX mediator/identity/
+    removes ca/ clients/ credentials/ listeners/ and keeps README.md/.gitignore. The log-cleaning
+    command was verified against a synthetic log only. "What closes SF-5" gained a status note.
+    No mechanism change, so no Test Command run (SF-5 and SF-6 remain).
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md

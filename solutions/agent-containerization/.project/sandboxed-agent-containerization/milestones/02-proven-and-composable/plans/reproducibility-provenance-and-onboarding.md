@@ -455,7 +455,7 @@ lands before the new reference commit.
   - Push; branch publish; test repin; composite. Then the SF-4 path: PR to `main`, operator merge,
     capture the `main` digest, repin through PR, phase C green.
   - Little code; the long pole is CI and operator wall-clock, as in SF-4.
-- [ ] **SF-5d: Clean-environment procedure, revision 2 (F1, F4–F10).**
+- [x] **SF-5d: Clean-environment procedure, revision 2 (F1, F4–F10).**
   - `docs/records/reproducibility.md` gains "Clean-environment procedure — revision 2" per
     Decision 8. The pre-run procedure stays as written.
   - Size: 1 file, documentation.
