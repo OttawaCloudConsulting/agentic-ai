@@ -223,7 +223,23 @@ FROM ghcr.io/ottawacloudconsulting/agentic-ai/agent-sandbox-base@${AGENT_BASE_DI
 COPY --chmod=0755 images/pack-install.sh /usr/local/bin/pack-install
 
 COPY --from=pack-plan /out /tmp/pack-plan
+
+# /opt/agent-pack/profile.json names the profile these images were built for and its
+# resolved pack set (02.4 Decision 8, F1). Nothing in the image recorded its profile
+# before this, so fingerprint-environment.sh could not refuse to fingerprint images
+# built for a different profile than the one it was asked about -- the first SF-5 run's
+# references fingerprinted default packs under three profile names. PROFILE is the same
+# build arg pack-plan consumed; it is checked as a token here because it is printed
+# into JSON, and pack-plan only checks that profiles/<PROFILE>.yaml exists. Pack names
+# come from pack-plan's packs.txt (already validated there), sorted, no timestamps, so
+# the file is identical on every rebuild of the same profile.
+ARG PROFILE=default
 RUN bash /usr/local/bin/pack-install /tmp/pack-plan /usr/local/share/keyrings/debian-archive.gpg \
+    && { printf '%s' "$PROFILE" | grep -Eq '^[a-z0-9][a-z0-9-]*$' \
+         || { echo "agent-packs: PROFILE '$PROFILE' must match ^[a-z0-9][a-z0-9-]*$" >&2; exit 2; }; } \
+    && packs="$(cut -d' ' -f1 /tmp/pack-plan/packs.txt | sort | sed 's/.*/"&"/' | paste -sd, -)" \
+    && printf '{"profile":"%s","packs":[%s]}\n' "$PROFILE" "$packs" > /opt/agent-pack/profile.json \
+    && chmod 0444 /opt/agent-pack/profile.json \
     && rm -rf /tmp/pack-plan
 
 # Test-only hook for the volume-upgrade smoke check (Edge Case 8): empty by default, so

@@ -427,7 +427,7 @@ lands before the new reference commit.
   - Phase C goes green, and the full composite is re-run against the `main` digest.
   - Record the D21 proposed amendment text.
   - Little code; the long pole is operator wall-clock.
-- [ ] **SF-5a: Fingerprint v2 (F1, F3).** *(re-plan 2026-09-13)*
+- [x] **SF-5a: Fingerprint v2 (F1, F3).** *(re-plan 2026-09-13)*
   - `scripts/fingerprint-environment.sh` per Contract 5 revision 2: `AGENT_PROFILE="$PROFILE"` on the
     render, normalised JSON hash, version fields, profile check (exit 4), `schema: 2`.
   - `images/Dockerfile` `agent-packs` stage writes `/opt/agent-pack/profile.json`.

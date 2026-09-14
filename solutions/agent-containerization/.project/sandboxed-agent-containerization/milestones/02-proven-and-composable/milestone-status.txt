@@ -22,7 +22,7 @@
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 4/10 complete
+    Sub-features: 5/10 complete
     Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
     node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
     bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
@@ -130,6 +130,27 @@
     rather than reset to [ ]: the re-plan spec covers planned-awaiting-build and pending features
     only, and 02.4 was already in progress with built sub-features. Prior Gate 4 review preserved as
     reviews/gate-4-reproducibility-provenance-and-onboarding-review-2026-09-10.md.
+    SF-5a (2026-09-13): fingerprint-environment.sh to Contract 5 revision 2 -- schema 2,
+    compose_config_sha256 = sha256 of `AGENT_PROFILE="$PROFILE" compose ... config --format json`,
+    <ROOT>-normalised, `del(.. | .create_host_path?)`, `jq -S`; docker_version/compose_version
+    recorded; exit 4 when any of the three agent images' /opt/agent-pack/profile.json is absent or
+    names another profile (read out with cat and parsed on the host -- jq is absent from the
+    claude/codex images). images/Dockerfile agent-packs writes profile.json ({"profile","packs"},
+    pack names sorted from pack-plan's packs.txt; PROFILE redeclared as a stage ARG and checked as
+    a ^[a-z0-9][a-z0-9-]*$ token before it is printed into JSON, since pack-plan only checks the
+    profile file exists). COMPOSE_BIN (optional standalone Compose binary) added solely to drive the
+    v5.3.1 negative control through the shipped code path. Negative controls, run once on the build
+    host: (1) pre-change :local images -> exit 4 "records no profile"; (2) `fingerprint github`
+    against AGENT_PROFILE=default-built images -> exit 4 "built for profile 'default', not
+    'github'"; (3) `fingerprint default` under Compose v2.38.2 and under COMPOSE_BIN=v5.3.1
+    (sha256-verified release binary) -> both exit 0, compose_config_sha256 f5827457... on both, full
+    documents diff clean with commit/docker_version/compose_version excluded. The normalised render
+    pipeline, run by hand with both binaries, gives equal hashes for all four shipped profiles
+    (default f5827457, terraform 62452ef4, kubernetes 9cad75c2, github 3cb34c1b) -- and default no
+    longer equals terraform, so the render now distinguishes pack selection (F1). Only default's
+    images were rebuilt; the script-level run for the three pack profiles happens with the SF-5
+    references. pack_roots_sha256 now covers profile.json (schema-1 references were already void).
+    Mediator dpkg_sha256 still 800c5839... (the F2 drift) -- SF-5b's scope, untouched here.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
