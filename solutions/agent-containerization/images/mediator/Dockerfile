@@ -169,6 +169,9 @@ FROM base AS runtime
 ARG SNAPSHOT_URL=https://snapshot.debian.org/archive/debian/20260910T203409Z/
 ARG SNAPSHOT_SUITE=trixie
 ARG SNAPSHOT_FINGERPRINT=04B54C3CDCA79751B16BC6B5225629DF75B188BD
+ARG SECURITY_SNAPSHOT_URL=https://snapshot.debian.org/archive/debian-security/20260910T203409Z/
+ARG SECURITY_SNAPSHOT_SUITE=trixie-security
+ARG SECURITY_SNAPSHOT_FINGERPRINT=5E04A1E3223A19A20706E20F9904613D4CCE68C6
 ARG SQUID_VERSION=6.13-2+deb13u2
 ARG SQUID_SHA256=31aecf295fdb7c8b888b0771a4e9faa08a2189a989ed34011b11544fe5bc0fa2
 ARG UNBOUND_VERSION=1.22.0-2+deb13u3
@@ -178,16 +181,44 @@ ARG DNSDIST_SHA256=9840a1f60c51713473638e2a766ab14f813f6b9980df362bdf739b933bb7a
 ARG CA_CERTIFICATES_VERSION=20250419
 ARG CA_CERTIFICATES_SHA256=ef590f89563aa4b46c8260d49d1cea0fc1b181d19e8df3782694706adf05c184
 COPY images/keyrings/debian-archive-trixie.gpg /usr/local/share/keyrings/debian-archive-trixie.gpg
+COPY images/keyrings/debian-security-trixie.gpg /usr/local/share/keyrings/debian-security-trixie.gpg
 COPY --chmod=0755 images/apt-pinned.sh /usr/local/bin/apt-pinned
-# ca-certificates + curl + gpgv bootstrapped UNPINNED from the base image's default
-# (plain-HTTP, already-trusted) sources -- apt-pinned.sh needs all three to fetch and
-# verify the snapshot's InRelease, and NONE exist in debian:trixie-slim (measured; unlike
-# node:22-slim, which ships gpgv). The pinned re-run below replaces this ca-certificates
-# with the exact pinned .deb; curl and gpgv are removed afterward because the runtime
-# image has no other use for either.
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gpgv \
+# ca-certificates + curl + gpgv are what apt-pinned.sh needs to fetch and verify the
+# snapshot's InRelease, and NONE exist in debian:trixie-slim (measured; unlike
+# node:22-slim, which ships gpgv).
+#
+# 02.4 SF-5b (Decision 8, F2, Interface Contract 7): they are bootstrapped from the SAME
+# dated snapshot, not from the base image's live default sources. The live bootstrap was
+# the verified cause of the first SF-5 run's mediator drift: libcom-err2 arrived as a
+# dependency of that install (via libkrb5-3/libgssapi-krb5-2), survived the purge below,
+# and so took whatever version the live archive carried on the rebuild date (+b11 on the
+# reference, +b12 two days later). apt-pinned pins the packages it names, not the closure
+# an earlier install already pulled in. The default sources are removed first so apt has
+# no other place to satisfy a dependency from. The snapshot is reached over http because
+# nothing in the base image can verify TLS yet; apt verifies InRelease with sqv against
+# the committed keyring, and each .deb against the signed Packages index. apt-pinned then
+# replaces this source with its own https one and re-asserts the pinned key fingerprint.
+# The pinned re-run replaces this ca-certificates with the exact pinned .deb; curl and
+# gpgv are removed afterward because the runtime image has no other use for either.
+#
+# TWO dated sources, main and security, at the same timestamp (feature plan Deviation 1).
+# Debian stable is the main archive PLUS debian-security, and a main-only snapshot never
+# carries security uploads: measured at this timestamp, main resolves openssl 3.5.6
+# where security has 3.5.7, so a main-only mediator ships a downgraded TLS library.
+# The security index is signed by a different key (debian-security-trixie.gpg) and
+# carries a 7-day Valid-Until, which a frozen snapshot is always past, so
+# check-valid-until=no is set on THAT source only. Integrity is unaffected: InRelease is
+# still signature-checked, and apt-pinned asserts its primary key fingerprint.
+RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/* \
+    && printf 'deb [signed-by=/usr/local/share/keyrings/debian-archive-trixie.gpg] %s %s main\ndeb [signed-by=/usr/local/share/keyrings/debian-security-trixie.gpg check-valid-until=no] %s %s main\n' \
+         "$(printf %s "${SNAPSHOT_URL}" | sed 's|^https:|http:|')" "${SNAPSHOT_SUITE}" \
+         "$(printf %s "${SECURITY_SNAPSHOT_URL}" | sed 's|^https:|http:|')" "${SECURITY_SNAPSHOT_SUITE}" \
+         > /etc/apt/sources.list.d/bootstrap-snapshot.list \
+    && apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gpgv \
     && rm -rf /var/lib/apt/lists/* \
     && bash /usr/local/bin/apt-pinned \
+      --security /usr/local/share/keyrings/debian-security-trixie.gpg \
+      "${SECURITY_SNAPSHOT_URL}" "${SECURITY_SNAPSHOT_SUITE}" "${SECURITY_SNAPSHOT_FINGERPRINT}" \
       /usr/local/share/keyrings/debian-archive-trixie.gpg \
       "${SNAPSHOT_URL}" "${SNAPSHOT_SUITE}" "${SNAPSHOT_FINGERPRINT}" \
       "squid-openssl=${SQUID_VERSION}=${SQUID_SHA256}" \

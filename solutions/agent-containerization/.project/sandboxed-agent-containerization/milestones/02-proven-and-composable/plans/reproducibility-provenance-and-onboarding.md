@@ -435,7 +435,7 @@ lands before the new reference commit.
     - fingerprinting `github` against default-built images exits 4;
     - the Compose v2.38.2 and v5.3.1 renders give equal hashes for every shipped profile.
   - Size: 2 files, local only.
-- [ ] **SF-5b: Mediator and recorder OS packages from the snapshot (F2, local images).**
+- [x] **SF-5b: Mediator and recorder OS packages from the snapshot (F2, local images).**
   - `images/mediator/Dockerfile` and `images/recorder/Dockerfile` bootstrap per Contract 7. The
     recorder's `jq` resolves from the snapshot.
   - `verify-reproducibility.sh` phase B gains the snapshot-first check (Contract 4 addendum), with a
@@ -868,4 +868,38 @@ Paths are relative to the solution root, except the workflow, which is at the **
 
 ## Architectural Deviations
 
-(none)
+### Deviation 1: The dated snapshot is two sources, main and security (SF-5b)
+- **What changed:** Contract 7's bootstrap sources file carries a second line for a dated
+  `debian-security` snapshot (`MEDIATOR_SECURITY_SNAPSHOT_URL`/`_SUITE`/`_FINGERPRINT` in
+  `compose/pins.env`, same timestamp as `MEDIATOR_SNAPSHOT_URL`). It is signed by the Debian
+  Security Archive key, committed as `images/keyrings/debian-security-trixie.gpg`, and carries
+  `check-valid-until=no` on that source only. `images/apt-pinned.sh` gains an optional leading
+  `--security <keyring> <url> <suite> <fingerprint>`. When given, it verifies that InRelease by
+  VALIDSIG field 12, the same way it verifies the main one, and keeps both sources as the image's
+  only apt sources. The mediator and recorder use it. Existing callers (`agent-base`,
+  `pack-install.sh`) are unchanged.
+- **Originally planned:** Decision 8 F2 and Contract 7 configure one snapshot source, the dated
+  main archive, and state "`apt-pinned.sh` is unchanged".
+- **Why necessary:** Debian stable is the main archive plus `debian-security`, and a main-only
+  snapshot never carries security uploads. Measured at `20260910T203409Z`:
+  - main has `jq`/`libjq1` 1.7.1-6+deb13u2 and `libssl3t64`/`openssl`/`openssl-provider-legacy`
+    3.5.6-1~deb13u2;
+  - `trixie-security` has deb13u3 and 3.5.7-1~deb13u2.
+
+  As planned, the recorder build failed because `JQ_VERSION=1.7.1-6+deb13u3` exists only in
+  security, and the mediator's OpenSSL was downgraded to 3.5.6. Every package the SF-5 reference
+  mediator and recorder add over the base image is in main ∪ security; `trixie-updates` adds none
+  of them. The security InRelease carries a 7-day `Valid-Until` (16 Sep 2026 at this timestamp).
+  apt refuses an expired one (`E: Release file … is expired`, measured against the `20260801`
+  security snapshot) and accepts it with `check-valid-until=no` scoped to that source. A frozen
+  dated snapshot is expired by design, so without the option the build would stop working a week
+  after the pin. Operator decision, 2026-09-13.
+- **Impact:**
+  - SF-5c must take the same form for `agent-base`: `bookworm-security`, the bookworm security
+    key, and `--security` on its `apt-pinned` call. `pack-install.sh`'s call inherits the
+    sources file, but re-writes it only when it calls `apt-pinned` itself, so it needs the flag
+    too.
+  - Contract 7's text, Edge Cases 9/18/19 (a second availability and keyring dependency) and
+    `ARCHITECTURE_AND_DESIGN.md`'s snapshot description are stale for a consolidation pass.
+  - `images/build-allowlist.yaml` is unchanged in hosts: the security snapshot is also on
+    `snapshot.debian.org`.

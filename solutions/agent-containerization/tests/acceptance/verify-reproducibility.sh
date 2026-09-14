@@ -2,13 +2,15 @@
 # Acceptance test for Feature 02.4 (Reproducibility, provenance and onboarding).
 #
 # Phase A (SF-1): no build input resolves to a mutable tag. Every `FROM` in
-# images/Dockerfile and images/mediator/Dockerfile is `scratch`, a stage name, or a
+# images/Dockerfile, images/mediator/Dockerfile and images/recorder/Dockerfile is `scratch`, a stage name, or a
 # digest-pinned reference whose digest ARG has a sha256: value in compose/pins.env;
 # every rendered profile's Compose `image:` is either paired with `build:` or
 # digest-pinned; the workflow's SBOM step carries no unpinned action reference.
 #
 # Phase B (SF-2): every non-pack build-time fetch site resolves to a host in
 # images/build-allowlist.yaml or a selected pack's egress.build.allow_fqdns (R10.4).
+# SF-5b adds the snapshot-first check: every `apt-get install` runs after the default apt
+# sources are replaced by the dated snapshot (Interface Contract 7) or after apt-pinned.
 # Phase C (SF-2): T45 -- the pinned AGENT_BASE_DIGEST carries an SBOM and SLSA
 # provenance naming a github.com Actions run, and that run's own metadata is
 # checked against criterion 1's five facts.
@@ -106,6 +108,12 @@ else
   fail "A: images/mediator/Dockerfile has a FROM that is not scratch/stage-name/digest-pinned (see stderr above)"
 fi
 
+if check_no_mutable_from images/recorder/Dockerfile "images/recorder/Dockerfile"; then
+  pass "A: every FROM in images/recorder/Dockerfile is scratch, a stage name, or digest-pinned via a sha256 pins.env value"
+else
+  fail "A: images/recorder/Dockerfile has a FROM that is not scratch/stage-name/digest-pinned (see stderr above)"
+fi
+
 # Negative control (Test Strategy, run once and recorded, not left standing): a
 # temporary unpinned FROM must be refused by the same check above.
 NEG_TMP="$(mktemp)"
@@ -186,6 +194,8 @@ else
   extracted_hosts=""
   add_host() { extracted_hosts="$(printf '%s\n%s\n' "$extracted_hosts" "$1")"; }
 
+  DOCKERFILES=(images/Dockerfile images/mediator/Dockerfile images/recorder/Dockerfile)
+
   # FROM registries: a bare `name:tag@sha256:...` resolves to Docker Hub's registry;
   # `ghcr.io/...` and any other `host/path` form name themselves.
   while IFS= read -r ref; do
@@ -194,15 +204,15 @@ else
       */*.*/*|ghcr.io/*) add_host "$(cut -d/ -f1 <<< "$ref")" ;;
       *) add_host "registry-1.docker.io" ;;
     esac
-  done < <(grep -hE '^FROM ' images/Dockerfile images/mediator/Dockerfile \
+  done < <(grep -hE '^FROM ' "${DOCKERFILES[@]}" \
     | sed -E 's/^FROM[[:space:]]+(--platform=[^ ]+[[:space:]]+)?([^[:space:]]+).*/\2/' \
     | grep -v '^scratch$')
 
-  # ADD https:// fetches (yq's release binary in both Dockerfiles).
+  # ADD https:// fetches (yq's release binary in all three Dockerfiles).
   while IFS= read -r url; do
     [ -n "$url" ] || continue
     add_host "$(sed -E 's#^https?://([^/]+)/.*#\1#' <<< "$url")"
-  done < <(grep -hoE 'https?://[^[:space:]]+' images/Dockerfile images/mediator/Dockerfile)
+  done < <(grep -hoE 'https?://[^[:space:]]+' "${DOCKERFILES[@]}")
 
   # pins.env: any *_URL / *_SOURCE value that is itself an http(s) URL, plus `npm:`
   # scheme sources, which resolve to the npm registry rather than a literal URL.
@@ -214,13 +224,59 @@ else
     esac
   done < <(grep -E '^[A-Z0-9_]+_(URL|SOURCE)=' compose/pins.env | sed -E 's/^[^=]+=//')
 
-  # The unpinned bootstrap install (ca-certificates/curl(/gpgv), both Dockerfiles' own
-  # "bootstrapped UNPINNED" comments) runs against the base image's baked-in default apt
-  # sources before apt-pinned swaps them. Not extractable from a URL literal in the
-  # Dockerfile, so named directly rather than pattern-matched.
-  if grep -qE 'apt-get install.*ca-certificates curl' images/Dockerfile images/mediator/Dockerfile; then
+  # Snapshot-first (feature plan Contract 4 addendum, Contract 7). An `apt-get install`
+  # that runs before the default apt sources are replaced resolves from the base image's
+  # baked-in live archive, so its dependency closure follows the rebuild date (02.4 F2).
+  # Covered means: earlier in the file, the default sources were removed AND
+  # bootstrap-snapshot.list was written (Contract 7), or apt-pinned was invoked.
+  #
+  # FILE ORDER, not stage scope, on purpose: agy's `apt-get install jq` sits in a stage
+  # whose only snapshot step is apt-pinned in agent-base, which it inherits through the
+  # published base. Within one RUN, the Contract 7 form puts `rm -f` and the sources
+  # file on physical lines before `apt-get install`, so line order is also command order.
+  snapshot_first_violations() {
+    awk -v label="$2" '
+      /^[[:space:]]*#/ { next }
+      /rm -f \/etc\/apt\/sources\.list/ { removed = 1 }
+      removed && /bootstrap-snapshot\.list/ { covered = 1 }
+      /bash \/usr\/local\/bin\/apt-pinned/ { covered = 1 }
+      /apt-get install/ && !covered {
+        printf "  %s:%d: apt-get install runs before the default apt sources are replaced by the dated snapshot or apt-pinned\n", label, NR > "/dev/stderr"
+        bad = 1
+      }
+      END { exit bad ? 1 : 0 }
+    ' "$1"
+  }
+
+  live_archive=0
+  for df in "${DOCKERFILES[@]}"; do
+    if snapshot_first_violations "$df" "$df"; then
+      pass "B: every apt-get install in $df runs from the dated snapshot (Contract 7) or after apt-pinned"
+    else
+      fail "B: $df has an apt-get install that resolves from the live default archive (see stderr above)"
+      live_archive=1
+    fi
+  done
+
+  # A violation IS a deb.debian.org fetch site -- the base images' default sources name
+  # it -- so the dead-entry check below forces the allowlist entry out once none remain.
+  if [ "$live_archive" -eq 1 ]; then
     add_host "deb.debian.org"
   fi
+
+  # Negative control (Contract 4 addendum): an apt-get install placed ahead of the
+  # mediator's Contract 7 step must be refused by the same check.
+  NEG_B="$(mktemp)"
+  awk '/^RUN rm -f \/etc\/apt\/sources\.list/ && !done { print "RUN apt-get update && apt-get install -y curl"; done = 1 } { print }' \
+    images/mediator/Dockerfile > "$NEG_B"
+  if ! grep -q '^RUN apt-get update && apt-get install -y curl$' "$NEG_B"; then
+    fail "B: negative control -- could not place an install ahead of the mediator's snapshot step (anchor line not found)"
+  elif snapshot_first_violations "$NEG_B" "negative control" 2>/dev/null; then
+    fail "B: negative control -- an apt-get install ahead of the snapshot step was NOT refused (check is too permissive)"
+  else
+    pass "B: negative control -- an apt-get install ahead of the snapshot step is refused, as expected"
+  fi
+  rm -f "$NEG_B"
 
   extracted_hosts="$(printf '%s\n' "$extracted_hosts" | sed '/^$/d' | sort -u)"
 

@@ -8,8 +8,8 @@ schema: 1
 hosts:
   - fqdn: registry-1.docker.io
     verified_by: digest
-    used_by: [images/Dockerfile, images/mediator/Dockerfile]
-    note: node:22-slim (images/Dockerfile) and debian:trixie-slim (images/mediator/Dockerfile), both pulled by index digest via NODE_BASE_DIGEST / MEDIATOR_BASE_DIGEST.
+    used_by: [images/Dockerfile, images/mediator/Dockerfile, images/recorder/Dockerfile]
+    note: node:22-slim (images/Dockerfile) and debian:trixie-slim (images/mediator/Dockerfile, images/recorder/Dockerfile), both pulled by index digest via NODE_BASE_DIGEST / MEDIATOR_BASE_DIGEST.
 
   - fqdn: ghcr.io
     verified_by: digest
@@ -18,18 +18,18 @@ hosts:
 
   - fqdn: github.com
     verified_by: sha256
-    used_by: [images/Dockerfile, images/mediator/Dockerfile]
+    used_by: [images/Dockerfile, images/mediator/Dockerfile, images/recorder/Dockerfile]
     note: "yq_linux_${TARGETARCH} release asset, checked against YQ_SHA256_ARM64/YQ_SHA256_AMD64 in compose/pins.env."
 
   - fqdn: snapshot.debian.org
     verified_by: gpg
-    used_by: [images/Dockerfile, images/mediator/Dockerfile, images/apt-pinned.sh]
-    note: dated snapshot InRelease/Release.gpg, checked against SNAPSHOT_FINGERPRINT / MEDIATOR_SNAPSHOT_FINGERPRINT in compose/pins.env via images/keyrings/*.gpg.
+    used_by: [images/Dockerfile, images/mediator/Dockerfile, images/recorder/Dockerfile, images/apt-pinned.sh]
+    note: dated snapshot InRelease/Release.gpg, checked against SNAPSHOT_FINGERPRINT / MEDIATOR_SNAPSHOT_FINGERPRINT in compose/pins.env via images/keyrings/*.gpg. The mediator and recorder also use the dated debian-security snapshot (MEDIATOR_SECURITY_SNAPSHOT_*, feature 02.4 Deviation 1), and their bootstrap installs reach both over http (Interface Contract 7), verified by apt against the same committed keyrings.
 
   - fqdn: deb.debian.org
     verified_by: gpg
-    used_by: [images/Dockerfile, images/mediator/Dockerfile]
-    note: unpinned bootstrap install of ca-certificates/curl(/gpgv) from the base image's baked-in default sources, needed before apt-pinned can fetch the snapshot over https -- see both Dockerfiles' "bootstrapped UNPINNED" comments. Trusted via the base image's own debian-archive-keyring, not a pinned fingerprint; that gap is the R10.4 finding below.
+    used_by: [images/Dockerfile]
+    note: agent-base's unpinned bootstrap install of ca-certificates/curl from node:22-slim's baked-in default sources, needed before apt-pinned can fetch the snapshot over https -- see images/Dockerfile's "bootstrapped UNPINNED" comment. Trusted via the base image's own debian-archive-keyring, not a pinned fingerprint. The mediator and recorder moved off it at 02.4 SF-5b; agent-base moves at SF-5c, and phase B's dead-entry check then requires this entry's removal.
 
   - fqdn: registry.npmjs.org
     verified_by: version-only
