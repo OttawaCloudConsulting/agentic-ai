@@ -22,7 +22,7 @@
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 6/10 complete
+    Sub-features: 7/10 complete
     Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
     node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
     bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
@@ -210,10 +210,18 @@
     package list identical to the local build (127). Full Test Command against that digest (working-tree
     pin only, restored after; shell export does not reach verify-pod-topology.sh, which sources pins.env):
     all harnesses and lint-policy pass with only the two recorded T6 known gaps; verify-reproducibility
-    24/1, the 1 = phase C head_branch on the branch digest (expected). Remaining: PR to main (operator
-    merges), capture main digest, repin through PR, phase C green. Operator flag, not in scope:
-    CA_CERTIFICATES_VERSION still pins the 2023 bundle (security has 20250419~deb12u1). Sub-feature
-    count stays 6/10.
+    24/1, the 1 = phase C head_branch on the branch digest (expected). Promotion: PR #45 merged by
+    operator (squash commit f3a7d2f3643cc3b13d55d730cdd6c6428363805d); main push run 34799978913 published
+    sha256:e3ae687e1b432fb2e2fd78620f199b59692e776d7368948ea4196a729d266824 (provenance builder.id = that run,
+    vcs:revision f3a7d2f, SPDX SBOM 327 packages); installed package list identical to the branch publish
+    and the local build (127). Repin through PR #46 (merged by operator, commit b3e17bb). Before merge:
+    verify-reproducibility.sh standalone 25/0 (phase C head_branch == main); full Test Command against the
+    committed pin exit 0 -- verify-pack-composition 109/0, verify-pod-topology, verify-egress-mediator,
+    verify-audit-completeness pass, verify-tool-packs 41/0, verify-mcp-inventory 44/0, validate-boundary
+    (terraform/kubernetes/github/default) pass, verify-reproducibility 25/0, lint-policy OK; only the two
+    recorded T6 known gaps, same 16 lines as the branch-digest run. Operator flag, not in scope:
+    CA_CERTIFICATES_VERSION still pins the 2023 bundle (security has 20250419~deb12u1). Completed
+    2026-09-14.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
