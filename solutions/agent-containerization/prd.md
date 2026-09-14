@@ -106,7 +106,11 @@ records the plan, not the breakdown.
    Adversarial validation passes
    (SC-1, SC-2, SC-3), the remaining tool packs compose without hand-editing policy (SC-6), and
    audit and reproducibility land (SC-7, SC-8). **Unlocks real work without AWS** — SC-5 is not in
-   scope here, so a session that needs AWS still waits for Milestone 03.
+   scope here, so a session that needs AWS still waits for Milestone 03. **Revised 2026-09-13:**
+   after the first clean-machine run, 02.4's T18 criterion requires the "functionally identical"
+   check to hold on a real clean machine: each profile fingerprinted with its own packs, OS
+   packages independent of rebuild date, and a comparison that does not depend on the host's
+   Docker Desktop or Compose version. Criteria-only; no feature reset.
 3. **AWS access** — `.project/sandboxed-agent-containerization/milestones/03-aws-access/`.
    Brokered short-lived credentials (Model B) against a
    dedicated least-privilege role, with entitlement scope verified empirically from inside the

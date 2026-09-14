@@ -73,6 +73,23 @@ if [ -f /etc/agent-apt-snapshot-url ]; then
     "profile pins ${APT_URL%/} but agent-base was built against ${base_url}. Align profiles/*.yaml package_repository.apt.url with SNAPSHOT_URL in compose/pins.env."
 fi
 
+# --- the security source agent-base used (feature plan Deviation 2) ---------------
+# apt-pinned replaces every apt source on each call, so calling it with the profile's
+# main snapshot alone would drop agent-base's debian-security line for the pack closure
+# and for every later stage (agy's jq). The profile declares no security source;
+# agent-base's own record is the authority for it. A base published before 02.4 SF-5c
+# carries no record and no security source, so there is nothing to keep -- the same
+# tolerance as the URL reconciliation above.
+sec_args=()
+if [ -f /etc/agent-apt-security-snapshot ]; then
+  read -r sec_keyring sec_url sec_suite sec_fpr < /etc/agent-apt-security-snapshot \
+    || die "/etc/agent-apt-security-snapshot is unreadable"
+  [ -n "${sec_fpr:-}" ] || die "/etc/agent-apt-security-snapshot is malformed (expected: keyring url suite fingerprint)"
+  sec_args=(--security "$sec_keyring" "$sec_url" "$sec_suite" "$sec_fpr")
+else
+  echo "pack-install: agent-base records no security snapshot; pack apt items resolve from the main snapshot only"
+fi
+
 echo "pack-install: $(wc -l < "$PLAN/packs.txt" | tr -d ' ') pack(s) selected:"
 sed 's/^/pack-install:   /' "$PLAN/packs.txt"
 
@@ -84,7 +101,7 @@ while read -r name version sha; do
 done < "$PLAN/apt-items.txt"
 
 if [ "${#specs[@]}" -gt 0 ]; then
-  bash /usr/local/bin/apt-pinned "$KEYRING" "$APT_URL" "$APT_SUITE" "$APT_FINGERPRINT" \
+  bash /usr/local/bin/apt-pinned "${sec_args[@]}" "$KEYRING" "$APT_URL" "$APT_SUITE" "$APT_FINGERPRINT" \
     "${specs[@]}"
 else
   echo "pack-install: no apt items in the plan"

@@ -15,9 +15,34 @@ FROM debian:trixie-slim@${MEDIATOR_BASE_DIGEST}
 # (Interface Contract 1). Pinned exactly like the mediator's package installs --
 # measured against this base with `apt-cache policy jq` rather than guessed, because
 # an unpinned install moves silently off whatever was verified.
+#
+# 02.4 SF-5b (Decision 8, F2, Interface Contract 7): installed from the SAME dated trixie
+# snapshot the mediator uses (MEDIATOR_SNAPSHOT_URL/_SUITE in compose/pins.env), not from
+# the base image's live default sources. The version pin bounded jq itself but not its
+# dependencies, and a point release can supersede the pinned version in place. The
+# default sources are removed first, so the snapshot is the ONLY source; this image never
+# runs apt-pinned, so it stays that way. http, because the base image has no
+# ca-certificates to verify TLS with; apt verifies InRelease with sqv against the
+# committed keyring, and each .deb against the signed Packages index. trusted=yes is
+# never used.
+#
+# Two dated sources, main and security (feature plan Deviation 1): JQ_VERSION's deb13u3
+# exists only in trixie-security, and a main-only snapshot resolves the older deb13u2.
+# check-valid-until=no on the security source only; see images/mediator/Dockerfile.
 ARG JQ_VERSION=1.7.1-6+deb13u3
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      "jq=${JQ_VERSION}" \
+ARG SNAPSHOT_URL=https://snapshot.debian.org/archive/debian/20260910T203409Z/
+ARG SNAPSHOT_SUITE=trixie
+ARG SECURITY_SNAPSHOT_URL=https://snapshot.debian.org/archive/debian-security/20260910T203409Z/
+ARG SECURITY_SNAPSHOT_SUITE=trixie-security
+COPY images/keyrings/debian-archive-trixie.gpg /usr/local/share/keyrings/debian-archive-trixie.gpg
+COPY images/keyrings/debian-security-trixie.gpg /usr/local/share/keyrings/debian-security-trixie.gpg
+RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/* \
+    && printf 'deb [signed-by=/usr/local/share/keyrings/debian-archive-trixie.gpg] %s %s main\ndeb [signed-by=/usr/local/share/keyrings/debian-security-trixie.gpg check-valid-until=no] %s %s main\n' \
+         "$(printf %s "${SNAPSHOT_URL}" | sed 's|^https:|http:|')" "${SNAPSHOT_SUITE}" \
+         "$(printf %s "${SECURITY_SNAPSHOT_URL}" | sed 's|^https:|http:|')" "${SECURITY_SNAPSHOT_SUITE}" \
+         > /etc/apt/sources.list.d/bootstrap-snapshot.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends "jq=${JQ_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
 # yq: reads the ONE scalar Interface Contract 2 requires --

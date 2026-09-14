@@ -124,14 +124,43 @@ ARG IPROUTE2_VERSION=6.1.0-3
 ARG IPROUTE2_SHA256=58fad55c5a29be6c1e6301d0c572f2ac5e5962ff244e7da3784c1b29ffc6c6bf
 ARG XZ_UTILS_VERSION=5.4.1-1+deb12u1
 ARG XZ_UTILS_SHA256=c75a1418753c03c3f8c544222381102da317bc42b251a12f46ad0227964a8830
-# ca-certificates + curl bootstrapped UNPINNED from node:22-slim's default (plain-HTTP,
-# already-trusted) sources first -- apt-pinned.sh needs both to fetch and TLS-verify the
+ARG SECURITY_SNAPSHOT_URL=https://snapshot.debian.org/archive/debian-security/20260910T203409Z/
+ARG SECURITY_SNAPSHOT_SUITE=bookworm-security
+ARG SECURITY_SNAPSHOT_FINGERPRINT=05AB90340C0C5E797F44A8C8254CF3B5AEC0A8F0
+COPY images/keyrings/debian-security-bookworm.gpg /usr/local/share/keyrings/debian-security-bookworm.gpg
+# ca-certificates + curl are what apt-pinned.sh needs to fetch and TLS-verify the
 # snapshot's InRelease over https, and neither exists in node:22-slim (measured: only
-# gpgv and apt-get ship). The pinned re-run below replaces both with the exact pinned
-# .debs, so nothing unpinned survives into the final layer.
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+# gpgv and apt-get ship).
+#
+# 02.4 SF-5c (Decision 8, F2, Interface Contract 7): they are bootstrapped from the SAME
+# dated snapshot, not from node:22-slim's live default sources (deb.debian.org). Their
+# dependency closure used to follow the rebuild date, which is how the mediator's
+# libcom-err2 drifted in the first SF-5 run; the mediator and recorder moved at SF-5b.
+# The default sources are removed first so apt has no other place to satisfy a
+# dependency from. http, because nothing in the base image can verify TLS yet; apt
+# verifies InRelease with gpgv against the committed keyrings, and each .deb against the
+# signed Packages index. apt-pinned then replaces this source with its own https one,
+# re-asserts both primary key fingerprints, and replaces ca-certificates and curl with
+# the exact pinned .debs.
+#
+# TWO dated sources, main and security (feature plan Deviation 1): a main-only snapshot
+# never carries security uploads (measured here: libssh2-1 1.10.0-3+deb12u1, libpcre2-8-0
+# 10.42-1+deb12u1 and libexpat1 2.5.0-1+deb12u3 exist only in bookworm-security). The
+# security timestamp is LATER than main's (Deviation 2; see compose/pins.env). The security
+# InRelease carries a 7-day Valid-Until, which a frozen snapshot is always past, so
+# check-valid-until=no is set on THAT source only; see images/apt-pinned.sh.
+# apt-pinned records the security source at /etc/agent-apt-security-snapshot, and
+# pack-install passes it back (Deviation 2).
+RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/* \
+    && printf 'deb [signed-by=/usr/local/share/keyrings/debian-archive.gpg] %s %s main\ndeb [signed-by=/usr/local/share/keyrings/debian-security-bookworm.gpg check-valid-until=no] %s %s main\n' \
+         "$(printf %s "${SNAPSHOT_URL}" | sed 's|^https:|http:|')" "${SNAPSHOT_SUITE}" \
+         "$(printf %s "${SECURITY_SNAPSHOT_URL}" | sed 's|^https:|http:|')" "${SECURITY_SNAPSHOT_SUITE}" \
+         > /etc/apt/sources.list.d/bootstrap-snapshot.list \
+    && apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 RUN bash /usr/local/bin/apt-pinned \
+      --security /usr/local/share/keyrings/debian-security-bookworm.gpg \
+      "${SECURITY_SNAPSHOT_URL}" "${SECURITY_SNAPSHOT_SUITE}" "${SECURITY_SNAPSHOT_FINGERPRINT}" \
       /usr/local/share/keyrings/debian-archive.gpg \
       "${SNAPSHOT_URL}" "${SNAPSHOT_SUITE}" "${SNAPSHOT_FINGERPRINT}" \
       "ca-certificates=${CA_CERTIFICATES_VERSION}=${CA_CERTIFICATES_SHA256}" \
@@ -223,7 +252,23 @@ FROM ghcr.io/ottawacloudconsulting/agentic-ai/agent-sandbox-base@${AGENT_BASE_DI
 COPY --chmod=0755 images/pack-install.sh /usr/local/bin/pack-install
 
 COPY --from=pack-plan /out /tmp/pack-plan
+
+# /opt/agent-pack/profile.json names the profile these images were built for and its
+# resolved pack set (02.4 Decision 8, F1). Nothing in the image recorded its profile
+# before this, so fingerprint-environment.sh could not refuse to fingerprint images
+# built for a different profile than the one it was asked about -- the first SF-5 run's
+# references fingerprinted default packs under three profile names. PROFILE is the same
+# build arg pack-plan consumed; it is checked as a token here because it is printed
+# into JSON, and pack-plan only checks that profiles/<PROFILE>.yaml exists. Pack names
+# come from pack-plan's packs.txt (already validated there), sorted, no timestamps, so
+# the file is identical on every rebuild of the same profile.
+ARG PROFILE=default
 RUN bash /usr/local/bin/pack-install /tmp/pack-plan /usr/local/share/keyrings/debian-archive.gpg \
+    && { printf '%s' "$PROFILE" | grep -Eq '^[a-z0-9][a-z0-9-]*$' \
+         || { echo "agent-packs: PROFILE '$PROFILE' must match ^[a-z0-9][a-z0-9-]*$" >&2; exit 2; }; } \
+    && packs="$(cut -d' ' -f1 /tmp/pack-plan/packs.txt | sort | sed 's/.*/"&"/' | paste -sd, -)" \
+    && printf '{"profile":"%s","packs":[%s]}\n' "$PROFILE" "$packs" > /opt/agent-pack/profile.json \
+    && chmod 0444 /opt/agent-pack/profile.json \
     && rm -rf /tmp/pack-plan
 
 # Test-only hook for the volume-upgrade smoke check (Edge Case 8): empty by default, so

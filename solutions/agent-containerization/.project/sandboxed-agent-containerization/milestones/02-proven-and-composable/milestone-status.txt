@@ -1,5 +1,5 @@
 # Milestone 02: Proven and Composable
-# Status: [ ] pending  5 features, 0 complete
+# Status: [~] in progress  5 features, 3 complete
 
 ## Features
 
@@ -22,7 +22,7 @@
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 4/6 complete
+    Sub-features: 6/10 complete
     Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
     node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
     bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
@@ -115,6 +115,105 @@
     findings F4-F10 (runbook defects and run conduct). R11.1 not discharged. F1's fingerprint-script
     gaps, F2 and F3 route to /milestone; new references and a factory-reset full re-run are
     needed. See docs/records/reproducibility.md, SF-5 run results. Sub-feature count stays 4/6.
+    Milestone revision (2026-09-13, /milestone revision mode, criteria only): 02.4's T18 criterion
+    clarified in README.md after the SF-5 findings -- every profile fingerprinted as built for that
+    profile (F1), OS package set independent of rebuild date (F2), comparison independent of Docker
+    Desktop/Compose version with versions recorded (F3). Feature NOT reset; plan and SF-1-SF-4 kept.
+    Implementation re-plan follows via /plan-feature. Fresh gate-3-review.md generated.
+    Re-plan (2026-09-13, /plan-feature re-plan mode, Gate 4 re-approved): Decision 8 and four new
+    sub-features ahead of the SF-5 re-run -- SF-5a fingerprint v2 (F1 profile-aware render + exit-4
+    profile check via /opt/agent-pack/profile.json, F3 normalised Compose JSON + version fields),
+    SF-5b mediator/recorder OS packages from the dated snapshot (F2, local), SF-5c agent-base from
+    the snapshot with republish + repin (F2, operator-gated), SF-5d clean-environment procedure
+    revision 2 (F1, F4-F10). Contract 5 revision 2, Contract 4 addendum, new Contract 7, Edge Cases
+    16 corrected and 17-19 added. Sub-features 6 -> 10; SF-1-SF-4 remain complete. Status kept [~]
+    rather than reset to [ ]: the re-plan spec covers planned-awaiting-build and pending features
+    only, and 02.4 was already in progress with built sub-features. Prior Gate 4 review preserved as
+    reviews/gate-4-reproducibility-provenance-and-onboarding-review-2026-09-10.md.
+    SF-5a (2026-09-13): fingerprint-environment.sh to Contract 5 revision 2 -- schema 2,
+    compose_config_sha256 = sha256 of `AGENT_PROFILE="$PROFILE" compose ... config --format json`,
+    <ROOT>-normalised, `del(.. | .create_host_path?)`, `jq -S`; docker_version/compose_version
+    recorded; exit 4 when any of the three agent images' /opt/agent-pack/profile.json is absent or
+    names another profile (read out with cat and parsed on the host -- jq is absent from the
+    claude/codex images). images/Dockerfile agent-packs writes profile.json ({"profile","packs"},
+    pack names sorted from pack-plan's packs.txt; PROFILE redeclared as a stage ARG and checked as
+    a ^[a-z0-9][a-z0-9-]*$ token before it is printed into JSON, since pack-plan only checks the
+    profile file exists). COMPOSE_BIN (optional standalone Compose binary) added solely to drive the
+    v5.3.1 negative control through the shipped code path. Negative controls, run once on the build
+    host: (1) pre-change :local images -> exit 4 "records no profile"; (2) `fingerprint github`
+    against AGENT_PROFILE=default-built images -> exit 4 "built for profile 'default', not
+    'github'"; (3) `fingerprint default` under Compose v2.38.2 and under COMPOSE_BIN=v5.3.1
+    (sha256-verified release binary) -> both exit 0, compose_config_sha256 f5827457... on both, full
+    documents diff clean with commit/docker_version/compose_version excluded. The normalised render
+    pipeline, run by hand with both binaries, gives equal hashes for all four shipped profiles
+    (default f5827457, terraform 62452ef4, kubernetes 9cad75c2, github 3cb34c1b) -- and default no
+    longer equals terraform, so the render now distinguishes pack selection (F1). Non-default
+    propagation (the controls above all used default, which is also the ARG fallback): rebuilt with
+    AGENT_PROFILE=github -> all three images carry {"profile":"github","packs":["github-cli",
+    "language-runtimes"]}; `fingerprint github` exit 0 (compose_config_sha256 3cb34c1b..., matching
+    the hand-run pipeline); symmetric control `fingerprint default` against those images -> exit 4.
+    terraform/kubernetes not rebuilt; their script-level run happens with the SF-5 references.
+    :local agent images are left github-built. No test or image script enumerates /opt/agent-pack
+    (fixed-path reads only, entrypoint.sh:150/170/195), so profile.json breaks nothing there.
+    pack_roots_sha256 now covers profile.json (schema-1 references were already void).
+    Mediator dpkg_sha256 still 800c5839... (the F2 drift) -- SF-5b's scope, untouched here.
+    SF-5b (2026-09-13): mediator bootstrap (ca-certificates/curl/gpgv) and recorder jq moved off
+    the base image's live default sources onto the dated snapshot per Contract 7 (default sources
+    removed first, http, signed-by the committed keyring). Deviation 1 recorded (operator
+    decision): Contract 7 as written, one main-archive snapshot, dropped security updates -- the
+    recorder build failed (JQ_VERSION 1.7.1-6+deb13u3 exists only in trixie-security) and the
+    mediator's OpenSSL downgraded 3.5.7 -> 3.5.6. Fix: a second dated source, debian-security
+    trixie-security at the same timestamp (MEDIATOR_SECURITY_SNAPSHOT_URL/_SUITE/_FINGERPRINT in
+    pins.env), security key committed as images/keyrings/debian-security-trixie.gpg (byte-identical
+    to the base image's debian-archive-trixie-security-automatic.pgp), check-valid-until=no on
+    that source only (its InRelease has a 7-day Valid-Until; apt refuses an expired one, measured
+    against the 20260801 security snapshot). apt-pinned.sh gained an optional leading --security
+    <keyring> <url> <suite> <fingerprint> (verified per source by VALIDSIG field 12); existing
+    callers unchanged -- agent-base target rebuilt locally without the flag and passes. compose.yaml
+    passes the snapshot args to the mediator and all three recorders. Coverage measured: every
+    package the sf5-ref mediator and the prior recorder add over the base is in main U security;
+    trixie-updates adds none. Evidence: no-cache mediator build -- libcom-err2 1.47.2-3+b11 and
+    openssl 3.5.7 match sf5-ref; the remaining 3-line diff (libdbi-perl 1.652-2~deb13u1, libexpat1
+    2.8.3-1~deb13u1, libtdb1 ...deb13u2) is all trixie-security versions newer than sf5-ref's,
+    which lacked them because SF-1c's apt-pinned closure resolved from the main snapshot only. A
+    second no-cache rebuild gives an identical list (sha256 e98336d5...), so the package set no
+    longer depends on the rebuild date. Recorder package list identical to its pre-change image.
+    verify-reproducibility.sh: images/recorder/Dockerfile added to phase A and phase B; phase B
+    gained the snapshot-first check (file-order awk: default sources removed + bootstrap-snapshot.list,
+    or apt-pinned, before any apt-get install) with an in-suite negative control (install ahead of
+    the mediator's snapshot step is refused); the old `ca-certificates curl` grep for deb.debian.org
+    is replaced by "a snapshot-first violation is a deb.debian.org fetch site". Standalone run: 24
+    passed, 1 failed -- EXPECTED RED on images/Dockerfile:132 (agent-base bootstrap) until SF-5c.
+    deb.debian.org NOT removed from build-allowlist.yaml: agent-base still fetches there (the plan's
+    "once no fetch site remains" is not yet met); used_by trimmed to images/Dockerfile, and the
+    dead-entry check forces removal after SF-5c. SF-5c impact (Deviation 1): agent-base and
+    pack-install.sh's apt-pinned calls need bookworm-security + --security the same way. Local
+    :local mediator and recorder images are now SF-5b builds. Investigation:
+    agents/investigations/02.4-sf5b-snapshot-lacks-security-updates.md (resolved; local only,
+    agents/ is gitignored -- plan Deviation 1 carries the same content).
+    SF-5c (2026-09-13, partial -- local half, branch publish and branch composite done; main
+    promotion and repin pending, operator-gated): agent-base bootstrap (ca-certificates, curl) moved
+    off node:22-slim's live sources onto the dated snapshot per Contract 7, main bookworm
+    20260901T000000Z + bookworm-security; images/keyrings/debian-security-bookworm.gpg (byte-identical
+    to node:22-slim's debian-archive-bookworm-security-automatic.gpg, primary 05AB9034...A8F0);
+    SECURITY_SNAPSHOT_* in pins.env, the workflow pin loop/build-args and the three agent services'
+    build.args. deb.debian.org removed from build-allowlist.yaml (phase B dead-entry check). Deviation 2
+    recorded (operator decisions): (a) security snapshot is 20260910T203409Z, LATER than main -- at
+    20260901 a no-cache build downgraded libssh2-1 1.10.0-3+deb12u1 (security upload, present in the
+    published base from the live archive) to +b1; (b) apt-pinned.sh records the security source at
+    /etc/agent-apt-security-snapshot and pack-install.sh passes --security from it (profile schema
+    unchanged; absent record on an older base -> note, main-only, as before). Measured: bookworm-updates
+    @20260901 newer than main for no installed package. Evidence: two no-cache agent-base builds
+    identical; vs published base only libexpat1 deb12u2 -> deb12u3; terraform agent-packs on the local
+    base verifies both InReleases and keeps the security line. Committed 9627782; branch pushed; publish
+    via workflow_dispatch run 34797477156 -> sha256:389f689ee8c807b0e8d3d46ce9ae0fb8ec4bf7d15f3c396075272d66a2a03d07,
+    package list identical to the local build (127). Full Test Command against that digest (working-tree
+    pin only, restored after; shell export does not reach verify-pod-topology.sh, which sources pins.env):
+    all harnesses and lint-policy pass with only the two recorded T6 known gaps; verify-reproducibility
+    24/1, the 1 = phase C head_branch on the branch digest (expected). Remaining: PR to main (operator
+    merges), capture main digest, repin through PR, phase C green. Operator flag, not in scope:
+    CA_CERTIFICATES_VERSION still pins the 2023 bundle (security has 20250419~deb12u1). Sub-feature
+    count stays 6/10.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
