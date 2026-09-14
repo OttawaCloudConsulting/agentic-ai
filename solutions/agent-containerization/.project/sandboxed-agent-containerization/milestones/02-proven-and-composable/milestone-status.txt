@@ -221,7 +221,7 @@
     (terraform/kubernetes/github/default) pass, verify-reproducibility 25/0, lint-policy OK; only the two
     recorded T6 known gaps, same 16 lines as the branch-digest run. Operator flag, not in scope:
     CA_CERTIFICATES_VERSION still pins the 2023 bundle (security has 20250419~deb12u1). Completed
-    2026-09-14.
+    2026-09-13.
     SF-5d (2026-09-13): docs/records/reproducibility.md gained "Clean-environment procedure --
     revision 2 (SF-5d)" after the SF-5 run results; the pre-run procedure is unchanged. Fixes F1
     (AGENT_PROFILE on every profile build, default included), F4 (build, not up), F5 (pod down,
