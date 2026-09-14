@@ -8,7 +8,8 @@ the proposed architecture edits, and the criterion → evidence table.
 Decision 3/Contract 6, and the results of that run (§ SF-5 run results). **T18 did not pass**: the
 Test Command passed on the second Mac (six of its nine scripts by operator attestation), but the
 fingerprint diff is not clean. SF-5 stays open
-pending the findings below. The remaining sections (T45 chain and results, R10.4 finding, R11.2
+pending the findings below. The re-run follows § Clean-environment procedure — revision 2 (SF-5d),
+at the end of this file; the pre-run procedure is kept unchanged. The remaining sections (T45 chain and results, R10.4 finding, R11.2
 assessment, proposed architecture edits, criterion → evidence table) are SF-6's close-out and land
 in a later commit.
 
@@ -296,3 +297,234 @@ volumes, identity material removed, Claude and Codex sessions revoked at each pr
 3. After the mechanism fixes land at a new X: regenerate all four references with
    `AGENT_PROFILE` set, then do a factory-reset full re-run that follows the README verbatim
    (F8), captures every Test Command script's output (F7), and carries back the Stage 2 output.
+
+**Status (2026-09-13).** Item 1 is done as § Clean-environment procedure — revision 2 (SF-5d),
+below. Item 2 is done as mechanism: SF-5a (F1's two script gaps, F3), SF-5b and SF-5c (F2), with
+`agent-base` republished from `main` and repinned (PR #45, PR #46). Item 3 is the SF-5 re-run.
+
+## Clean-environment procedure — revision 2 (SF-5d)
+
+This procedure replaces the pre-run procedure above for the SF-5 re-run. The pre-run procedure
+stays as written, because the first run was measured against it. Revision 2 fixes F1 and F4–F10 as
+runbook. F1's two script gaps, F2 and F3 are fixed as mechanism by SF-5a–SF-5c (feature plan,
+Decision 8).
+
+**What changed from the pre-run procedure:**
+
+| Finding | Revision 2 |
+|---|---|
+| F1 | Every profile, `default` included, is built with `AGENT_PROFILE` set. `fingerprint-environment.sh` (schema 2) exits 4 on images built for another profile |
+| F4 | Profiles are built with `build`, never `up`. Fingerprinting reads built images and never needs a running pod |
+| F5 | The pod is brought down before the Test Command |
+| F6 | Teardown removes only git-ignored material (`git clean -fdX`) |
+| F7 | Each Test Command script's output is captured with `2>&1 \| tee`, under `pipefail`, with every exit code written to a file |
+| F8 | README steps are referenced here by section and step number, never restated (rule below) |
+| F9 | Build output goes to per-profile files, not the terminal, and a documented command cleans the session log |
+| F10 | Teardown runs only after the build host confirms it has received every carried-back file |
+| — | Stage 2 output is captured to a file and carried back, not attested |
+
+**Rule for this procedure (F8).** Decision 3 makes the README the contract. Every README step below
+is named by its README section and step number, and the operator carries it out from `README.md`
+itself. Nothing here restates a README command. The blocks written out below are **test
+instrumentation** only: checkout, capture, per-profile build and fingerprint, pod down, the Test
+Command wrapper, log cleaning, carry-back and teardown. Do not make a derived operator copy that
+merges the two. If a README step is not enough to proceed, that is a T39 finding (Edge Case 12).
+Log it; this procedure does not fill the gap.
+
+**Reference commit X₂.** X₂ is a `main` commit carrying SF-5a–SF-5d and SF-5c's `main`-pinned
+`AGENT_BASE_DIGEST` (`b3e17bb`, PR #46). This procedure lands on `main` by pull request, so X₂ is at
+least that PR's merge commit, and is recorded here when the re-run starts. The first run's schema-1
+references are void. All four references are regenerated at X₂ (Contract 5 revision 2).
+
+**Shell.** Every block runs in `bash`. macOS 26's default login shell is `zsh`, so start `bash`
+first. Commands piped through `tee` rely on `set -o pipefail`.
+
+**One `:local` tag for all profiles.** Every profile build writes to the same
+`sandboxed-agent/<agent>:local` and `sandboxed-agent/mediator:local` tags, and
+`fingerprint-environment.sh` reads only those. So each profile is built and then fingerprinted
+before the next profile is built. The loops below keep that order; the script's exit 4 is a
+backstop, not the ordering.
+
+**No pack credential is staged for the builds.** None of the compose files gives a `build:` block
+any `secrets:`, and the profile overrides have no `build:` key. The `github` and `kubernetes`
+overrides read their `file:` secrets from `${PACK_CREDENTIALS_DIR:-…}`. Measured on the build host
+(Compose v2.38.2, 2026-09-13): with `AGENT_PROFILE=github` and `PACK_CREDENTIALS_DIR` set to an
+empty directory, `docker compose … -f compose/overrides/github.yaml build claude` exits 0
+(`claude Built`). That build reused cached layers, so it shows Compose does not require the
+secret file to build, not a from-scratch build. If a build fails on the second Mac for want of a
+credential, that is a finding. The Test Command's `validate-boundary.sh`
+stages its own dummy files in a `mktemp -d` directory.
+
+### Stage 1 — Reference, on the build host (revision 2)
+
+At X₂, with no modified tracked files:
+
+```bash
+git checkout <X2>
+git diff --quiet HEAD && echo "tracked tree clean"
+mkdir -p /tmp/sf5-ref
+( set -euo pipefail
+  for p in default terraform kubernetes github; do
+    AGENT_PROFILE="$p" docker compose --env-file compose/pins.env -f compose/compose.yaml \
+      -f "compose/overrides/$p.yaml" build --no-cache > "/tmp/sf5-ref/build.$p.log" 2>&1
+    bash scripts/fingerprint-environment.sh "$p" > "/tmp/sf5-ref/ref.$p.json"
+  done )
+jq -r '[.profile, .schema, .commit, .docker_version, .compose_version] | @tsv' /tmp/sf5-ref/ref.*.json
+```
+
+`--no-cache` makes the reference what a from-scratch build produces, as the second Mac's build is.
+Apt resolves from frozen snapshots, but npm transitive dependencies are not locked (Decision 6), so
+a cached `npm install -g` layer would show up as an `npm_tree_sha256` diff caused by the build
+host's cache. Build the references as close in time to Stage 3 as practical.
+
+The last command must show four rows: `schema` 2, `commit` X₂, each row's `profile` matching its
+file name. Carry the four `ref.<profile>.json` files to the second Mac out-of-band (AirDrop or USB).
+They hold versions and hashes only. Do not commit them before the run.
+
+### Stage 2 — Clean-state attestation, on the second Mac (revision 2)
+
+The criteria are unchanged from the pre-run Stage 2 (macOS 26.x, `arm64`, Docker Desktop freshly
+installed or factory-reset, no images, volumes or build cache, no clone). Revision 2 captures the
+evidence to a file. From the home directory, before any README step:
+
+```bash
+bash
+set -o pipefail
+mkdir -p ~/sf5-run
+{ date -u; sw_vers; uname -m; docker version; docker compose version
+  docker images; docker volume ls; docker buildx du; docker system df
+  ls -d ~/agentic-ai; } 2>&1 | tee ~/sf5-run/stage2.txt
+```
+
+`ls -d ~/agentic-ai` must report `No such file or directory`. `stage2.txt` is carried back and
+includes the Docker and Compose versions.
+
+### Stage 3 — T39 + T18, on the second Mac (revision 2)
+
+1. **Session log (Edge Case 16).** Set the key before recording starts, so it never reaches the
+   screen or the log, then record the session:
+   ```bash
+   read -rs GEMINI_API_KEY; export GEMINI_API_KEY
+   script -q ~/sf5-run/raw-session-1.log bash
+   ```
+   A second terminal, if one is used, runs the same two lines (`read -rs` first, then `script` to
+   `raw-session-2.log`), so the key is never typed into a recorded shell. The raw logs
+   hold the OAuth paste-back code and the device code, so they never leave the second Mac.
+2. **README Bring-Up, step 2** (clone and enter the solution directory), from `~`. Then, as
+   instrumentation, inside the solution directory: `git checkout <X2>`.
+3. **README Bring-Up, steps 3–7**, verbatim, including § First-run authentication for `claude`,
+   `codex` and `agy`. Log every command run, every deviation and every wait.
+4. **Stop the pod (F5).** Stop the foreground `up` from step 5 of Bring-Up (Ctrl-C), then:
+   ```bash
+   docker compose --env-file compose/pins.env -f compose/compose.yaml \
+     -f compose/overrides/default.yaml down
+   docker ps
+   ```
+   Without `-v`: the state volumes keep first-run authentication. `docker ps` must list no
+   containers. The static `ipam` subnets allow one Compose project at a time (F5).
+5. **Build and fingerprint every profile (F1, F4).** Build output goes to files, not the recorded
+   terminal (F9):
+   ```bash
+   ( set -euo pipefail
+     for p in default terraform kubernetes github; do
+       AGENT_PROFILE="$p" docker compose --env-file compose/pins.env -f compose/compose.yaml \
+         -f "compose/overrides/$p.yaml" build > ~/sf5-run/build."$p".log 2>&1
+       bash scripts/fingerprint-environment.sh "$p" > ~/sf5-run/clean."$p".json
+     done )
+   echo "build+fingerprint exit=$?"
+   jq -r '[.profile, .schema, .commit, .docker_version, .compose_version] | @tsv' ~/sf5-run/clean.*.json
+   ```
+   The exit must be 0, with four rows as in Stage 1. The build logs stay on the second Mac unless a
+   build fails, in which case the failing profile's log is carried back.
+6. **Test Command (F7).** The same scripts, in the same order, with the same `&&` gating as § Test
+   Command. Only output capture is added, as a DD-12 operator adjustment, not a deviation. Under
+   `pipefail`, a failing script stops the chain even though its output passes through `tee`:
+   ```bash
+   bash -c '
+   set -uo pipefail
+   : > ~/sf5-run/test-exit.txt
+   run() { local name="$1"; shift; echo "=== $name"
+           "$@" 2>&1 | tee ~/sf5-run/test."$name".log; local rc=$?
+           echo "$name exit=$rc" | tee -a ~/sf5-run/test-exit.txt; return "$rc"; }
+   run verify-pack-composition bash tests/acceptance/verify-pack-composition.sh &&
+   run verify-pod-topology bash tests/acceptance/verify-pod-topology.sh &&
+   run verify-egress-mediator bash tests/acceptance/verify-egress-mediator.sh &&
+   run verify-audit-completeness bash tests/acceptance/verify-audit-completeness.sh &&
+   run verify-tool-packs bash tests/acceptance/verify-tool-packs.sh &&
+   run verify-mcp-inventory bash tests/acceptance/verify-mcp-inventory.sh &&
+   run validate-boundary env BOUNDARY_PROFILES="default terraform kubernetes github" bash tests/acceptance/validate-boundary.sh &&
+   run verify-reproducibility bash tests/acceptance/verify-reproducibility.sh &&
+   run lint-policy bash scripts/lint-policy.sh
+   echo "composite exit=$?" | tee -a ~/sf5-run/test-exit.txt
+   '
+   ```
+   Measured with stand-in scripts (exit 0, exit 3, then a third): the chain stopped after the
+   failing script, the third never ran, and `test-exit.txt` recorded `composite exit=3`.
+7. **End the recording.** `exit` from the recorded shell in each terminal.
+8. **Clean the session log (F9)**, on the second Mac:
+   ```bash
+   for f in ~/sf5-run/raw-session-*.log; do
+     LC_ALL=C perl -pe 's/\e\][^\a\e]*(?:\a|\e\\)//g; s/\e\[[0-?]*[ -\/]*[@-~]//g; s/\e[@-_]//g;
+                        s/\r\n/\n/g; s/.*\r//; s/[^\t\n\x20-\x7e]//g' "$f" \
+       | grep -Ev '^#[0-9]+ |^ *=> |^\[\+\] (Building|Running)' \
+       | perl -pe 's/AIza[0-9A-Za-z_-]{20,}/<REDACTED>/g; s/sk-[A-Za-z0-9_-]{16,}/<REDACTED>/g;
+                   s/gh[pousr]_[A-Za-z0-9]{20,}/<REDACTED>/g; s/github_pat_[A-Za-z0-9_]{20,}/<REDACTED>/g;
+                   s/eyJ[A-Za-z0-9_-]{20,}(?:\.[A-Za-z0-9_-]+)*/<REDACTED>/g'
+   done > ~/sf5-run/session-clean.log
+   grep -nE 'AIza|sk-|gh[pousr]_|github_pat_|eyJ' ~/sf5-run/session-clean.log
+   ```
+   The perl passes strip OSC and CSI terminal sequences, keep only the last carriage-return rewrite
+   of each line, and drop non-printable bytes. The `grep -v` drops BuildKit progress lines. The
+   last perl pass redacts provider key and token shapes. The final `grep` must find no match outside
+   `<REDACTED>`. The claude paste-back code and the codex device code have no fixed shape, so the
+   operator reads the cleaned log and redacts them by hand before it leaves the machine. The
+   command was verified against a synthetic log (escape sequences, carriage-return progress,
+   BuildKit lines, binary bytes, a key shape and a token shape), not against a real session log. A
+   real log it does not clean is a finding.
+
+### Stage 4 — Compare and record, on the build host (revision 2)
+
+Carry back out-of-band: `stage2.txt`, `clean.<profile>.json` ×4, `test.<script>.log` ×9 (fewer if
+the chain stopped), `test-exit.txt` and `session-clean.log`. The raw session logs and passing build
+logs are not carried back.
+
+```bash
+for p in default terraform kubernetes github; do
+  echo "== $p"
+  diff <(jq -S 'del(.commit, .docker_version, .compose_version)' "ref.$p.json") \
+       <(jq -S 'del(.commit, .docker_version, .compose_version)' "clean.$p.json") && echo "clean"
+done
+jq -r '[.profile, .commit, .docker_version, .compose_version] | @tsv' ref.*.json clean.*.json
+cat test-exit.txt
+```
+
+Record both commits and both Docker/Compose version pairs for each profile. **T18 passes only if**
+all four diffs are clean **and** `test-exit.txt` shows every script and the composite at
+`exit=0`. The findings loop is unchanged from the pre-run Stage 4. A README-only fix changes only
+`commit`, which the comparison excludes.
+
+### Stage 5 — Teardown, on the second Mac (revision 2)
+
+Start only after the build host confirms it has received every Stage 4 file (F10). Findings that
+need a section re-run are re-run before teardown where possible, so identity material is not
+re-issued. From the solution directory:
+
+```bash
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml down -v
+git clean -fdX mediator/identity/
+git clean -fdX compose/generated/
+git status --short mediator/identity/
+rm -f ~/sf5-run/raw-session-*.log
+unset GEMINI_API_KEY
+```
+
+`git clean -fdX` removes only git-ignored files, and `git status` must show no deleted tracked
+file. Dry-run on the build host (`git clean -ndX mediator/identity/`): it removes `ca/`,
+`clients/`, `credentials/` and `listeners/`, and keeps the tracked `README.md` and `.gitignore`.
+`compose/generated/` is git-ignored by its own `.gitignore`. Then, outside the shell:
+
+1. Revoke the Claude and Codex sessions the run created, at each provider.
+2. Factory-reset Docker Desktop.
+
+Record each teardown step and its outcome, including the revocation.
