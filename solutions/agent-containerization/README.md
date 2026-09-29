@@ -11,9 +11,12 @@ per-agent authentication all ship. Milestone 02 (Proven and Composable) is build
 Feature 02.3 (tool packs, use-case profiles and MCP inventory — see
 ["Tool packs, use-case profiles and MCP inventory (02.3)"](#tool-packs-use-case-profiles-and-mcp-inventory-023)
 below) are complete, with SC-1/SC-2/SC-3 demonstrated from inside the real agent containers under
-every shipped profile. **This pod is not yet cleared for real work** — Feature 02.4
-(reproducibility and onboarding) and 02.5 (containment, response and the authorization gate) are
-still building. See [`progress.txt`](progress.txt) for current gate/feature state.
+every shipped profile. Feature 02.4 (reproducibility, provenance and onboarding — see
+["Reproducibility, provenance and onboarding (02.4)"](#reproducibility-provenance-and-onboarding-024)
+below) is complete: every build input is pinned, the consumed base is provably CI-built from `main`
+with an SBOM, and a clean rebuild on a second machine was verified. **This pod is not yet cleared
+for real work** — Feature 02.5 (containment, response and the authorization gate) is still
+building. See [`progress.txt`](progress.txt) for current gate/feature state.
 
 **Entry point** (requires Docker Desktop; builds the pod cold on first run):
 
@@ -954,9 +957,60 @@ explicit empty. Two things follow from an image-baked, start-time gate:
 Full per-agent measurement, the gate's design and limitations, and the T29–T32 results are in
 [`docs/records/mcp-inventory.md`](docs/records/mcp-inventory.md).
 
+### Reproducibility, provenance and onboarding (02.4)
+
+Feature 02.4 is **complete**. What now exists:
+
+- **Every build input is pinned.** No `FROM` in any Dockerfile and no rendered profile `image:`
+  resolves to a mutable tag. `node:22-slim` is pinned by index digest (`NODE_BASE_DIGEST`), the
+  published base by index digest (`AGENT_BASE_DIGEST`), and every OS package in every image —
+  transitive dependencies included — installs from a **dated Debian snapshot** (main plus
+  debian-security), so the package set does not depend on the rebuild date.
+- **The base you consume is provably CI-built from `main` (T45).** `AGENT_BASE_DIGEST` resolves to
+  a GHCR index carrying an SPDX SBOM (327 packages) and SLSA provenance naming the GitHub Actions
+  run that built it; that run's own metadata is then checked — workflow path, `push` event,
+  `success`, `head_sha` agreeing with the provenance, and `head_branch: main`. Branch-triggered
+  publishes continue **for testing only**, and this check is the control that stops one being
+  consumed.
+- **A clean rebuild on a second machine produces the same environment (T18).** Verified
+  2026-09-28 on a factory-reset second Mac: four profiles fingerprinted, all four diffing clean
+  against references taken on the build host, and the full acceptance composite passing there —
+  across a Compose v2.38.2 → v5.3.1 version gap. R11.1 is discharged.
+- **A declared build allowlist (R10.4).** `images/build-allowlist.yaml` names every host the image
+  builds reach outside pack manifests, with how each fetch is verified. It is checked statically in
+  both directions: no fetch site reaches an undeclared host, and no declared host is dead. **It is
+  not enforced at build time** — that finding and the mechanism that would close it are recorded.
+- **Onboarding for an operator who did not build this.** Bring-Up is one ordered sequence with a
+  single `docker compose` entry point (T39); first-run authentication is documented for all three
+  agents; and there are written procedures for
+  [changing the allowlist](#changing-the-allowlist-r123) (R12.3, reviewed by the **security
+  reviewer** role) and [updating an agent version](#updating-an-agent-version-r106) (R10.6).
+
+```bash
+# The reproducibility gate — static phases plus the live T45 provenance chain.
+# Needs anonymous ghcr.io and api.github.com; no login, no model tokens.
+bash tests/acceptance/verify-reproducibility.sh
+
+# The environment fingerprint a clean rebuild is compared against, per profile.
+bash scripts/fingerprint-environment.sh default > ref.default.json
+```
+
+**Two caveats, stated rather than buried:**
+
+- **T39 is closed on operator attestation, not on step-log evidence.** The session recording of the
+  clean-environment run was lost, part of the run was driven from a second shell, and one
+  off-README command (`up -d`) was run. The rebuild *result* is evidenced; the conduct of the
+  operator walkthrough is not.
+- **Builds are not network-confined.** The build allowlist is a checked declaration, not an
+  enforcement boundary — a fetch the build files do not name would not fail the build. The review
+  trigger for enforcing it is a second operator, or a build-time fetch found outside the list.
+
+The T45 chain and results, the R10.4 finding, the R11.2 (Linux-host portability) assessment, two
+proposed architecture edits, and the criterion → evidence table are in
+[`docs/records/reproducibility.md`](docs/records/reproducibility.md).
+
 Still not produced:
 
-- Reproducibility, provenance and onboarding — Feature 02.4
 - Containment, response and the authorization gate — Feature 02.5
 - AWS access (R6) — Milestone 03
 

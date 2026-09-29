@@ -9,10 +9,11 @@ the proposed architecture edits, and the criterion → evidence table.
 re-run (§ SF-5 re-run results, 2026-09-28). **T18 passed on the re-run**: four clean fingerprint
 diffs and the Test Command at `composite exit=0`, both from captured output, across a two-version
 Docker/Compose gap. **T39 is closed on operator attestation**, not on step-log evidence — the
-recording was lost and an off-README command was run; see F-a, F-g (ii) and F-h. The remaining
-sections (T45 chain and results, R10.4 finding, R11.2
-assessment, proposed architecture edits, criterion → evidence table) are SF-6's close-out and land
-in a later commit.
+recording was lost and an off-README command was run; see F-a, F-g (ii) and F-h. **SF-6 closed the
+file out** (2026-09-29): the T45 chain measured green on the build host, the R10.4 finding and its
+review trigger, the R11.2 assessment, the two proposed architecture edits as replacement text, the
+carried findings' disposition, and the criterion → evidence table. Feature 02.4 is complete; the two
+architecture edits are recorded here for the milestone consolidation pass and are **not** applied.
 
 ## Clean-environment procedure (SF-5)
 
@@ -694,3 +695,349 @@ factory-reset. The teardown confirmation is the assisting session's final report
 - **R11.1 discharged.**
 - **Carried into SF-6 or `/milestone`:** F-c (unresolved), F-d, F-f, the revision 2 amendment from
   F-a (confirm the recording is live before proceeding), and F-b's clone-location disagreement.
+
+## T45 — the provenance chain, measured in both directions (SF-6)
+
+T45 is criterion 1: the digest the pod consumes resolves to a `main`-built, CI-published image
+carrying an SBOM. It is checked mechanically by `tests/acceptance/verify-reproducibility.sh`
+phase C, which walks one chain and asserts seven facts along it:
+
+```
+compose/pins.env AGENT_BASE_DIGEST
+  -> ghcr.io index (anonymous pull)
+     -> SPDX SBOM attestation          (>= 1 package)
+     -> SLSA provenance attestation    (runDetails.builder.id names a run of
+                                        OttawaCloudConsulting/agentic-ai;
+                                        materials carry vcs:revision)
+        -> api.github.com /actions/runs/<id>
+           -> path        == .github/workflows/agent-sandbox-image.yml
+           -> event       in {push, workflow_dispatch}
+           -> conclusion  == success
+           -> head_sha    == the provenance's vcs:revision
+           -> head_branch == main
+```
+
+**Red, measured during planning (2026-09-10).** `AGENT_BASE_DIGEST` then pointed at the base
+published by run `34376295042`, whose `head_branch` is `feature/containerization`. The chain held
+at every other link — SBOM, provenance, workflow path, event, conclusion, `head_sha` — and failed
+on `head_branch` alone. That is the assertion the whole D21 promotion exists to flip, and it is the
+control that keeps a branch-triggered test publish from being consumed (criterion 3).
+
+**Green, measured now (2026-09-29, on the build host).** Full run output below, from
+`bash tests/acceptance/verify-reproducibility.sh`:
+
+| Assertion | Result |
+|---|---|
+| SPDX SBOM on the pinned index | **327 packages** |
+| `runDetails.builder.id` names a run of `OttawaCloudConsulting/agentic-ai` | run **34799978913** |
+| provenance `vcs:revision` | `f3a7d2f3643cc3b13d55d730cdd6c6428363805d` |
+| run `path` | `.github/workflows/agent-sandbox-image.yml` |
+| run `event` | `push` |
+| run `conclusion` | `success` |
+| run `head_sha` == provenance `vcs:revision` | agrees (`f3a7d2f…`) |
+| run `head_branch` | **`main`** |
+
+Consumed digest: `sha256:e3ae687e1b432fb2e2fd78620f199b59692e776d7368948ea4196a729d266824`
+(`compose/pins.env:167`), the **index** digest, so the SBOM and provenance manifests stay reachable
+from what is pinned rather than hanging off a platform manifest the pin does not name.
+
+**T45 — passed.** The whole suite reports **25 passed, 0 failed** across phases A–D, so the T45
+result is not read in isolation: phase A holds that no `FROM` and no rendered profile `image:`
+resolves to a mutable tag, phase B holds the build-allowlist containment below, and phase D holds
+T39's static half. The same run passed on the second Mac on 2026-09-28 (§ SF-5 re-run results,
+Test Command table), so the chain is verified from two hosts.
+
+**Publish history, for the record.** Run `34652870008` (02.4 SF-4, PR #39) was the first
+`main`-triggered publish and the point at which T45 first went green. Run `34799978913` (02.4 SF-5c,
+PR #45) is the currently pinned one — the republish that moved `agent-base`'s OS packages onto the
+dated bookworm main + security snapshots. Branch-triggered publishes continue and are for testing
+only; `compose/pins.env:139-167` records that rule beside the pin it governs.
+
+## R10.4 — the declared build allowlist, and the enforcement finding (SF-6)
+
+**What is declared.** `images/build-allowlist.yaml` names every host the image builds reach
+*outside* pack manifests, each with how the fetch is verified and which files reach it:
+
+| Host | `verified_by` | Reached from |
+|---|---|---|
+| `registry-1.docker.io` | digest | `images/Dockerfile`, `images/mediator/Dockerfile`, `images/recorder/Dockerfile` |
+| `ghcr.io` | digest | `images/Dockerfile`, `.github/workflows/agent-sandbox-image.yml` |
+| `github.com` | sha256 | all three Dockerfiles (`yq` release asset) |
+| `snapshot.debian.org` | gpg | all three Dockerfiles + `images/apt-pinned.sh` |
+| `registry.npmjs.org` | version-only | `images/Dockerfile` |
+| `storage.googleapis.com` | sha512 | `images/Dockerfile` (`agy` archive) |
+
+Pack build hosts are **not** duplicated here; they stay in each pack's
+`egress.build.allow_fqdns`. `deb.debian.org` was removed at 02.4 SF-5c, when `agent-base`'s
+bootstrap — the last live-archive fetch site — moved onto the dated snapshot.
+
+**What is checked.** `verify-reproducibility.sh` phase B asserts three things, and reports them
+green today:
+
+1. every build-time fetch site extracted from the Dockerfiles, `compose/pins.env` and the pack
+   manifests resolves to a host in the **union** of this file and the selected packs' declared
+   build hosts;
+2. every declared host has at least one fetch site — no dead entries;
+3. every `apt-get install` runs after the default apt sources have been replaced by the dated
+   snapshot (Interface Contract 7) or via `images/apt-pinned.sh`.
+
+Each direction carries a negative control that was run once and recorded: an undeclared host is
+refused by the containment check, and an `apt-get install` placed ahead of the snapshot step is
+refused by the snapshot-first check.
+
+**The finding (R10.4, SHOULD — recorded, not closed).**
+
+> **Builds are not network-confined to the declared list.** `images/build-allowlist.yaml` is a
+> declaration checked statically against what the build *files* name. It is not compiled, and
+> nothing enforces it at build time: builds run on the host build network (`packs/README.md:69-70`).
+> A fetch the build files do not name — an `npm` lifecycle script reaching a fourth host, a
+> transitive dependency's `postinstall` — is not caught by this mechanism and would not fail the
+> build.
+
+**The named enforcing mechanism, recorded as the review trigger** (feature plan Decision 5,
+tradeoff callout 2). Option B, not built here: a `docker-container` buildx builder on an
+`internal: true` network whose only route out is an allowlisting proxy seeded from this same file.
+Its cost is a second proxy configuration, a builder lifecycle to manage, and proxy trust wired into
+`apt`, `npm` and BuildKit's own `ADD` — real build work for a SHOULD on a one-workstation scope.
+
+**Review trigger — build option B when either fires:**
+
+1. **Q2 changes.** A second operator, a team or a CI-distributed artifact raises R10 from SHOULD
+   toward MUST (`prd.md:247` names the same trigger).
+2. **A build-time fetch is found outside the declared list** — by an SBOM diff, a proxy log, or a
+   phase B failure that turns out to be a real undeclared reach rather than a stale declaration.
+
+The list lives in `images/`, not `policy/`. `policy/` is compiler input and mediator build context,
+and build-time egress must never reach `policy/resolved/` — `packs/README.md` states the same
+separation as "`egress.build` is not `egress.runtime`".
+
+## R11.2 — Linux-host portability assessment (SF-6)
+
+R11.2 is a SHOULD: *runs on Linux hosts without architectural change*. Q2 settled deployment scope
+as one workstation, so it is **assessed here, not exercised** — nothing in this project has been
+run on a Linux host. What follows is a static reading of the tree, by construct, with file:line.
+It is grounded in the sweeps actually run (`host.docker.internal`/`host-gateway`, `Darwin`/`uname`,
+`brew`/`xcode-select`, BSD-vs-GNU shell idioms, `linux/arm64`/`TARGETARCH`, Docker Desktop and
+VirtioFS references, Keychain references, `user:`/uid declarations in `compose/compose.yaml`), not
+a line-by-line read of every file.
+
+**Headline: the blocker is architecture, not operating system.** On an **arm64** Linux host the
+tree is close to portable. On an **x86_64** Linux host it is not, and the gap is a pinning problem
+rather than a design problem — every item in group A is a second, separately verified pin.
+
+### A. Single-architecture pins (blocking on x86_64, no change on arm64)
+
+| Construct | Location | What must change |
+|---|---|---|
+| `agy` archive is `linux-arm/cli_linux_arm64.tar.gz`, pinned by one SHA-512 | `compose/pins.env:17-19` | A second URL + SHA-512 for `linux_amd64`, selected by `TARGETARCH` |
+| `git` `.deb` pinned by one SHA-256, the arm64 one | `compose/pins.env:134` | A second `.deb` hash; `images/apt-pinned.sh` verifies against the container's own dpkg architecture, so an amd64 build fails at that comparison (D21 already records this) |
+| `gh` tarball path `gh_<version>_linux_arm64/` | `images/pack-install.sh:171,173,174` | Architecture-templated path + a second pack checksum (`packs/github-cli/pack.yaml:33`) |
+| `helm` tarball path `linux-arm64/` | `images/pack-install.sh:188,190,191` | Same, against `packs/kubernetes/pack.yaml` |
+| `terraform` `_linux_arm64.zip` | `packs/terraform/pack.yaml:34` | Second URL + checksum |
+| node / go `linux-arm64` archives | `packs/language-runtimes/pack.yaml:44-45` | Second URLs + checksums |
+| Published base is a **linux/arm64-only** index | `compose/pins.env:167`; `.github/workflows/agent-sandbox-image.yml:180` | An x86_64 host cannot consume the pinned digest **at all** — the index carries no matching platform. Needs `platforms:` widened *after* the pins above, not before (D21) |
+| Publish runner | `.github/workflows/agent-sandbox-image.yml:114` (`ubuntu-24.04-arm`) | A matrix or a second job; this is the *last* change, not the first |
+
+Two constructs are already architecture-correct and need nothing: `yq` selects by `TARGETARCH`
+against two committed checksums (`images/Dockerfile:52-58`, and the same block in the mediator and
+recorder Dockerfiles), and `NODE_BASE_DIGEST` is an **index** digest
+(`compose/pins.env:141`), so `node:22-slim` resolves per platform rather than being narrowed to
+arm64.
+
+### B. Host toolchain — already portable, no change
+
+`scripts/install-deps.sh` branches on `uname -s` at `:15,:21` and installs via Homebrew on Darwin
+(`:25-27`) or `apt` on Linux (`:43`), including the Linux `sbx` path — `docker-sbx` package, Docker
+Engine install, and the `kvm` group note (`:72-84`). This script is portable as written; it was
+built that way rather than fixed here.
+
+### C. Docker Desktop assumptions (one real behaviour change, the rest are narrative)
+
+1. **Bind-mount ownership — the one item that changes behaviour.** Docker Desktop's VirtioFS fakes
+   file ownership, which is why `:ro` is recorded as the only real control on the mounted host
+   credential (R4.13, `README.md:293`, `images/bootstrap-auth.sh:330`,
+   `compose/overrides/oauth-mount.bootstrap.yaml:32-33`). On Linux the bind mount carries the real
+   host uid/gid, and the agent containers run as `user: "1000:1000"`
+   (`compose/compose.yaml:163`). A Linux operator whose uid is not 1000 gets permission errors on
+   the project mount. **Fix shape:** a `UID`/`GID` pair in `compose/pins.env` interpolated into
+   `user:`, or a documented `--user "$(id -u):$(id -g)"`. This is the one place where R11.2's
+   "without architectural change" is arguable — it is a new input, not a new component.
+2. **Host modes become a control, which strengthens the design rather than breaking it.** R11.4
+   (`REQUIREMENTS.md:313`) and R4.13 (`:142`) both reason from VirtioFS faking ownership. On Linux
+   the host's mode bits are real inside the container, so the `:ro` mount gains a second control it
+   does not have on macOS. No code change; the recorded rationale needs a Linux clause.
+3. **Volume backup narrative.** `README.md:607-609` explains that no per-volume exclusion is
+   possible because Docker Desktop keeps every named volume in one VM disk image; the same
+   reasoning sits in `tests/acceptance/verify-pod-topology.sh:178`. On Linux, volumes are
+   directories under `/var/lib/docker/volumes`, so a per-volume exclusion **is** possible. The
+   assertion still holds, the reason changes.
+4. **Bind-source reporting.** `tests/acceptance/verify-pack-composition.sh:1004` already accepts
+   both the plain host path and Docker Desktop's `/host_mnt` prefix. No change.
+5. **Default-route measurement.** `tests/acceptance/verify-egress-mediator.sh:396` asserts a
+   property measured against "this Docker Desktop". It needs re-measuring on Linux Engine, not
+   rewriting.
+6. **Namespaced sysctl.** `compose/compose.yaml:245-261` prefers
+   `net.ipv4.ip_unprivileged_port_start` over `cap_add: NET_BIND_SERVICE` so `cap_drop: ALL`
+   survives. The sysctl is namespaced and supported by Linux Engine directly; the comment's
+   "fallback if Docker Desktop's VM refuses it" clause is what becomes moot. No change.
+
+### D. Credential narrative (a decision reopens, not a mechanism)
+
+`claude`'s host credential is macOS-Keychain-resident and therefore *not portable* into a Linux
+container — recorded as settled at `README.md:187,256-258`, `images/bootstrap-auth.sh:300`,
+`REQUIREMENTS.md:142` (R4.8), `docs/RESEARCH_FINDINGS.md:98` and `docs/OPTIONS_ANALYSIS.md:296,357`.
+On a **Linux host** that credential is a plain file (`~/.claude/.credentials.json`, mode 0600), so
+"not portable" stops being true and mode D (mount the host credential) becomes technically
+available for `claude`. R4.8 would then need a recorded per-agent decision rather than being
+foreclosed by the platform. Nothing to change in code; a settled decision would have to be re-taken.
+
+### E. Documentation (mechanical)
+
+`README.md:87-89` states the prerequisite as macOS 26 on Apple silicon with Docker Desktop
+installed by hand. A Linux bring-up needs its own prerequisites block (Docker Engine + the Compose
+plugin, `install-deps.sh` without the Homebrew path).
+
+### Verdict
+
+**R11.2 is not met today, and the distance is measurable rather than architectural.** On arm64
+Linux: one real change (C1, the uid/gid input) plus documentation. On x86_64 Linux: eight
+second-pin changes (group A) in the order D21 states — pins first, `platforms:` second, runner
+label last — plus C1 and the documentation. No component is redesigned, no boundary moves, and the
+enforcement architecture (mediator, resolver, policy compiler, audit sink) is Linux-native already
+since it runs inside the containers.
+
+## Proposed architecture edits — recorded, not applied (SF-6)
+
+`/build` does not edit Gate artifacts, so both edits below are recorded here as exact replacement
+text for an authority that may apply them — the milestone consolidation pass or `/milestone`
+revision. Neither is applied by this feature. Same convention 02.3 used for its proposed T32
+amendment (`docs/records/mcp-inventory.md`).
+
+### Edit 1 — D21's promotion trigger is Milestone 02, not project completion
+
+**Why.** D21 and § Reproducibility both say the workflow moves to `main` "on project completion".
+The Gate 3 amendment moved that trigger to Milestone 02, and 02.4 SF-4 executed it: the workflow
+has published from `main` since run `34652870008`, with the project far from complete. The document
+now describes a state that is two milestones out of date, and T45 — which asserts `head_branch ==
+main` — would read as premature against it.
+
+**Anchor 1: `.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md:69`, the D21
+row, `Decision` cell.** Current text (first sentence of the cell):
+
+> **The base image is built by GitHub Actions and published to GitHub Packages (GHCR), consumed by
+> digest.** Builds run from the working branch during the project and move to `main` on completion.
+
+Replacement text:
+
+> **The base image is built by GitHub Actions and published to GitHub Packages (GHCR), consumed by
+> digest.** Builds ran from the working branch until Milestone 02; the promotion trigger is
+> **Milestone 02, not project completion** (Gate 3 amendment, executed at 02.4 SF-4). The workflow
+> publishes from `main`; branch-triggered publishes continue **for testing only**, and T45
+> (`tests/acceptance/verify-reproducibility.sh` phase C, asserting the pinned digest's run has
+> `head_branch: main`) is the control that keeps one from being consumed.
+
+**Anchor 2: same file, the D21 row, `Alternatives` cell, final sentence.** Current text:
+
+> The promotion to `main` is the stated completion trigger
+
+Replacement text:
+
+> The promotion to `main` was originally the project-completion trigger; the Gate 3 amendment moved
+> it to Milestone 02
+
+**Anchor 3: same file, `### Reproducibility`, second sentence (line 660-663).** Current text:
+
+> During the project the workflow builds from the working branch and those images are for testing
+> only; on project completion the workflow moves to `main`, which is the point at which a published
+> digest becomes usable for real work.
+
+Replacement text:
+
+> The workflow built from the working branch until Milestone 02 and those images were for testing
+> only; the Gate 3 amendment moved the promotion trigger to **Milestone 02**, executed at 02.4
+> SF-4. The workflow now publishes from `main`, which is what makes a published digest usable for
+> real work. Branch-triggered publishes continue for testing; nothing consumes one, and T45 is the
+> mechanical control on that.
+
+### Edit 2 — the GitHub CLI pack exists; the inventory and file tree still say it does not
+
+**Why.** 02.3 built all three remaining packs. The component inventory still says only
+`language-runtimes` is built, and the file tree omits `packs/github-cli/` entirely — an operator
+reading the tree would not know the directory exists.
+
+**Anchor 1: same file, line 87, the `Tool packs` inventory row, `Responsibility` cell, final
+sentence.** Current text:
+
+> Only `language-runtimes` is built (01.5 SF-1); Terraform, Kubernetes and GitHub CLI arrive at 02.3
+> and AWS CLI at 03.3
+
+Replacement text:
+
+> `language-runtimes` was built at 01.5 SF-1; `terraform`, `kubernetes` and `github-cli` were built
+> at 02.3, each backing a named use-case profile. AWS CLI arrives at 03.3
+
+**Anchor 2: same file, the file tree `packs/` block (lines 350-356).** Current text:
+
+> ```
+> ├── packs/
+> │   ├── README.md                  # manifest schema; the no-runtime-egress decision; the checksum
+> │   │                              #   residual (01.5 Deviation 13) and what the removals cost
+> │   ├── language-runtimes/pack.yaml # BUILT (01.5 SF-1). Node, Python, Go; build-time only
+> │   ├── terraform/pack.yaml        # (not yet built — 02.3)
+> │   ├── kubernetes/pack.yaml       # (not yet built — 02.3)
+> │   └── aws-cli/pack.yaml          # (not yet built — 03.3)
+> ```
+
+Replacement text:
+
+> ```
+> ├── packs/
+> │   ├── README.md                  # manifest schema; the no-runtime-egress decision; the checksum
+> │   │                              #   residual (01.5 Deviation 13) and what the removals cost
+> │   ├── language-runtimes/pack.yaml # BUILT (01.5 SF-1). Node, Python, Go; build-time only
+> │   ├── terraform/pack.yaml        # BUILT (02.3). terraform CLI; runtime egress to
+> │   │                              #   registry.terraform.io + releases.hashicorp.com
+> │   ├── kubernetes/pack.yaml       # BUILT (02.3). kubectl + helm; NO runtime egress -- cluster
+> │   │                              #   reach needs a separate, not-shipped, per-cluster pack
+> │   ├── github-cli/pack.yaml       # BUILT (02.3). gh CLI; runtime egress to api.github.com +
+> │   │                              #   github.com, extended from codex's 01.1 base to all three
+> │   └── aws-cli/pack.yaml          # (not yet built — 03.3)
+> ```
+
+## Carried findings — disposition (SF-6)
+
+Operator decision, 2026-09-29: SF-6 records only. No code or README behaviour edit lands under a
+records close-out; each item below is routed rather than patched.
+
+| Finding | Disposition |
+|---|---|
+| **F-a** — session recording lost; revision 2 should require the recording to be confirmed live before the run proceeds | **Routed to `/milestone`** as a procedure amendment. Not applied: the procedure's next use is 02.5's T41 drill, which is where the amendment belongs |
+| **F-b** — README step 2's `git clone` gives no location; runbook revision 2 says "from `~`" | **Routed.** A one-line README clarification. No result depends on it (Stage 2's `ls -d ~/agentic-ai` ran before the clone, so the clean-state attestation stands) |
+| **F-c** — all three agent containers exited 0 within one second of `up`, mediator and recorders staying up | **Unresolved, routed to `/milestone` as a real README/behaviour question.** The README says containers "start unauthenticated rather than failing" but does not say whether they then stay running. Whether F-h's detached `up -d` was involved was never established. This is the one carried item that may be a defect rather than a wording gap |
+| **F-d** — `bootstrap-auth` prints `(codex, oauth-interactive) starting paste-back login.` and then runs device-code login (`images/bootstrap-auth.sh:261`, against `codex login --device-auth` at `:278`) | **Routed.** A one-line message fix. The README and the implementation both say device code; only the message is wrong, so no behaviour is at issue |
+| **F-e** — `agy`'s key validity unverified; `bootstrap-auth` checks only that `GEMINI_API_KEY` is set | **Closed on the operator's accepted-as-pass decision of 2026-09-28**, recorded as accepted on that basis, not as a verified pass. No further action here |
+| **F-f** — every profile build prints a `CODEX_HOME` path warning; build exit 0 | **Routed.** Cosmetic, but it appears in every clean build. A fix touches the image and would invalidate the fingerprint references taken at X₂, which is why it is not done under a records close-out |
+| **F-g**, **F-h**, **F-i** — run-conduct deviations | **Closed as recorded.** They are why T39 is attestation rather than step-log evidence (§ SF-5 re-run results, Verdicts). Nothing further to do; the T39 caveat carries them |
+
+## Criterion → evidence
+
+Feature 02.4's eleven acceptance criteria, each against what actually shows it.
+
+| # | Criterion | Status | Evidence |
+|---|---|---|---|
+| 1 | T45 — consumed base resolves to a `main`-built, CI-published, SBOM'd digest | **Met** | § T45 above: phase C, 8/8 assertions, run `34799978913`, `head_branch: main`, 327-package SBOM. Red direction measured at planning against run `34376295042` |
+| 2 | No profile consumes a mutable tag (T45, R10.2) | **Met** | `verify-reproducibility.sh` phase A, 6/6 including the negative control that refuses an unpinned `FROM node:22-slim`. `NODE_BASE_DIGEST` (`compose/pins.env:141`) pins `images/Dockerfile:44,82`; the workflow uses buildx's own `sbom: true` rather than an external scanner action |
+| 3 | D21 promotion (Gate 3 amendment) | **Met** | `feature/containerization` landed on `main` by PR #39 (D21 promotion, operator-merged — `/build` prepared it and did not merge it), repinned by PR #40 and closed out by PR #41. The SF-5c republish and its repin landed as PR #45 and PR #46. `compose/pins.env:139-167` names the run, ref and commit. The D21 trigger amendment is recorded above as proposed text, **not applied** |
+| 4 | T18 — clean rebuild, no manual steps | **Met** | § SF-5 re-run results (2026-09-28): four clean fingerprint diffs across a Compose v2.38.2 → v5.3.1 gap, and the Test Command at `composite exit=0` with all nine scripts green on a factory-reset second Mac. Both halves of the criterion, from captured output. R11.1 discharged |
+| 5 | T39 — fresh operator, `docker compose` the only entry point | **Partly met — statically yes, operationally on attestation** | Static half: `verify-reproducibility.sh` phase D, green (one recorded exception, `scripts/run-shadow-run-sf5.sh`, a boundary-verification harness). Operator half: **closed on operator attestation, not step-log evidence** — see F-a, F-g (ii), F-h |
+| 6 | Onboarding covers first-run auth for all three agents (R12.6) | **Met** | `README.md` § First-run authentication: `claude` paste-back, `codex` device code, and `agy`'s `exec -e GEMINI_API_KEY` / `run --rm -e` path with the paid-tier constraint carried. Exercised live on the second Mac for all three, with F-d (wrong label) and F-e (validity unverified) recorded against it |
+| 7 | R12.3 — allowlist change procedure, naming the reviewer | **Met** | `README.md` § "Changing the allowlist (R12.3)": the six-step chain (R14.1 record → edit → `compile-policy-build.sh` → drift gate → mediator rebuild → `validate-boundary.sh`), landing on `main` by PR reviewed by the **security reviewer** role. Recorded there as a documented procedure, not a mechanism — no CODEOWNERS, no branch protection |
+| 8 | R10.6 — agent version update path | **Met** | `README.md` § "Updating an agent version (R10.6)": the six-step procedure including `agy`'s by-hand manifest resolution and the mandatory `BOUNDARY_SHADOW_RUN=1` re-verification. `docs/records/agent-verification.md` carries the pointer; `check_pin_agreement()` in `verify-pod-topology.sh` enforces the pins/record agreement |
+| 9 | R10.4 — declared build allowlist, statically checked | **Met as declared + checked; enforcement recorded as absent** | § R10.4 above. `images/build-allowlist.yaml` + phase B (7/7, both negative controls). The finding and its two-part review trigger are recorded, per Decision 5 option A |
+| 10 | Records | **Met by this sub-feature** | This file: T45 chain and results, R10.4 finding and trigger, R11.2 assessment, the two proposed architecture edits as replacement text, and this table. T18/T39 results in § SF-5 re-run results |
+| 11 | The R12.8 notice is **not** lifted here | **Held** | `README.md:13-15` still reads "**This pod is not yet cleared for real work**", now naming 02.5 alone as outstanding. 02.2 SF-6 owns the notice's current-state wording; the milestone Definition of Done lifts it, not this feature |
+
+**Not edited by this feature** (feature plan § Documentation, explicit):
+`.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md`, `REQUIREMENTS.md`,
+`prd.md`. `prd.md` § Outputs "Image digest + SBOM" status is left for the milestone consolidation
+pass for the same reason.

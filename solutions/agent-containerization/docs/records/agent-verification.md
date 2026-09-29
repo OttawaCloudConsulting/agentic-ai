@@ -37,6 +37,9 @@ time and skip the installer's live manifest fetch entirely, or (b) accept that `
 "whatever the manifest served on build day" and re-verify after every image rebuild per R10.6.
 Recorded as a build-blocking open item for 01.2, not resolved here.
 
+**The R10.6 procedure itself lives in the README** (02.4), under "Updating an agent version (R10.6)": bump `compose/pins.env`, update this file's version table (`check_pin_agreement()` in `tests/acceptance/verify-pod-topology.sh` enforces the agreement between the two), resolve `agy`'s manifest URL and SHA-512 by hand, rebuild, then **re-verify the policy** with
+`BOUNDARY_SHADOW_RUN=1 bash tests/acceptance/validate-boundary.sh` — a version bump can change an agent's outbound host set. A host the shadow run surfaces that is not already allowlisted goes through the README's "Changing the allowlist (R12.3)" procedure.
+
 ---
 
 ## `agy` HTTPS_PROXY, GEMINI_API_KEY route, and CA-trust (criterion 4)
