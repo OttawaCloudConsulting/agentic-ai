@@ -4,12 +4,13 @@
 this file carries T45/T18/T39 results, the R10.4 build-allowlist statement, the R11.2 assessment,
 the proposed architecture edits, and the criterion → evidence table.
 
-**Status.** This file carries SF-5's runbook, written before the clean-environment run per
-Decision 3/Contract 6, and the results of that run (§ SF-5 run results). **T18 did not pass**: the
-Test Command passed on the second Mac (six of its nine scripts by operator attestation), but the
-fingerprint diff is not clean. SF-5 stays open
-pending the findings below. The re-run follows § Clean-environment procedure — revision 2 (SF-5d),
-at the end of this file; the pre-run procedure is kept unchanged. The remaining sections (T45 chain and results, R10.4 finding, R11.2
+**Status.** This file carries SF-5's runbook, the first clean-environment run (§ SF-5 run results,
+**T18 not passed**), the revised procedure (§ Clean-environment procedure — revision 2) and the
+re-run (§ SF-5 re-run results, 2026-09-28). **T18 passed on the re-run**: four clean fingerprint
+diffs and the Test Command at `composite exit=0`, both from captured output, across a two-version
+Docker/Compose gap. **T39 is closed on operator attestation**, not on step-log evidence — the
+recording was lost and an off-README command was run; see F-a, F-g (ii) and F-h. The remaining
+sections (T45 chain and results, R10.4 finding, R11.2
 assessment, proposed architecture edits, criterion → evidence table) are SF-6's close-out and land
 in a later commit.
 
@@ -528,3 +529,168 @@ file. Dry-run on the build host (`git clean -ndX mediator/identity/`): it remove
 2. Factory-reset Docker Desktop.
 
 Record each teardown step and its outcome, including the revocation.
+
+## SF-5 re-run results (2026-09-28)
+
+**Run date.** 2026-09-28 (UTC 2026-09-28T23:54Z through 2026-09-29T01:00Z). Followed
+§ Clean-environment procedure — revision 2.
+
+**Reference commit X₂ = `028ff4ac362c3fecc16760b944269ae433ecd1a6`** (PR #48 on `main`). Both sides are
+at X₂. The references were regenerated on the build host at 2026-09-28 19:47 EDT from `--no-cache`
+builds, immediately before the run. They came out byte-identical to a set built at the same commit
+on 2026-09-13, so the pinned package sets and the npm tree held for fifteen days across two
+from-scratch builds.
+
+**Hosts.**
+
+| | Build host | Second Mac |
+|---|---|---|
+| OS | macOS 26, Apple silicon | macOS 26.6.1 (25G76), `arm64` |
+| Docker | 28.3.2 | Engine 29.6.2, Desktop 4.83.0 |
+| Compose | v2.38.2-desktop.1 | v5.3.1 |
+
+The Compose gap is deliberate: v5.3.1 against v2.38.2 is the exact difference that produced F3 in
+the first run. SF-5a's normalised render is what this run tests.
+
+### Verdicts
+
+| Test | Result | Basis |
+|---|---|---|
+| **T18** — clean rebuild | **Passed** | Both halves of criterion 4, from captured output: four clean fingerprint diffs, and the Test Command at `composite exit=0` with all nine scripts at `exit=0` on the second Mac |
+| **T39** — fresh operator | **Closed on operator attestation** | The step log was lost (F-a), part of Stage 3 ran from the assisting session's shell rather than the recorded operator shell (F-g ii), and an off-README `up -d` was run (F-h). The operator vouched for the functionality and accepted the run; recorded as attestation, **not** as step-log evidence |
+| **R11.1** | **Discharged** | By T18 passing on macOS 26 / Apple silicon. The T39 evidence caveat above applies to the conduct of the run, not to the rebuild result |
+
+### Clean-state attestation (Stage 2)
+
+Captured to `stage2.txt` and carried back, which the first run did not do. Docker Desktop was
+factory-reset by the operator before capture. `docker images`, `docker volume ls` and
+`docker buildx du` all empty, `docker system df` all zero, and `ls -d ~/agentic-ai` reported no such
+file. Stage 2 passed with no failed check.
+
+### Fingerprint diffs (Stage 4)
+
+`diff <(jq -S 'del(.commit, .docker_version, .compose_version)' ref.<p>.json) <(… clean.<p>.json)`
+— **clean for all four profiles**. Every field matched, so the values below are both sides'.
+
+| Profile | `compose_config_sha256` | `pack_roots_sha256` | `npm_tree_sha256` | mediator `dpkg_sha256` |
+|---|---|---|---|---|
+| `default` | `e2fcaaa9…` | `f5c19659…` | `744e0973…` | `e98336d5…` |
+| `terraform` | `36f6bc00…` | `51dfb59f…` | `744e0973…` | `e98336d5…` |
+| `kubernetes` | `1b75fdc2…` | `d369eabf…` | `744e0973…` | `e98336d5…` |
+| `github` | `5d683826…` | `6cd19ca7…` | `744e0973…` | `e98336d5…` |
+
+Against the first run's three causes:
+
+- **F1 fixed.** Each profile carries its own `pack_roots_sha256`, and all four differ. In the first
+  run `terraform` was indistinguishable from `default`.
+- **F2 fixed.** The mediator package hash matched on a machine that had never built these images,
+  and matched again fifteen days after the 2026-09-13 reference build.
+- **F3 fixed.** `compose_config_sha256` matched across Compose v2.38.2 and v5.3.1. In the first run
+  every profile differed on this field alone.
+
+### Test Command on the second Mac
+
+Run as one chain under `pipefail` with each script's output teed to its own file (F7), exit codes in
+`test-exit.txt`. **Every script `exit=0`, `composite exit=0`.**
+
+| Script | Result |
+|---|---|
+| `verify-pack-composition.sh` | 109 PASS, 0 FAIL — all phases passed |
+| `verify-pod-topology.sh` | ALL CHECKS PASSED |
+| `verify-egress-mediator.sh` | ALL PHASES PASSED |
+| `verify-audit-completeness.sh` | ALL PHASES PASSED |
+| `verify-tool-packs.sh` | 41 passed, 0 failed |
+| `verify-mcp-inventory.sh` | 44 passed, 0 failed |
+| `validate-boundary.sh` (`default terraform kubernetes github`) | ALL CHECKS PASSED, carrying only the two recorded T6 known gaps |
+| `verify-reproducibility.sh` | 25 passed, 0 failed — phases A–D, including phase C (T45) green against the `main` pin |
+| `lint-policy.sh` | OK |
+
+All nine have captured output. In the first run six rested on operator attestation.
+
+### Findings
+
+**F-a — the session recording was lost. Test-conduct defect; removes the T39 evidence.**
+`raw-session-1.log` was 3.7 MB at 20:13, 115 bytes at 20:21, and 141 bytes at carry-back: a shell
+prompt and `exit`. `session-clean.log` is 55 bytes. The step 8 cleaning command ran and its
+secret-shape grep found no match, so the cleaning path is untested against a real log. Probable
+cause, **not verified**: a second `script` invocation reused `raw-session-1.log` (revision 2 gives a
+second terminal `raw-session-2.log`), or the recorded shell was restarted onto the same name.
+Revision 2 should require the recording to be confirmed non-empty before the run proceeds.
+
+**F-b — the clone landed in the operator's working tree.** `~/Documents/tools/git-repos/occ/agentic-ai`,
+not `~`. README step 2 gives `git clone <repository-url>` without a location, and revision 2 says
+"from `~`". Stage 2's `ls -d ~/agentic-ai` ran before the clone, so the attestation stands. No
+effect on the result; the runbook and README disagree about where the clone goes.
+
+**F-c — all three agent containers exited 0 within one second of `up`.** At 00:07:56Z, with the
+mediator and recorders staying up. `claude` logged
+`bootstrap-auth: WARNING -- (claude|codex, oauth-interactive) has no credential yet.` The README
+says containers "start unauthenticated rather than failing" but does not say whether they should
+then stay running. Whether F-h's detached `up` was involved was not established. **Unresolved, and a
+real README/behaviour question for SF-6 or `/milestone`.**
+
+**F-d — the codex auth label is wrong.** `bootstrap-auth` printed
+`(codex, oauth-interactive) starting paste-back login.` and then ran device-code login. The README
+and the implementation both say codex uses device code; the message names the wrong flow. A
+one-line message fix.
+
+**F-e — `agy`'s key validity was not verified. Accepted as a pass by operator decision, 2026-09-28.**
+`bootstrap-auth` printed `(agy, apikey) ready -- credential supplied by environment (GEMINI_API_KEY
+set)`, which checks only that the variable is set. The operator's account was that the key "should
+have been valid, but it may have expired". The evidence is that the variable was set; the key's
+validity is unverified. Recorded as accepted on that basis, not as a verified pass.
+
+**F-f — every profile build printed a `CODEX_HOME` warning.** `WARNING: proceeding, even though we
+could not create PATH aliases: CODEX_HOME points to "/home/agent/.codex", but that path does not
+exist`. Build exit 0. Also seen on the build host's reference builds, where
+`fingerprint-environment.sh` inspects images with no state. Cosmetic, but it appears in every clean
+build and should either be suppressed or explained.
+
+**F-g — deviations from revision 2.**
+  1. The runbook and README were read via `gh api` into `/tmp/sf5-read` before the clone, to keep the
+     machine clone-free for Stage 2. Accepted as instrumentation; same content at X₂.
+  2. Stage 3 steps 4–6 (pod down, the four profile builds and fingerprints, the Test Command) ran
+     from the assisting session's shell, not the operator's recorded shell. This is part of why T39
+     has no step log.
+  3. The assisting session's first `compose down` was refused by its own safety classifier; its user
+     instructed it directly and it ran once, without `-v`. Correctly authorised in that session.
+
+**F-h — an off-README `up -d` was run. Confirmed by the operator.** README step 5 gives a foreground
+`up --build --force-recreate`, and revision 2 says to Ctrl-C it. The operator ran both the foreground
+`up` and a detached `up -d`. Order and timing are unknown (`~/.bash_history` has no timestamps), so
+whether it explains F-c is **unresolved**. This is the finding that would have been caught by a step
+log, and it is the reason T39 is recorded as attestation rather than evidence.
+
+**F-i — `down -v` lines in shell history predate the run.** The operator states only a plain `down`
+was run. Stage 2 recorded zero volumes before the run started, which is consistent. Not verifiable
+from untimestamped history; recorded as resolved-by-attestation, and nothing in the results depends
+on it.
+
+### Evidence that does not exist
+
+Stated plainly, because the verdicts above rest on what remains:
+
+- there is no step log for this run;
+- `~/.bash_history` shows a final command block whose every entry matches a README command, in
+  README order, but it is untimestamped, has no ordering across runs, and is missing `git clone`;
+- the operator's step 6 and 7 terminal output exists only in the assisting session's transcript and
+  carries a one-time codex device code, so it was not carried back;
+- six of the first run's nine scripts rested on attestation; this run's nine all have captured
+  output, so the Test Command half of T18 is fully evidenced.
+
+### Teardown (Stage 5)
+
+Approved 2026-09-29 after all carried-back files were confirmed received: pod down with volumes,
+`git clean -fdX` on `mediator/identity/` and `compose/generated/`, raw session logs deleted, key
+unset, Claude and Codex sessions revoked at each provider by the operator, Docker Desktop
+factory-reset. The teardown confirmation is the assisting session's final report.
+
+### What this closes
+
+- **T18 passed** — criterion 4, both halves, including the 2026-09-13 clarifications (per-profile
+  fingerprints, date-independent package sets, renderer-independent comparison).
+- **T39 closed on operator attestation**, with F-a, F-g (ii) and F-h named as the reasons it is not
+  step-log evidenced.
+- **R11.1 discharged.**
+- **Carried into SF-6 or `/milestone`:** F-c (unresolved), F-d, F-f, the revision 2 amendment from
+  F-a (confirm the recording is live before proceeding), and F-b's clone-location disagreement.
