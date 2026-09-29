@@ -22,7 +22,7 @@
 
 [~] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 8/10 complete
+    Sub-features: 9/10 complete
     Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
     node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
     bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
@@ -240,6 +240,27 @@
     removes ca/ clients/ credentials/ listeners/ and keeps README.md/.gitignore. The log-cleaning
     command was verified against a synthetic log only. "What closes SF-5" gained a status note.
     No mechanism change, so no Test Command run (SF-5 and SF-6 remain).
+    SF-5 re-run (2026-09-28, second Mac, macOS 26.6.1 arm64, Docker 29.6.2 / Compose v5.3.1 against
+    the build host's 28.3.2 / v2.38.2): T18 PASSED. X2 = 028ff4ac, references regenerated --no-cache
+    immediately before the run and byte-identical to a 2026-09-13 set at the same commit. All four
+    fingerprint diffs clean (del .commit/.docker_version/.compose_version) -- F1, F2 and F3 all
+    confirmed fixed, F3 across the same Compose version gap that broke the first run. Test Command on
+    the second Mac: every script exit=0, composite exit=0, all nine with captured output
+    (verify-pack-composition 109/0, verify-tool-packs 41/0, verify-mcp-inventory 44/0,
+    verify-reproducibility 25/0 including phase C T45 green, validate-boundary all four profiles with
+    only the two recorded T6 known gaps, lint-policy OK). Stage 2 attestation captured to a file.
+    T39 CLOSED ON OPERATOR ATTESTATION, not step-log evidence: the session recording was lost (F-a,
+    141 bytes at carry-back), Stage 3 steps 4-6 ran from the assisting session's shell (F-g ii), and
+    the operator confirmed running an off-README detached `up -d` (F-h, order unknown, may explain
+    F-c). Operator accepted the run and vouched for the functionality; recorded with that provenance.
+    F-e (agy key validity unverified -- bootstrap-auth only checks the variable is set) accepted as a
+    pass by operator decision. R11.1 discharged. Open and carried to SF-6 or /milestone: F-c (all
+    three agent containers exited 0 within a second of `up`, README silent on whether they should
+    stay running -- unresolved), F-d (codex prints "starting paste-back login" then runs device-code
+    login), F-f (CODEX_HOME warning on every build), F-b (README/runbook disagree on clone location),
+    and a revision 2 amendment from F-a (confirm the recording is live before the run proceeds).
+    Run conducted with a Claude session on the second Mac; the operator did all browser auth, key
+    entry and provider revocations. See docs/records/reproducibility.md, SF-5 re-run results.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md

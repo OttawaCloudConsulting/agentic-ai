@@ -459,7 +459,7 @@ lands before the new reference commit.
   - `docs/records/reproducibility.md` gains "Clean-environment procedure — revision 2" per
     Decision 8. The pre-run procedure stays as written.
   - Size: 1 file, documentation.
-- [ ] **SF-5: T18 + T39 clean-environment run on a second physical Mac.**
+- [x] **SF-5: T18 + T39 clean-environment run on a second physical Mac.**
   - **Re-plan 2026-09-13.** The first run (2026-09-12/13) is recorded and did not pass T18. The
     re-run follows revision 2 at a new reference commit that carries SF-5a–SF-5d and SF-5c's
     `main`-pinned `agent-base`: new references for all four profiles, a factory-reset second Mac,
