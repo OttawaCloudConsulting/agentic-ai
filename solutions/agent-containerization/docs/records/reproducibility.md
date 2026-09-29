@@ -945,7 +945,7 @@ Replacement text:
 > The promotion to `main` was originally the project-completion trigger; the Gate 3 amendment moved
 > it to Milestone 02
 
-**Anchor 3: same file, `### Reproducibility`, second sentence (line 660-663).** Current text:
+**Anchor 3: same file, `### Reproducibility`, second sentence.** Current text:
 
 > During the project the workflow builds from the working branch and those images are for testing
 > only; on project completion the workflow moves to `main`, which is the point at which a published
@@ -1011,7 +1011,7 @@ records close-out; each item below is routed rather than patched.
 
 | Finding | Disposition |
 |---|---|
-| **F-a** — session recording lost; revision 2 should require the recording to be confirmed live before the run proceeds | **Routed to `/milestone`** as a procedure amendment. Not applied: the procedure's next use is 02.5's T41 drill, which is where the amendment belongs |
+| **F-a** — session recording lost; revision 2 should require the recording to be confirmed live before the run proceeds | **Routed to `/milestone`** as a procedure amendment. Not applied here: the amendment belongs with the procedure the next clean-environment or drill run actually follows, and no such run is scheduled under this feature |
 | **F-b** — README step 2's `git clone` gives no location; runbook revision 2 says "from `~`" | **Routed.** A one-line README clarification. No result depends on it (Stage 2's `ls -d ~/agentic-ai` ran before the clone, so the clean-state attestation stands) |
 | **F-c** — all three agent containers exited 0 within one second of `up`, mediator and recorders staying up | **Unresolved, routed to `/milestone` as a real README/behaviour question.** The README says containers "start unauthenticated rather than failing" but does not say whether they then stay running. Whether F-h's detached `up -d` was involved was never established. This is the one carried item that may be a defect rather than a wording gap |
 | **F-d** — `bootstrap-auth` prints `(codex, oauth-interactive) starting paste-back login.` and then runs device-code login (`images/bootstrap-auth.sh:261`, against `codex login --device-auth` at `:278`) | **Routed.** A one-line message fix. The README and the implementation both say device code; only the message is wrong, so no behaviour is at issue |
@@ -1035,7 +1035,7 @@ Feature 02.4's eleven acceptance criteria, each against what actually shows it.
 | 8 | R10.6 — agent version update path | **Met** | `README.md` § "Updating an agent version (R10.6)": the six-step procedure including `agy`'s by-hand manifest resolution and the mandatory `BOUNDARY_SHADOW_RUN=1` re-verification. `docs/records/agent-verification.md` carries the pointer; `check_pin_agreement()` in `verify-pod-topology.sh` enforces the pins/record agreement |
 | 9 | R10.4 — declared build allowlist, statically checked | **Met as declared + checked; enforcement recorded as absent** | § R10.4 above. `images/build-allowlist.yaml` + phase B (7/7, both negative controls). The finding and its two-part review trigger are recorded, per Decision 5 option A |
 | 10 | Records | **Met by this sub-feature** | This file: T45 chain and results, R10.4 finding and trigger, R11.2 assessment, the two proposed architecture edits as replacement text, and this table. T18/T39 results in § SF-5 re-run results |
-| 11 | The R12.8 notice is **not** lifted here | **Held** | `README.md:13-15` still reads "**This pod is not yet cleared for real work**", now naming 02.5 alone as outstanding. 02.2 SF-6 owns the notice's current-state wording; the milestone Definition of Done lifts it, not this feature |
+| 11 | The R12.8 notice is **not** lifted here | **Held** | `README.md:17-19` still reads "**This pod is not yet cleared for real work**", now naming 02.5 alone as outstanding. 02.2 SF-6 owns the notice's current-state wording; the milestone Definition of Done lifts it, not this feature |
 
 **Not edited by this feature** (feature plan § Documentation, explicit):
 `.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md`, `REQUIREMENTS.md`,

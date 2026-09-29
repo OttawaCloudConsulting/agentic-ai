@@ -499,7 +499,7 @@ lands before the new reference commit.
     second Mac.
   - Record T18, T39 and R11.1.
   - **Largest by wall-clock, small by code.** Its risk is findings, not size.
-- [ ] **SF-6: Records close-out.**
+- [x] **SF-6: Records close-out.**
   - `docs/records/reproducibility.md`:
     - the R11.2 assessment;
     - the R10.4 finding and its review trigger;

@@ -1,5 +1,5 @@
 # Milestone 02: Proven and Composable
-# Status: [~] in progress  5 features, 3 complete
+# Status: [~] in progress  5 features, 4 complete
 
 ## Features
 
@@ -20,9 +20,9 @@
     Notes: Started 2026-09-10. Completed 2026-09-11. SF-8 gated on Feature 02.2 reaching [x] (gate-3-review.md: 02.2 before 02.3). SF-1-SF-7 do not consume 02.2 output. Deviation (not recorded, implementation-detail): pack-install.sh COPY moved from agent-base to agent-packs in images/Dockerfile (SF-2) -- agent-base is GHCR-published and digest-pinned (D21), so a local script edit reached nothing until moved, same class of fix as entrypoint.sh (01.6 SF-3). Deviation (not recorded, implementation-detail, SF-3): scripts/check-profile-compose.sh's normalise() stripped `.build.args.MEDIATOR_PROFILE`, which does not exist -- MEDIATOR_PROFILE renders under `.environment`, not `.build.args`. Fixed to del `.environment.MEDIATOR_PROFILE`; the SF-2 script never hit this path because `check-profile-compose.sh --profile default` compares default to itself, where MEDIATOR_PROFILE is identical either way. Deviation (not recorded, implementation-detail, SF-5): `check-profile-compose.sh`'s `secrets_of()` compared `docker compose config`'s rendered secrets with a bare `yq eval '...secrets[]'`, which emits each entry as a two-line `{source, target}` mapping (Compose v2.38.2 normalizes every secret reference to long form, even ones written short) -- so line-based `comm`/`sort` treated `source:`/`target:` as separate set members and every profile carrying a pack credential (including the already-shipped `github`) reported a false secret-set mismatch; the (b) hardening-comparison half never actually passed for `github` either, because Phase B only ever exercised `check-profile-compose.sh` against `default`-vs-itself. Fixed to extract `.source` via `yq -o=json | jq`, one name per line regardless of rendered form; both `github` and the new `kubernetes` profile now pass. Real HashiCorp/GitHub-pattern SHA-256 checksums for `kubectl` (`dl.k8s.io/release/v1.31.2/.../kubectl.sha256`) and `helm` (`get.helm.sh/.../....sha256sum`) fetched and verified against a live build, per `packs/README.md`'s "How these hashes were obtained" pattern.
     SF-8 (2026-09-11): BOUNDARY_PROFILES matrix built into validate-boundary.sh (terraform/kubernetes/github/default, default forced last per Contract 7); scratch test-base compiles via Decision 10's mechanism (--profile-file already existed from 02.1 SF-1, so that named interface-change item is a no-op here); new Phase 11 (credential reachability, pack-egress allow/deny, /run/secrets delta against a captured default baseline). tests/fixtures/authoritative-dns/unbound.conf gained fixture-collector-backed records for the four real pack FQDNs. Two pre-existing shared-harness reconciliations, recorded as Deviations, both required for "Composite green": (1) verify-pack-composition.sh's sf7-probe fixture needed a third_parties placeholder (02.3 SF-1's new R14.1 gate) and one stale expected-message fragment fixed. (2) T6's resolved_ip-on-deny gap (02.2 Decision 9) stays unfixed -- a real fix needs a new external_acl_type helper in the mediator's deny path, judged out of SF-8's scope after live investigation; validate-boundary.sh now excuses only that field's absence on an otherwise-fully-verified-correct deny. Live re-exercising this scenario surfaced a SECOND, previously unrecorded finding (attempt 1's front-cold-peer 500, unrelated to the profile matrix -- reproduces under BOUNDARY_PROFILES=default alone): two retry-based fixes were tried and reverted because each one measurably broke attempt 2 instead (Squid connection-pool state left warm by the extra touch); the shipped fix recognizes the symptom on attempt 1's own line and records it as a known gap, no extra request added. Full matrix + full 7-harness composite (verify-pack-composition, verify-pod-topology, verify-egress-mediator, verify-audit-completeness, verify-tool-packs, verify-mcp-inventory, lint-policy) run clean end-to-end. See docs/records/boundary-validation.md for the full per-profile results and both findings' writeups, docs/records/mcp-inventory.md for the T31 assessment and github.com residual, and docs/records/third-party-assessments.md for the T42 re-inspection.
 
-[~] Feature 02.4: Reproducibility, provenance and onboarding
+[x] Feature 02.4: Reproducibility, provenance and onboarding
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/reproducibility-provenance-and-onboarding.md
-    Sub-features: 9/10 complete
+    Sub-features: 10/10 complete
     Notes: Started 2026-09-11. SF-1 (2026-09-11): NODE_BASE_DIGEST pinned (index digest of
     node:22-slim) at both images/Dockerfile FROMs; agent-base's ca-certificates/curl/
     bubblewrap/iproute2/xz-utils moved onto the same bookworm snapshot as git (SF-1b);
@@ -261,6 +261,32 @@
     and a revision 2 amendment from F-a (confirm the recording is live before the run proceeds).
     Run conducted with a Claude session on the second Mac; the operator did all browser auth, key
     entry and provider revocations. See docs/records/reproducibility.md, SF-5 re-run results.
+    SF-6 (2026-09-29): records close-out. T45 measured green on the build host against the main
+    pin -- run 34799978913, 327-package SBOM, head_sha agreeing with the provenance vcs:revision,
+    head_branch main; the red direction (run 34376295042, head_branch feature/containerization) is
+    recorded beside it. R10.4 build-allowlist statement written with the finding that builds are
+    NOT network-confined to the declared list, naming option B as the enforcing mechanism and its
+    two-part review trigger. R11.2 assessed by construct with file:line: the blocker is
+    architecture, not OS -- arm64 Linux needs one real change (uid/gid, since Linux bind mounts
+    carry real ownership where VirtioFS fakes it), x86_64 needs eight second-pin changes in D21's
+    stated order. The two proposed architecture edits (D21 promotion trigger is Milestone 02, not
+    project completion; packs/github-cli/ exists) are recorded as exact anchored replacement text
+    and NOT applied -- /build does not edit Gate artifacts, so the milestone consolidation pass or
+    /milestone owns them. Carried findings disposed by operator decision 2026-09-29 as record-only:
+    F-c stays UNRESOLVED and routes to /milestone (agent containers exiting 0 within a second of
+    `up`, README silent on whether they should stay running -- the one item that may be a defect
+    rather than a wording gap); F-b, F-d, F-f routed as one-line doc/message fixes; F-e closed on
+    the operator's accepted-as-pass decision; F-g/F-h/F-i closed as recorded, and they are why T39
+    is attestation rather than step-log evidence. Criterion -> evidence table written for all
+    eleven acceptance criteria: ten met, criterion 5 (T39) partly met -- static half green via
+    phase D, operator half on attestation. Criterion 11 held: the R12.8 notice is NOT lifted, and
+    the README status paragraph now names 02.5 alone as outstanding. Also closed an SF-3 omission:
+    docs/records/agent-verification.md had no pointer to the README R10.6 procedure the feature
+    plan's Documentation section required. Test Command: all nine scripts exit 0 on the build host
+    (109/0, ALL CHECKS, ALL PHASES, ALL PHASES, 41/0, 44/0, ALL CHECKS, 25/0, OK) -- run serially
+    after the first composite attempt was killed by host memory pressure mid-teardown, which left
+    an orphaned sf8-verify-54130 compose project that was removed before the re-run.
+    Completed 2026-09-29.
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
