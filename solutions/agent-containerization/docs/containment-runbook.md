@@ -400,11 +400,15 @@ moved to fit.
   `codex` session's access *and* refresh tokens both working, and rotation does not retire a captured
   refresh token either, so nothing at the provider contained those rows — the isolate-and-discard at
   `t0` is what did. **V2's timed row is a stated GAP** (operator decision): its substantive question
-  was measured, its clock was not. It bounds the action that actually contains: **isolate the agent (§ 3.2, disconnect)
-  and discard its volume at `t0`, *before* revoking.** The access token's survival past revocation
-  (V1: 8 h; V2/V3: a 10-day JWT `codex` does not verify locally) is measured by SF-6 and recorded as
-  a **named finding against R13.1** — it is not folded into this commitment, and the commitment is
-  not widened to 8 h or 10 days to make the row pass.
+  was measured, its clock was not.
+  **What the 10:00 bounds is the action that actually contains** — isolate the agent (§ 3.2,
+  disconnect) and discard its volume at `t0`, *before* revoking — and **not** the moment the
+  credential dies at the provider. That distinction is why the number survives contact with the
+  measurements: V1's access token died inside 03:27 (the anticipated 8-hour survival did not occur),
+  while V2's and V3's did not die at all — a 10-day JWT `codex` does not verify locally, backed by a
+  refresh token that per-device revocation left working. Both survivals are recorded as a **named
+  finding against R13.1** in `docs/records/containment-drills.md`, and neither is folded into this
+  commitment: the maximum is not widened to 8 h or 10 days to make a row pass.
 
 ---
 

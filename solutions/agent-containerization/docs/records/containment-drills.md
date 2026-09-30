@@ -1830,7 +1830,7 @@ SF-7, 2026-09-30.
 | 4 — R12.5 teardown | Phase D | Phase D (SF-3); this record § R12.5 | **MEASURED (SF-3)** |
 | (Decision 3) — the pod-wide cut keeps the detection signal | Phase C | Phase C (SF-3); this record § The pod-wide cut | **MEASURED (SF-3)** |
 | 5 — T37 authorization gate | Phase F, compile negatives and runtime checks | Phase F (SF-2); this record § T37 | **MEASURED (SF-2, recorded SF-7)** — phase F 35 passed, 0 failed; both negative-control variants run once and recorded (exit 2 accounting, exit 3 T37 refusal) |
-| 6 — T44 ToS monitoring and the seam | R14.3 record for three routes; tabletop SIMULATION; seam inspection | `third-party-assessments.md` § R14.3; this record § T44 | **RECORDED (SF-7)** — three-route Route/Owner/Review-trigger table; cadence **quarterly + provider announcements** (operator-confirmed); tabletop labelled **SIMULATION** with the owner's decision (suspend the `agy` route) and the containment it triggers; seam inspected on the built image (ICAP and eCAP compiled in; TLS termination is the blocker and it is a D4 decision) |
+| 6 — T44 ToS monitoring and the seam | R14.3 record for three routes; tabletop SIMULATION; seam inspection | `third-party-assessments.md` § R14.3; this record § T44 | **RECORDED (SF-7)** — three-route Route/Owner/Review-trigger table; cadence **quarterly + provider announcements** (operator-confirmed); tabletop labelled **SIMULATION** with the owner's decision (suspend the `agy` route) and the containment it triggers — recorded with the finding that **no written re-review checklist exists**, so the decision was made against the trigger list and the runbook rather than a checklist; seam inspected on the built image (ICAP and eCAP compiled in; TLS termination is the blocker and it is a D4 decision) |
 | 7 — the runbook | Shipped, with event/incident defined before go-live; README links it | `docs/containment-runbook.md` (SF-1 draft, SF-7 final) | **FINAL (SF-7)** — every command is a measured form; the incident list was reviewed again at close-out and neither added to nor struck; § 6's drill cadence set to **quarterly, with the R14.3 review**; `README.md` § "Containment and response (02.5)" links it |
 | 8 — records and proposed edits | This record; the two proposed edits above | This record (SF-7) | **BOTH WRITTEN** — edit 2 (R13.2/T40) from the exercised path (SF-4); edit 1 (the architecture runbook table) from the measured forms (SF-7). Neither applied, by design |
 | 9 — the R12.8 notice is not lifted here | Stated, not acted on | This record, § Proposed edits 2 | **STATED (SF-1, unchanged)** — the milestone Definition of Done lifts it, once the R13.2/T40 amendment is accepted |
@@ -1851,8 +1851,11 @@ Stated here so close-out is not read as "everything is finished".
 4. **V2's timed row is a GAP**, by operator decision.
 5. **Detection stays pull-based** (R9.6 remains MAY). Nothing here bounds compromise to detection —
    only detection to revocation.
-6. **The T44 tabletop surfaced a missing resumption criterion** in the re-review checklist: it says
-   when to suspend a route, not what evidence would let one resume. Recorded in
+6. **The T44 tabletop surfaced two gaps, the first about its own premise.** There is **no written
+   re-review checklist** — criterion 6 assumed one, and the decision was made against the route
+   table's triggers and the runbook's actions instead, which is enough to decide and not the same
+   thing. And neither the triggers nor the runbook carries a **resumption** criterion: both say when
+   to suspend a route, neither says what would let one restart. Recorded in
    `third-party-assessments.md`, not fixed here.
 
 ### Close-out regression — the full composite, harness by harness

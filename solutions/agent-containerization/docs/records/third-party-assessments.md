@@ -155,8 +155,14 @@ R13.1's — detection is pull-based — and it is stated rather than implied.
 ### T44 tabletop — SIMULATION (Feature 02.5 SF-7, 2026-09-30)
 
 **SIMULATION. No terms change occurred.** The owner received a simulated Antigravity terms change
-that closes the §6 headless-use reading — the reading D9 rests on — and ran the re-review checklist
-against it.
+that closes the §6 headless-use reading — the reading D9 rests on — and decided against it.
+
+**First finding, and it is about the exercise's own premise: there is no written re-review
+checklist.** Criterion 6 says the owner "runs the re-review checklist"; a search of this record, the
+architecture document and the milestone artifacts finds no such document. What exists is the
+**trigger list** in the route table above and the **containment actions** in the runbook. The
+decision below was made against those two, which is enough to decide and not the same thing as
+running a checklist. Recorded as an absence observed, not a procedure performed.
 
 | Field | Value |
 |---|---|
@@ -167,7 +173,8 @@ against it.
 | **Decision (owner)** | **Suspend the `agy` route until a re-review clears it.** The route's use rests entirely on the §6 reading; with that reading closed there is no remaining basis for unattended container use, so the route stops rather than continuing under conditions |
 | **Containment action triggered** | Isolate `agy` (runbook § 3.2, stop form — `agy` first, its recorder once drained), then discard `agy-state` (runbook § 5.2's `discard` row), then revoke `GEMINI_API_KEY` at the provider. The `audit` and `agy-action-audit` volumes are **preserved** — § 2's first rule is unchanged by a governance trigger |
 | Ordering note | A governance trigger is not an incident under § 1, so there is no `t0` clock and no revocation maximum applies. The actions are the runbook's, used deliberately rather than under time pressure. The isolate-then-discard-then-revoke order is still the one used, because it is the order that holds when revocation alone does not contain (D-1) |
-| Checklist outcome | The re-review checklist ran end to end on the simulated input and produced a decision without needing information the record does not carry. One gap surfaced, and is recorded rather than fixed here: the checklist has no *resumption* criterion — it says when to stop a route, not what evidence would let it restart. Recorded as the trigger for writing one: a suspended route an operator wants to resume |
+| Method, stated plainly | **No checklist was executed, because none is written** (see above). The owner matched the injected change to trigger (2) in the route table, then chose the containment action from the runbook's § 3.2 / § 5.2. The inputs the decision needed were all present in these two records |
+| Gaps this surfaced | **(1) The checklist itself does not exist** — criterion 6 assumed one, and writing it is now a named follow-up rather than a claim. **(2) Neither the triggers nor the runbook carries a *resumption* criterion:** both say when to suspend a route, and neither says what evidence would let a suspended route restart. Trigger for writing both: a suspended route an operator wants to resume. Recorded, not fixed here |
 | Labelled | **SIMULATION** — no provider action, no real revocation, no containment performed |
 
 ---
