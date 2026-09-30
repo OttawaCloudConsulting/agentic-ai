@@ -23,8 +23,13 @@
 # CONNECT to github.com from `claude` and `agy` is refused with an audit line carrying `agent`
 # and `identity_source`.
 #
-# Phase E (T41's mechanical steps) arrives with SF-4, between D and F, on the same fixture
-# stack. The teardown contract: `down -v --remove-orphans` runs ONLY in the trap, under this
+# Phase E (SF-4): T41's mechanical steps. Contaminate the five criterion-3 stores, `down` without
+# `-v`, `docker volume rm` the discard rows by name, rebuild and recreate, then assert every
+# disposition: no marker in a discarded store, the workspace marker still there because the project
+# mount is reviewed and never discarded, the audit and action-audit volumes byte-identical in their
+# pre-recovery prefix, and the recorder resuming on a fresh state volume without re-shipping.
+#
+# The teardown contract: `down -v --remove-orphans` runs ONLY in the trap, under this
 # script's own project names, because the phases here assert what SURVIVES a `down` and a
 # harness that volume-pruned between phases would destroy the evidence it is measuring.
 # Phase D's own `down` is deliberately WITHOUT `-v` -- that is the assertion.
@@ -73,11 +78,18 @@ COMPOSE=(docker compose --env-file compose/pins.env
 # something. A one-off `compose run` container, which is how every other harness gets a
 # long-lived agent, carries `com.docker.compose.oneoff=True` and every Compose subcommand
 # ignores it.
+#
+# `build-cache.yaml` is layered in for phase E: criterion 3 contaminates "each opt-in build-cache
+# volume, when enabled", and a disposition that is only ever asserted statically is a disposition
+# nothing has exercised. Enabling the fragment here is what makes the three `discard` rows for the
+# build caches a measured claim rather than a table entry. It adds three volume mounts and five
+# cache environment variables and touches nothing phases B-D depend on.
 FX_COMPOSE=(docker compose --env-file compose/pins.env
             -f compose/compose.yaml
             -f compose/overrides/default.yaml
             -f compose/overrides/test-egress.yaml
             -f compose/overrides/test-containment.yaml
+            -f compose/overrides/build-cache.yaml
             -p "$PROJECT_FX")
 fx() { AGENT_PROFILE=test-fixtures "${FX_COMPOSE[@]}" "$@"; }
 
@@ -95,6 +107,11 @@ cleanup() {
   rm -f "$FIXTURES"/probe-*.yaml
   rm -rf "$PROBE_PACK_DIR"
   rm -rf "$TLS_DIR"
+  # Phase E writes one marker into the operator's own `workspace/` bind mount, because the
+  # project mount's disposition is `review` and the only way to assert "never discarded by the
+  # path" is to have something there to survive. It is removed here as well as inline, so a
+  # phase that dies mid-run does not leave it in the operator's tree.
+  rm -f "$ROOT/workspace/.t41-marker"
   if [ "$FX_TOUCHED" = 1 ]; then
     echo
     echo "--- tearing down $PROJECT_FX ---"
@@ -690,6 +707,258 @@ if [ -n "$D_AUDIT_AFTER" ] && [ "$D_AUDIT_AFTER" -ge "${D_AUDIT_BEFORE:-0}" ]; t
 else
   fail "D: the audit trail lost lines across 'down' (${D_AUDIT_BEFORE} -> ${D_AUDIT_AFTER:-unreadable})"
 fi
+
+# ---------------------------------------------------------------------------
+# Phase E -- T41's mechanical steps: contaminate, discard selectively, recover
+# ---------------------------------------------------------------------------
+# The runbook's § 5.1 path, executed end to end against the fixture stack. What this phase can
+# assert is everything T41 does that does not need a provider: the markers, the dispositions,
+# the preserved evidence and the recorder. The FULL drill -- identity rotation for the
+# contaminated agent and a real re-bootstrap for all three -- is performed once by the operator
+# and recorded in `docs/records/containment-drills.md`; it cannot live in an unattended harness,
+# because it spends real logins.
+phase E "T41 mechanical -- contaminate, selective discard, rebuild, assert every disposition"
+
+# --- instrumentation: one pre-recovery session per agent -----------------------------------
+# Edge Case 10 is the assertion this sets up: the state volume is discarded, so the transcript
+# directory goes with it, and 02.1's recorder must resume on the fresh volume WITHOUT re-shipping
+# what it already shipped. That needs lines on the sink from BEFORE the discard to count against.
+E_PRE_CLAUDE="e1e1e1e1-0000-4000-8000-e1e1e1e1e1e1"
+E_PRE_CODEX="e2e2e2e2-0000-4000-8000-e2e2e2e2e2e2"
+E_PRE_AGY="e3e3e3e3-0000-4000-8000-e3e3e3e3e3e3"
+E_POST_CLAUDE="f1f1f1f1-0000-4000-8000-f1f1f1f1f1f1"
+E_POST_CODEX="f2f2f2f2-0000-4000-8000-f2f2f2f2f2f2"
+E_POST_AGY="f3f3f3f3-0000-4000-8000-f3f3f3f3f3f3"
+
+fx_rec() { docker exec "${PROJECT_FX}-$1-recorder-1" "${@:2}" 2>/dev/null || true; }
+fx_sink() { fx_rec "$1" cat /var/log/actions/action-audit.log; }
+# How many lines the sink holds for one session. One shape for all three agents: `claude` and
+# `codex` ship `record`, `agy` ships `record_snapshot`, but every line carries `session_id`.
+fx_sink_count() { # <agent> <session id>
+  fx_sink "$1" | jq -c --arg s "$2" 'select(.session_id == $s)' 2>/dev/null | grep -c . || true
+}
+
+# The three transcript shapes, taken from the recorders' own RECORDER_SOURCE_GLOB in
+# compose.yaml -- append-only JSONL for claude and codex, a whole-file snapshot for agy.
+fx_plant_session() { # <agent> <session id> <payload name>
+  case "$1" in
+    claude) fx_in claude "mkdir -p /home/agent/.claude/projects/-t41 && printf '%s\n' '{\"type\":\"tool_call\",\"sessionId\":\"$2\",\"name\":\"$3\"}' >> /home/agent/.claude/projects/-t41/$2.jsonl" >/dev/null ;;
+    codex)  fx_in codex "mkdir -p /home/agent/.codex/sessions/2026/09/30 && printf '%s\n' '{\"type\":\"session_meta\",\"id\":\"$2\",\"name\":\"$3\"}' >> /home/agent/.codex/sessions/2026/09/30/rollout-2026-09-30T00-00-00-$2.jsonl" >/dev/null ;;
+    agy)    fx_in agy "mkdir -p /home/agent/.gemini/antigravity-cli/conversations && printf '%s' '$3' > /home/agent/.gemini/antigravity-cli/conversations/$2.db" >/dev/null ;;
+  esac
+}
+
+fx_wait_ship() { # <agent> <session id> <timeout seconds>
+  local waited=0
+  while [ "$(fx_sink_count "$1" "$2")" = 0 ]; do
+    waited=$((waited + 1))
+    [ "$waited" -lt "$3" ] || return 1
+    sleep 1
+  done
+  return 0
+}
+
+fx_plant_session claude "$E_PRE_CLAUDE" t41-pre-claude
+fx_plant_session codex  "$E_PRE_CODEX"  t41-pre-codex
+fx_plant_session agy    "$E_PRE_AGY"    t41-pre-agy
+
+E_PRE_COUNT_claude=0; E_PRE_COUNT_codex=0; E_PRE_COUNT_agy=0
+for a in "${AGENTS[@]}"; do
+  case "$a" in claude) s="$E_PRE_CLAUDE" ;; codex) s="$E_PRE_CODEX" ;; agy) s="$E_PRE_AGY" ;; esac
+  if fx_wait_ship "$a" "$s" 15; then
+    n="$(fx_sink_count "$a" "$s")"
+    eval "E_PRE_COUNT_$a=\$n"
+    pass "E: '$a''s pre-recovery session shipped to its action-audit volume ($n line(s))"
+  else
+    fail "E: '$a''s pre-recovery session never shipped; the no-duplication assertion cannot be made"
+  fi
+done
+
+# --- the preserved evidence, captured as a byte prefix --------------------------------------
+# Contract 8 wants the audit and action-audit volumes "byte-identical in their pre-recovery
+# prefix". A PREFIX, not the whole file: the mediator and the recorders legitimately append
+# their own start-up lines on the way back up, and an equality test would fail on those and say
+# nothing about whether the pre-recovery record survived intact.
+E_PREFIX_LEN_audit="$(fx_med sh -c 'wc -c < /var/log/mediator/egress-audit.log' 2>/dev/null | tr -d ' \n' || true)"
+E_PREFIX_SHA_audit="$(fx_med sh -c "head -c ${E_PREFIX_LEN_audit:-0} /var/log/mediator/egress-audit.log | sha256sum | cut -d' ' -f1" 2>/dev/null | tr -d ' \n' || true)"
+for a in "${AGENTS[@]}"; do
+  l="$(fx_rec "$a" sh -c 'wc -c < /var/log/actions/action-audit.log' | tr -d ' \n')"
+  h="$(fx_rec "$a" sh -c "head -c ${l:-0} /var/log/actions/action-audit.log | sha256sum | cut -d' ' -f1" | tr -d ' \n')"
+  eval "E_PREFIX_LEN_$a=\$l"; eval "E_PREFIX_SHA_$a=\$h"
+done
+if [ -n "$E_PREFIX_SHA_audit" ] && [ "${E_PREFIX_LEN_audit:-0}" -gt 0 ]; then
+  pass "E: pre-recovery evidence captured -- audit ${E_PREFIX_LEN_audit}B, and one prefix per action-audit volume"
+else
+  fail "E: could not capture the pre-recovery audit prefix; the preservation assertion cannot be made"
+fi
+
+# --- contaminate (criterion 3's markers, one per store) -------------------------------------
+# These are test instrumentation, NOT detection (D16). A contaminated volume stays
+# indistinguishable from a clean one, and the recovery path discards without trying to tell --
+# the markers exist only so this harness can see afterwards what the path did.
+#
+# Each marker is chosen to be a file that does NOT exist on a fresh state volume (measured:
+# `~/.claude` and `~/.gemini` are seeded empty, and `~/.codex/config.toml` is seeded WITHOUT any
+# `[mcp_servers.*]` table), so "no marker remains" is unambiguous.
+E_WS_MARKER="workspace/.t41-marker"
+
+fx_in claude 'mkdir -p /home/agent/.claude && printf "%s\n" "{\"hooks\":{\"PreToolUse\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"t41-contamination-marker\"}]}]}}" > /home/agent/.claude/settings.json' >/dev/null
+fx_in codex  'printf "\n[mcp_servers.t41probe]\ncommand = \"t41-contamination-marker\"\n" >> /home/agent/.codex/config.toml' >/dev/null
+fx_in agy    'mkdir -p /home/agent/.gemini && printf "%s\n" "{\"t41ContaminationMarker\":true}" > /home/agent/.gemini/settings.json' >/dev/null
+for a in "${AGENTS[@]}"; do
+  fx_in "$a" 'printf "t41\n" > /build-cache/.t41-marker' >/dev/null
+done
+printf 't41\n' > "$ROOT/$E_WS_MARKER"
+
+E_PLANTED=1
+[ "$(fx_in claude '[ -f /home/agent/.claude/settings.json ] && echo y')" = y ] || { E_PLANTED=0; note "claude settings marker did not land"; }
+[ "$(fx_in codex  'grep -q "\[mcp_servers.t41probe\]" /home/agent/.codex/config.toml && echo y')" = y ] || { E_PLANTED=0; note "codex config.toml marker did not land"; }
+[ "$(fx_in agy    '[ -f /home/agent/.gemini/settings.json ] && echo y')" = y ] || { E_PLANTED=0; note "agy settings marker did not land"; }
+for a in "${AGENTS[@]}"; do
+  [ "$(fx_in "$a" '[ -f /build-cache/.t41-marker ] && echo y')" = y ] || { E_PLANTED=0; note "$a build-cache marker did not land"; }
+done
+[ "$(fx_in claude '[ -f /workspace/.t41-marker ] && echo y')" = y ] || { E_PLANTED=0; note "workspace marker is not visible in the agents"; }
+[ "$E_PLANTED" = 1 ] \
+  && pass "E: contaminated all five criterion-3 stores -- a hook entry in claude's settings, an [mcp_servers.*] table in codex's config.toml, an agy settings change, each build cache, and the workspace" \
+  || fail "E: contamination is incomplete; the recovery assertions below would be vacuous"
+
+# --- recover: the runbook § 5.1 path, verbatim ----------------------------------------------
+# `down` WITHOUT `-v`, then `docker volume rm` of the discard rows BY NAME, then a rebuild. The
+# selectivity is the whole point: `down -v` would take the audit and action-audit volumes with it.
+E_DISCARD=()
+for a in "${AGENTS[@]}"; do E_DISCARD+=("${PROJECT_FX}_${a}-state" "${PROJECT_FX}_${a}-build-cache"); done
+
+fx down --remove-orphans >/dev/null 2>&1 || fail "E: 'docker compose down' failed"
+
+E_RM_OK=1
+for v in "${E_DISCARD[@]}"; do
+  docker volume rm "$v" >/dev/null 2>&1 || { E_RM_OK=0; note "could not remove $v"; }
+done
+[ "$E_RM_OK" = 1 ] \
+  && pass "E: the six discard-row volumes were removed by name (three state, three build cache)" \
+  || fail "E: at least one discard-row volume could not be removed"
+
+E_KEPT_OK=1
+for v in "${PROJECT_FX}_audit" "${PROJECT_FX}_claude-action-audit" "${PROJECT_FX}_codex-action-audit" "${PROJECT_FX}_agy-action-audit"; do
+  docker volume inspect "$v" >/dev/null 2>&1 || { E_KEPT_OK=0; note "$v is gone"; }
+done
+[ "$E_KEPT_OK" = 1 ] \
+  && pass "E: the four preserve-row volumes survived the selective discard (audit + three action-audit)" \
+  || fail "E: a preserve-row volume was destroyed by the recovery path"
+
+echo "--- rebuilding and recreating (runbook § 5.1) ---"
+fx up -d --build --force-recreate >"${TMPDIR:-/tmp}/containment-fx-recover.$$.log" 2>&1 || {
+  fail "E: the recovery bring-up failed"
+  tail -20 "${TMPDIR:-/tmp}/containment-fx-recover.$$.log" | sed 's/^/      /'
+}
+E_MED_WAIT=0
+while ! fx_med true >/dev/null 2>&1; do
+  E_MED_WAIT=$((E_MED_WAIT + 1))
+  [ "$E_MED_WAIT" -lt 60 ] || break
+  sleep 1
+done
+
+E_ALL_UP=1
+for a in "${AGENTS[@]}"; do
+  [ "$(fx_state "$a")" = running ] || { E_ALL_UP=0; note "$a is $(fx_state "$a") after recovery"; }
+  [ "$(fx_state "${a}-recorder")" = running ] || { E_ALL_UP=0; note "${a}-recorder is $(fx_state "${a}-recorder") after recovery"; }
+done
+[ "$E_ALL_UP" = 1 ] \
+  && pass "E: every agent and recorder came back after the discard and rebuild" \
+  || fail "E: the pod did not come back complete after recovery"
+
+# --- assert every disposition -----------------------------------------------------------
+# discard: no marker may remain
+[ "$(fx_in claude '[ -f /home/agent/.claude/settings.json ] && echo present || echo absent')" = absent ] \
+  && pass "E/discard: claude's planted hook entry is gone with its state volume" \
+  || fail "E/discard: claude's planted hook entry survived the discard"
+
+# codex's config.toml is RE-SEEDED by the entrypoint on a fresh volume, so the file is expected
+# back. What must not come back is the planted table.
+E_CODEX_CFG="$(fx_in codex '[ -f /home/agent/.codex/config.toml ] && echo present || echo absent')"
+E_CODEX_TBL="$(fx_in codex 'grep -q "\[mcp_servers.t41probe\]" /home/agent/.codex/config.toml && echo present || echo absent')"
+if [ "$E_CODEX_CFG" = present ] && [ "$E_CODEX_TBL" = absent ]; then
+  pass "E/discard: codex's config.toml is re-seeded fresh and carries no [mcp_servers.t41probe] table"
+else
+  fail "E/discard: codex's config.toml is '$E_CODEX_CFG' and the planted table is '$E_CODEX_TBL'"
+fi
+
+[ "$(fx_in agy '[ -f /home/agent/.gemini/settings.json ] && echo present || echo absent')" = absent ] \
+  && pass "E/discard: agy's planted settings change is gone with its state volume" \
+  || fail "E/discard: agy's planted settings change survived the discard"
+
+for a in "${AGENTS[@]}"; do
+  [ "$(fx_in "$a" '[ -f /build-cache/.t41-marker ] && echo present || echo absent')" = absent ] \
+    && pass "E/discard: '$a''s build-cache marker is gone" \
+    || fail "E/discard: '$a''s build-cache marker survived the discard"
+done
+
+# review: the project mount is host content and the operator's repository. The path NEVER
+# discards it (Edge Case 12, Contract 5). Its marker surviving is the assertion, not a failure.
+[ "$(fx_in claude '[ -f /workspace/.t41-marker ] && echo present || echo absent')" = present ] \
+  && pass "E/review: the workspace marker SURVIVED -- the path reviews the project mount and never discards it (Edge Case 12)" \
+  || fail "E/review: the workspace marker is gone; the recovery path destroyed host content it must only review"
+
+# preserve: the pre-recovery record is byte-identical in its prefix
+E_AUDIT_SHA_AFTER="$(fx_med sh -c "head -c ${E_PREFIX_LEN_audit:-0} /var/log/mediator/egress-audit.log | sha256sum | cut -d' ' -f1" 2>/dev/null | tr -d ' \n' || true)"
+if [ -n "$E_PREFIX_SHA_audit" ] && [ "$E_AUDIT_SHA_AFTER" = "$E_PREFIX_SHA_audit" ]; then
+  pass "E/preserve: the audit volume's first ${E_PREFIX_LEN_audit}B are byte-identical after recovery"
+else
+  fail "E/preserve: the audit volume's pre-recovery prefix changed"
+  note "before: ${E_PREFIX_SHA_audit:-<none>}  after: ${E_AUDIT_SHA_AFTER:-<unreadable>}"
+fi
+
+for a in "${AGENTS[@]}"; do
+  eval "l=\$E_PREFIX_LEN_$a"; eval "h=\$E_PREFIX_SHA_$a"
+  after="$(fx_rec "$a" sh -c "head -c ${l:-0} /var/log/actions/action-audit.log | sha256sum | cut -d' ' -f1" | tr -d ' \n')"
+  if [ -n "$h" ] && [ "$after" = "$h" ]; then
+    pass "E/preserve: '$a''s action-audit volume is byte-identical in its first ${l}B"
+  else
+    fail "E/preserve: '$a''s action-audit prefix changed across recovery"
+    note "before: ${h:-<none>}  after: ${after:-<unreadable>}"
+  fi
+done
+
+# --- the recorder on a fresh state volume (Edge Case 10) -----------------------------------
+# Two separate claims. It must NOT re-ship what it already shipped -- the transcript that
+# produced those lines is gone with the volume, and a recorder that re-scanned from zero would
+# double every line it holds. And it must still be recording: a new session on the fresh volume
+# ships exactly once.
+for a in "${AGENTS[@]}"; do
+  case "$a" in claude) s="$E_PRE_CLAUDE" ;; codex) s="$E_PRE_CODEX" ;; agy) s="$E_PRE_AGY" ;; esac
+  eval "before=\$E_PRE_COUNT_$a"
+  after="$(fx_sink_count "$a" "$s")"
+  if [ "$after" = "$before" ]; then
+    pass "E/recorder: '$a' did not re-ship its pre-recovery session ($before line(s) before and after)"
+  else
+    fail "E/recorder: '$a''s pre-recovery session went from $before to $after line(s) -- the sink was duplicated"
+  fi
+done
+
+fx_plant_session claude "$E_POST_CLAUDE" t41-post-claude
+fx_plant_session codex  "$E_POST_CODEX"  t41-post-codex
+fx_plant_session agy    "$E_POST_AGY"    t41-post-agy
+
+for a in "${AGENTS[@]}"; do
+  case "$a" in claude) s="$E_POST_CLAUDE" ;; codex) s="$E_POST_CODEX" ;; agy) s="$E_POST_AGY" ;; esac
+  if fx_wait_ship "$a" "$s" 20; then
+    n="$(fx_sink_count "$a" "$s")"
+    [ "$n" = 1 ] \
+      && pass "E/recorder: '$a' resumed on the fresh state volume and shipped the new session exactly once" \
+      || fail "E/recorder: '$a' shipped the new session $n times, not once"
+  else
+    fail "E/recorder: '$a' never shipped a session from the fresh state volume"
+  fi
+done
+
+# Stated, not asserted: what a discarded volume looks like to a recorder that was mid-file.
+# 02.1 emits `transcript_truncated` on a shrink and `transcript_replaced` on an inode change;
+# a volume that is removed and recreated is neither, it is a source glob that matches nothing
+# and then matches something new. Recorded so the drill record can say what was observed rather
+# than what was expected.
+note "E: recorder events on the fresh volume: $(fx_sink claude | jq -r 'select(.event != null) | .event' 2>/dev/null | tail -3 | tr '\n' ' ' | sed 's/ $//')"
+
+rm -f "$ROOT/$E_WS_MARKER"
 
 # ---------------------------------------------------------------------------
 # Hand the subnets over to phase F

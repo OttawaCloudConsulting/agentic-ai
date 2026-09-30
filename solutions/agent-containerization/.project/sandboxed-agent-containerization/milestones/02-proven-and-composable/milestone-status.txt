@@ -345,3 +345,27 @@
     ignore it. Codebase-assessment refresh SKIPPED again (no codebase-assessment.md exists;
     documented edge case, warning not blocker). The composite was NOT re-run at SF-3 per D-08
     (tests at feature completion only); SF-2's composite result stands.
+    SF-4 PARTIAL 2026-09-30 -- sub-feature NOT closed, count stays 3/7. Landed: phase E
+    (26 assertions, all green), the MCP-disable exercise, and the R13.2/T40 amendment text.
+    Harness now 165 passed, 4 failed -- the same four phase A expected reds, nothing new.
+    build-cache.yaml is layered into the fixture stack so criterion 3's three build-cache
+    volumes are really contaminated and really discarded rather than only asserted statically.
+    Phase E asserts every Contract 5 disposition: six discard volumes removed by name, four
+    preserve volumes byte-identical in their pre-recovery prefix (audit 23025B; action-audit
+    966/989/861B), the workspace marker SURVIVING because the project mount is reviewed and
+    never discarded (Edge Case 12), and the recorder resuming on a fresh state volume without
+    re-shipping (1 line before and after per agent; new session ships exactly once). Observed
+    rather than predicted: a removed-and-recreated volume emits recorder_start, not
+    transcript_truncated or transcript_replaced. Negative control E (skip the volume rm) run
+    once and recorded: every discard assertion fails AND codex exits 3 on
+    'mcp-gate: REFUSED uninventoried server t41probe', which is Decision 4's fourth prediction
+    measured from the other direction. NEW FINDING against the SF-1 runbook, now corrected in
+    section 3.3: the MCP disable's step 2 cannot be done from inside the agent -- entrypoint.sh
+    runs run_mcp_gate BEFORE exec "$@", so a refused agent exits 3 and the operator's edit never
+    runs; the working form is a helper container mounting the state volume, built on that
+    agent's OWN image (the volume is owned by its runtime uid; the mediator image was refused at
+    the filesystem). OPEN: SF-4's full T41 drill -- identity rotation, re-bootstrap of all three
+    agents, main-pinned digest from 02.4. Operator chose "phase E now, drill after" and
+    confirmed a GEMINI_API_KEY IS available, so agy is NOT a named gap this time (unlike
+    02.2 SF-4). No deviation recorded for SF-4. Codebase-assessment refresh SKIPPED again
+    (no codebase-assessment.md; documented edge case). Composite NOT re-run (D-08).

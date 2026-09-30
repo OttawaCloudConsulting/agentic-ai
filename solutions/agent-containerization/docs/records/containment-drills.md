@@ -1,14 +1,17 @@
 # Containment Drills — Feature 02.5
 
 **Feature:** `containment-response-and-the-authorization-gate.md`
-**Date:** 2026-09-29 (SF-1: skeleton and template), 2026-09-30 (SF-3: phases A–D measured)
+**Date:** 2026-09-29 (SF-1: skeleton and template), 2026-09-30 (SF-3: phases A–D measured; SF-4: phase E,
+the MCP-disable exercise and the R13.2/T40 amendment text)
 **Method:** Every drill follows `docs/containment-runbook.md` **verbatim**. A deviation is a
 **finding**: it is fixed in the runbook and the drill is **re-run**, not annotated (Test Strategy).
 A drill whose clock is interrupted is re-run, not annotated — `t0` to `t1` is only meaningful
 without a gap (Edge Case 18).
-**Outcome:** *(pending — SF-4 through SF-7)*. SF-3 is recorded: `verify-containment.sh` phases A–D
-measured green except phase A's two expected reds (§ "Expected red"), plus the three recorded
-negative controls for B, C and D.
+**Outcome:** *(pending — SF-4's full drill, and SF-5 through SF-7)*. `verify-containment.sh` phases
+A–F are measured green except phase A's two expected reds (§ "Expected red"), with a recorded
+negative control for each of B, C, D and E. SF-4's mechanical half (phase E), the MCP-disable
+exercise and the R13.2/T40 amendment text are recorded below; **SF-4's full T41 drill is the one
+open item** — it spends real logins and the operator runs it.
 
 > **This repository is public.** No credential value, OAuth code, or token prefix longer than the
 > provider's own public type prefix (`sk-ant-`, `ghp_`) ever enters this record. Drills use
@@ -160,10 +163,54 @@ to a listener that is gone, so it times out; `codex` and `agy` are refused at TC
 ### MCP-disable exercise (Decision 4)
 
 Runs against 02.3's `test-mcp.yaml`, because **no shipped profile carries a server**
-(`servers: []`). The record states every step, which agents are stopped or recreated, and that the
-shipped path **requires a rebuild** because the inventory is baked into the image (02.3 Decision 8).
+(`servers: []`). **Exercised 2026-09-30** against `codex`, four steps plus one probe, each run as
+`docker compose -f compose.yaml -f overrides/test-mcp.yaml run --build --rm --no-deps codex`. The
+substitution `test-mcp.yaml` makes is stated first, because it is what lets the exercise iterate:
+it **bind-mounts** a scratch inventory over `/opt/agent-pack/mcp-inventory.json`, the path the gate
+reads. On the shipped path that file is **image content** (02.3 Decision 8), so every inventory edit
+below is a profile edit plus a rebuild in real use.
 
-*(pending SF-4)*
+The server: `t40-server`, a stdio entry `command = "t40-demo"` in `~/.codex/config.toml`, with the
+matching `capability_baseline.config_sha256` =
+`a63cc539a19f32f4bf161cfbf6cfca9795ed18447bca1b672c22bd1002fc11c4`.
+
+| Step | What was done | Result |
+|---|---|---|
+| 1 — enabled | Inventory carries `t40-server`; `config.toml` carries the matching entry | **exit 0**, the agent's own command ran. This is the baseline the disable has to move away from |
+| 2 — disable attempt A: **inventory only** | Server removed from the inventory; the `config.toml` entry left in place | **exit 3** — `mcp-gate: REFUSED uninventoried server 't40-server' in /home/agent/.codex/config.toml (R7.14, T29)`. The agent **does not start** |
+| 2b — **probe: can the agent fix its own config?** | From step 2's refused state, the start command was a `sed` deleting the entry | **exit 3, and the edit never ran.** See the finding below |
+| 3 — disable attempt B: **inventory + the config entry** | Inventory empty, and the `config.toml` entry removed **from outside the agent**, through a helper container mounting `codex-state` | **exit 0**, the agent's own command ran. The server is disabled and the agent starts |
+| 4 — a compromised agent re-adds the entry | The entry appended back to `config.toml` on the state volume, inventory still empty | **exit 3**, the same REFUSED line. The agent does not start. **Containment-safe**, and it is Decision 4's fourth prediction, measured |
+
+**Which agents are stopped or recreated.** Only the agents that load the server. On the shipped path
+the canonical `docker compose up --build --force-recreate` with no service argument recreates
+**every** service, the mediator included; naming the affected agents —
+`docker compose up --build --force-recreate codex` — narrows it to a rebuild plus a restart of that
+agent. It is still a restart: there is no live form.
+
+#### FINDING — the agent container cannot be used to remove its own entry
+
+Step 2b is a finding against the runbook as SF-1 drafted it. § 3.3 step 2 says "remove the
+corresponding entry from the agent's own config **on its state volume**" without saying from where.
+The obvious reading — `docker compose exec` or `run` into that agent and edit the file — **does not
+work**, and cannot: `images/entrypoint.sh` calls `run_mcp_gate` *before* `exec "$@"`, so a refused
+gate exits 3 before any command the operator supplied ever runs. Measured: the `sed` did not
+execute, and the exit was the gate's.
+
+The working form, measured at step 3, is a helper container mounting the state volume directly:
+
+```bash
+docker run --rm -v sandboxed-agent-pod_codex-state:/s --entrypoint sh sandboxed-agent/codex:local \
+  -c 'sed -i "/mcp_servers.<name>/,+1d" /s/.codex/config.toml'
+```
+
+The agent's own image is used deliberately: the state volume is owned by that image's runtime uid,
+and a container built on a different base is refused at the filesystem (measured — the mediator
+image could not read the same path). `§ 3.3` is corrected to this form.
+
+**This sharpens Decision 4's tradeoff rather than changing it.** The gate refusing is the *correct*
+behaviour — it is exactly what makes step 4 containment-safe — but it means the disable procedure
+must reach the state volume from outside the blast radius, which the runbook now says.
 
 ---
 
@@ -239,16 +286,99 @@ deliberately does not have. Recorded as measured rather than engineered around.
 
 ## T41 — return to known-good (SF-4)
 
-Mechanical steps under the fixture topology are `verify-containment.sh` phase E. The **full drill**
-is performed once and recorded here: identity rotation for the contaminated agent, re-bootstrap for
-all three agents, and the recorder resuming without duplicates. The drill runs against the
-`main`-pinned digest from 02.4.
+Mechanical steps under the fixture topology are `verify-containment.sh` phase E — **measured
+2026-09-30, 26 assertions, all green**. The **full drill** is performed once by the operator and
+recorded below: identity rotation for the contaminated agent, re-bootstrap for all three agents, and
+the recorder resuming without duplicates, against the `main`-pinned digest from 02.4.
+
+### Phase E — the mechanical path (SF-4)
+
+The runbook's § 5.1 path executed end to end: contaminate, `down` **without** `-v`,
+`docker volume rm` the discard rows **by name**, then `up --build --force-recreate`.
+
+`build-cache.yaml` is layered into the fixture stack for this phase. Criterion 3 contaminates "each
+opt-in build-cache volume, when enabled", and a disposition only ever asserted statically is a
+disposition nothing has exercised — so the fragment is enabled and its three volumes are really
+contaminated and really discarded.
+
+**The markers are test instrumentation, not detection** (D16). A contaminated volume stays
+indistinguishable from a clean one; the path discards without trying to tell. Each marker was chosen
+to be a file that does **not** exist on a fresh state volume — measured: `~/.claude` and `~/.gemini`
+are seeded empty and `~/.codex/config.toml` is seeded with no `[mcp_servers.*]` table — so "no marker
+remains" is unambiguous.
 
 ### Per-store outcomes
 
 One row per store in the runbook's § 5.2 disposition table, with the outcome asserted after recovery.
 
-*(pending SF-4)*
+| Store | Disposition | Marker planted | Outcome after recovery |
+|---|---|---|---|
+| `claude-state` | `discard` | a `hooks.PreToolUse` command entry in `~/.claude/settings.json` | **gone** — the file does not exist on the fresh volume |
+| `codex-state` | `discard` | `[mcp_servers.t41probe]` appended to `~/.codex/config.toml` | **gone.** The file itself is back — the entrypoint re-seeds it on a fresh volume — and carries no `t41probe` table. Asserted on the table, not the file |
+| `agy-state` | `discard` | a `t41ContaminationMarker` key in `~/.gemini/settings.json` | **gone** |
+| `claude-build-cache`, `codex-build-cache`, `agy-build-cache` | `discard` | `/build-cache/.t41-marker` in each | **gone**, all three |
+| `audit` | `preserve` | — | **byte-identical in its first 23025 B** after recovery |
+| `claude-action-audit`, `codex-action-audit`, `agy-action-audit` | `preserve` | — | **byte-identical** in their first 966 B / 989 B / 861 B |
+| project mount (`workspace/`) | `review` | `/workspace/.t41-marker` | **SURVIVED, and that is the assertion** (Edge Case 12). The path reviews host content and never discards it. The harness removes its own marker in the trap |
+| `compose/generated/` | `rotate` | — | Not exercised by phase E. Host staging; its rotation is T26's procedure, drilled at SF-5 |
+| `mediator/identity/` | `rotate` | — | Not exercised by phase E. Identity rotation is part of the **full drill** below and of S1/S4/S5 at SF-5 |
+
+**A prefix, not the whole file.** The preservation assertion compares the first *N* bytes, where *N*
+is the file's length before recovery. The mediator and the recorders legitimately append their own
+start-up lines on the way back up; an equality test would fail on those and say nothing about
+whether the pre-recovery record survived intact.
+
+### The recorder on a fresh state volume (Edge Case 10)
+
+Two separate claims, both measured for all three agents.
+
+| Asserted | Result |
+|---|---|
+| the recorder does **not** re-ship what it already shipped | yes — each agent's pre-recovery session held **1** line on its sink before recovery and **1** after. The transcript that produced it went with the volume; a recorder that re-scanned from zero would have doubled it |
+| the recorder still records | yes — a new session planted on the fresh volume shipped **exactly once** for each agent |
+
+**What a discarded volume looks like to the recorder, observed rather than predicted.** 02.1 emits
+`transcript_truncated` on a shrink and `transcript_replaced` on an inode change. A volume that is
+removed and recreated is neither: the source glob matches nothing, then matches something new. The
+events on the sink after recovery were **`recorder_start`** — one per recorder — and nothing else.
+
+### Recorded negative control (run once, not left in the suite)
+
+**Skip the `volume rm`.** Contaminate, `down`, then `up --build --force-recreate` with no discard.
+Measured 2026-09-30:
+
+| Asserted by phase E | Result without the discard |
+|---|---|
+| claude's planted hook entry is gone | **no — PRESENT** |
+| agy's planted settings change is gone | **no — PRESENT** |
+| each build-cache marker is gone | **no — PRESENT**, all three |
+
+Every discard assertion fails, so the phase is a real one.
+
+**And the control produced a second result worth keeping.** `codex` did not come back at all:
+
+```
+status=exited exit=3
+codex-1  | mcp-gate: REFUSED uninventoried server 't41probe' in /home/agent/.codex/config.toml (R7.14, T29)
+```
+
+The planted `[mcp_servers.t41probe]` table survived on the undiscarded volume, and the start-time
+gate refused the agent. That is **Decision 4's fourth prediction, measured from the other direction**
+— a contaminated capability declaration is not merely recorded, it stops the agent starting — and it
+is why the recovery path's discard is not optional for an agent contaminated this way.
+
+### The full drill — pending the operator
+
+Phase E proves the mechanical path. The drill adds what no unattended harness can spend:
+
+1. identity rotation for the contaminated agent (`scripts/issue-identity.sh`), CA untouched;
+2. re-bootstrap of authentication for **all three** agents — real OAuth logins for `claude` and
+   `codex`, and the `GEMINI_API_KEY` cell for `agy` (operator confirmed 2026-09-30 that a key is
+   available, so `agy` is **not** a named gap here, unlike 02.2 SF-4);
+3. the recorder resuming on the rotated pod without duplicates;
+4. the whole path run against the **`main`-pinned digest from 02.4**, not a local build.
+
+*(pending — the operator runs it; SF-4 stays open until it is recorded here)*
 
 ---
 
@@ -407,7 +537,43 @@ recreation of every agent that loads the server; a stdio server has no enforceme
 tested amendment text; it does not accept it. The milestone Definition of Done gates on acceptance,
 and the R12.8 notice is **not lifted here** (criterion 9).
 
-*(exact amendment text — pending SF-4, which exercises the path it describes)*
+**Exact replacement text, written 2026-09-30 from the exercised path** (see § T40, MCP-disable
+exercise). Two lines change and nothing else.
+
+`REQUIREMENTS.md:337` — R13.2, replace:
+
+> | R13.2 | MUST | S | A single agent can be isolated, and a single MCP server or tool disabled, without stopping the other agents |
+
+with:
+
+> | R13.2 | MUST | S | A single agent can be isolated live, without stopping the other agents. A single MCP server or tool can be disabled without stopping the other agents; disabling it restarts the agents that load it, because the capability inventory is image content and the agent's own declaration is on its state volume |
+
+`REQUIREMENTS.md:510` — T40, replace:
+
+> | T40 Single-agent isolation | Stop one agent container; then disable one MCP server | The other two agents continue unaffected. The MCP disable path is exercised and its current rebuild requirement recorded | R13.2 |
+
+with:
+
+> | T40 Single-agent isolation | Isolate one agent, both forms: stop it with its recorder, and detach it from its network with the container kept. Then disable one MCP server: remove it from the inventory, remove the agent's own declaration from its state volume **from outside that agent**, and recreate the agents that load it | The other two agents continue unaffected in both isolation forms, and the mediator keeps serving. The MCP disable requires a rebuild and a restart of the loading agents; removing it from the inventory alone refuses that agent at its next start (`mcp-gate` exit 3), which is containment-safe | R13.2 |
+
+**What changed and why.**
+
+- **Isolation splits into two forms**, because both are now measured and they are not
+  interchangeable: `stop` is durable and ends the recording; `network disconnect` keeps the
+  container for forensics and keeps the recording alive. R13.2 said "isolated" without saying which.
+- **"without stopping the other agents" is kept and met.** Measured for both forms, for all three
+  agents, at SF-3 phase B.
+- **The disable clause admits the restart.** R13.2 as written implies a live disable. There is none,
+  and building one is a feature in its own right (Decision 4, option B): a stdio server has no
+  enforcement point at all (D18), and an HTTP server's egress could be cut live only through a
+  mediator reload path that does not exist (D4).
+- **The removal step says *from outside that agent*,** which the exercise measured as load-bearing:
+  the gate runs before anything the agent runs, so a refused agent cannot edit its own declaration.
+- **The refusal is named as containment-safe**, because it is the property that makes an
+  inventory-only removal a safe intermediate state rather than a half-applied change.
+
+**R13.2 stays formally unmet until the operator accepts this text.** Accepting it is the operator's
+decision, the milestone Definition of Done gates on it, and the R12.8 notice is not lifted here.
 
 ---
 
@@ -418,12 +584,12 @@ Every numbered acceptance criterion maps to a harness phase, a drill, or a recor
 | Criterion | Evidence | Where | State |
 |---|---|---|---|
 | 1 — T26 tested revocation, every persisted type | Drills E1–E4, V1–V3, S1–S5 | This record, § T26 (SF-5, SF-6); inventory Table B | pending |
-| 2 — T40 single-agent isolation | Phase B (both forms); MCP-disable exercise; amendment text | Phase B (SF-3); this record § T40 | **both forms measured (SF-3)**; MCP half pending SF-4 |
-| 3 — T41 return to known-good | Phase E (mechanical); full drill; per-store outcomes | Phase E (SF-4); this record § T41 | pending |
+| 2 — T40 single-agent isolation | Phase B (both forms); MCP-disable exercise; amendment text | Phase B (SF-3); this record § T40, § Proposed edits 2 | **measured (SF-3 + SF-4)** — both isolation forms, the MCP-disable exercise and the amendment text. Acceptance of the amendment is the operator's, and R13.2 stays formally unmet until then |
+| 3 — T41 return to known-good | Phase E (mechanical); full drill; per-store outcomes | Phase E (SF-4); this record § T41 | **mechanical path measured (SF-4)**, every disposition asserted; **full drill pending the operator** |
 | 4 — R12.5 teardown | Phase D | Phase D (SF-3); this record § R12.5 | **measured (SF-3)** |
 | (Decision 3) — the pod-wide cut keeps the detection signal | Phase C | Phase C (SF-3); this record § The pod-wide cut | **measured (SF-3)** |
 | 5 — T37 authorization gate | Phase F, compile negatives and runtime checks | Phase F (SF-2); this record § T37 | pending |
 | 6 — T44 ToS monitoring and the seam | R14.3 record for three routes; tabletop SIMULATION; seam inspection | `third-party-assessments.md`; this record § T44 (SF-7) | pending |
 | 7 — the runbook | Shipped, with event/incident defined before go-live; README links it | `docs/containment-runbook.md` (SF-1 draft, SF-7 final) | **draft (SF-1)** |
-| 8 — records and proposed edits | This record; the two proposed edits above | This record (SF-7) | pending |
+| 8 — records and proposed edits | This record; the two proposed edits above | This record (SF-7) | **edit 2 (R13.2/T40) written from the exercised path (SF-4)**; edit 1 pending SF-7 |
 | 9 — the R12.8 notice is not lifted here | Stated, not acted on | This record, § Proposed edits 2 | **stated (SF-1)** |

@@ -5,10 +5,12 @@ measurements and finalised at SF-7)
 **Requirements:** R13.1, R13.2, R13.3, R12.5, R12.7, D16, and the R9.6 review trigger handed over
 by Feature 02.1.
 **Status:** **DRAFT.** Event and incident definitions and every stated maximum are
-operator-confirmed (2026-09-29). The **live containment forms (§ 3.1, § 3.2) are measured**, and so is
-the **teardown guarantee § 2 states and § 5.1's `down`-without-`-v` step depends on** — SF-3,
-2026-09-30, `verify-containment.sh` phases B–D, recorded in `docs/records/containment-drills.md`. The
-rest of § 5's recovery path is **not yet measured**; SF-4 drills it (phase E and the full T41 drill). The **revocation procedures (§ 3.4, § 4) are not yet
+operator-confirmed (2026-09-29). The **live containment forms (§ 3.1, § 3.2)**, the **teardown
+guarantee (§ 2)**, the **MCP disable path (§ 3.3)** and the **mechanical recovery path (§ 5.1, § 5.2)**
+are all measured — SF-3 and SF-4, 2026-09-30, `verify-containment.sh` phases B–E and the MCP-disable
+exercise, recorded in `docs/records/containment-drills.md`. Still **not measured**: the revocation
+procedures (§ 3.4, § 4), which SF-5 and SF-6 drill, and § 5's live half — identity rotation and
+re-bootstrap — which the operator's full T41 drill covers. The **revocation procedures (§ 3.4, § 4) are not yet
 measured**; SF-5 and SF-6 drill them. Written before the drills, deliberately (Decision 7) — a drill
 measures a procedure only if the procedure existed before the clock started. Commands still marked
 **UNMEASURED** are corrected to their measured form in SF-5/SF-6.
@@ -181,24 +183,38 @@ sink. Stopping the recorder first loses it.
 `docs/records/containment-drills.md`; **R13.2 stays formally unmet until the operator accepts it**,
 and the milestone Definition of Done gates on that.
 
-**Durable form:**
+**Durable form — MEASURED 2026-09-30** (SF-4; `docs/records/containment-drills.md` § MCP-disable
+exercise):
 
 1. remove the server from the profile's `mcp:` list and recompile;
 2. remove the corresponding entry from the agent's own config **on its state volume** — that file is
    inside the blast radius (R1.2), and without this step `mcp-gate` refuses the agent at its next
-   start (exit 3);
+   start (exit 3, measured);
 3. rebuild and recreate every agent that loads it:
 
 ```bash
 docker compose up --build --force-recreate claude   # narrower than recreating the whole pod
 ```
 
+> **Step 2 must be done from OUTSIDE the agent.** `docker compose exec`/`run` into the refused agent
+> and editing the file **does not work**: `images/entrypoint.sh` runs `mcp-gate` *before* it execs
+> anything you asked for, so a refused gate exits 3 and your edit never runs. Measured at SF-4. Use
+> a helper container that mounts the state volume directly, built on **that agent's own image** —
+> the volume is owned by that image's runtime uid, and a container on a different base is refused at
+> the filesystem:
+>
+> ```bash
+> docker run --rm -v sandboxed-agent-pod_codex-state:/s --entrypoint sh sandboxed-agent/codex:local \
+>   -c 'sed -i "/mcp_servers.<name>/,+1d" /s/.codex/config.toml'
+> ```
+
 The inventory is **image content** (02.3 Decision 8), so this path requires a rebuild. The canonical
 `up --build --force-recreate` with no service argument recreates **every** service, the mediator
 included; naming the affected agents narrows it to a restart of those agents.
 
 A compromised agent that re-adds the config entry meets the gate at its next start and **does not
-start**. That is containment-safe.
+start**. That is containment-safe — measured at SF-4, twice: once by re-adding the entry directly,
+and once as the side effect of recovering a contaminated pod without discarding its state volume.
 
 ### 3.4 Rotate credentials
 

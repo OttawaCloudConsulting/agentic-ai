@@ -377,13 +377,15 @@ recompile, and the operator-heavy drills last.
   - Phase D: R12.5.
   - Measures Decision 3's live forms, including whether the mediator tolerates an agent-network
     detach. The runbook commands are corrected to what was measured.
-- [ ] **SF-4: T41 drill and the T40 MCP half.**
-  - Harness **phase E** covers T41's mechanical steps (contaminate, selective discard, rebuild,
+- [ ] **SF-4: T41 drill and the T40 MCP half.** *(partial, 2026-09-30 — the full drill is the only
+  open item; the sub-feature stays unchecked until it is recorded)*
+  - [x] Harness **phase E** covers T41's mechanical steps (contaminate, selective discard, rebuild,
     assert dispositions) under the fixture topology with the harness's own project name.
-  - The **full drill** is performed once and recorded: identity rotation for the contaminated agent,
-    re-bootstrap for all three agents, and the recorder resuming without duplicates.
-  - The **MCP-disable exercise** runs against 02.3's `test-mcp.yaml` and records per Decision 4.
-  - The R13.2 and T40 amendment text goes into the drills record.
+  - [ ] The **full drill** is performed once and recorded: identity rotation for the contaminated
+    agent, re-bootstrap for all three agents, and the recorder resuming without duplicates.
+    *(operator-run; `GEMINI_API_KEY` confirmed available, so `agy` is not a named gap)*
+  - [x] The **MCP-disable exercise** runs against 02.3's `test-mcp.yaml` and records per Decision 4.
+  - [x] The R13.2 and T40 amendment text goes into the drills record.
 - [ ] **SF-5: T26 drills — pod-local and pack credentials (S1–S3, P1–P2).**
   - Drill each row per Contract 6, and measure `restart` versus `--force-recreate` (inode and
     replay).
