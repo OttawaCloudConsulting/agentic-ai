@@ -1250,7 +1250,23 @@ FAIL: A2: rows with no measured value and no GAP: E1 E2 E3 E4 V1 V2 V3 S1 S2 S3 
 FAIL: A2: rows with no rebuild cell: E1 E2 E3 E4 V1 V2 V3 S1 S2 S3 S4 S5
 ```
 
-**After SF-5 they name only the seven provider rows** — measured on the committed tree,
+**After SF-6's E rows, E4 and V1 they name only V2 and V3** — measured on the committed tree
+2026-09-30, after the Deviation 5/6 image change, at **165 passed, 4 failed**: the same totals as
+before that change, which is the regression evidence for it.
+
+```
+FAIL: A2: rows with no measured value and no GAP: V2 V3
+FAIL: A2: rows with no rebuild cell: V2 V3
+```
+
+`verify-auth-state.sh` — the harness that actually covers `already_authenticated()` — was
+deliberately **not** run: its own header records that it iterates **live provider credentials, the
+operator's real accounts**, which is why D22 keeps it out of the composite. With the drill session
+revoked it would fail for want of a credential rather than for a regression, and would spend the
+operator's working credentials to do it. The two-direction test of the rebuilt image above is the
+targeted evidence in its place.
+
+**After SF-5 they named only the seven provider rows** — measured on the committed tree,
 2026-09-30, with the same overall counts as SF-4 (**165 passed, 4 failed**, the four being these two
 plus part 2's two):
 
