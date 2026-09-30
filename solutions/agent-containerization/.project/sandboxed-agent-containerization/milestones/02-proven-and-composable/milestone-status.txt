@@ -398,5 +398,39 @@
     oauth-interactive cell -- operator decision, bounded because T41 revokes nothing, and it does
     NOT extend to SF-5/SF-6 which do revoke. E4 CORRECTION: a CLAUDE_CODE_OAUTH_TOKEN IS
     outstanding (minted by the operator for this testing work, in the git-ignored .env_keys).
+    SF-5 PARTIAL 2026-09-30 -- sub-feature NOT closed, count stays 4/7. Four of the five rows are
+    drilled and recorded; only S2 (the GitHub PAT) is outstanding, waiting on the operator to mint a
+    drill token. Measured, all inside their maxima and all with the five image IDs identical before
+    and after (R8.5 'no'): S4 codex proxy credential 00:06/10:00, S5 agy 00:14/10:00, S1 the whole
+    Edge Case 6 CA path (ca --force, three listener certs, the client cert, mediator restart,
+    claude/agy recreate) 00:07/10:00, S3 the scoped kubeconfig 00:11/30:00 against a disposable kind
+    cluster that was deleted after. Operator authorised the real-pod CA reissue, chose the
+    rotate-with---force form for S4/S5 as the procedure of record, and chose a kind cluster for S3.
+    S1/S4/S5 needed no provider credential at all (bare curl replays), so Deviation 4's apikey
+    departure is not engaged and the throwaway rule holds by construction -- these are the pod's own
+    material and rotating it IS the drill. ATTEMPT 1 of S4/S5 was re-run under Edge Case 18: its t1
+    was a curl_rc=7 connection failure against a still-binding Squid, which is indistinguishable
+    from a revocation and left no audit line; the readiness gate now polls with the NEW credential
+    until the proxy answers, and that wait is inside the measured time. FINDINGS recorded rather
+    than annotated away: (1) a superseded client certificate is refused but leaves NO attributable
+    audit line -- only proxy_internal error:transaction-end-before-headers, no agent and no
+    destination, and squid-cache.log carries nothing at the shipped debug level, so S1's evidence is
+    the client-side failure plus the cert sha256/serial; the no-certificate case is the one the
+    listener names out loud (TLS 1.3 alert 116). (2) Edge Case 4 measured SHARPER than predicted:
+    the write-then-rename form does not leave the container on a stale inode serving the old
+    credential -- it BREAKS the mount, stat still reporting the old inode and size while a read
+    fails with No such file or directory. It fails closed; the healthy-looking stat is what
+    misleads. The in-place form (what issue-identity.sh does) is visible to a running container with
+    no restart at all. (3) Table B's S4/S5 procedure named `issue-identity.sh credential <agent>
+    --rebuild`, which the script rejects (--rebuild takes no agent, issue-identity.sh:648-654);
+    corrected to the drilled form. (4) S3: a deleted ServiceAccount's bound token kept working ~10s
+    (API-server auth path, no operator action shortens it), and S3's replay is necessarily host-side
+    because the shipped pack's egress.runtime is empty (Decision 6), so the credential is inert in
+    the pod -- a design property, not a drill shortcut. Corrections landed in
+    docs/containment-runbook.md (3.4 gains the readiness rule and the in-place/rename rule; 4 gains
+    a per-row evidence rule naming S1's absent trail), mediator/identity/README.md (the revocation
+    block gains the two missing restart commands and the three measured notes) and README.md's 02.3
+    rotation note. No deviation recorded for SF-5 so far. Codebase-assessment refresh SKIPPED again
+    (no codebase-assessment.md; documented edge case). Composite NOT re-run (D-08).
     Edge Case 1 does not reopen -- its premise was a LEAKED token -- but E4's standing revocation
     obligation is now live and SF-7 carries it. Composite NOT re-run (D-08).
