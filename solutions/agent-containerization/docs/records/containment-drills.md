@@ -843,7 +843,85 @@ documentation.**
 | **D-3** | **A `codex` agent that has run once will not restart** until its self-provisioned `~/.codex/skills/.system` is removed by a helper container on its own image, or the profile's MCP inventory declares those skills (a rebuild and repin, 02.3 Decision 8). Include the exact refusal text so the message is searchable | `README.md` MCP-inventory section **and** runbook § 3.3 | codex-skills finding above |
 | **D-4** | **A stray `compose run` one-off container blocks every volume discard**, `compose down` does not clear one-offs, and an interactive login leaves exactly such a container behind. Include the clearing command | runbook § 5 (already in § 3.4; must also reach the README's recovery text) | V1 drill |
 | **D-5** | **"Revoked" is not a state you may assume.** `t1` is a replay that fails. V2 is the worked example: a console action reported success while the credential kept working. User documentation must tell an operator to replay after revoking | `README.md` containment section | V2 finding |
+| **D-7** | **`README.md`'s `oauth-mount` warning overstates its cost and understates its risk.** "Costs you your host codex login" was **not** measured: after the container rolled, the host set's refresh token still worked. Rolling is not revoking. The correction must say both halves — the host login may well keep working, **and** a captured copy is not neutralised by rotation | `README.md` `oauth-mount` section (the paragraph at README:262) **and** the V3 inventory row | V3 finding above |
+| **D-8** | **`docker compose images --quiet` cannot verify R8.5 across a containment that removes a container** — it lists per container, so a removed agent looks like a changed image. Compare per service by name, or re-create the service first | runbook § 3.4 (where the R8.5 confirmation command is given) | V3 method note |
 | **D-6** | **The credential-handling rule for anyone reproducing these drills:** never print a credential file's contents while inspecting its structure — key names via `grep -o`, size via `wc -c`, identity via a sha256 prefix | `docs/records/containment-drills.md` method preamble **and** the README's drill-reproduction note | method finding above |
+
+### Drill V3 — `codex`'s OAuth set with host provenance (`oauth-mount`)
+
+This row's credential type is **identical to V2's**; only its provenance differs. So what V3
+uniquely tests is the provenance property the plan states as **"rotation is not revocation — a
+captured refresh token stays valid after the legitimate client refreshes past it"** — and that
+claim was in **direct contradiction** with `README.md`'s own operational advice for this cell
+(*"Treat it as a one-shot bootstrap that costs you your host codex login: expect to run `codex
+login` on the host again"*). Both cannot hold. This drill decides it.
+
+- Drill credential: **the operator's own host `codex` login** — which is not a departure from the
+  throwaway rule but the definition of this cell: host provenance *is* the credential under test
+  (R4.13–R4.15). Staged by `scripts/stage-oauth-mount.sh`, which strips `OPENAI_API_KEY` on the way
+  through. Preserved pre-rotation copy: 4025 B, sha256 `cb59d5447902…`; host copy 4050 B,
+  `883ca04a7291…` (differing only by the stripped key). No value recorded, and `~/.codex` was never
+  written to. **Operator authorised the measurement, having been told it could cost the host login.**
+- Stated maximum: **10:00 — the containment clock**, as V1 and V2
+- t0 (incident declared, UTC): **2026-09-30T21:35:38Z**
+- **Contained at 21:35:54Z — 00:16.   Within the 10:00 containment clock: yes.** One-off containers
+  were cleared first, per **D-4**, the gap V1's voided clock exposed; isolate → 6 s recorder drain →
+  stop → discard `codex-state`. The other two agents and the mediator stayed `running`, 1962 audit
+  lines and both action-audit volumes preserved
+- Image IDs before / after: identical — but see the measurement-method note below, because the naive
+  comparison **looked** like a change   Rebuild: **no**
+
+#### The bootstrap boundary held, measured rather than assumed
+
+| Property | Result |
+|---|---|
+| the staged set reaches the volume | `auth.json` 4025 B, sha256 `cb59d5447902…` — **byte-identical to the staged copy** |
+| `OPENAI_API_KEY` stripped (test-validity control, so the cell cannot pass on the API key) | field **absent** from the volume copy |
+| the bootstrap source is absent at steady state (R4.15 — the boundary is the mount, not a flag) | `/run/oauth-src` **not present** in a steady-state container |
+
+#### FINDING (confirmed) — rotation is NOT revocation, and the README's advice is wrong about the cost
+
+Measured in four steps, each with its own evidence, and the V2 lesson applied throughout —
+**success is a new session file, not the presence of an `OK`**:
+
+| # | Step | Evidence |
+|---|---|---|
+| 1 | pod bootstrapped from the staged set | volume sha `cb59d5447902…`, `last_refresh 2026-09-27T22:56:13Z` |
+| 2 | the pod's copy forced to refresh (its `access_token` emptied, refresh token left) | **rolled**: sha → `00eae84a5adb…`, `last_refresh` → **2026-09-30T21:33:40Z**, model call succeeded, 14-line session at 21:33:44Z. 01.4 SF-3's "codex **rolls** its refresh token" is reconfirmed |
+| 3 | the **captured pre-rotation copy** restored and replayed | **worked** — its own 14-line session at 21:34:09Z. `auth.json` unchanged afterwards (`cb59d5447902…`, `last_refresh` still 09-27), so this step used the superseded **access** token |
+| 4 | the captured copy with its **`access_token` emptied**, so only the **superseded refresh token** can work | **worked** — session count 2 → 3, a 14-line session at 21:34:37Z, and `auth.json` **refilled** with a new access token (`last_refresh 2026-09-30T21:34:34Z`, sha → `b72d7f020e89…`). The superseded refresh token minted a working credential **one minute after the pod had rolled past it** |
+
+**So both documents were half right, and the distinction they collapse is the whole finding.**
+`codex` does **roll** its refresh token — a new token is minted, which is what 01.4 SF-3 measured and
+what the README describes. It does **not revoke the old one**. Rolling and revoking are different
+events, and every operational consequence follows from which one you assume:
+
+- **The plan's premise is CONFIRMED.** A captured refresh token stays valid after the legitimate
+  client refreshes past it. For an incident, this is the important direction: **rotation does not
+  neutralise a copy that has already left** (Decision 5, now measured for this row rather than
+  argued).
+- **`README.md`'s stated cost is NOT what was measured.** "Costs you your host codex login — expect
+  to run `codex login` on the host again" did not happen: the host set's refresh token still worked
+  after the container's roll. The cost is *possible*, not certain, and the README states it as
+  certain. **This is D-7 below.**
+- **Together with V2, the picture for `codex` is coherent and uncomfortable:** neither provider-side
+  revocation (V2) nor rotation (V3) invalidates a captured credential set. The only thing that
+  contained anything in either row is the pod-side action — isolate and discard at `t0` — and a
+  captured `codex` credential must be treated as **live until its own expiry** regardless of what
+  the console reports.
+
+#### Measurement-method note — `compose images` is a per-CONTAINER listing
+
+The naive R8.5 comparison across this drill **looked like a change**: five image IDs before, four
+after. The missing line was `69c0a08b3b2c…`, `codex`'s own image, absent because the containment had
+**removed codex's container** — `docker compose images` enumerates images per running container, not
+per defined service. Recreating the service restored the fifth line, identical, and the correct
+result is **no rebuild**.
+
+Recorded because the runbook tells an operator to confirm R8.5 with
+`docker compose images --quiet` before and after, and **any containment that removes a container
+will make that comparison lie**. Compare per service by name, or re-create the service before
+comparing. V1's comparison was unaffected because that drill recreated `claude` before its replays.
 
 ### Access-token survival findings (Edge Case 2)
 

@@ -290,7 +290,7 @@
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
-    Sub-features: 5/7 complete
+    Sub-features: 6/7 complete
     Notes: Started 2026-09-29. SF-1 complete 2026-09-29 (documentation only, 3 files).
     SF-2 complete 2026-09-29 (T37 enforced at compile). Operator supplied both waive
     reasons (github/git-push, kubernetes/infrastructure-apply) and chose the vocabulary
@@ -568,6 +568,40 @@
     one-off container blocks every volume discard and compose down does not clear one-offs; D-5
     'revoked' is not a state to assume, t1 is a replay that fails; D-6 never print a credential
     file's contents while inspecting its structure.
+    V3 drilled 2026-09-30: contained in 00:16 against the row's 10:00 containment clock, no
+    rebuild, one-off containers cleared first per the gap V1 exposed. The credential is the
+    operator's own host login, which for this cell IS the credential under test (R4.13-R4.15), and
+    the operator authorised the measurement having been told it could cost the host login.
+    THE PLAN'S PREMISE IS CONFIRMED -- ROTATION IS NOT REVOCATION -- and it settles a contradiction
+    between two of our own documents. Measured in four steps, each by session file rather than by an
+    OK: the pod bootstrapped from the staged set byte-identically; its copy was forced to roll
+    (last_refresh -> 21:33:40Z); the captured pre-rotation set still worked; and with its access_token
+    emptied so only the SUPERSEDED REFRESH TOKEN could work, it MINTED A NEW ACCESS TOKEN and wrote
+    its own session one minute after the pod had rolled past it. So codex ROLLS its refresh token
+    (01.4 SF-3, reconfirmed) but does NOT REVOKE the old one -- rolling and revoking are different
+    events, and README.md's stated cost for this cell ('costs you your host codex login -- expect to
+    run codex login again') was NOT what happened: the host set still worked. That correction is D-7.
+    With V2 the picture for codex is coherent and uncomfortable: NEITHER provider revocation NOR
+    rotation invalidates a captured credential set, so the pod-side isolate-and-discard is the only
+    measured containment and a captured codex credential must be treated as live until its own
+    expiry. Bootstrap boundary verified rather than assumed: staged set arrives byte-identical,
+    OPENAI_API_KEY stripped (the test-validity control, so the cell cannot pass on the API key), and
+    /run/oauth-src absent at steady state (R4.15 -- the boundary is the mount, not a flag).
+    METHOD FINDING, now D-8: `docker compose images --quiet` lists per CONTAINER, so the containment's
+    own container removal made the naive R8.5 comparison read as a change (five IDs before, four
+    after, the missing one being codex's). Recreating the service restored the fifth, identical --
+    no rebuild. The runbook tells an operator to confirm R8.5 with exactly that command, so any
+    containment that removes a container will make it lie; compare per service by name.
+    SF-6 COMPLETE 2026-09-30. PHASE A'S DRILL-EVIDENCE HALF IS GREEN: verify-containment on the
+    committed tree reads 167 passed, 2 failed, and the two are the R14.3 pair that closes at SF-7 --
+    all twelve inventory rows now carry a measured value and a rebuild cell. Totals: E1 02:29,
+    E2 02:25, E3 02:05, E4 04:39 against 15:00 each; S1 00:07, S4 00:06, S5 00:14 against 10:00;
+    S2 02:21 against 15:00; S3 00:11 against 30:00; V1 00:07 contained (provider effective inside
+    03:27); V2 GAP on the timed row, substantive question measured; V3 00:16 contained. The plan's
+    prediction for this sub-feature was wrong in both directions and that is recorded in the plan:
+    no replay had to wait hours, and 'smallest in code' became two deviations into image code plus
+    EIGHT items carried to user documentation (D-1 to D-8). Composite NOT re-run (D-08); it belongs
+    to feature completion at SF-7.
  (3) method: the bearer probe that is authoritative for E4 is NOT
     authoritative for a session token, and its 401 should not have stood beside the CLI failure.
     A-vs-B resolved: a fresh login authenticated and the CLI answered OK, so attempt 1's death was

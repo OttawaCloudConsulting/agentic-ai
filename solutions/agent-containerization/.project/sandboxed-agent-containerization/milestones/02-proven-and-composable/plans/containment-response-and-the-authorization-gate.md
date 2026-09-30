@@ -401,7 +401,7 @@ recompile, and the operator-heavy drills last.
   implied: S2's re-issue (one drill token was minted), and the `restart`-versus-`--force-recreate`
   comparison was measured on the **mount** — in-place versus rename — not on the proxy-credential
   splice. Attempt 1 of S4/S5 was re-run under Edge Case 18.)*
-- [ ] **SF-6: T26 drills — provider credentials (E1–E4, V1–V3).**
+- [x] **SF-6: T26 drills — provider credentials (E1–E4, V1–V3).**
   - Mint drill credentials, place them in the pod, declare, revoke, and replay both the refresh
     token and the access token.
   - Record the access-token survival findings, and add the compensating action to the runbook where
@@ -410,6 +410,17 @@ recompile, and the operator-heavy drills last.
     (amended at SF-3; see Deviation 3).
   - **Smallest in code and largest in operator wall-clock.** Some access-token replays have to wait
     hours.
+  *(Built 2026-09-30. **Phase A's drill-evidence half is green: 167 passed, 2 failed**, the two being
+  the R14.3 pair that closes at SF-7. All twelve inventory rows carry a measured value. E1 02:29,
+  E2 02:25, E3 02:05, E4 04:39 (15:00 each); V1 00:07 contained with the provider effective inside
+  03:27; **V2 a GAP on the timed row by operator decision**, its substantive question measured; V3
+  00:16 contained (V rows' 10:00 is a containment clock). "Largest in operator wall-clock" did not
+  happen, and not because the work was skipped: no access-token replay had to wait hours, because
+  the survival question resolved differently in each row — V1's died on revocation, V2's survived
+  and was recorded as provider-stated per the operator's decision, and V3's question was rotation
+  rather than expiry. The sub-feature turned out to be the opposite of "smallest in code": it took
+  **two deviations into image code** (5 and 6) and produced **eight** items for user
+  documentation.)*
 - [ ] **SF-7: T44 and close-out.**
   - **Write the six MUST-REACH-USER-DOCUMENTATION items (D-1 to D-6) into `README.md` and the
     runbook.** Operator-directed at SF-6; the table with destinations and sources is in
