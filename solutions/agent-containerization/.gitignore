@@ -1,5 +1,11 @@
 # Live credentials — never committed
 references/.env_keys
+# Any credential file whose name carries `env_keys`, hidden or not. Added 2026-09-30 (02.5 SF-6):
+# the rule above matches an EXACT path, so `references/.sf6-drill_env_keys` — the drill API keys
+# for rows E1–E3 — was ignored by nothing, and one `git add` of this directory away from a public
+# repository. `.dockerignore` already excluded it (`references/**`, deny-all), so no build context
+# ever carried it.
+references/*env_keys*
 *.env
 *.env.*
 
