@@ -3,12 +3,15 @@
 **Feature:** `containment-response-and-the-authorization-gate.md`
 **Date:** 2026-09-29 (SF-1: skeleton and template), 2026-09-30 (SF-3: phases A–D measured; SF-4: phase E,
 the MCP-disable exercise, the R13.2/T40 amendment text and the full T41 drill; SF-5: the five T26
-drills for the pod-local and pack credential rows, S1–S5)
+drills for the pod-local and pack credential rows, S1–S5; SF-6: the seven provider rows, E1–E4 and
+V1–V3, plus two defects fixed in image code and eight items carried to user documentation)
 **Method:** Every drill follows `docs/containment-runbook.md` **verbatim**. A deviation is a
 **finding**: it is fixed in the runbook and the drill is **re-run**, not annotated (Test Strategy).
 A drill whose clock is interrupted is re-run, not annotated — `t0` to `t1` is only meaningful
 without a gap (Edge Case 18).
-**Outcome:** *(pending — SF-6 and SF-7)*. `verify-containment.sh` phases A–F are measured green
+**Outcome:** *(pending — SF-7)*. **SF-6 is complete and phase A's drill-evidence half is green
+(167 passed, 2 failed — the two are the R14.3 pair that closes at SF-7).** All twelve credential rows
+are drilled, one of them (V2) recorded as a `GAP` on its timed half by operator decision. `verify-containment.sh` phases A–F are measured green
 except phase A's two expected reds (§ "Expected red"), with a recorded negative control for each of
 B, C, D and E. **SF-4 is complete**: phase E, the MCP-disable exercise, the R13.2/T40 amendment text
 and the full T41 drill against the real pod. **SF-5 is complete**: all five pod-local and pack
@@ -1433,7 +1436,19 @@ FAIL: A2: rows with no measured value and no GAP: E1 E2 E3 E4 V1 V2 V3 S1 S2 S3 
 FAIL: A2: rows with no rebuild cell: E1 E2 E3 E4 V1 V2 V3 S1 S2 S3 S4 S5
 ```
 
-**After SF-6's E rows, E4 and V1 they name only V2 and V3** — measured on the committed tree
+**After SF-6 completed they are GONE — this half of phase A is green.** Measured on the committed
+tree 2026-09-30: **167 passed, 2 failed**, and the two remaining failures are part 2's R14.3 pair
+alone, which closes at SF-7. All twelve inventory rows carry a measured value (or, for V2, a
+recorded `GAP`) and a rebuild cell:
+
+```
+PASS: A2: every inventory row carries a measured detection-to-revocation time or a GAP
+PASS: A2: every inventory row states whether a rebuild was required (R8.5)
+```
+
+Edge Case 17's expected red is therefore closed, on the sub-feature the plan said would close it.
+
+**After SF-6's E rows, E4 and V1 they named only V2 and V3** — measured on the committed tree
 2026-09-30, after the Deviation 5/6 image change, at **165 passed, 4 failed**: the same totals as
 before that change, which is the regression evidence for it.
 
