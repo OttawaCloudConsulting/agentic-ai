@@ -43,6 +43,7 @@ package_repository:
 
 # R12.7, unchanged from default.yaml. Exactly one of `classify` or `waiver`; shape only at this
 # milestone, enforcement is 02.5's (T37).
+# T37 is ENFORCED (02.5 SF-2, Decision 1) -- see profiles/default.yaml for the rule.
 authorization:
   classify:
     - git-push

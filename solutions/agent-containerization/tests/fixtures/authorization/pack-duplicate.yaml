@@ -1,0 +1,8 @@
+# Probe manifest for verify-containment.sh phase F: the same action twice.
+# Installed as packs/authz-probe/pack.yaml for one compile and removed. Minimal on purpose --
+# the vocabulary scan reads only 'enables_actions', and a manifest no profile selects is never
+# read for anything else.
+name: authz-probe
+description: probe manifest for the T37 vocabulary scan
+schema: 1
+enables_actions: [git-push, git-push]

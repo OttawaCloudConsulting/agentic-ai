@@ -89,6 +89,10 @@ AGENT_RE='^[a-z][a-z0-9_]{0,31}$'
 # (validate_resolved reading compiled_from.packs), because 01.5 makes that field a channel from
 # third-party content into the mediator's render.
 PACK_RE='^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$'
+# Action name: the vocabulary T37 matches on. It is declared in pack manifests (third-party
+# content) and in profiles, compared as a literal on both sides, and printed into refusal
+# messages. Constrained so the two sides can only agree by being written identically.
+ACTION_RE='^[a-z][a-z0-9-]*$'
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -409,34 +413,81 @@ REL_PROFILE="${PROFILE_FILE_IN:-profiles/${PROFILE}.yaml}"
 ALLOW_AGENTS="$(yq eval '.agents | keys | .[]' "$ALLOWLIST")"
 [[ -n "$ALLOW_AGENTS" ]] || invalid "$REL_ALLOWLIST has no agents"
 
-# ---- R12.7: exactly one of authorization.classify or authorization.waiver -------------------
-# Shape only at this milestone. NOTHING enforces the classification: T37 is 02.5's, and that is
-# recorded as a residual rather than presented as satisfying R12.7. Requiring the waiver as the
-# explicit alternative is what stops the field from being quietly omitted.
+# ---- R12.7 / T37: authorization SHAPE ------------------------------------------------------
+# 02.5 SF-2 turns this field from shape into enforcement (Decision 1). The shape is checked
+# here, before anything is emitted. The vocabulary, the per-action accounting and the refusal
+# run in their own gate further down, after `packs:` has been resolved: the refusal has to know
+# what the LOADED packs enable, and that is not known this early.
+#
+# The field grew a third key. `classify` and `waiver` were one-of at 01.5, and that pair cannot
+# express `github`: push waived, apply still classified. Under one-of the only ways to waive a
+# single action were to waive the whole profile or to drop the action from `classify` silently
+# -- and silent dropping is the quiet omission the field exists to prevent. So `waive` is added
+# as a per-action map of action -> recorded reason, it composes with `classify`, and the
+# whole-profile `waiver` remains the standalone alternative rather than a third thing to mix in.
 [[ "$(yq eval 'has("authorization")' "$PROFILE_FILE")" == "true" ]] \
-  || invalid "$REL_PROFILE: field 'authorization' is missing (R12.7). Declare either 'classify' (a non-empty list of actions requiring human authorization) or 'waiver' (a recorded reason this profile waives it)"
+  || invalid "$REL_PROFILE: field 'authorization' is missing (R12.7). Declare 'classify' (actions requiring human authorization) and/or 'waive' (per-action recorded reasons), or 'waiver' (one recorded reason this profile waives the requirement whole)"
 require_tag "$PROFILE_FILE" '.authorization' '!!map' \
-  "$REL_PROFILE: field 'authorization' must be a mapping declaring 'classify' or 'waiver' (R12.7)"
+  "$REL_PROFILE: field 'authorization' must be a mapping declaring 'classify'/'waive' or 'waiver' (R12.7)"
 HAS_CLASSIFY="$(yq eval '.authorization | has("classify")' "$PROFILE_FILE")"
+HAS_WAIVE="$(yq eval '.authorization | has("waive")' "$PROFILE_FILE")"
 HAS_WAIVER="$(yq eval '.authorization | has("waiver")' "$PROFILE_FILE")"
-if [[ "$HAS_CLASSIFY" == "true" && "$HAS_WAIVER" == "true" ]]; then
-  invalid "$REL_PROFILE: authorization declares both 'classify' and 'waiver'; exactly one is required (R12.7). A profile that classifies actions has not waived the requirement"
-elif [[ "$HAS_CLASSIFY" == "true" ]]; then
+
+# Consumed by the T37 gate below. Empty under a whole-profile waiver, which is what exempts
+# that profile from the accounting.
+AUTHZ_CLASSIFY=()
+AUTHZ_WAIVE=()
+
+if [[ "$HAS_WAIVER" == "true" && ( "$HAS_CLASSIFY" == "true" || "$HAS_WAIVE" == "true" ) ]]; then
+  invalid "$REL_PROFILE: authorization declares the whole-profile 'waiver' together with 'classify' or 'waive'. The whole-profile waiver stands alone (R12.7) -- a profile that classifies or waives individual actions has not waived the requirement, and reading both would make it ambiguous which record applies to an action named in neither"
+fi
+
+if [[ "$HAS_CLASSIFY" == "true" ]]; then
   require_tag "$PROFILE_FILE" '.authorization.classify' '!!seq' \
     "$REL_PROFILE: authorization.classify must be a list of actions (R12.7)"
   CLASSIFY_N="$(yq eval '.authorization.classify | length' "$PROFILE_FILE")"
   [[ "$CLASSIFY_N" =~ ^[0-9]+$ ]] && ((CLASSIFY_N > 0)) \
-    || invalid "$REL_PROFILE: authorization.classify is empty. An empty classification is a waiver written so it does not look like one -- declare 'waiver' instead"
+    || invalid "$REL_PROFILE: authorization.classify is empty. An empty classification is a waiver written so it does not look like one -- declare 'waiver', or omit the key and account for every action under 'waive'"
   for ((i = 0; i < CLASSIFY_N; i++)); do
-    scalar_nonblank "$PROFILE_FILE" ".authorization.classify[$i]" >/dev/null \
+    CA="$(scalar_nonblank "$PROFILE_FILE" ".authorization.classify[$i]")" \
       || invalid "$REL_PROFILE: authorization.classify[$i] is empty or is not a scalar"
+    [[ "$CA" =~ $ACTION_RE ]] \
+      || invalid "$REL_PROFILE: authorization.classify[$i] '$CA' is not a valid action name (lowercase letters, digits and hyphens, starting with a letter). The name is matched against what the pack manifests declare, so a name shaped differently can never match one"
+    for PREV in ${AUTHZ_CLASSIFY[@]+"${AUTHZ_CLASSIFY[@]}"}; do
+      [[ "$PREV" != "$CA" ]] || invalid "$REL_PROFILE: authorization.classify lists '$CA' more than once"
+    done
+    AUTHZ_CLASSIFY+=("$CA")
   done
-elif [[ "$HAS_WAIVER" == "true" ]]; then
+fi
+
+if [[ "$HAS_WAIVE" == "true" ]]; then
+  require_tag "$PROFILE_FILE" '.authorization.waive' '!!map' \
+    "$REL_PROFILE: authorization.waive must be a mapping of action -> recorded reason. A list of action names would be a waiver with the reason left out, which R12.7 does not accept"
+  while IFS= read -r WA; do
+    [[ -n "$WA" ]] || continue
+    [[ "$WA" =~ $ACTION_RE ]] \
+      || invalid "$REL_PROFILE: authorization.waive key '$WA' is not a valid action name (lowercase letters, digits and hyphens, starting with a letter)"
+    scalar_nonblank "$PROFILE_FILE" ".authorization.waive.\"$WA\"" >/dev/null \
+      || invalid "$REL_PROFILE: authorization.waive['$WA'] has no recorded reason. R12.7 requires a waiver to be explicit AND recorded; an empty reason is neither, and a per-action waiver with no reason is the silent drop this key exists to replace"
+    AUTHZ_WAIVE+=("$WA")
+  done <<< "$(yq eval '.authorization.waive | keys | .[]' "$PROFILE_FILE")"
+fi
+
+if [[ "$HAS_WAIVER" == "true" ]]; then
   scalar_nonblank "$PROFILE_FILE" '.authorization.waiver' >/dev/null \
     || invalid "$REL_PROFILE: authorization.waiver is empty. R12.7 requires the waiver to be explicit AND recorded; an empty one is neither"
-else
-  invalid "$REL_PROFILE: authorization declares neither 'classify' nor 'waiver'; exactly one is required (R12.7)"
+elif [[ "$HAS_CLASSIFY" != "true" && "$HAS_WAIVE" != "true" ]]; then
+  invalid "$REL_PROFILE: authorization declares none of 'classify', 'waive' or 'waiver' (R12.7). Declare how this profile accounts for every action the committed packs enable"
 fi
+
+# An action both classified and waived says two opposite things about the same action, and the
+# gate below would have to pick one. It picks neither.
+for CA in ${AUTHZ_CLASSIFY[@]+"${AUTHZ_CLASSIFY[@]}"}; do
+  for WA in ${AUTHZ_WAIVE[@]+"${AUTHZ_WAIVE[@]}"}; do
+    [[ "$CA" != "$WA" ]] \
+      || invalid "$REL_PROFILE: authorization lists '$CA' in both 'classify' and 'waive'. An action is either withheld from unattended use or waived with a reason, not both"
+  done
+done
 
 # ---- egress_exclusions: shape, before anything reads it -------------------------------------
 # A profile that writes this as a MAP instead of a list is the worst case in the file, because it
@@ -503,6 +554,11 @@ else
 fi
 
 declare -A SEEN_MCP_SERVER_NAMES=()
+# The actions this profile's inventoried servers declare (02.5 Interface Contract 3), and the
+# server each came from, for the T37 gate's message. Parallel arrays rather than one map: an
+# action can be enabled by more than one server and the gate names all of them.
+MCP_ACTIONS=()
+MCP_ACTION_SRV=()
 for ((m = 0; m < MCP_SRV_N; m++)); do
   MS=".mcp.servers[$m]"
   require_tag "$PROFILE_FILE" "$MS" '!!map' "$REL_PROFILE: mcp.servers[$m] must be a mapping"
@@ -600,6 +656,38 @@ for ((m = 0; m < MCP_SRV_N; m++)); do
     read-only|write|irreversible) : ;;
     *) invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').risk_tier must be one of read-only, write or irreversible, found '$MTIER'" ;;
   esac
+
+  # ---- enables_actions (02.5 Interface Contract 3, T37) -------------------------------------
+  # R7.14's `irreversible` tier is literally what R12.7 names, so a server the operator has
+  # called irreversible must say WHICH action it enables: a tier with no action behind it is a
+  # label the authorization gate below cannot act on. A `write`-tier server may declare one and
+  # is not required to. The actions join the vocabulary, so a profile inventorying a server that
+  # enables an action no pack does must still classify or waive that action.
+  MEA_N=0
+  if [[ "$(yq eval "$MS | has(\"enables_actions\")" "$PROFILE_FILE")" == "true" ]]; then
+    require_tag "$PROFILE_FILE" "$MS.enables_actions" '!!seq' \
+      "$REL_PROFILE: mcp.servers[$m] ('$MNAME').enables_actions must be a list of action names"
+    MEA_N="$(yq eval "$MS.enables_actions | length" "$PROFILE_FILE")"
+    MEA_SEEN=()
+    for ((e = 0; e < MEA_N; e++)); do
+      MEA="$(scalar_nonblank "$PROFILE_FILE" "$MS.enables_actions[$e]")" \
+        || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').enables_actions[$e] is empty or is not a scalar"
+      [[ "$MEA" =~ $ACTION_RE ]] \
+        || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').enables_actions[$e] '$MEA' is not a valid action name (lowercase letters, digits and hyphens, starting with a letter)"
+      for PREV in ${MEA_SEEN[@]+"${MEA_SEEN[@]}"}; do
+        [[ "$PREV" != "$MEA" ]] \
+          || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME').enables_actions lists '$MEA' more than once"
+      done
+      MEA_SEEN+=("$MEA")
+      MCP_ACTIONS+=("$MEA")
+      MCP_ACTION_SRV+=("mcp server '$MNAME'")
+    done
+    unset MEA_SEEN
+  fi
+  if [[ "$MTIER" == "irreversible" ]]; then
+    ((MEA_N > 0)) \
+      || invalid "$REL_PROFILE: mcp.servers[$m] ('$MNAME') is risk_tier 'irreversible' but declares no enables_actions. R7.14's irreversible tier is what R12.7 classifies; name the action the server enables so the authorization gate can act on it (02.5 Interface Contract 3)"
+  fi
 
   require_tag "$PROFILE_FILE" "$MS.capability_baseline" '!!map' "$REL_PROFILE: mcp.servers[$m] ('$MNAME').capability_baseline must be a mapping"
   MCFG="$(yq eval "$MS.capability_baseline.config_sha256" "$PROFILE_FILE")"
@@ -984,7 +1072,7 @@ done
 # The same philosophy as the mount-key gate above: an ignored key is indistinguishable from an
 # honoured one until the day it is implemented. A third-party pack manifest carrying `cap_add`,
 # `privileged` or `devices` must fail here, not be silently dropped on the floor.
-KNOWN_PACK_KEYS="name description schema blast_radius needs_write_access packages egress runtime_install runtime_install_reason mounts env credentials third_parties"
+KNOWN_PACK_KEYS="name description schema blast_radius needs_write_access packages egress runtime_install runtime_install_reason mounts env credentials third_parties enables_actions"
 for ((i = 0; i < PACKS_LEN; i++)); do
   PN="${PACK_NAMES[$i]}"; PF="${PACK_FILES[$i]}"; REL_PF="packs/$PN/pack.yaml"
   PACK_KEYS="$(yq eval 'keys | .[]' "$PF")"
@@ -994,6 +1082,105 @@ for ((i = 0; i < PACKS_LEN; i++)); do
       || invalid "$REL_PF: unrecognised top-level key '$pk'. A pack manifest may declare only: $KNOWN_PACK_KEYS -- an unknown key such as cap_add, privileged or devices is refused rather than ignored (R7.8), because a schema field this compiler does not read is a capability request nothing enforces"
   done <<< "$PACK_KEYS"
 done
+
+# ---- GATE (T37, R12.7) -- the authorization vocabulary, the accounting and the refusal -----
+# 02.5 SF-2, Decision 1: T37 is enforced by CAPABILITY ABSENCE, at compile time. A profile that
+# classifies an action cannot load anything that enables it unless that action carries a
+# recorded per-action waiver. The classified action is then structurally unavailable to an
+# unattended agent, rather than blocked by something living inside the blast radius.
+#
+# The vocabulary is the union over EVERY COMMITTED pack manifest, not only the selected ones,
+# plus the actions this profile's inventoried MCP servers declare. Two consequences, both
+# wanted: a profile can classify an action no pack it loads enables (the classification is a
+# statement about the profile, not about its pack list), and adding an action to any manifest
+# makes every non-waiver profile fail to compile until it accounts for it (Edge Case 14). That
+# failure is deliberate and loud.
+#
+# Every committed manifest is SHAPE-CHECKED here, including manifests no profile selects. An
+# unselected manifest still contributes to the vocabulary, so a misspelling or a duplicate in
+# one would otherwise enter the vocabulary unexamined and be enforced against every profile.
+declare -A VOCAB_SRC=()
+VOCAB=()
+while IFS= read -r CPF; do
+  [[ -n "$CPF" ]] || continue
+  CPN="$(basename "$(dirname "$CPF")")"
+  REL_CPF="packs/$CPN/pack.yaml"
+  yq eval '.' "$CPF" >/dev/null 2>&1 || invalid "$REL_CPF does not parse as YAML"
+  [[ "$(yq eval 'has("enables_actions")' "$CPF")" == "true" ]] || continue
+  require_tag "$CPF" '.enables_actions' '!!seq' \
+    "$REL_CPF: enables_actions must be a list of action names (02.5 Interface Contract 1); omit the key where the pack enables none"
+  EA_N="$(yq eval '.enables_actions | length' "$CPF")"
+  EA_SEEN=()
+  for ((e = 0; e < EA_N; e++)); do
+    EA="$(scalar_nonblank "$CPF" ".enables_actions[$e]")" \
+      || invalid "$REL_CPF: enables_actions[$e] is empty or is not a scalar"
+    [[ "$EA" =~ $ACTION_RE ]] \
+      || invalid "$REL_CPF: enables_actions[$e] '$EA' is not a valid action name (lowercase letters, digits and hyphens, starting with a letter). Profiles match this name literally, so a name shaped differently is one no profile can classify"
+    for PREV in ${EA_SEEN[@]+"${EA_SEEN[@]}"}; do
+      [[ "$PREV" != "$EA" ]] || invalid "$REL_CPF: enables_actions lists '$EA' more than once"
+    done
+    EA_SEEN+=("$EA")
+    if [[ -z "${VOCAB_SRC[$EA]+x}" ]]; then
+      VOCAB+=("$EA")
+      VOCAB_SRC[$EA]="$REL_CPF"
+    else
+      VOCAB_SRC[$EA]="${VOCAB_SRC[$EA]}, $REL_CPF"
+    fi
+  done
+  unset EA_SEEN
+done <<< "$(find "$REPO_ROOT/packs" -mindepth 2 -maxdepth 2 -name pack.yaml | LC_ALL=C sort)"
+
+# The inventoried servers' actions join the same vocabulary (02.5 Interface Contract 3).
+for ((i = 0; i < ${#MCP_ACTIONS[@]}; i++)); do
+  MA="${MCP_ACTIONS[$i]}"
+  if [[ -z "${VOCAB_SRC[$MA]+x}" ]]; then
+    VOCAB+=("$MA")
+    VOCAB_SRC[$MA]="${REL_PROFILE} ${MCP_ACTION_SRV[$i]}"
+  else
+    VOCAB_SRC[$MA]="${VOCAB_SRC[$MA]}, ${REL_PROFILE} ${MCP_ACTION_SRV[$i]}"
+  fi
+done
+
+# A whole-profile waiver is the recorded alternative to the accounting, so it skips it. The
+# vocabulary above was still built and shape-checked, which is the part a test profile must not
+# be able to opt out of.
+if [[ "$HAS_WAIVER" != "true" ]]; then
+  # Every classified or waived action must EXIST. A misspelled classification enforces nothing
+  # and reads exactly like one that does, which is the worst failure this gate can have.
+  for AA in ${AUTHZ_CLASSIFY[@]+"${AUTHZ_CLASSIFY[@]}"} ${AUTHZ_WAIVE[@]+"${AUTHZ_WAIVE[@]}"}; do
+    [[ -n "${VOCAB_SRC[$AA]+x}" ]] \
+      || invalid "$REL_PROFILE: authorization names the action '$AA', but no committed pack declares it -- a misspelled classification enforces nothing. Declare it in the enabling pack's 'enables_actions', or remove it here. Known actions: ${VOCAB[*]:-<none>}"
+  done
+
+  # Every KNOWN action must be accounted for, one way or the other. The alternative is a
+  # profile that classifies the action it remembered and says nothing about the one it did not.
+  for KA in ${VOCAB[@]+"${VOCAB[@]}"}; do
+    ACCOUNTED=0
+    for AA in ${AUTHZ_CLASSIFY[@]+"${AUTHZ_CLASSIFY[@]}"} ${AUTHZ_WAIVE[@]+"${AUTHZ_WAIVE[@]}"}; do
+      [[ "$AA" != "$KA" ]] || { ACCOUNTED=1; break; }
+    done
+    ((ACCOUNTED == 1)) \
+      || invalid "$REL_PROFILE: the action '$KA' is declared by ${VOCAB_SRC[$KA]} but this profile neither classifies nor waives it (R12.7). Add it to authorization.classify, or to authorization.waive with a recorded reason"
+  done
+
+  # THE REFUSAL (exit 3). A classified action that something this profile actually LOADS can
+  # perform is not withheld from an unattended agent -- it is merely written down. This is the
+  # operator's decision to take, not the author's typo, which is why it is a refusal and not an
+  # input error.
+  for CA in ${AUTHZ_CLASSIFY[@]+"${AUTHZ_CLASSIFY[@]}"}; do
+    for ((i = 0; i < PACKS_LEN; i++)); do
+      LPF="${PACK_FILES[$i]}"; LPN="${PACK_NAMES[$i]}"
+      [[ "$(yq eval 'has("enables_actions")' "$LPF")" == "true" ]] || continue
+      if yq eval '.enables_actions[]' "$LPF" | grep -qFx "$CA"; then
+        refuse "$REL_PROFILE classifies '$CA' as requiring human authorization, but it loads pack '$LPN' (packs/$LPN/pack.yaml), whose credential, egress or binaries enable that action for an unattended agent. A classification the pod cannot enforce is a note, not a control (T37). Either remove the pack from this profile's 'packs', or move '$CA' from 'classify' to 'waive' with a recorded reason for why unattended '$CA' is acceptable here"
+      fi
+    done
+    for ((i = 0; i < ${#MCP_ACTIONS[@]}; i++)); do
+      [[ "${MCP_ACTIONS[$i]}" == "$CA" ]] || continue
+      refuse "$REL_PROFILE classifies '$CA' as requiring human authorization, but it inventories ${MCP_ACTION_SRV[$i]}, which declares that it enables the action. A classification the pod cannot enforce is a note, not a control (T37). Either remove the server from 'mcp.servers', or move '$CA' from 'classify' to 'waive' with a recorded reason"
+    done
+  done
+fi
 
 # ---- GATE (SC-3, R5.14) -- project-mount containment ----------------------------------------
 # An agent whose project mount contains the solution tree can rewrite allowlist.base.yaml,

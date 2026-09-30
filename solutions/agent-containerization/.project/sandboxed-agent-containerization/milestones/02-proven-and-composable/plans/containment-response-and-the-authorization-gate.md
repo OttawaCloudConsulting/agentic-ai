@@ -353,7 +353,7 @@ recompile, and the operator-heavy drills last.
     - the R9.6 trigger.
   - `docs/records/containment-drills.md` skeleton, with the drill template (Contract 6).
   - Documentation only, 3 files.
-- [ ] **SF-2: T37 — the authorization gate.**
+- [x] **SF-2: T37 — the authorization gate.**
   - `compile-policy.sh`:
     - the `authorization` rules (Contract 2);
     - `enables_actions` accepted on pack manifests and MCP entries (Contracts 1 and 3);

@@ -3,13 +3,13 @@
 # Verify with: bash scripts/compile-policy.sh --check --profile kubernetes
 schema: 1
 profile: kubernetes
-compiled_at: 2026-09-11T15:09:24Z
+compiled_at: 2026-09-30T02:22:56Z
 compiled_from:
   allowlist: policy/allowlist.base.yaml
   denylist: policy/denylist.base.yaml
   profile: profiles/kubernetes.yaml
   packs:
-    - {name: kubernetes, path: packs/kubernetes/pack.yaml, sha256: 3269caaba47b52e864e9354768bda5032cc1f40baee07ec56b52aece2a2f0040}
+    - {name: kubernetes, path: packs/kubernetes/pack.yaml, sha256: d4060e22bf04b1c941ed5af0b1fb022b8b828661979d2aeb2d3322281c0aa5cb}
     - {name: language-runtimes, path: packs/language-runtimes/pack.yaml, sha256: 3db75d16933588a9e52c6ec1e5eaec1f51a91a5c69631173be09be50943b982e}
 provisional: false
 pins: agent-verification.md

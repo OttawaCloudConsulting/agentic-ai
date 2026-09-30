@@ -47,11 +47,16 @@ package_repository:
 # SHAPE ONLY AT THIS MILESTONE. Nothing enforces the classification yet -- T37 is 02.5's, and
 # this is recorded as a residual rather than presented as satisfying R12.7. A field validated
 # for shape and exercised by nothing drifts, so the landing point is named rather than implied.
+# T37 is ENFORCED (02.5 SF-2, Decision 1): a classified action may not be enabled by any pack
+# this profile loads or any MCP server it inventories. The compile REFUSES (exit 3) if one is,
+# and the remedy is either to drop the pack or to move the action to `waive` with a recorded
+# reason. Every action any committed pack declares must appear under `classify` or `waive`.
 authorization:
   classify:
     - git-push                 # leaves the pod and rewrites shared history
     - infrastructure-apply     # Milestone 03's terraform apply; irreversible against real accounts
-  # waiver: <recorded reason this profile waives R12.7>
+  # waive: <action>: <reason>  # per-action waiver; composes with classify
+  # waiver: <recorded reason this profile waives R12.7 whole; stands alone>
 
 # R4.12 defaults -- "the safest mode that agent supports". The enum is PER AGENT and the agents
 # are asymmetric; Interface Contract 1 of the 01.4 plan is the authoritative matrix, and

@@ -33,7 +33,8 @@ A change to the schema below therefore touches both readers.
 
 ## Manifest schema — `packs/<name>/pack.yaml`
 
-Every field is mandatory. `scripts/lint-policy.sh` refuses a manifest missing any of them, naming
+Every field is mandatory except `enables_actions`, whose default is the empty list.
+`scripts/lint-policy.sh` refuses a manifest missing any of the others, naming
 the file and the failing field. Absence is never treated as a default: a pack that forgets to
 declare `credentials` is a pack whose author did not answer the question, which is not the same
 as a pack that needs none.
@@ -54,6 +55,7 @@ as a pack that needs none.
 | `env` | R7.3 | non-secret environment variables; each entry names, values and gives a `reason` (Interface Contract 1) |
 | `credentials` | R7.3 | secret credentials; each entry names, gives a `delivery` (`{env: VAR}` or `{path_env: VAR}`), a `description`, a `blast_radius` (R8.4) and a `revocation` path (R7.12) |
 | `third_parties` | R14.1 | required non-empty iff `egress.runtime` is non-empty; each entry's `record` resolves to an anchor in `docs/records/third-party-assessments.md` |
+| `enables_actions` | R12.7, T37 | **optional**, default `[]`. The actions this pack's credential, egress or binaries let an **unattended** agent perform. Each name is `^[a-z][a-z0-9-]*$` and unique within the manifest |
 
 `runtime_install` and its reason are refused in **both** directions (01.5 SF-2). Runtime egress
 with `runtime_install: false` is a widening R7.6 requires declared; `runtime_install: true` with
@@ -65,6 +67,44 @@ three at **exit 3**, because which packs a profile may load is a policy decision
 A pack may **not** declare `deny_fqdns` or `deny_cidrs`. The denylist is copied from
 `policy/denylist.base.yaml` unmodified and deny wins after resolution; a pack-supplied deny key
 would appear to narrow or widen it and would in fact do neither. The linter rejects it.
+
+### `enables_actions` is the authorization gate's vocabulary
+
+`enables_actions` is the one field in the manifest that is **not** about what the pack installs.
+It is what T37 enforces on (02.5 SF-2). Every profile must account for every action any
+**committed** manifest declares — not only the manifests it loads — by either classifying the
+action as requiring human authorization or waiving it with a recorded reason:
+
+```yaml
+# packs/github-cli/pack.yaml
+enables_actions: [git-push]
+
+# profiles/github.yaml
+authorization:
+  classify: [infrastructure-apply]
+  waive:
+    git-push: >-
+      <why unattended push is acceptable under this profile, and what bounds it>
+```
+
+`scripts/compile-policy.sh` **refuses** (exit 3) a profile that classifies an action a pack it
+loads enables: a classification the pod cannot enforce is a note, not a control. The remedies it
+names are the only two there are — drop the pack, or waive the action with a reason. An action
+named in a profile that no committed manifest declares is an input error (exit 2), because a
+misspelled classification enforces nothing and reads exactly like one that does.
+
+Adding an action to any manifest therefore breaks every non-waiver profile until each one
+accounts for it. That is deliberate: the alternative is a new capability arriving in a pack and
+no profile ever noticing.
+
+**The question to ask when writing or reviewing the field** — and it is a review-time control,
+because the compiler can only enforce what the author declared (R7.3, R12.3's PR path):
+
+> With this pack's credential, its egress and its binaries, can an **unattended** agent do X?
+
+If the answer is yes, `X` belongs in `enables_actions`, whether or not the profile that will
+load the pack happens to reach far enough to do it today. `packs/kubernetes` declares
+`infrastructure-apply` while granting no cluster egress at all, for exactly that reason.
 
 ### `egress.build` is not `egress.runtime`
 

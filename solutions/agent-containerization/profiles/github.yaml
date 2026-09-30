@@ -30,11 +30,20 @@ package_repository:
     fingerprint: B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8
 
 # R12.7 -- see profiles/terraform.yaml's comment; unchanged reasoning.
+# T37 is ENFORCED (02.5 SF-2, Decision 1). This profile loads packs/github-cli, which declares
+# `enables_actions: [git-push]`, so `git-push` cannot stay classified here: a classification the
+# pod cannot enforce is a note, not a control. It is waived per action, with the reason recorded,
+# and `infrastructure-apply` stays classified -- no pack this profile loads enables it.
 authorization:
   classify:
-    - git-push                 # leaves the pod and rewrites shared history
     - infrastructure-apply     # Milestone 03's terraform apply; irreversible against real accounts
-  # waiver: <recorded reason this profile waives R12.7>
+  waive:
+    git-push: >-
+      Unattended push is acceptable under this profile because the only credential it carries is
+      a fine-grained PAT scoped to the operator's own repositories with contents:write and no
+      admin, no workflow and no organisation scope; a push it makes is recoverable from the
+      remote's reflog and is bounded to those repositories. The pod's project mount is the
+      operator's working tree, so a push here rewrites work the operator already owns.
 
 # R4.12 defaults -- unchanged from `default` / `terraform.yaml`.
 auth_mode:

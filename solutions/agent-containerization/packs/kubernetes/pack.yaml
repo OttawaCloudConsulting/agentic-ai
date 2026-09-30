@@ -23,6 +23,16 @@ blast_radius: |                  # R7.11
   gives all three a pack's egress (Decision 1) -- one kubeconfig compromise exposes the whole RBAC
   scope to every agent, not one agent's slice of it. No host mount is granted.
 
+enables_actions: [infrastructure-apply]   # 02.5 Interface Contract 1 (T37). `kubectl apply`
+                                 # and `helm upgrade` against a real cluster are irreversible in
+                                 # the sense R12.7 names. The pack ships the binaries and carries
+                                 # the kubeconfig credential; a profile loading it must waive
+                                 # `infrastructure-apply` with a recorded reason or the compile
+                                 # refuses (exit 3). Cluster REACH still needs a per-cluster
+                                 # egress pack -- declared here anyway, because the declaration
+                                 # is about what the pack makes possible, not about how far the
+                                 # profile happens to let it reach today.
+
 needs_write_access: false        # R7.3
 
 packages:

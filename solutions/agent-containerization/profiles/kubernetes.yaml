@@ -29,11 +29,20 @@ package_repository:
     fingerprint: B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8
 
 # R12.7 -- see profiles/terraform.yaml's comment; unchanged reasoning.
+# T37 is ENFORCED (02.5 SF-2, Decision 1). This profile loads packs/kubernetes, which declares
+# `enables_actions: [infrastructure-apply]`, so that action is waived per action with the reason
+# recorded; `git-push` stays classified -- no pack this profile loads enables it.
 authorization:
   classify:
     - git-push                 # leaves the pod and rewrites shared history
-    - infrastructure-apply     # Milestone 03's terraform apply; irreversible against real accounts
-  # waiver: <recorded reason this profile waives R12.7>
+  waive:
+    infrastructure-apply: >-
+      Unattended infrastructure-apply is acceptable under this profile because the pack ships
+      kubectl and helm with no cluster credential and no cluster egress: reach requires a
+      per-cluster egress pack and a kubeconfig the operator mounts deliberately, and the scope of
+      an apply is therefore exactly the cluster the operator chose to expose for the session. The
+      waiver covers that deliberate act, not an unattended reach into a cluster the profile
+      itself grants.
 
 # R4.12 defaults -- unchanged from `default` / `terraform.yaml` / `github.yaml`.
 auth_mode:

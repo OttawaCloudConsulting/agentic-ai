@@ -19,6 +19,11 @@ blast_radius: |                  # R7.11
   shared by all three agent containers (Decision 1) -- a single compromise exposes the whole
   scope to every agent, not one agent's slice of it.
 
+enables_actions: [git-push]      # 02.5 Interface Contract 1 (T37). The pack's PAT and its
+                                 # github.com/api.github.com egress are what let an unattended
+                                 # agent push. A profile loading this pack must waive `git-push`
+                                 # with a recorded reason, or the compile refuses (exit 3).
+
 needs_write_access: false        # R7.3
 
 packages:
