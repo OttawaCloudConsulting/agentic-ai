@@ -248,9 +248,12 @@ The one row whose credential **is** usable from inside the pod, so the replay is
 agent, through the mediator, under the `github` profile — the profile that grants `claude`
 `api.github.com` (the `default` profile does not).
 
-- Drill credential: a **fine-grained PAT minted for this drill** by the operator —
-  *Public Repositories (read-only)*, every repository and account permission at **No access**,
-  7-day expiry. Never the operator's working token. Staged in place (per the Edge Case 4 finding
+- Drill credential: a **fine-grained PAT minted for this drill** by the operator, to the drill's
+  instructions — *Public Repositories (read-only)*, every repository and account permission at
+  **No access**, 7-day expiry. Never the operator's working token. **Stated, not observed:** the
+  scope and expiry are what was asked for; what the pod verified is that the token authenticated
+  (200) and then did not (401). The drill deliberately never reads the value, so it cannot inspect
+  the token's own grants. Staged in place (per the Edge Case 4 finding
   below) at `compose/generated/credentials/github/github-cli/github-token`. Read only from inside
   the container as `/run/secrets/pack-github-cli-github-token`, sha256 prefix `a1c9ec32ea28`; no
   value recorded
