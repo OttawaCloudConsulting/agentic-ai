@@ -4,16 +4,23 @@
 measurements and finalised at SF-7)
 **Requirements:** R13.1, R13.2, R13.3, R12.5, R12.7, D16, and the R9.6 review trigger handed over
 by Feature 02.1.
-**Status:** **DRAFT.** Event and incident definitions and every stated maximum are
+**Status:** **FINAL (SF-7, 2026-09-30).** Every section below is measured, and the commands are
+the measured forms. What remains unmeasured is named where it sits, not here. Event and incident
+definitions and every stated maximum are
 operator-confirmed (2026-09-29). The **live containment forms (§ 3.1, § 3.2)**, the **teardown
 guarantee (§ 2)**, the **MCP disable path (§ 3.3)** and the **mechanical recovery path (§ 5.1, § 5.2)**
 are all measured — SF-3 and SF-4, 2026-09-30, `verify-containment.sh` phases B–E and the MCP-disable
-exercise, recorded in `docs/records/containment-drills.md`. Still **not measured**: the revocation
-procedures (§ 3.4, § 4), which SF-5 and SF-6 drill, and § 5's live half — identity rotation and
-re-bootstrap — which the operator's full T41 drill covers. The **revocation procedures (§ 3.4, § 4) are not yet
-measured**; SF-5 and SF-6 drill them. Written before the drills, deliberately (Decision 7) — a drill
-measures a procedure only if the procedure existed before the clock started. Commands still marked
-**UNMEASURED** are corrected to their measured form in SF-5/SF-6.
+exercise. The **revocation procedures (§ 3.4, § 4) are measured too**: all twelve inventory rows were
+drilled 2026-09-30 (SF-5: S1–S5; SF-6: E1–E4, V1–V3), and § 5's live half — identity rotation and
+re-bootstrap — by the full T41 drill of the same date. Everything is recorded in
+`docs/records/containment-drills.md`. Written before the drills, deliberately (Decision 7) — a drill
+measures a procedure only if the procedure existed before the clock started; every command here is
+now the form a drill actually ran, with each correction recorded as a finding in that record rather
+than absorbed into a timing.
+
+**One row is a stated gap:** V2's timed containment clock was not measured (operator decision), and
+its substantive question — whether provider revocation contains a `codex` session — was. See § 3.4
+and § 4.
 A deviation observed during a drill is a **finding**: it is fixed here and the drill is re-run, not
 annotated (Test Strategy, Edge Case 18).
 
@@ -58,8 +65,9 @@ An incident is any of:
 nothing added, nothing struck. The R8.6 redaction hit was weighed for promotion to an incident and
 deliberately left an **event**: incident item 6 already covers a credential value reaching a
 transcript, and the redaction hit is the relay-side signal for the same condition, so promoting it
-would make every relay-side catch an incident while the sink-side finding stays triage. SF-7 may
-still revise this list before go-live.
+would make every relay-side catch an incident while the sink-side finding stays triage. **SF-7 reviewed the list at close-out and struck nothing and
+added nothing** (2026-09-30): the drills produced no signal that the list does not already cover, so
+it ships as confirmed.
 
 **What R13.1 does not bound.** R13.1 bounds **detection to revocation**. It does not bound
 **compromise to detection**, which is unbounded while detection is pull-based. Nothing in this
@@ -212,6 +220,26 @@ The inventory is **image content** (02.3 Decision 8), so this path requires a re
 `up --build --force-recreate` with no service argument recreates **every** service, the mediator
 included; naming the affected agents narrows it to a restart of those agents.
 
+**The same gate stops a `codex` agent that has simply RUN ONCE, and it is not an MCP change that
+does it** (measured 2026-09-30, SF-6 — user-documentation item **D-3**). `codex` provisions its own
+bundled system skills onto the state volume on first run, into `~/.codex/skills/.system/`. Every
+shipped profile inventories `skills: []` (02.3 Decision 8), so the next start is refused:
+
+```
+mcp-gate: REFUSED uninventoried server 'codex-system-skills' in /home/agent/.codex/skills/.system (R7.14, T29)
+```
+
+**exit 3, before the agent CLI runs.** The refusal is correct. The consequence is operational: a
+`codex` container that has completed one run **will not start again** until either
+
+- an operator removes that directory from outside the agent — the step-2 helper-container form above,
+  substituting `rm -rf /s/.codex/skills/.system`; or
+- the profile's `mcp:` block declares those skills, which is **a rebuild and a repin** (image-baked
+  inventory, 02.3 Decision 8).
+
+This meets T41's "each agent re-bootstraps authentication" on any `codex` re-bootstrap that follows
+real use, so expect it during a recovery rather than being surprised by it.
+
 A compromised agent that re-adds the config entry meets the gate at its next start and **does not
 start**. That is containment-safe — measured at SF-4, twice: once by re-adding the entry directly,
 and once as the side effect of recovering a contaminated pod without discarding its state volume.
@@ -230,6 +258,32 @@ Per inventory row, against that row's stated maximum — see § 4. Two rules ove
 
 ```bash
 docker compose images --quiet   # before t0 and after re-issue; the IDs must be equal
+```
+
+**Two rules about revocation itself, both measured and both counter-intuitive:**
+
+- **"Revoked" is not a state you may assume — it is a state you confirm by replay**
+  (user-documentation item **D-5**). `t1` is a replay that fails, never a console click. V2 is the
+  worked example: the ChatGPT device list reported the session revoked, and the credential kept
+  working. Replay after every revoking action, and keep replaying until it is refused.
+- **Provider revocation does NOT contain a `codex` session** (item **D-1**, measured 2026-09-30 at
+  V2, and again from the other direction at V3). Per-device revocation in the ChatGPT UI left
+  **both** halves working — the access token *and* the refresh token, which kept minting new access
+  tokens — so the window is not the access token's 10 days and is not bounded by the revoke at all.
+  Rotation does not close it either: a captured refresh token stays valid after the legitimate
+  client rolls past it (V3). **For this row, containment is pod-side and its ordering is
+  load-bearing rather than defence in depth: isolate the agent (§ 3.2, disconnect) and discard its
+  state volume at `t0`, BEFORE revoking.** Treat a captured `codex` set as live until its own expiry.
+  `claude` behaved differently (V1's access token died on revocation), which is exactly why each row
+  is replayed rather than generalised — item **D-2**.
+
+**Confirming R8.5 across a containment: compare per SERVICE, not `--quiet` alone** (item **D-8**).
+`docker compose images --quiet` lists one line **per container**, so a containment that removed an
+agent's container makes the naive before/after comparison read as a changed image when nothing was
+rebuilt. Either re-create the service first, or compare by service name:
+
+```bash
+docker compose images   # read the per-service rows by name, before t0 and after re-issue
 ```
 
 **One special case: a proxy credential survives until the mediator restarts** (Edge Case 5).
@@ -339,9 +393,14 @@ moved to fit.
   2026-09-29). **V1 measured 2026-09-30 (02.5 SF-6): contained in 00:07, and the provider became
   effective inside 03:27 — and Edge Case 2's anticipated 8-hour access-token survival did NOT
   occur.** The access token was refused 03:23 after `t0`, against its own stated expiry 7 h 53 m
-  later. The isolate-and-discard-first ordering below therefore stays as **defence in depth against
-  a survival that was not observed**, not as mitigation for a measured hole. V2/V3's 10-day JWT is a
-  separate question this row does not answer. It bounds the action that actually contains: **isolate the agent (§ 3.2, disconnect)
+  later. For V1 the isolate-and-discard-first ordering is therefore **defence in depth against a
+  survival that was not observed**, not mitigation for a measured hole.
+  **For V2 and V3 the same ordering is LOAD-BEARING, and that asymmetry is what an operator must not
+  generalise away** (items **D-1** and **D-2**, measured 2026-09-30): per-device revocation left a
+  `codex` session's access *and* refresh tokens both working, and rotation does not retire a captured
+  refresh token either, so nothing at the provider contained those rows — the isolate-and-discard at
+  `t0` is what did. **V2's timed row is a stated GAP** (operator decision): its substantive question
+  was measured, its clock was not. It bounds the action that actually contains: **isolate the agent (§ 3.2, disconnect)
   and discard its volume at `t0`, *before* revoking.** The access token's survival past revocation
   (V1: 8 h; V2/V3: a 10-day JWT `codex` does not verify locally) is measured by SF-6 and recorded as
   a **named finding against R13.1** — it is not folded into this commitment, and the commitment is
@@ -365,14 +424,26 @@ therefore **discards without trying to tell**. It does not inspect; it does not 
    **discard its volume now, before revoking** — Edge Case 2.
 4. **Revoke every credential the agent held** — § 4, chained per § 3.4. Discarding is not revoking.
 5. **`docker compose down`** — without `-v`. Never `-v`.
-6. **Discard, selectively, by name:**
+6. **Clear stray one-off containers, or step 7 fails** (item **D-4**, measured at SF-6).
+   `docker volume rm` refuses while **any** container references the volume, including an exited
+   one, and `compose down` does **not** remove one-off `compose run` containers — they carry
+   `com.docker.compose.oneoff=True` and `stop`/`start`/`down` ignore them. **An interactive login is
+   performed in exactly such a container**, so the one left behind by authenticating is the one most
+   likely to block you, and the failure names only a hex container ID.
+
+```bash
+docker ps -aq --filter label=com.docker.compose.project=sandboxed-agent-pod \
+              --filter label=com.docker.compose.oneoff=True | xargs -r docker rm -f
+```
+
+7. **Discard, selectively, by name:**
 
 ```bash
 docker volume rm sandboxed-agent-pod_claude-state
 # plus sandboxed-agent-pod_claude-build-cache if the build-cache fragment is enabled
 ```
 
-7. **Rebuild from the pinned digest** (the `main`-pinned digest from 02.4) and recreate:
+8. **Rebuild from the pinned digest** (the `main`-pinned digest from 02.4) and recreate:
 
 ```bash
 docker compose up --build --force-recreate
@@ -384,9 +455,10 @@ docker compose up --build --force-recreate
    the mediator included, because the question "which containers are clean" is exactly what D16
    says cannot be answered by inspection.
 
-8. **Re-bootstrap authentication** for each agent.
-9. **Assert every disposition in § 5.2.**
-10. **Run the Test Command.** It must be green.
+9. **Re-bootstrap authentication** for each agent. For `codex` after real use, expect the
+   `codex-system-skills` refusal first (§ 3.3, item **D-3**).
+10. **Assert every disposition in § 5.2.**
+11. **Run the Test Command.** It must be green.
 
 ### 5.2 Disposition table
 
@@ -415,13 +487,13 @@ the harness** — that is the point: a volume cannot arrive without a stated rec
 > shasum -a 256 mediator/identity/ca/mediator-ca.crt           # before and after; it MUST NOT
 > ```
 >
-> Rotate **before** the `up --build --force-recreate` in § 5.1, so the recreated container takes the
-> new material in the same step.
+> Rotate **before** the `up --build --force-recreate` in § 5.1 (step 8), so the recreated container
+> takes the new material in the same step.
 
 **Why the project mount is reviewed and not discarded** (Edge Case 12). It is host content and the
 operator's own repository, and an agent can write there by design (R2.1). This path does not return
 it to known-good, and it says so rather than pretending otherwise. `workspace/` also stays **outside
-the build context** — the deny-all `.dockerignore` never admits it — which is what makes step 7's
+the build context** — the deny-all `.dockerignore` never admits it — which is what makes step 8's
 rebuild safe against workspace contamination (Decision 5).
 
 ### 5.3 After recovery, assert
@@ -459,9 +531,20 @@ is the trigger for building a terms-page monitor. Both are reviewed at the caden
 
 ### Drill cadence
 
-> **OPERATOR-CONFIRM.** The cadence for re-running the T26 revocation drills and the T41
-> return-to-known-good drill is set at SF-7, alongside the R14.3 review cadence (review
-> assumption 5).
+**Quarterly, alongside the R14.3 route review** (operator-confirmed 2026-09-30, review
+assumption 5). The T26 revocation drills and the T41 return-to-known-good drill are re-run each
+quarter, in the same sitting as the three-route ToS review in
+`docs/records/third-party-assessments.md` § R14.3 — one cadence, so a quarter that reviews the terms
+also re-measures the procedures those terms may have changed.
+
+Out of cadence, a re-drill is triggered by any of: a provider changing its revocation path or its
+console; an agent version bump (R10.6), because the credential's own shape is what the bump can
+change; a change to this runbook's § 5 recovery path; or a finding from a real incident.
+
+**What the cadence costs, stated so it is not discovered later:** the SF-5/SF-6 drill set — twelve
+rows, with replays — took a full working day of operator wall-clock, and two rows had to be re-run
+after findings. A quarter that skips it should say so in the record rather than leaving the gap
+implicit.
 
 Every drill result — with its `t0`, its `t1`, its measured time and its image-ID comparison — is
 recorded in `docs/records/containment-drills.md` per that record's template.

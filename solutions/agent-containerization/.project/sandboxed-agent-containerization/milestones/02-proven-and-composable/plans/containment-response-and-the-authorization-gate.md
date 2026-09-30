@@ -421,7 +421,7 @@ recompile, and the operator-heavy drills last.
   rather than expiry. The sub-feature turned out to be the opposite of "smallest in code": it took
   **two deviations into image code** (5 and 6) and produced **eight** items for user
   documentation.)*
-- [ ] **SF-7: T44 and close-out.**
+- [x] **SF-7: T44 and close-out.**
   - **Write the six MUST-REACH-USER-DOCUMENTATION items (D-1 to D-6) into `README.md` and the
     runbook.** Operator-directed at SF-6; the table with destinations and sources is in
     `docs/records/containment-drills.md`. **Close-out is not complete while any of the six is only
@@ -437,6 +437,40 @@ recompile, and the operator-heavy drills last.
   - The two proposed edits recorded as exact replacement text.
   - The criterion-to-evidence table.
   - Full composite green.
+  *(Built 2026-09-30. **Phase A is fully green and Deviation 3 is closed: `verify-containment.sh`
+  169 passed, 0 failed, rc=0** — the two R14.3 checks closed by SF-7's own writing. Full composite
+  green, harness by harness (one at a time; a combined `&&` run was OOM-killed at SF-2, an
+  environment fact): pack-composition 109, pod-topology 63, egress-mediator 101, audit-completeness
+  76, tool-packs 41, mcp-inventory 44, validate-boundary 416 (four profiles), reproducibility 25,
+  containment 169, lint-policy OK — every one rc=0. **Eight, not six, user-documentation items:**
+  the record's table carries D-1…D-5, D-7, D-8, D-6 and the SF-6 built-note already said eight, so
+  the table is the binding list, nothing was renumbered, and this is NOT recorded as a deviation —
+  the record supersedes a bullet written before the last two items existed. Each item's destination
+  is named in a new "Where each item was written" table. Also written here, because SF-2 left them
+  as `(pending SF-2)` and the milestone note carried them forward: the **T37 section** (phase F
+  35/0) and its **negative control**, which turned out to have **two** variants rather than the
+  plan's one — deleting the `waive` entry exits **2** (the accounting rule: a profile may not
+  decline to have an opinion), and moving `git-push` to `classify` exits **3** (the T37 refusal
+  proper). Both run once on a scratch copy and recorded; the plan's predicted exit 3 is variant B.
+  **T44** inspected on the built image: ICAP and eCAP are compiled in (`squid -v` on
+  `sandboxed-agent/mediator:local`, Squid 6.13), the cascade offers a per-agent identity-annotated
+  attach point, and the blocker is TLS termination — a D4 decision, never available for `agy`
+  (R5.13), with stdio invisible either way (D18). **R14.3** now carries a three-route
+  Route/Owner/Review-trigger table; the operator made **Owner a per-deployment field** rather than a
+  fixed name, because other clients consume this solution. **Cadence quarterly + provider
+  announcements**, and the runbook's drill cadence set to the same sitting. **Tabletop recorded as
+  SIMULATION**: the owner suspends the `agy` route, with isolate → discard `agy-state` → revoke the
+  key, audit volumes preserved; it surfaced one gap — the checklist has no resumption criterion.
+  Inventory **Residual 4 rewritten** to its measured state, and **Residual 3 (R4.17) closed for
+  `codex`** in the negative: neither rotation nor provider revocation retires a captured refresh
+  token, so it stays open for `claude` alone. **Proposed edit 1 written** as exact replacement text
+  for the architecture runbook table (four of five rows change; "denylist entry at the mediator" was
+  never a live action), and not applied. **NOT closed, and named as open items in the record:** the
+  one-year `CLAUDE_CODE_OAUTH_TOKEN` in `references/.env_keys` — the operator answered "revoked
+  today", the close-out replay returned **HTTP 200 twice** at 2026-09-30T22:04:35Z, so it is live,
+  the operator will revoke it out of session, and **no date is recorded because no replay confirmed
+  one**, which is this feature's own D-5 rule applied to itself; R13.2 still formally unmet pending
+  the T40 amendment's acceptance; and the R12.8 notice not lifted.)*
 
 No sub-feature is oversized. SF-2 is the only one with real code, and it is one compiler rule plus
 the manifests and profiles it touches. SF-6's length is waiting, not work.
@@ -860,6 +894,10 @@ Paths are relative to the solution root.
   green (measured at SF-3: 140 passed, 4 failed, and all four are these expected reds; phases B, C, D
   and F are clean). SF-6 must not treat a still-red phase A as a failure, and SF-7 must write the
   R14.3 table in the shape the drills record now specifies.
+- **CLOSED at SF-7 (2026-09-30).** SF-7 wrote the three-route table, the cadence and the tabletop
+  into `docs/records/third-party-assessments.md` § R14.3, and `verify-containment.sh` now reports
+  **169 passed, 0 failed, rc=0**. Both parts of the two-part expected red are green, and the drills
+  record's expected-red table carries the measured numbers for each recording point.
 
 ### Deviation 4: the T41 drill used the existing credentials and the `apikey` cell, not minted throwaways in the default cell
 - **What changed:** the full T41 drill re-bootstrapped all three agents from the keys already in

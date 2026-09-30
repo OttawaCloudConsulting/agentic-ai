@@ -1,5 +1,5 @@
 # Milestone 02: Proven and Composable
-# Status: [~] in progress  5 features, 4 complete
+# Status: [x] complete  5 features, 5 complete
 
 ## Features
 
@@ -288,10 +288,10 @@
     an orphaned sf8-verify-54130 compose project that was removed before the re-run.
     Completed 2026-09-29.
 
-[~] Feature 02.5: Containment, response and the authorization gate
+[x] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
-    Sub-features: 6/7 complete
-    Notes: Started 2026-09-29. SF-1 complete 2026-09-29 (documentation only, 3 files).
+    Sub-features: 7/7 complete
+    Notes: Started 2026-09-29. Completed 2026-09-30. SF-1 complete 2026-09-29 (documentation only, 3 files).
     SF-2 complete 2026-09-29 (T37 enforced at compile). Operator supplied both waive
     reasons (github/git-push, kubernetes/infrastructure-apply) and chose the vocabulary
     rule: committed pack manifests PLUS the profile's inventoried MCP servers -- offered
@@ -636,3 +636,53 @@
     default cell's state, not the credential's absence.
     Edge Case 1 does not reopen -- its premise was a LEAKED token -- but E4's standing revocation
     obligation is now live and SF-7 carries it. Composite NOT re-run (D-08).
+    SF-7 complete 2026-09-30 -- close-out. Phase A FULLY GREEN and Deviation 3 CLOSED:
+    verify-containment.sh 169 passed, 0 failed, rc=0 (was 167/2; the two were the R14.3 pair).
+    Full composite green harness by harness, one at a time (a combined && run was OOM-killed at
+    SF-2, an environment fact): pack-composition 109, pod-topology 63, egress-mediator 101,
+    audit-completeness 76, tool-packs 41, mcp-inventory 44, validate-boundary 416 (four profiles),
+    reproducibility 25, containment 169, lint-policy OK -- every one rc=0. Every count equals its
+    SF-2 baseline except containment.
+    EIGHT user-documentation items, not the plan's six: the drills record's table carries
+    D-1..D-5, D-7, D-8, D-6 and the SF-6 built note already said eight, so the table is the binding
+    list. Nothing renumbered, and NOT recorded as a deviation -- the record supersedes a bullet
+    written before the last two items existed. All eight written into README.md and the runbook, and
+    a new 'Where each item was written' table names each destination so the claim is checkable.
+    Written here because SF-2 left them '(pending SF-2)' and the milestone note carried them
+    forward: the T37 section (phase F 35/0) and its negative control, which has TWO variants rather
+    than the plan's one -- deleting the waive entry exits 2 (the accounting rule), moving git-push to
+    classify exits 3 (the T37 refusal proper). Both run once on a scratch copy; the plan's predicted
+    exit 3 is variant B, and variant A is recorded because it is the edit an operator would actually
+    make.
+    T44 inspected on the BUILT image, not the Dockerfile: squid -v on sandboxed-agent/mediator:local
+    (Squid 6.13) carries --enable-icap-client AND --enable-ecap, so the adaptation seam is compiled
+    in; the front/inner cache_peer cascade offers a per-agent, identity-annotated attach point; the
+    template's @GATE_RULES@/@PROXY_LISTENERS@ seams render into an ordered policy and any rule class
+    is a rebuild (D4). Conclusion with its limits: the blocker is TLS termination, which is a D4
+    decision and never available for agy (R5.13), and stdio is invisible either way (D18) --
+    'without redesign' does not mean 'without a decision'.
+    R14.3 now carries a three-route Route/Owner/Review-trigger table. OPERATOR DECISION: Owner is a
+    PER-DEPLOYMENT field rather than a fixed name, because other clients consume this solution.
+    Cadence quarterly plus provider-announcement subscriptions (review assumption 5), and the
+    runbook's drill cadence set to the same quarterly sitting. Tabletop recorded as SIMULATION: the
+    owner suspends the agy route, containment isolate -> discard agy-state -> revoke the key with
+    the audit volumes preserved; it surfaced one gap, that the re-review checklist has no resumption
+    criterion, recorded not fixed.
+    Inventory Residual 4 rewritten from 'documented, not tested' to its measured state, and
+    Residual 3 (R4.17) CLOSED FOR codex IN THE NEGATIVE -- neither rotation nor provider revocation
+    retires a captured refresh token (V3 and V2) -- so it stays open for claude alone. Proposed
+    edit 1 written as exact replacement text for the architecture runbook table (four of five rows
+    change; 'denylist entry at the mediator' was never a live action) and NOT applied.
+    Runbook finalised: status DRAFT -> FINAL, every command a measured form, the incident list
+    reviewed again at close-out with nothing added and nothing struck, D-4 promoted to its own
+    numbered step 6 before the discard (steps renumbered 6-11), and README.md gains a 'Containment
+    and response (02.5)' section that links it.
+    OPEN ITEMS, named in the record rather than implied: (1) the one-year CLAUDE_CODE_OAUTH_TOKEN in
+    references/.env_keys is STILL LIVE -- the operator answered 'revoked today', the close-out
+    replay returned HTTP 200 twice at 2026-09-30T22:04:35Z, the operator will revoke it out of
+    session, and NO DATE IS RECORDED because no replay confirmed one (this feature's own D-5 rule
+    applied to itself); (2) R13.2 stays formally unmet until the operator accepts the T40 amendment
+    text, and the R12.8 notice is not lifted here; (3) both proposed edits written, neither applied;
+    (4) V2's timed row stays a GAP by operator decision; (5) detection stays pull-based (R9.6 MAY).
+    Codebase-assessment refresh SKIPPED again: no codebase-assessment.md exists (Gate 0 skipped,
+    greenfield) -- the documented edge case, a warning not a blocker, so no refresh commit.

@@ -9,7 +9,22 @@ V1–V3, plus two defects fixed in image code and eight items carried to user do
 **finding**: it is fixed in the runbook and the drill is **re-run**, not annotated (Test Strategy).
 A drill whose clock is interrupted is re-run, not annotated — `t0` to `t1` is only meaningful
 without a gap (Edge Case 18).
-**Outcome:** *(pending — SF-7)*. **SF-6 is complete and phase A's drill-evidence half is green
+**Credential-handling rule, binding on anyone reproducing these drills (D-6):** never print a
+credential file's contents while inspecting its structure. Key names via `grep -o`, size via
+`wc -c`, identity via a sha256 prefix — that is enough to tell one credential from another and to
+prove a rotation happened, without putting a value in a transcript, a scrollback or a public record.
+This rule exists because one drill in this record broke it and recorded the breach as a finding
+against its own conduct (§ V2).
+**Outcome:** **COMPLETE — SF-7 close-out 2026-09-30.** All twelve credential rows drilled (one
+stated gap: V2's timed half, by operator decision), `verify-containment.sh` phases A–F **fully
+green** with phase A's two expected reds both closed, T37 and T44 recorded, the R14.3 three-route
+record and the T44 tabletop written in `third-party-assessments.md`, and all **eight** items in
+§ "MUST REACH USER DOCUMENTATION" written into `README.md` and the runbook. **Two things are
+deliberately NOT closed here:** R13.2 stays formally unmet until the operator accepts the T40
+amendment text below (criterion 8), and **the one-year `CLAUDE_CODE_OAUTH_TOKEN` in
+`references/.env_keys` is still live** — replayed 2026-09-30T22:04:35Z, HTTP **200** twice; the
+operator has stated it will be revoked out of session, and no revocation date is recorded because no
+replay has confirmed one (this feature's own D-5 rule, applied to itself). **SF-6 is complete and phase A's drill-evidence half is green
 (167 passed, 2 failed — the two are the R14.3 pair that closes at SF-7).** All twelve credential rows
 are drilled, one of them (V2) recorded as a `GAP` on its timed half by operator decision. `verify-containment.sh` phases A–F are measured green
 except phase A's two expected reds (§ "Expected red"), with a recorded negative control for each of
@@ -18,9 +33,8 @@ and the full T41 drill against the real pod. **SF-5 is complete**: all five pod-
 credential rows drilled and inside their stated maxima — S4 00:06, S5 00:14, S1 00:07 (all against
 10:00), S2 02:21 (15:00), S3 00:11 (30:00) — every one with identical image IDs before and after, so
 R8.5's no-rebuild rule holds for the whole set. Phase A's drill-evidence red is **narrower but not
-gone**: the S rows now carry measured values, the E and V rows do not. What remains is the provider
-revocation drills (SF-6) and close-out (SF-7) — including revoking the `CLAUDE_CODE_OAUTH_TOKEN`
-minted for this work.
+gone**: the S rows now carry measured values, the E and V rows do not. **SF-6 is complete**, and so is close-out (SF-7) — with
+the `CLAUDE_CODE_OAUTH_TOKEN` obligation named above as the one thing it did not discharge.
 
 > **This repository is public.** No credential value, OAuth code, or token prefix longer than the
 > provider's own public type prefix (`sk-ant-`, `ghp_`) ever enters this record. Drills use
@@ -527,6 +541,28 @@ inner 401. **No provider-credential revocation is confirmable from the pod's own
 E rows, V rows and S2 alike. The runbook's § 4 evidence rule already says this for S2/S3; it applies
 unchanged to every E and V row.
 
+#### SF-7 close-out — the standing obligation is NOT discharged, and this is the evidence
+
+E4's cell carries a standing obligation: revoke every one-year token minted to prove it. Two tokens
+existed.
+
+- **The SF-6 drill token** (`references/.sf6-drill_env_keys`) was revoked *by the drill itself* and
+  measured dead — HTTP 401, monotonic across 138 poll lines, confirmed independently by the `claude`
+  CLI replying `Not logged in`. Discharged.
+- **The older token in `references/.env_keys`**, outstanding since before these drills, is **still
+  live at close-out.** Replayed 2026-09-30T22:04:35Z: `GET api.anthropic.com/v1/models` with it as a
+  plain bearer returned **HTTP 200**, twice, two seconds apart. Identified in this record by
+  **sha256 prefix `8390a8b0`** and length only; no value, and no prefix beyond the provider's public
+  type prefix.
+
+The operator has stated it will be revoked **out of session**. **No revocation date is recorded,
+because no replay has confirmed one** — and recording a date on the strength of an intention is
+precisely what D-5 says not to do. The obligation therefore ships as an **open item** of this
+feature rather than as a completed step, and the next replay that returns 401 is what closes it.
+
+*(Why it is stated this loudly: the alternative was to write "revoked 2026-09-30" from an operator
+answer that the replay then contradicted. A record that does that is worth less than no record.)*
+
 ### V1 — first attempt, abandoned before the clock, and the three findings it produced
 
 **No `t0` was declared, so nothing here is a mis-measurement** — the baseline never held, and under
@@ -833,7 +869,7 @@ inventory declares those skills. Two existing conclusions are affected:
 Not fixed here — it is a 02.3 surface, and SF-6 is a drills sub-feature that has already taken two
 deviations into image code. Recorded for the operator's decision.
 
-### MUST REACH USER DOCUMENTATION (carried to SF-7)
+### MUST REACH USER DOCUMENTATION (written at SF-7)
 
 Operator-facing consequences that a reader of `README.md` and the runbook must not have to find in a
 drills record. **SF-7's close-out is not complete until each is written into user-facing
@@ -849,6 +885,29 @@ documentation.**
 | **D-7** | **`README.md`'s `oauth-mount` warning overstates its cost and understates its risk.** "Costs you your host codex login" was **not** measured: after the container rolled, the host set's refresh token still worked. Rolling is not revoking. The correction must say both halves — the host login may well keep working, **and** a captured copy is not neutralised by rotation | `README.md` `oauth-mount` section (the paragraph at README:262) **and** the V3 inventory row | V3 finding above |
 | **D-8** | **`docker compose images --quiet` cannot verify R8.5 across a containment that removes a container** — it lists per container, so a removed agent looks like a changed image. Compare per service by name, or re-create the service first | runbook § 3.4 (where the R8.5 confirmation command is given) | V3 method note |
 | **D-6** | **The credential-handling rule for anyone reproducing these drills:** never print a credential file's contents while inspecting its structure — key names via `grep -o`, size via `wc -c`, identity via a sha256 prefix | `docs/records/containment-drills.md` method preamble **and** the README's drill-reproduction note | method finding above |
+
+#### Where each item was written — SF-7, 2026-09-30
+
+**All eight are now in user-facing documentation.** The table above is the source; this one is the
+destination, so a reader can check the claim rather than take it. Close-out was not complete while
+any item was only in this record.
+
+| # | Written into | What it says there |
+|---|---|---|
+| **D-1** | `README.md` § "Containment and response (02.5)", bullet 2 · `docs/containment-runbook.md` § 3.4 (second bullet of the two revocation rules) · § 4 (the V-row clock note, rewritten) | Provider revocation leaves both `codex` token halves working; containment is pod-side and the isolate-then-discard-then-revoke ordering is load-bearing for V2/V3, not defence in depth |
+| **D-2** | `README.md` § "Containment and response", bullet 3 · runbook § 3.4 and § 4 (same rewritten note) | `claude`'s access token died on revocation, `codex`'s did not — the per-row replay rule is why, and an operator must not generalise across providers |
+| **D-3** | `README.md` § "Tool packs, use-case profiles and MCP inventory (02.3)" (new bullet, with the exact refusal text) · `README.md` § "Containment and response", bullet 5 · runbook § 3.3 (with the helper-container command) · runbook § 5.1 step 9 | A `codex` agent that has run once will not restart until `~/.codex/skills/.system` is cleared from outside the agent, or the inventory declares those skills (a rebuild and a repin) |
+| **D-4** | `README.md` § "Containment and response", bullet 4 (with the clearing command) · runbook § 5.1 **step 6**, promoted to its own numbered step before the discard (it was already in § 4's clock notes) | A stray `compose run` one-off blocks every volume discard, `compose down` does not clear one-offs, and an interactive login leaves exactly such a container |
+| **D-5** | `README.md` § "Containment and response", bullet 1 · `README.md` § "Revocation (R12.6)" · runbook § 3.4 (first bullet of the two revocation rules) | "Revoked" is not a state to assume: `t1` is a replay that fails, and V2 is the worked example of a console action reporting success over a credential that kept working |
+| **D-6** | `README.md` § "Containment and response" (closing paragraph) · this record's **Method** preamble | Never print a credential file's contents while inspecting its structure — key names via `grep -o`, size via `wc -c`, identity via a sha256 prefix |
+| **D-7** | `README.md` § "Codex `oauth-mount` (optional, one-shot)" — the warning paragraph rewritten with both halves · `credential-inventory.md` V3 row (already carried the finding) | The old "costs you your host codex login" was never measured: the host set still worked afterwards. Rolling is not revoking, and a captured copy is not neutralised by rotation |
+| **D-8** | `docs/containment-runbook.md` § 3.4 (at the R8.5 confirmation command) | `docker compose images --quiet` lists per container, so a containment that removed a container makes a naive comparison read as a changed image — compare per service by name, or re-create the service first |
+
+**The plan's SF-7 bullet says "six (D-1 to D-6)"; there are eight.** D-7 and D-8 were added to this
+table during SF-6 alongside the first six, and the plan's own SF-6 built-note records the count as
+eight. The table is the binding list and the numbering is left as SF-6 wrote it — nothing is missing
+and nothing was renumbered. Not recorded as a deviation: the record supersedes a bullet written
+before the last two items existed.
 
 ### Drill V3 — `codex`'s OAuth set with host provenance (`oauth-mount`)
 
@@ -1381,19 +1440,62 @@ cost the runbook's first rule exists to prevent.
 
 ---
 
-## T37 — the authorization gate (SF-2)
+## T37 — the authorization gate (SF-2, results recorded at SF-7)
 
-*(pending SF-2 — `verify-containment.sh` phase F: one compile negative per Interface Contract 2 row;
-every shipped profile compiles; the runtime credential-absence checks under `default`; and
-`CONNECT github.com` refused from `claude` and `agy` with each deny line carrying `agent` and
-`identity_source`.)*
+Built at SF-2 and measured by `verify-containment.sh` **phase F**. Enforcement is by **capability
+absence** (Decision 1): a profile must account for every action its loaded packs — and its
+inventoried MCP servers — can enable, as either `classify` (requires human authorization) or
+`waive: {<action>: <reason>}`, and the compiler refuses a classification the pod cannot enforce.
+
+**Phase F result: 35 passed, 0 failed** (composite run of the committed tree, 2026-09-30). It covers
+both directions: one compile negative per Interface Contract 2 row against probe profiles in a
+scratch copy; every shipped profile compiles and passes `--check`; and the runtime half under
+`default` — capability absence inside all three agents (no `GH_TOKEN`/`GITHUB_TOKEN`/`KUBECONFIG`,
+no `/run/secrets/pack-*`, no `credential.helper`, no `~/.git-credentials`) plus a refused
+`CONNECT github.com` from `claude` and `agy`, with deny lines carrying `identity_source`
+`listener+mtls` and `listener+proxy_auth` respectively.
+
+**Baseline note, unchanged from SF-2:** `compile-policy.sh --check` still exits 4 for the
+`test-fixtures` and `test-selfcheck` profiles, as it did before SF-2 — those two are compiled from
+`allowlist.test.yaml`.
 
 ### Recorded negative control
 
-Removing `git-push` from the `github` profile's `waive` block makes the compile exit 3. Run once and
-recorded here; not left in the suite.
+Run once on a scratch copy of the committed tree, 2026-09-30, and **not** left in the suite. The
+plan predicted one variant; the compiler has **two** distinct refusals here, and both were measured
+because they are different controls and a reader would otherwise assume the wrong one.
 
-*(pending SF-2)*
+**Variant A — the waiver removed entirely** (the plan's literal "removing `git-push` from
+`github`'s `waive`"). The action is then neither classified nor waived, and the *accounting* rule
+fires first:
+
+```
+compile-policy: INVALID: profiles/github.yaml: the action 'git-push' is declared by
+packs/github-cli/pack.yaml but this profile neither classifies nor waives it (R12.7). Add it to
+authorization.classify, or to authorization.waive with a recorded reason
+```
+
+**exit 2** — an input-validation failure. Silence is not an option: a profile cannot decline to have
+an opinion about an action its own pack enables.
+
+**Variant B — `git-push` moved from `waive` to `classify`** (the refusal the plan's "exit 3"
+describes). The classification is now one the pod cannot enforce, and the T37 rule fires:
+
+```
+compile-policy: REFUSED: profiles/github.yaml classifies 'git-push' as requiring human
+authorization, but it loads pack 'github-cli' (packs/github-cli/pack.yaml), whose credential,
+egress or binaries enable that action for an unattended agent. A classification the pod cannot
+enforce is a note, not a control (T37). Either remove the pack from this profile's 'packs', or move
+'git-push' from 'classify' to 'waive' with a recorded reason for why unattended 'git-push' is
+acceptable here
+```
+
+**exit 3** — the T37 refusal proper.
+
+Together they are the whole gate in negative form: **exit 2 says you must decide, exit 3 says you
+may not decide something the pod cannot deliver.** The plan's single predicted control is variant B;
+variant A is recorded because the obvious edit an operator would make (deleting the waiver) produces
+the *other* message, and a reader who expects exit 3 would mis-read exit 2 as a different defect.
 
 ### `codex` and `github.com` (Edge Case 16)
 
@@ -1402,17 +1504,93 @@ recorded here; not left in the suite.
 attempted — the harness contacts no third-party host. The residual this leaves is a
 repository-embedded credential in the project mount (a token in `.git/config`).
 
-*(pending SF-2)*
+**Measured at SF-2, phase F.** The credential-absence checks ran inside `codex` like the other two
+agents and passed — no `GH_TOKEN`/`GITHUB_TOKEN`/`KUBECONFIG`, no `/run/secrets/pack-*`, no
+`credential.helper`, no `~/.git-credentials` — and no `CONNECT github.com` refusal was asserted for
+`codex`, because for this agent there is none to assert: the name is on its base allowlist and the
+request is allowed at the mediator. The halt rests on credential absence alone, which is what the
+phase measures, and the residual above is unchanged by the measurement.
 
 ---
 
 ## T44 — the mediation seam (SF-7)
 
-*(pending SF-7 — `squid -v` on the built image for the ICAP and eCAP build flags; the front/inner
-`cache_peer` cascade; and the template's `@GATE_RULES@` and `@PROXY_LISTENERS@` seams. The recorded
-conclusion names its limits: a tool-call layer needs TLS termination, which is a D4 decision and is
-never available for `agy` (R5.13), and the mediator never sees stdio (D18). "Without redesign" does
-not mean "without a decision".)*
+Inspected 2026-09-30 on the **built** mediator image (`sandboxed-agent/mediator:local`,
+image ID `5cd5aa6b06e0`), not on the Dockerfile's intent. Three things, as criterion 6 asks, and the
+conclusion names its limits.
+
+### 1. The build flags — the capability is COMPILED IN
+
+```bash
+docker run --rm --entrypoint squid sandboxed-agent/mediator:local -v
+```
+
+```
+Squid Cache: Version 6.13
+Service Name: squid
+Debian GNU/Linux 13 (trixie)
+```
+
+Its `configure options` carry **both** `'--enable-icap-client'` and `'--enable-ecap'`, and the
+image ships the adaptation module directory. So the content-adaptation seam is **present in the
+binary this pod runs**: an ICAP service or an eCAP module could be attached by configuration alone,
+with no new image and no upstream build of Squid.
+
+Note the `--rm`: a one-off left behind here is exactly the container that blocks a volume discard
+later (D-4). Inspection uses the same hygiene the runbook demands during an incident.
+
+### 2. The front/inner `cache_peer` cascade — where an adaptation point would sit
+
+The topology is a **self-cascade**: for the two TLS-fronted agents, a front listener terminates the
+proxy hop and forwards through `cache_peer 127.0.0.1 parent <inner>` to an inner `http_port …
+ssl-bump` listener that peeks the ClientHello (`images/mediator/entrypoint.sh:442-472`;
+`mediator/config/proxy.conf.tmpl:7-20`). `codex` gets one listener that does both. Identity survives
+the hop because policy is selected by `myportname`, never by the client address — every inner
+listener sees `127.0.0.1`.
+
+For T44 the cascade matters in one specific way: it is **two master transactions**, so an adaptation
+service attached at the inner layer would see the CONNECT and its own annotations, and the front's
+`cache_peer_access <agent>peer allow p_<agent>_frontreal` is what keeps the inner reachable by
+nothing else. The seam therefore has a place to attach that is already per-agent and already
+identity-annotated. **What it would see is still only the CONNECT envelope** — see § 4.
+
+### 3. The template seams — `@GATE_RULES@` and `@PROXY_LISTENERS@`
+
+`mediator/config/proxy.conf.tmpl` is rendered at start from `policy/resolved/<profile>.yaml`; the
+fixed lines carry the **ordering** (which is the policy) and the `@…@` markers carry only per-agent
+content (`proxy.conf.tmpl:1-5`). `@PROXY_LISTENERS@` (line 77) renders the listener set with its
+per-agent `clientca=`/`tls-cert=` and auth scheme; `@GATE_RULES@` (line 247) renders the per-agent
+allowlist gate, and it is deliberately placed **before** any rule that can resolve a name
+(`proxy.conf.tmpl:195-203`) so that a name off an agent's list is refused before the mediator
+resolves it.
+
+Both are true seams in the sense T44 asks about: new rule classes render into an existing, ordered
+policy, and the entrypoint fatals on any **surviving** marker in the rendered file, so a
+half-substituted policy cannot start. Adding a rule class means an entrypoint change plus a
+recompile — **an image rebuild, not a live reload** (D4).
+
+### 4. Conclusion, with its limits named
+
+**A tool-call-aware layer is not reachable without a decision, and the decision is not this
+feature's.** Concretely:
+
+- **The binary is not the blocker.** ICAP and eCAP are compiled in (§ 1), and the cascade already
+  offers a per-agent, identity-annotated attach point (§ 2).
+- **TLS termination is the blocker, and it is a D4 decision.** Every allowed path today is
+  peek+splice: the mediator sees the CONNECT envelope and the SNI, never the request body, so no
+  adaptation service attached today could see a tool call. Seeing one means terminating and
+  inspecting agent-to-provider TLS — which is what D4 declines, and it is a **decision**, not a
+  missing capability.
+- **For `agy` it is never available at all** (R5.13): its proxy hop is itself TLS, and its route is
+  the one where termination is out of scope by requirement rather than by preference.
+- **The mediator never sees stdio** (D18). An MCP server on stdio has no egress leg through this
+  seam, so a tool-call layer built here would be blind to exactly the surface 02.3's `mcp-gate`
+  exists to cover.
+- **Any rule class is a rebuild** (§ 3), so even the reachable half is not a runtime control.
+
+**"Without redesign" does not mean "without a decision".** The seam is real and the capability is
+compiled in; what stands between it and tool-call mediation is D4's refusal to terminate TLS and
+D18's stdio blind spot. Recorded, not resolved.
 
 ---
 
@@ -1515,8 +1693,13 @@ at SF-6. Phase A goes fully green at **SF-7**. See the feature plan's Deviation 
 | Recorded at | Part 1 (drill evidence) | Part 2 (R14.3) |
 |---|---|---|
 | SF-3 (phase A lands) | **red — measured, 2 failures** | **red — measured, 2 failures** |
-| SF-6 (drills complete) | *(pending — expected green)* | *(pending — still red)* |
-| SF-7 (close-out) | *(pending — expected green)* | *(pending — expected green)* |
+| SF-6 (drills complete) | **green — measured: 167 passed, 2 failed, both the R14.3 pair** | **red — measured, the same 2 failures** |
+| SF-7 (close-out) | **green** | **green — measured: `verify-containment.sh` 169 passed, 0 failed, rc=0 (2026-09-30)** |
+
+**Deviation 3 is closed.** Phase A is fully green, and the two-part expected red is now a recorded
+history rather than an outstanding state. The closing write was the R14.3 three-route table, the
+cadence statement and the tabletop in `docs/records/third-party-assessments.md` § R14.3 — the shape
+phase A reads, with SF-7's content in it.
 
 ---
 
@@ -1532,7 +1715,57 @@ It is **a rebuild**, not a live action: the policy is baked into the mediator im
 live reload (D4). The live forms are the **network disconnects**, and the recorder is stopped
 **alongside** its agent, after it drains.
 
-*(exact replacement text — pending SF-7)*
+**Exact replacement text, written 2026-09-30 from the measured forms** (SF-3 phases B–D, SF-4's
+MCP-disable exercise and full T41 drill, SF-5/SF-6's twelve revocation rows). Four of the five rows
+change; the MCP row is already correct and is left alone.
+
+`ARCHITECTURE_AND_DESIGN.md:697-707` — the runbook table, replace:
+
+> | Need | Action |
+> |---|---|
+> | Cut egress immediately | Denylist entry at the mediator, or detach the agent's network |
+> | Isolate one agent, others keep running | Stop that container. Per-agent networks (D2) make this native, not a special case (R13.2) |
+> | Disable one MCP server or tool across all agents | Profile inventory change plus rebuild. **No live mechanism exists** — recorded, not solved (R13.2 partially unmet) |
+> | Rotate credentials | Per credential type, per the tested revocation procedure with its stated maximum detection-to-revocation time (R13.1, R8.5). The one-year `CLAUDE_CODE_OAUTH_TOKEN` is the longest-lived and the priority |
+> | Return to known-good | Rebuild containers from the pinned digest and **discard the state volumes**, re-bootstrapping authentication. A contaminated volume cannot currently be distinguished from a clean one, so the documented path does not attempt to (R13.3, D16) |
+>
+> Define what constitutes an event versus an incident before go-live.
+
+with:
+
+> | Need | Action |
+> |---|---|
+> | Cut egress immediately | **`docker network disconnect sandboxed-agent-pod_egress-net sandboxed-agent-pod-egress-mediator-1`** — the live form, and the only one. A denylist entry is **not** a live action: the policy is compiled into the mediator image and there is no live reload (D4), so a denylist change is a recompile plus a rebuild. Detaching the mediator keeps DNS, policy and the audit writer running, so the blocked attempt is still recorded — which is the detection signal (R9.1) |
+> | Isolate one agent, others keep running | Two forms, not interchangeable, both measured. **Disconnect** (`docker network disconnect sandboxed-agent-pod_<agent>-net sandboxed-agent-pod-<agent>-1`) keeps the container for forensics and keeps its recorder writing. **Stop** is durable and ends the recording — stop the agent's recorder *alongside* it, after the recorder drains. Per-agent networks (D2) make both native, not a special case (R13.2) |
+> | Disable one MCP server or tool across all agents | Profile inventory change plus rebuild. **No live mechanism exists** — recorded, not solved (R13.2 partially unmet) |
+> | Rotate credentials | Per credential type, per the tested revocation procedure with its stated maximum detection-to-revocation time (R13.1, R8.5). The one-year `CLAUDE_CODE_OAUTH_TOKEN` is the longest-lived and the priority. **Two measured qualifications:** `t1` is a replay that fails, never a console action; and for `codex` neither provider revocation nor rotation retires a captured OAuth set, so for that agent the containment is pod-side — isolate and discard the state volume at `t0`, *before* revoking |
+> | Return to known-good | Rebuild containers from the pinned digest and **discard the state volumes**, re-bootstrapping authentication. A contaminated volume cannot currently be distinguished from a clean one, so the documented path does not attempt to (R13.3, D16). **Clear stray one-off `compose run` containers first** — `docker volume rm` refuses while any container references the volume, and `compose down` does not remove one-offs |
+>
+> Event and incident are defined in `docs/containment-runbook.md` § 1, operator-confirmed
+> 2026-09-29 and reviewed again at feature close-out. The runbook is the operational form of this
+> table; this table is the design statement.
+
+**What changed and why.**
+
+- **"Denylist entry at the mediator" was never a live action.** The resolved policy is baked into
+  the image at build (D4, and 01.5 SF-4's compile-stage drift check makes it structural). Offering it
+  as the first option for "cut egress immediately" points an operator at a rebuild during an
+  incident. The live form is the network detach, measured at SF-3 phase C.
+- **Isolation splits into two forms**, because both are measured and they trade differently:
+  `disconnect` preserves the container and the recording; `stop` is durable and ends the recording.
+  The old row said "stop that container" and lost the forensic option.
+- **The recorder is named.** Stopping an agent without its recorder leaves a writer with nothing to
+  read; stopping the recorder before it drains loses the tail of the evidence. Order matters and the
+  old row did not carry it.
+- **The credential row gains the two measured rules** that change what an operator must do, not just
+  what they must know: replay-confirms-revocation, and the `codex` ordering.
+- **The one-off container clearing** is in the recovery row because without it the discard step
+  simply fails, with an error naming only a hex ID.
+- **The "define event versus incident" instruction is discharged**, so it becomes a pointer rather
+  than an open action.
+
+**Not applied here.** This is proposed text for the design authority, exactly as 02.3 and 02.4 did
+with their own architecture edits.
 
 ### 2. `REQUIREMENTS.md` — the R13.2 / T40 amendment
 
@@ -1586,17 +1819,59 @@ decision, the milestone Definition of Done gates on it, and the R12.8 notice is 
 
 ## Criterion-to-evidence table (coverage)
 
-Every numbered acceptance criterion maps to a harness phase, a drill, or a record section.
+Every numbered acceptance criterion maps to a harness phase, a drill, or a record section. Closed at
+SF-7, 2026-09-30.
 
 | Criterion | Evidence | Where | State |
 |---|---|---|---|
-| 1 — T26 tested revocation, every persisted type | Drills E1–E4, V1–V3, S1–S5 | This record, § T26 (SF-5, SF-6); inventory Table B | pending |
-| 2 — T40 single-agent isolation | Phase B (both forms); MCP-disable exercise; amendment text | Phase B (SF-3); this record § T40, § Proposed edits 2 | **measured (SF-3 + SF-4)** — both isolation forms, the MCP-disable exercise and the amendment text. Acceptance of the amendment is the operator's, and R13.2 stays formally unmet until then |
-| 3 — T41 return to known-good | Phase E (mechanical); full drill; per-store outcomes | Phase E (SF-4); this record § T41 | **measured (SF-4)** — phase E, and the full drill performed 2026-09-30 against the real pod and the `main` pins, after one failed attempt recorded as three findings |
-| 4 — R12.5 teardown | Phase D | Phase D (SF-3); this record § R12.5 | **measured (SF-3)** |
-| (Decision 3) — the pod-wide cut keeps the detection signal | Phase C | Phase C (SF-3); this record § The pod-wide cut | **measured (SF-3)** |
-| 5 — T37 authorization gate | Phase F, compile negatives and runtime checks | Phase F (SF-2); this record § T37 | pending |
-| 6 — T44 ToS monitoring and the seam | R14.3 record for three routes; tabletop SIMULATION; seam inspection | `third-party-assessments.md`; this record § T44 (SF-7) | pending |
-| 7 — the runbook | Shipped, with event/incident defined before go-live; README links it | `docs/containment-runbook.md` (SF-1 draft, SF-7 final) | **draft (SF-1)** |
-| 8 — records and proposed edits | This record; the two proposed edits above | This record (SF-7) | **edit 2 (R13.2/T40) written from the exercised path (SF-4)**; edit 1 pending SF-7 |
-| 9 — the R12.8 notice is not lifted here | Stated, not acted on | This record, § Proposed edits 2 | **stated (SF-1)** |
+| 1 — T26 tested revocation, every persisted type | Drills E1–E4, V1–V3, S1–S5 | This record, § T26 (SF-5, SF-6); inventory Table B | **MEASURED (SF-5 + SF-6)** — all twelve rows drilled 2026-09-30, each inside its stated maximum, each with identical service image IDs before and after (R8.5). **One stated GAP: V2's timed clock** (operator decision); its substantive question was measured. The inventory's Residual 4 is rewritten from "documented, not tested" to its measured state |
+| 2 — T40 single-agent isolation | Phase B (both forms); MCP-disable exercise; amendment text | Phase B (SF-3); this record § T40, § Proposed edits 2 | **MEASURED (SF-3 + SF-4)** — both isolation forms, the MCP-disable exercise and the amendment text. Acceptance of the amendment is the operator's, and **R13.2 stays formally unmet until then** |
+| 3 — T41 return to known-good | Phase E (mechanical); full drill; per-store outcomes | Phase E (SF-4); this record § T41 | **MEASURED (SF-4)** — phase E, and the full drill performed 2026-09-30 against the real pod and the `main` pins, after one failed attempt recorded as three findings |
+| 4 — R12.5 teardown | Phase D | Phase D (SF-3); this record § R12.5 | **MEASURED (SF-3)** |
+| (Decision 3) — the pod-wide cut keeps the detection signal | Phase C | Phase C (SF-3); this record § The pod-wide cut | **MEASURED (SF-3)** |
+| 5 — T37 authorization gate | Phase F, compile negatives and runtime checks | Phase F (SF-2); this record § T37 | **MEASURED (SF-2, recorded SF-7)** — phase F 35 passed, 0 failed; both negative-control variants run once and recorded (exit 2 accounting, exit 3 T37 refusal) |
+| 6 — T44 ToS monitoring and the seam | R14.3 record for three routes; tabletop SIMULATION; seam inspection | `third-party-assessments.md` § R14.3; this record § T44 | **RECORDED (SF-7)** — three-route Route/Owner/Review-trigger table; cadence **quarterly + provider announcements** (operator-confirmed); tabletop labelled **SIMULATION** with the owner's decision (suspend the `agy` route) and the containment it triggers; seam inspected on the built image (ICAP and eCAP compiled in; TLS termination is the blocker and it is a D4 decision) |
+| 7 — the runbook | Shipped, with event/incident defined before go-live; README links it | `docs/containment-runbook.md` (SF-1 draft, SF-7 final) | **FINAL (SF-7)** — every command is a measured form; the incident list was reviewed again at close-out and neither added to nor struck; § 6's drill cadence set to **quarterly, with the R14.3 review**; `README.md` § "Containment and response (02.5)" links it |
+| 8 — records and proposed edits | This record; the two proposed edits above | This record (SF-7) | **BOTH WRITTEN** — edit 2 (R13.2/T40) from the exercised path (SF-4); edit 1 (the architecture runbook table) from the measured forms (SF-7). Neither applied, by design |
+| 9 — the R12.8 notice is not lifted here | Stated, not acted on | This record, § Proposed edits 2 | **STATED (SF-1, unchanged)** — the milestone Definition of Done lifts it, once the R13.2/T40 amendment is accepted |
+| **MUST REACH USER DOCUMENTATION (D-1 … D-8)** | Eight operator-facing consequences written into `README.md` and the runbook | § MUST REACH USER DOCUMENTATION → "Where each item was written" | **ALL EIGHT WRITTEN (SF-7)** — D-1 README + runbook § 3.4/§ 4; D-2 README + runbook § 3.4/§ 4; D-3 README (MCP section, with the exact refusal text) + runbook § 3.3/§ 5.1; D-4 README + runbook § 5.1 step 6; D-5 README (twice) + runbook § 3.4; D-6 README + this record's Method preamble; D-7 README `oauth-mount` paragraph + inventory V3 row; D-8 runbook § 3.4 |
+
+### Open items this feature does NOT close
+
+Stated here so close-out is not read as "everything is finished".
+
+1. **R13.2 stays formally unmet** until the operator accepts the T40 amendment text (§ Proposed
+   edits 2). The milestone Definition of Done gates on that acceptance, and the **R12.8 notice is
+   not lifted** by this feature (criterion 9).
+2. **The one-year `CLAUDE_CODE_OAUTH_TOKEN` in `references/.env_keys` is still live** — replayed
+   2026-09-30T22:04:35Z, HTTP 200. The operator will revoke it out of session; the closing evidence
+   is the next replay that returns 401 (§ Drill E4, "SF-7 close-out").
+3. **Two proposed edits are written and not applied** — `ARCHITECTURE_AND_DESIGN.md`'s runbook table
+   and `REQUIREMENTS.md`'s R13.2/T40 text. Applying them is the design authority's.
+4. **V2's timed row is a GAP**, by operator decision.
+5. **Detection stays pull-based** (R9.6 remains MAY). Nothing here bounds compromise to detection —
+   only detection to revocation.
+6. **The T44 tabletop surfaced a missing resumption criterion** in the re-review checklist: it says
+   when to suspend a route, not what evidence would let one resume. Recorded in
+   `third-party-assessments.md`, not fixed here.
+
+### Close-out regression — the full composite, harness by harness
+
+Run on the committed tree, 2026-09-30. Run **one harness at a time**: an earlier combined `&&` run
+was killed by the OS for memory, which is an environment fact, not a failure.
+
+| Harness | Result | rc |
+|---|---|---|
+| `verify-pack-composition.sh` | 109 passed, 0 failed | 0 |
+| `verify-pod-topology.sh` | 63 passed, 0 failed | 0 |
+| `verify-egress-mediator.sh` | 101 passed, 0 failed | 0 |
+| `verify-audit-completeness.sh` | 76 passed, 0 failed | 0 |
+| `verify-tool-packs.sh` | 41 passed, 0 failed | 0 |
+| `verify-mcp-inventory.sh` | 44 passed, 0 failed | 0 |
+| `validate-boundary.sh` (`default terraform kubernetes github`) | 416 passed, 0 failed | 0 |
+| `verify-reproducibility.sh` | 25 passed, 0 failed | 0 |
+| **`verify-containment.sh`** | **169 passed, 0 failed** — phase A fully green | 0 |
+| `scripts/lint-policy.sh` | OK | 0 |
+
+Every count equals its SF-2 baseline except containment, which moved from 167 passed / 2 failed to
+**169 passed / 0 failed** — the two R14.3 checks, closed by SF-7's own writing.

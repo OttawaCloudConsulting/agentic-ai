@@ -19,7 +19,7 @@ record past the next agent version bump (R10.6).
 - [R14.1 + R14.2 — Anthropic](#r141--r142--anthropic)
 - [R14.1 + R14.2 — OpenAI](#r141--r142--openai)
 - [R14.1 + R14.2 — Google (Gemini API / Antigravity `agy`)](#r141--r142--google-gemini-api--antigravity-agy)
-- [R14.3 — Antigravity ToS Monitoring Owner](#r143--antigravity-tos-monitoring-owner)
+- [R14.3 — ToS Monitoring Owner, Cadence and Review Triggers (all three provider routes)](#r143--tos-monitoring-owner-cadence-and-review-triggers-all-three-provider-routes)
 - [R14.1 — HashiCorp](#r141--hashicorp)
 - [R14.1 — GitHub](#r141--github)
 - [R14.1 — Kubernetes (posture)](#r141--kubernetes-posture-not-a-filled-record--feature-023-sf-5-decision-6)
@@ -107,7 +107,7 @@ record past the next agent version bump (R10.6).
 
 ---
 
-## R14.3 — Antigravity ToS Monitoring Owner
+## R14.3 — ToS Monitoring Owner, Cadence and Review Triggers (all three provider routes)
 
 | Field | Value |
 |---|---|
@@ -116,6 +116,59 @@ record past the next agent version bump (R10.6).
 | Review trigger | Re-review fires on any of: (1) Google clarifies the §6 boundary publicly or in direct correspondence; (2) the Antigravity Additional Terms change; (3) public-API (`GEMINI_API_KEY`) billing becomes material enough that Google's enforcement posture toward it is plausibly different from a hobbyist/low-volume key. Matches the trigger already recorded at `ARCHITECTURE_AND_DESIGN.md:482` |
 | Downstream test ownership | T44 (`ARCHITECTURE_AND_DESIGN.md:464`) — the simulated-terms-change exercise — is owned by Milestone 02, Feature 02.5, and runs under the owner named here. This record supplies the owner as an input; it does not itself constitute T44 |
 | Date | 2026-09-04 |
+
+### All three provider routes (Feature 02.5 SF-7, criterion 6)
+
+The block above is the Antigravity route alone, inherited from 01.1 SF-3. R14.3 asks for the owner
+and the review triggers on **every** provider route the pod carries, so the table below extends it
+to `claude` and `codex`. It does not supersede the Antigravity block: that block holds the §6
+reasoning, and this table holds the ownership and trigger shape for all three.
+
+**Owner is a per-deployment field, not a fixed name** (operator decision, 2026-09-30). This solution
+is consumable by other clients, so what the record fixes is *that an owner is named at deployment*,
+and the value below is Ottawa Cloud Consulting's own deployment. A consuming client substitutes its
+own operator of record.
+
+| Route | Owner | Review trigger |
+|---|---|---|
+| `claude` | The deploying organization's operator of record — **Ottawa Cloud Consulting** for this repository's own deployment | Any of: (1) Anthropic's Consumer or Commercial Terms, or the Usage Policy, change in a way that touches automated/unattended use or container deployment; (2) the `claude` agent version bump (R10.6) — the terms are re-read at the bump, because the client is what carries the ToS acceptance; (3) a provider-side enforcement signal on this account (a rate, device or session refusal not explained by a known policy gap); (4) the OAuth flow's shape changes, because the credential's persistence and revocation semantics are what V1 measured |
+| `codex` | The deploying organization's operator of record — **Ottawa Cloud Consulting** for this repository's own deployment | Any of: (1) OpenAI's Terms of Use or Service Terms change in a way that touches unattended use, or the ChatGPT-plan entitlement that backs `oauth-interactive` for this agent; (2) the `codex` agent version bump (R10.6); (3) a provider-side enforcement signal on this account; (4) **per-device revocation semantics change** — V2 measured that a revoked session's access *and* refresh tokens both keep working (D-1), so any change here changes the containment ordering user documentation states |
+| `agy` | The deploying organization's operator of record — **Ottawa Cloud Consulting** for this repository's own deployment | The three triggers in the Antigravity block above, unchanged: (1) Google clarifies the §6 boundary; (2) the Antigravity Additional Terms change; (3) `GEMINI_API_KEY` billing becomes material enough that Google's enforcement posture toward it is plausibly different from a low-volume key. Plus (4) the `agy` agent version bump (R10.6) |
+
+### Monitoring mechanism — a stated cadence, not a monitor (Decision 6)
+
+**Cadence: quarterly, plus provider-announcement subscriptions** (operator-confirmed 2026-09-30,
+review assumption 5). The owner reviews all three routes once a quarter and is subscribed to each
+provider's announcement channel; the per-route triggers above fire a re-review out of cadence.
+
+**Not built: a hash monitor of the terms pages.** Rendered pages churn for reasons unrelated to the
+terms, and a monitor that raises false alarms trains its owner to ignore it. The review trigger for
+building one is recorded rather than the monitor: **a missed terms change discovered after the
+fact.** That is the evidence that the cadence was too slow, and the only evidence that would justify
+the false-positive cost.
+
+**What this mechanism does not bound.** It bounds *notice* to one quarter plus whatever the
+announcement channels deliver. It does not bound provider change to notice, which is unbounded for a
+change that is neither announced nor caught in the quarterly read. That limit has the same shape as
+R13.1's — detection is pull-based — and it is stated rather than implied.
+
+### T44 tabletop — SIMULATION (Feature 02.5 SF-7, 2026-09-30)
+
+**SIMULATION. No terms change occurred.** The owner received a simulated Antigravity terms change
+that closes the §6 headless-use reading — the reading D9 rests on — and ran the re-review checklist
+against it.
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-30 |
+| Route | `agy` (Antigravity / Gemini API) |
+| Injected change | Antigravity Additional Terms §6 amended so that container/headless use via `GEMINI_API_KEY` is explicitly within the third-party-tooling prohibition |
+| Trigger matched | Trigger (2) of the `agy` row — "the Antigravity Additional Terms change" |
+| **Decision (owner)** | **Suspend the `agy` route until a re-review clears it.** The route's use rests entirely on the §6 reading; with that reading closed there is no remaining basis for unattended container use, so the route stops rather than continuing under conditions |
+| **Containment action triggered** | Isolate `agy` (runbook § 3.2, stop form — `agy` first, its recorder once drained), then discard `agy-state` (runbook § 5.2's `discard` row), then revoke `GEMINI_API_KEY` at the provider. The `audit` and `agy-action-audit` volumes are **preserved** — § 2's first rule is unchanged by a governance trigger |
+| Ordering note | A governance trigger is not an incident under § 1, so there is no `t0` clock and no revocation maximum applies. The actions are the runbook's, used deliberately rather than under time pressure. The isolate-then-discard-then-revoke order is still the one used, because it is the order that holds when revocation alone does not contain (D-1) |
+| Checklist outcome | The re-review checklist ran end to end on the simulated input and produced a decision without needing information the record does not carry. One gap surfaced, and is recorded rather than fixed here: the checklist has no *resumption* criterion — it says when to stop a route, not what evidence would let it restart. Recorded as the trigger for writing one: a suspended route an operator wants to resume |
+| Labelled | **SIMULATION** — no provider action, no real revocation, no containment performed |
 
 ---
 

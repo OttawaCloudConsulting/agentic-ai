@@ -250,8 +250,13 @@ Skipping the first step does not silently ship stale policy — since 01.5 SF-4 
 produce an image whose policy differs from the committed, reviewed artifact.
 
 **Revocation (R12.6).** `docs/records/credential-inventory.md` carries every credential an agent can
-obtain, its lifetime and its documented revocation path. The `oauth-token` cell mints a **one-year**
-token — record it there and revoke it when it is no longer needed.
+obtain, its lifetime, its documented revocation path, a **stated maximum** detection-to-revocation
+time and — since 02.5 — the **measured** time from a drill against that maximum (Table B). During an
+incident, start from [`docs/containment-runbook.md`](docs/containment-runbook.md) § 4, which indexes
+the same rows so the response does not begin with a search. The `oauth-token` cell mints a
+**one-year** token — record it there and revoke it when it is no longer needed, and **confirm the
+revocation by replay**: a console action that reports success is not evidence (see
+[Containment and response](#containment-and-response-025)).
 
 ### Codex `oauth-mount` (optional, one-shot)
 
@@ -262,10 +267,23 @@ decision.
 
 **Read this before you use it.** Codex **rolls** its refresh token — measured, not assumed
 (`docs/records/agent-verification.md`, 01.4 SF-3). The container's first refresh mints a new token
-onto the volume and leaves your host `~/.codex/auth.json` holding the previous one. Treat it as a
-**one-shot bootstrap that costs you your host codex login**: expect to run `codex login` on the
-host again. The cost is deferred, not immediate — the refresh trigger is the access token's own
-10-day expiry, so a pod you bootstrap and then leave alone may never pay it.
+onto the volume and leaves your host `~/.codex/auth.json` holding the previous one.
+
+**Corrected 2026-09-30 by the 02.5 V3 drill — this paragraph used to say the mount "costs you your
+host codex login", and that was never measured.** Both halves of the correction matter:
+
+- **The host login may well keep working.** After the container's copy rolled, the host set's
+  superseded refresh token still redeemed and minted a new access token. Plan for re-running
+  `codex login`, but do not count the host login as spent.
+- **Rolling is not revoking, and that is the real cost.** A copy of this credential captured from
+  the state volume stays valid after the legitimate client rolls past it. Age is not mitigation;
+  only explicit revocation at the provider retires it — and per-device revocation did **not** retire
+  a `codex` session in the V2 drill either (see [Containment and
+  response](#containment-and-response-025)). Treat a captured `codex` set as live until its own
+  expiry, and contain it pod-side: isolate the agent and discard `codex-state`.
+
+The rolling cost is deferred, not immediate — the refresh trigger is the access token's own 10-day
+expiry, so a pod you bootstrap and then leave alone may never trigger it.
 
 ```bash
 # 1. Stage. HOST-SIDE, and required first -- like the git-config scrub, the filtering happens
@@ -956,6 +974,19 @@ explicit empty. Two things follow from an image-baked, start-time gate:
   auth bootstrap's warn-don't-block start posture (01.4 Deviation 2) — an unreviewed capability
   declaration is the R7.17 persistence path an uninventoried entry exploits, and there is no safe
   default to warn-and-continue into.
+- **`codex` provisions its own skills on first run, and the gate then refuses it** (measured
+  2026-09-30, 02.5 SF-6). `codex` v0.152.1 writes `~/.codex/skills/.system/` onto its state volume
+  during its first run, by itself and after the login. Every shipped profile inventories
+  `skills: []`, so the **next** start is refused:
+  ```
+  mcp-gate: REFUSED uninventoried server 'codex-system-skills' in /home/agent/.codex/skills/.system (R7.14, T29)
+  ```
+  A `codex` container that has completed one run therefore **will not start again** until either the
+  directory is removed **from outside the agent** (the gate runs before anything you ask for, so a
+  refused agent cannot fix itself — use a helper container on that agent's own image, mounting the
+  state volume) or the profile's `mcp:` block declares those skills, which is a rebuild and a repin.
+  The command form and the recovery context are in
+  [`docs/containment-runbook.md`](docs/containment-runbook.md) § 3.3.
 - **Recorded gap (T32):** a *write* to a capability-declaration file from inside a running agent
   container is never blocked — `srt` is not installed and D14 disables every native sandbox, so
   the compensating control is the *next start's* gate, not the write itself. A proposed amendment
@@ -1016,9 +1047,83 @@ The T45 chain and results, the R10.4 finding, the R11.2 (Linux-host portability)
 proposed architecture edits, and the criterion → evidence table are in
 [`docs/records/reproducibility.md`](docs/records/reproducibility.md).
 
+### Containment and response (02.5)
+
+Feature 02.5 is **complete**. The response procedure is
+[`docs/containment-runbook.md`](docs/containment-runbook.md) — event versus incident, the five
+containment actions in live and durable forms, the per-credential revocation index with stated
+maxima, the return-to-known-good path with a disposition for every persistent store, and the drill
+cadence. Every command in it is a form a drill actually ran; the drills, with their findings, are in
+[`docs/records/containment-drills.md`](docs/records/containment-drills.md).
+
+```bash
+# The containment gate — phases A-F. Fixture topology; no model tokens, no login.
+bash tests/acceptance/verify-containment.sh
+```
+
+**Five things that will mislead you if you meet them for the first time during an incident.** Each
+is measured, and each is the reason a step in the runbook is ordered the way it is.
+
+- **"Revoked" is not a state you may assume.** `t1` — the moment a credential is actually dead — is
+  a **replay that fails**, never a console click. The worked example is the `codex` V2 drill: the
+  provider's device list reported the session revoked while the credential kept working. Replay
+  after revoking, and keep replaying until it is refused.
+- **Provider revocation does not contain a `codex` session.** Per-device revocation in the ChatGPT
+  UI left **both** halves working — the access token and the refresh token, which kept minting new
+  access tokens. Rotation does not close it either: a captured refresh token stays valid after the
+  legitimate client rolls past it. So for that row, containment is **pod-side and its ordering is
+  load-bearing, not defence in depth**: isolate the agent (`docker network disconnect`, container
+  kept) and **discard its state volume at `t0`, before revoking**.
+- **Do not generalise one provider's behaviour to another.** `claude`'s access token died on
+  revocation; `codex`'s did not. That asymmetry is why the runbook replays every row rather than
+  reasoning from one, and why the revocation index is per row.
+- **A stray one-off container blocks every volume discard.** `docker volume rm` refuses while any
+  container references the volume, including an exited one, and `docker compose down` does **not**
+  remove one-off `compose run` containers. **An interactive login is performed in exactly such a
+  container**, so authenticating leaves behind the thing most likely to block your recovery — and
+  the failure names only a hex container ID. Clear them first:
+
+  ```bash
+  docker ps -aq --filter label=com.docker.compose.project=sandboxed-agent-pod \
+                --filter label=com.docker.compose.oneoff=True | xargs -r docker rm -f
+  ```
+
+- **A `codex` agent that has run once will not restart** until its self-provisioned
+  `~/.codex/skills/.system` is cleared from outside the agent, or the profile's MCP inventory
+  declares those skills (a rebuild and a repin). See
+  [the MCP inventory notes](#tool-packs-use-case-profiles-and-mcp-inventory-023) for the exact
+  refusal text.
+
+**Revocation is measured, not just documented.** All twelve inventory rows were drilled on
+2026-09-30 against maxima committed **before** the clocks started (Table B of
+[`docs/records/credential-inventory.md`](docs/records/credential-inventory.md)), and every one came
+in under its maximum with image IDs unchanged — no rebuild, which R8.5 requires. **One stated gap:**
+`codex`'s V2 row has no timed clock (operator decision); its substantive question — whether provider
+revocation contains the session — was measured, and the answer is the second bullet above.
+
+**The authorization gate (T37) is enforced by capability absence, not by a prompt.** A profile must
+account for every action its packs can enable, as either `classify` (requires human authorization)
+or `waive` with a recorded reason; the policy compiler **refuses to compile** a profile that
+classifies an action one of its own packs enables (exit 3), and an unknown action name is a hard
+error (exit 2). Under `default` there is no `git-push` or `infrastructure-apply` credential in any
+agent, and `CONNECT github.com` is refused at the mediator. "Halts for authorization" therefore means
+the attempt is refused and recorded, and the operator either performs the action outside the pod or
+switches to a waiving profile — which is a committed change, reviewable in the diff. See
+[`packs/README.md`](packs/README.md) for the `enables_actions` field.
+
+**If you reproduce these drills, never print a credential file's contents while inspecting its
+structure.** Key names via `grep -o`, size via `wc -c`, identity via a sha256 prefix — that is
+enough to tell one credential from another without putting a value in a transcript, a scrollback or
+a public record. One drill printed a value and recorded it as a finding against its own conduct;
+this is the rule that came out of it.
+
+**What is not closed here:** R13.2 stays formally unmet until the operator accepts the T40 amendment
+text recorded in the drills record, and the R12.8 notice is not lifted by this feature. Detection
+stays pull-based (R9.6 remains MAY), so nothing bounds compromise to detection — only detection to
+revocation.
+
 Still not produced:
 
-- Containment, response and the authorization gate — Feature 02.5
 - AWS access (R6) — Milestone 03
 
 Note that requirements R6 (AWS access) and R7 (loadable tool packs) were added after the options analysis was written. The three options remain valid — both requirements are orthogonal to the choice of enforcement architecture — but the options analysis does not yet evaluate them per option.
