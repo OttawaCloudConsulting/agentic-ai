@@ -881,12 +881,26 @@ failures are the two parts below.
 **Rebuild required** columns and fails on an unfilled cell. It is therefore **red from SF-3 until
 SF-6**, by design, exactly as 02.4 SF-2 recorded its own expected red.
 
-Two of the four failures, each naming all twelve rows:
+Two of the four failures. **At SF-3 they named all twelve rows:**
 
 ```
 FAIL: A2: rows with no measured value and no GAP: E1 E2 E3 E4 V1 V2 V3 S1 S2 S3 S4 S5
 FAIL: A2: rows with no rebuild cell: E1 E2 E3 E4 V1 V2 V3 S1 S2 S3 S4 S5
 ```
+
+**After SF-5 they name only the seven provider rows** — measured on the committed tree,
+2026-09-30, with the same overall counts as SF-4 (**165 passed, 4 failed**, the four being these two
+plus part 2's two):
+
+```
+FAIL: A2: rows with no measured value and no GAP: E1 E2 E3 E4 V1 V2 V3
+FAIL: A2: rows with no rebuild cell: E1 E2 E3 E4 V1 V2 V3
+```
+
+The red is **narrower, not gone**, and this is the honest reading of it: the five S rows now carry
+measured values because SF-5 drilled them, and the seven E/V rows close at SF-6. The failure count
+does not drop until the last row is drilled, which is the behaviour Contract 4 asks for — a
+per-row check would let a half-drilled inventory report green.
 
 The **Stated maximum** column is the opposite case, and it passes: filled for all twelve rows as of
 SF-1, as it must be — the maximum is a commitment made before the drill.
