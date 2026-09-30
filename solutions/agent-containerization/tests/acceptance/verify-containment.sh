@@ -261,6 +261,11 @@ fi
 # whose base allowlist does not carry it.
 phase F "T37 runtime -- capability absence and the refused CONNECT (profile 'default')"
 
+# The generated probe profiles go BEFORE the build, not at EXIT: the solution root is the image
+# build context, so leaving them in place churns the context hash for no reason.
+rm -f "$FIXTURES"/probe-*.yaml
+
+
 AGENT_PROFILE=default "${COMPOSE[@]}" build egress-mediator claude codex agy \
   >"${TMPDIR:-/tmp}/containment-build.$$.log" 2>&1 || {
   fail "F: image build failed under profile 'default'"

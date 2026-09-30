@@ -1171,7 +1171,13 @@ if [[ "$HAS_WAIVER" != "true" ]]; then
     for ((i = 0; i < PACKS_LEN; i++)); do
       LPF="${PACK_FILES[$i]}"; LPN="${PACK_NAMES[$i]}"
       [[ "$(yq eval 'has("enables_actions")' "$LPF")" == "true" ]] || continue
-      if yq eval '.enables_actions[]' "$LPF" | grep -qFx "$CA"; then
+      # Here-string, not a pipe: `grep -q` exits on the first match, and a `yq` still writing
+      # into the closed read end dies with SIGPIPE -- which under `set -o pipefail` makes this
+      # `if` FALSE and skips the refusal silently. Today's manifests declare one action each, so
+      # the write is a single flush and it cannot happen; a manifest declaring several makes it
+      # reachable, and this is the one branch in the file where a missed firing is a control
+      # that did not run. Same shape as the KNOWN_PACK_KEYS check above.
+      if grep -qFx "$CA" <<< "$(yq eval '.enables_actions[]' "$LPF")"; then
         refuse "$REL_PROFILE classifies '$CA' as requiring human authorization, but it loads pack '$LPN' (packs/$LPN/pack.yaml), whose credential, egress or binaries enable that action for an unattended agent. A classification the pod cannot enforce is a note, not a control (T37). Either remove the pack from this profile's 'packs', or move '$CA' from 'classify' to 'waive' with a recorded reason for why unattended '$CA' is acceptable here"
       fi
     done
