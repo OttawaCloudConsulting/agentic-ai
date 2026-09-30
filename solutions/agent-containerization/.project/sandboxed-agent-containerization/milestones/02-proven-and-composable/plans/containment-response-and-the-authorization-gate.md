@@ -847,3 +847,56 @@ Paths are relative to the solution root.
   met in the `apikey` cell alone. And the departure does **not** extend to SF-5 and SF-6: those
   drills revoke, so the throwaway rule is load-bearing there and the plan's dependency list stands
   unchanged for them.
+
+### Deviation 5: SF-6 changed image code — the `already_authenticated` shape check for `claude`
+
+- **What changed:** `images/bootstrap-auth.sh`'s `claude` branch of `already_authenticated()` now
+  tests the **shape** of the credential, not merely that the file is non-empty. Both arms require a
+  non-empty `accessToken`; the undocumented `$HOME/.claude.json` arm is **narrowed rather than
+  removed** (Chesterton's Fence — it carries no recorded rationale, the installed claude 2.1.260 was
+  measured not to create it, and the cost of narrowing it wrongly is a re-login prompt, never a
+  credential treated as valid when it is not).
+- **Originally planned:** SF-6 is scoped to *drills* — "Mint drill credentials, place them in the
+  pod, declare, revoke, and replay." The plan's Files table contains no image code, and a drills
+  sub-feature editing the pod's authentication path is outside what it describes.
+- **Why necessary:** drill V1 measured the defect, twice. On a refused refresh the `claude` CLI
+  **empties the credential in place** (509 B → 281 B, `accessToken` and `refreshToken` empty,
+  `expiresAt` 0), and the old `-s`-only test then reported that file **already authenticated** and
+  skipped the re-login — leaving the agent unrecoverable without an operator discarding the state
+  volume. That makes T41's "each agent re-bootstraps authentication" (criterion 3, a Milestone 02
+  acceptance criterion already measured at SF-4) rest on a presence test. The function's own
+  docstring says "Presence and shape only", and the `codex` branch eleven lines below already
+  implements the shape half with a comment describing this exact class of failure; the `claude`
+  branch never received it. **The operator was offered the choice — fix now, defer to SF-7, or leave
+  as a finding — and chose to fix it now as a recorded deviation.**
+- **Impact:** all three agent images rebuilt, so **image IDs changed at this point in the feature**.
+  Every R8.5 "no rebuild" result recorded for S1–S5, E1–E4 and V1 was measured against the
+  *pre-fix* images and each is internally consistent (identical before and after its own drill);
+  V2 and V3 will be measured against the post-fix images. Verified in both directions after the
+  rebuild: the emptied credential now reports "has no credential yet" with the login instruction,
+  and a shaped credential still reports "already authenticated". `verify-auth-state.sh` is the
+  harness that covers this function (D22 keeps it out of the composite).
+
+### Deviation 6: the `bootstrap-auth.sh` COPY moved from `agent-base` to `agent-packs`
+
+- **What changed:** `images/Dockerfile` no longer copies `images/bootstrap-auth.sh` in the
+  `agent-base` stage; the COPY now sits in `agent-packs`, beside `entrypoint.sh`, `pack-install.sh`
+  and `mcp-gate.js`. Moved, not duplicated.
+- **Originally planned:** nothing in this plan touches the Dockerfile.
+- **Why necessary:** Deviation 5's fix was **inert without it**, and that was found by building, not
+  by reasoning. `agent-base` is pulled from GHCR **by digest** (D21) and BuildKit skips a stage
+  nothing references, so the edit reached nothing: all three agents were rebuilt and the rebuilt
+  image still carried the published copy and the old behaviour. This is the third instance of one
+  structural trap — `entrypoint.sh` hit it at 01.6 SF-3 (a credential splice that silently did not
+  happen), `pack-install.sh` at 02.3 SF-2 — and the `agent-base` stage carried a note predicting
+  it: *"an edit to images/bootstrap-auth.sh does not reach a local build until CI republishes this
+  stage and compose/pins.env is repinned. Recorded rather than fixed here; the next feature that
+  needs to edit it will have to choose, with this note in front of it."* This is that feature, and
+  it chose to move it. Nothing in `tests/`, `scripts/`, `cicd/` or `.github/` asserts the file lives
+  in `agent-base` (checked before the move).
+- **Impact:** D21 is not weakened, by the argument already recorded in the Dockerfile for
+  `entrypoint.sh`: D21 protects that the **base** an operator runs is the base CI built and
+  attested, which stays exactly true — this stage already layers locally-derived content onto that
+  attested base. The published base will no longer carry `/usr/local/bin/bootstrap-auth` once CI
+  next rebuilds it; every agent stage passes through `agent-packs`, so every agent still has it.
+  A future edit to this file now takes effect on a local build, which is the point.

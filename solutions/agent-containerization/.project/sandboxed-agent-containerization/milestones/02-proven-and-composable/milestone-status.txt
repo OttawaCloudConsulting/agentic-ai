@@ -502,8 +502,25 @@
     branch with a comment describing this exact failure. Composed, the two leave the agent
     unrecoverable without an operator discarding the state volume, which makes T41's 'each agent
     re-bootstraps authentication' step rest on a presence test; the one-line fix touches an image and
-    therefore a rebuild, so it is OPEN for the operator: fix now as a recorded deviation, defer to
-    SF-7, or leave as a finding. (3) method: the bearer probe that is authoritative for E4 is NOT
+    therefore a rebuild: the operator chose FIX NOW, and it is fixed -- Deviation 5 (the shape
+    check, both arms requiring a non-empty accessToken; the undocumented $HOME/.claude.json arm
+    NARROWED not removed, per Chesterton's Fence) and Deviation 6 (the COPY moved from agent-base to
+    agent-packs). Deviation 6 exists because Deviation 5's fix was INERT without it and that was
+    found BY BUILDING, not by reasoning: agent-base is pulled from GHCR by digest (D21) and BuildKit
+    skips a stage nothing references, so all three agents rebuilt and still carried the published
+    copy and the old behaviour. Third instance of one trap -- entrypoint.sh at 01.6 SF-3,
+    pack-install.sh at 02.3 SF-2 -- and the agent-base stage carried a note predicting it and handing
+    the choice to 'the next feature that needs to edit it'. Verified both directions after the move:
+    the emptied credential now reports 'has no credential yet' with the login command, and a shaped
+    credential still reports 'already authenticated'. CONSEQUENCE for this feature's other numbers:
+    the rebuild changed the agent image IDs at this point, so every R8.5 'no rebuild' result already
+    recorded (S1-S5, E1-E4, V1) was measured against the PRE-FIX images and is internally consistent,
+    each comparing before and after its own drill; V2/V3 will be measured against the post-fix
+    images. SIX deviations now recorded on this feature -- past the 3-deviation threshold, so a
+    /design refresh pass is worth running when 02.5 closes. V1 revocation granularity,
+    operator-reported: SINGLE SESSION, not account-wide, so Edge Case 3 does not bite for V1 either
+    and R4.17 stays unengaged; two of two provider rows drilled so far offered per-credential
+    revocation. (3) method: the bearer probe that is authoritative for E4 is NOT
     authoritative for a session token, and its 401 should not have stood beside the CLI failure.
     A-vs-B resolved: a fresh login authenticated and the CLI answered OK, so attempt 1's death was
     probe-induced (leading explanation: a refresh race between concurrent compose run containers

@@ -624,7 +624,12 @@ containers left it emptied.
   1. **isolate** — `docker network disconnect` the agent from its only network
   2. **drain, then stop the recorder** (§ 3.2 ordering), 6 s
   3. **discard** `claude-state` — `docker volume rm`
-  4. the operator revokes the OAuth session at the provider
+  4. the operator revokes the OAuth session at the provider. **Granularity, operator-reported:
+     single-session — the console revoked the pod's session alone, with no account-wide
+     "log out everywhere" and no effect on the operator's own other sessions. So Edge Case 3 does
+     **not** bite for this row either, and R4.17 is not engaged. Two of two provider rows drilled so
+     far have offered per-credential revocation; Edge Case 3's premise remains unreproduced, and V2
+     is the next chance to test it**
   5. **access-token replay** — the preserved credential restored **unchanged**, expiry still in the
      future, so the CLI uses the access token without refreshing
   6. **refresh-token replay** — restored with `expiresAt` forced to the past, so the refresh token
@@ -669,6 +674,48 @@ The refresh-replay failure wiped the credential a second time — 509 B → **28
 empty — from a file this drill had just restored. Two independent observations of the same
 destructive failure path, in one sub-feature, on a file that in the second case was *known-good
 before the call*. The preserved host copy is what made the second replay possible at all.
+
+#### Both defects are FIXED, and fixing the first one exposed a third structural trap
+
+The operator was offered fix-now / defer-to-SF-7 / leave-as-a-finding and **chose fix now**, so
+SF-6 changed image code — recorded as **Deviation 5** in the feature plan, since a drills
+sub-feature was not scoped to touch the pod's authentication path.
+
+**The fix.** `already_authenticated()`'s `claude` branch now tests the credential's **shape**, as
+its own docstring ("Presence and shape only") always claimed and as the `codex` branch eleven lines
+below already did. Both arms require a non-empty `accessToken`. The undocumented
+`$HOME/.claude.json` arm was **narrowed, not removed** — Chesterton's Fence: it has no recorded
+rationale, claude 2.1.260 was measured not to create it, and narrowing it wrongly costs a re-login
+prompt, never a bad credential accepted as good.
+
+**Then the fix did nothing, and that is the third instance of one trap.** All three agents were
+rebuilt and `bootstrap-auth` in the rebuilt image **still reported the old behaviour**, because
+`images/bootstrap-auth.sh` was copied in the `agent-base` stage — pulled from GHCR **by digest**
+(D21), and BuildKit skips a stage nothing references. `entrypoint.sh` hit this at **01.6 SF-3** (a
+credential splice that silently did not happen), `pack-install.sh` at **02.3 SF-2**, and the
+`agent-base` stage carried a note predicting the third:
+
+> *"an edit to images/bootstrap-auth.sh does not reach a local build until CI republishes this stage
+> and compose/pins.env is repinned. Recorded rather than fixed here; the next feature that needs to
+> edit it will have to choose, with this note in front of it."*
+
+This is that feature. The COPY **moved** to `agent-packs` (Deviation 6), beside the three files that
+made the same move for the same reason — moved rather than duplicated, so no operator is left unable
+to tell which copy is running. **Found by building, not by reasoning**, which is the same way 01.6
+SF-3 found it.
+
+**Verified in both directions after the move:**
+
+| Credential on the volume | `bootstrap-auth` says |
+|---|---|
+| the emptied shape this drill produced (`accessToken: ""`, `expiresAt: 0`) | `WARNING -- has no credential yet` + the exact login command. **Re-login is no longer skipped** |
+| a shaped credential (non-empty `accessToken`) | `already authenticated -- no-op`, unchanged |
+
+**Consequence for this feature's other numbers, stated so no reader has to work it out:** the
+rebuild changed the agent image IDs at this point. Every R8.5 "no rebuild" result already recorded —
+S1–S5, E1–E4, V1 — was measured against the *pre-fix* images and is internally consistent, each
+comparing before and after **its own** drill. V2 and V3 will be measured against the post-fix
+images.
 
 #### Two procedural gaps the clock exposed, both now in the runbook
 

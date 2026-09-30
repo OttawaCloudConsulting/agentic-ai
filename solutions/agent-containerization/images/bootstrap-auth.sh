@@ -188,7 +188,25 @@ authoritative denial record."
 already_authenticated() {
   case "$AGENT" in
     claude)
-      [ -s "$CLAUDE_CONFIG_DIR/.credentials.json" ] || [ -s "$HOME/.claude.json" ]
+      # SHAPE, not just presence -- the same rule the codex branch below already states, for the
+      # same reason, and this branch is where it was missing.
+      #
+      # MEASURED 2026-09-30 (02.5 SF-6, drill V1, observed twice): on a refused refresh the claude
+      # CLI CLEARS the token fields IN PLACE, leaving a 281-byte `.credentials.json` whose
+      # accessToken and refreshToken are empty strings and whose expiresAt is 0. That file is
+      # non-empty, so the previous `-s`-only test reported "already authenticated" and SKIPPED the
+      # re-login: the agent was then unrecoverable without an operator discarding the state volume,
+      # and T41's "each agent re-bootstraps authentication" step rested on a presence test.
+      #
+      # Both arms are shape-tested. The `$HOME/.claude.json` arm carries no recorded rationale and
+      # is NARROWED rather than removed (Chesterton's Fence): it covers a layout where the
+      # credential lives in that file instead of `.credentials.json`, and the installed
+      # claude 2.1.260 was measured NOT to create it at all. The cost of narrowing it wrongly is a
+      # re-login prompt, never a credential treated as valid when it is not.
+      { [ -s "$CLAUDE_CONFIG_DIR/.credentials.json" ] \
+          && grep -q '"accessToken"[[:space:]]*:[[:space:]]*"[^"]' "$CLAUDE_CONFIG_DIR/.credentials.json"; } \
+        || { [ -s "$HOME/.claude.json" ] \
+          && grep -q '"accessToken"[[:space:]]*:[[:space:]]*"[^"]' "$HOME/.claude.json"; }
       ;;
     codex)
       # SHAPE, not just presence (edge case 11): a bootstrap interrupted mid-copy, or an

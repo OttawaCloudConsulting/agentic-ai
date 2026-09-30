@@ -210,12 +210,17 @@ RUN mkdir -p /opt/agent-home-skel && chown -R agent:agent /opt/agent-home-skel
 # scripts/ because the copy-to-volume it performs must run inside the container -- see
 # this feature plan, Deviation 1.
 #
-# STILL IN THIS STAGE, and therefore still digest-pinned: nothing in 01.6 changes it, and moving
-# a file that is not broken would be a change nothing asked for. It carries the SAME latent
-# property the entrypoint had -- an edit to images/bootstrap-auth.sh does not reach a local build
-# until CI republishes this stage and compose/pins.env is repinned. Recorded rather than fixed
-# here; the next feature that needs to edit it will have to choose, with this note in front of it.
-COPY --chmod=0755 images/bootstrap-auth.sh /usr/local/bin/bootstrap-auth
+# The COPY is NOT here any more. It MOVED DOWN to agent-packs at 02.5 SF-6 -- see the note there.
+#
+# The note this replaces said: "STILL IN THIS STAGE, and therefore still digest-pinned ... an edit
+# to images/bootstrap-auth.sh does not reach a local build until CI republishes this stage and
+# compose/pins.env is repinned. Recorded rather than fixed here; the next feature that needs to
+# edit it will have to choose, with this note in front of it."
+#
+# 02.5 SF-6 is that feature, and it chose to move it. The latency was not hypothetical: drill V1
+# found a defect in already_authenticated(), the fix was written, all three agents were rebuilt,
+# and the rebuilt image still carried the PUBLISHED copy -- the identical symptom, and the identical
+# way of finding it, as 01.6 SF-3's credential splice.
 
 # AUTH_MODE is deliberately NOT declared with a value in any stage. Interface Contract 2:
 # "No default in the image -- an unset value is an error, not a fallback." A default here would
@@ -321,6 +326,25 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 # published, digest-pinned supply-chain artifact (D21). node is on PATH in every
 # agent stage (agent-base is node:22-slim), so no separate runtime is needed.
 COPY --chmod=0755 images/mcp-gate.js /usr/local/lib/mcp-gate.js
+
+# The AUTH_MODE dispatcher, MOVED HERE FROM agent-base AT 02.5 SF-6, on the invitation the note
+# left in that stage ("the next feature that needs to edit it will have to choose"), for the same
+# reason and on the same evidence as entrypoint.sh at 01.6 SF-3: agent-base is pulled from GHCR by
+# digest, BuildKit skips a stage nothing references, so an edit to images/bootstrap-auth.sh reached
+# nothing. Found by building, exactly as SF-3 was: 02.5 SF-6 fixed a defect in
+# already_authenticated(), rebuilt all three agents, and the rebuilt image still reported the old
+# behaviour because it still carried the published copy.
+#
+# D21 is not weakened, by the argument already recorded for entrypoint.sh above: what D21 protects
+# is that the BASE an operator runs is the base CI built and attested. That stays exactly true.
+# This stage already layers locally-derived content onto that attested base -- pack-install, the
+# profile's packages, SKEL_MARKER, the entrypoint, mcp-gate. The AUTH_MODE dispatcher joins them,
+# and it is repository code that changes with the features that use it: 01.4 wrote it, 01.6 and
+# 02.5 have each had reason to touch it.
+#
+# MOVED, not duplicated -- a copy in both stages would leave the published one dead, the local one
+# silently winning, and an operator with no way to tell which was running.
+COPY --chmod=0755 images/bootstrap-auth.sh /usr/local/bin/bootstrap-auth
 
 # ---------------------------------------------------------------------------
 FROM agent-packs AS claude
