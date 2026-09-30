@@ -2,16 +2,22 @@
 
 **Feature:** `containment-response-and-the-authorization-gate.md`
 **Date:** 2026-09-29 (SF-1: skeleton and template), 2026-09-30 (SF-3: phases A–D measured; SF-4: phase E,
-the MCP-disable exercise, the R13.2/T40 amendment text and the full T41 drill)
+the MCP-disable exercise, the R13.2/T40 amendment text and the full T41 drill; SF-5: the five T26
+drills for the pod-local and pack credential rows, S1–S5)
 **Method:** Every drill follows `docs/containment-runbook.md` **verbatim**. A deviation is a
 **finding**: it is fixed in the runbook and the drill is **re-run**, not annotated (Test Strategy).
 A drill whose clock is interrupted is re-run, not annotated — `t0` to `t1` is only meaningful
 without a gap (Edge Case 18).
-**Outcome:** *(pending — SF-5 through SF-7)*. `verify-containment.sh` phases A–F are measured green
+**Outcome:** *(pending — SF-6 and SF-7)*. `verify-containment.sh` phases A–F are measured green
 except phase A's two expected reds (§ "Expected red"), with a recorded negative control for each of
 B, C, D and E. **SF-4 is complete**: phase E, the MCP-disable exercise, the R13.2/T40 amendment text
-and the full T41 drill against the real pod. What remains is the T26 revocation drills (SF-5, SF-6)
-and close-out (SF-7) — including revoking the `CLAUDE_CODE_OAUTH_TOKEN` minted for this work.
+and the full T41 drill against the real pod. **SF-5 is complete**: all five pod-local and pack
+credential rows drilled and inside their stated maxima — S4 00:06, S5 00:14, S1 00:07 (all against
+10:00), S2 02:21 (15:00), S3 00:11 (30:00) — every one with identical image IDs before and after, so
+R8.5's no-rebuild rule holds for the whole set. Phase A's drill-evidence red is **narrower but not
+gone**: the S rows now carry measured values, the E and V rows do not. What remains is the provider
+revocation drills (SF-6) and close-out (SF-7) — including revoking the `CLAUDE_CODE_OAUTH_TOKEN`
+minted for this work.
 
 > **This repository is public.** No credential value, OAuth code, or token prefix longer than the
 > provider's own public type prefix (`sk-ant-`, `ghp_`) ever enters this record. Drills use
@@ -238,7 +244,87 @@ only the mount's re-resolution was. The runbook keeps `--force-recreate`, the me
 
 ### Drill S2 — `github-token` fine-grained PAT
 
-*(pending — drill credential to be minted)*
+The one row whose credential **is** usable from inside the pod, so the replay is run from inside an
+agent, through the mediator, under the `github` profile — the profile that grants `claude`
+`api.github.com` (the `default` profile does not).
+
+- Drill credential: a **fine-grained PAT minted for this drill** by the operator —
+  *Public Repositories (read-only)*, every repository and account permission at **No access**,
+  7-day expiry. Never the operator's working token. Staged in place (per the Edge Case 4 finding
+  below) at `compose/generated/credentials/github/github-cli/github-token`. Read only from inside
+  the container as `/run/secrets/pack-github-cli-github-token`, sha256 prefix `a1c9ec32ea28`; no
+  value recorded
+- Stated maximum: **15:00**
+- t0 (incident declared, UTC): **2026-09-30T16:00:30Z**
+- Steps:
+  1. `github` profile built separately (a profile switch needs `--build`), and
+     `scripts/check-profile-compose.sh --profile github` passes first: *secret set matches the
+     manifests, no other drift from default*
+  2. `up -d --force-recreate` under `compose/overrides/github.yaml`; all seven services `running`
+  3. delivery confirmed from inside `claude`: the secret is readable, `GH_TOKEN` is set, and
+     **`GH_TOKEN` equals the secret's content** — the 02.3 `env` mapping, verified rather than
+     assumed
+  4. baseline — the PAT authenticates through the mediator from inside `claude`:
+     `GET https://api.github.com/user` → **200** (a token with no permissions still authenticates;
+     an absent or revoked one gets 401, which is what makes this endpoint a valid clock)
+  5. a detached poll started in a `claude` container: the same request every 2 s, each line
+     timestamped, up to 20 minutes — so the clock cannot gap while the operator is at the console
+     (Edge Case 18)
+  6. the operator revokes the token at GitHub. **The console action is inside the measured time**,
+     which is the point of the row: R13.1 bounds detection to revocation
+- t1 (replay refused, UTC): **2026-09-30T16:02:51Z** — evidence: HTTP **401** from
+  `api.github.com`, the first of 4 consecutive 401s in the poll. 74 poll lines, **one single
+  transition**: 200 through `16:02:48Z`, 401 from `16:02:51Z`. No flapping
+- Access-token replay: n/a (not an OAuth row)
+- Measured: **02:21**   Within maximum: **yes**
+- Image IDs before / after (the `github` profile's five): `383b5028b69d 5cd5aa6b06e0 7a0c046d44cd
+  cbe2812a5b31 d04b811d8bef`, identical   Rebuild: **no**
+- Re-issue: **not measured.** Only one drill token was minted (operator's decision when asked), so
+  the "new credential in place, agent authenticated, image IDs unchanged" half of Contract 6 was not
+  exercised for this row. Recorded as unmeasured rather than implied. The mechanism is the one
+  measured under Edge Case 4 below — an in-place file swap plus `--force-recreate`, no rebuild —
+  and S3 also defers its rotation half to this mechanism
+
+#### FINDING — a revoked pack credential leaves no signal at the mediator at all
+
+This is the third distinct evidence shape in this feature, and the weakest of the three for an
+operator watching the pod:
+
+| Row | Where the refusal happens | What the mediator's trail shows |
+|---|---|---|
+| S4, S5 | at the mediator, `proxy_auth` | `verdict=deny, http_status=407, squid=TCP_DENIED`, naming the agent, with `identity_source` degraded to `listener` |
+| S1 | in the TLS handshake with the mediator | only `{"event":"proxy_internal","detail":"error:transaction-end-before-headers"}` — no agent, no destination |
+| **S2** | **at the third party, inside the tunnel** | **`verdict=allow, http_status=200, squid=TCP_TUNNEL`** — indistinguishable from a successful request |
+
+The replays after `t1` are on the trail as **allowed**: `{"agent":"claude","identity_source":
+"listener+mtls","dest_host":"api.github.com","verdict":"allow","http_status":200,"squid":
+"TCP_TUNNEL","bytes_out":846,"bytes_in":4300}`. The `http_status` there is the CONNECT tunnel's,
+not the inner response's, and the mediator never sees the inner 401 — by design (D18: it does not
+terminate TLS on this path). **Consequence:** a revoked pack credential cannot be confirmed revoked
+from the pod's own audit trail. Confirmation is the replay's own HTTP status, from inside the agent.
+Now stated in the runbook's § 4 evidence rule alongside S1's.
+
+#### Two smaller observations, recorded because each would mislead a reader of this sink
+
+**No measurable survival past the console action.** The last 200 was `16:02:48Z` and the first 401
+`16:02:51Z` — one poll interval apart, so any survival window is under the 2 s cadence. That
+completes a pattern worth stating plainly, because three of the five rows have one and the causes are
+all different:
+
+| Row | Survival past the revocation action | Cause |
+|---|---|---|
+| S4, S5 | until `docker compose restart egress-mediator` | `basic_ncsa_auth` reads the htpasswd at start and Squid caches accepted credentials (Edge Case 5) |
+| S3 | ~10 s | the API server's authentication path; no operator action shortens it |
+| **S2** | **none measurable (< 2 s)** | GitHub revokes at the provider, effective on the next request |
+| S1 | none once the mediator restarts | the new CA is loaded at start |
+
+**The first request through a freshly recreated cascade failed, and the baseline is not that
+request.** Immediately after `up --force-recreate`, one `GET /user` returned `curl_rc=56` with the
+audit line `verdict=allow, http_status=500, bytes_in=0, layer=front, resolved_ip=null` — a
+front-layer failure with no origin contact, the cold-peer behaviour this repository already names
+(`retry_cold_peer`). Every request from a second later returned 200. The recorded baseline is the
+poll's own 200s. A drill that had taken that first failure as its baseline would have concluded the
+drill credential never worked.
 
 ### Drill S3 — `kubeconfig` context credential
 

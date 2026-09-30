@@ -299,6 +299,18 @@ moved to fit.
   revocation from the replay's own client-side failure (`curl` exit 56) **plus** the certificate
   sha256 and serial before and after. Do not look for an S1 refusal on the audit trail; it is not
   there (02.5 SF-5).
+- **S2 and S3 leave no mediator-side signal either, for a different reason: the refusal happens at
+  the third party.** A revoked pack credential's replay is on the trail as
+  `verdict=allow, http_status=200, squid=TCP_TUNNEL` — indistinguishable from a successful request,
+  because the mediator does not terminate TLS on this path (D18) and never sees the inner 401.
+  Confirm from the replay's own HTTP status, run from inside the agent (S2) or from the host (S3,
+  whose credential has no route from the pod at all — the shipped `kubernetes` pack declares
+  `egress.runtime: []`). Measured at 02.5 SF-5: **S2 02:21, HTTP 401; S3 00:11, HTTP 401.**
+- **Expect a short survival window, and know which one you are in.** Measured at 02.5 SF-5:
+  S4/S5 survive until the mediator restarts (Edge Case 5); S3 survived **~10 s** past the
+  ServiceAccount delete, in the API server's authentication path, where no operator action shortens
+  it; S2 showed **no measurable survival**. Replay until refused — a single replay immediately after
+  the revoking action can report a credential still working when it is already revoked.
 - For an OAuth row (V1, V2, V3), the **refresh token and the access token are both replayed**, and
   the row's effective time is the **later of the two**. If the access token survives revocation until
   its own expiry, **that survival is the measured time** (Edge Case 2).

@@ -290,7 +290,7 @@
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
-    Sub-features: 4/7 complete
+    Sub-features: 5/7 complete
     Notes: Started 2026-09-29. SF-1 complete 2026-09-29 (documentation only, 3 files).
     SF-2 complete 2026-09-29 (T37 enforced at compile). Operator supplied both waive
     reasons (github/git-push, kubernetes/infrastructure-apply) and chose the vocabulary
@@ -398,10 +398,8 @@
     oauth-interactive cell -- operator decision, bounded because T41 revokes nothing, and it does
     NOT extend to SF-5/SF-6 which do revoke. E4 CORRECTION: a CLAUDE_CODE_OAUTH_TOKEN IS
     outstanding (minted by the operator for this testing work, in the git-ignored .env_keys).
-    SF-5 PARTIAL 2026-09-30 -- sub-feature NOT closed, count stays 4/7. Four of the five rows are
-    drilled and recorded; only S2 (the GitHub PAT) is outstanding, waiting on the operator to mint a
-    drill token. Measured, all inside their maxima and all with the five image IDs identical before
-    and after (R8.5 'no'): S4 codex proxy credential 00:06/10:00, S5 agy 00:14/10:00, S1 the whole
+    SF-5 COMPLETE 2026-09-30 -- all five rows drilled, none a named gap. Measured, all inside
+    their maxima and all with the five image IDs identical before and after (R8.5 'no'): S4 codex proxy credential 00:06/10:00, S5 agy 00:14/10:00, S1 the whole
     Edge Case 6 CA path (ca --force, three listener certs, the client cert, mediator restart,
     claude/agy recreate) 00:07/10:00, S3 the scoped kubeconfig 00:11/30:00 against a disposable kind
     cluster that was deleted after. Operator authorised the real-pod CA reissue, chose the
@@ -432,5 +430,31 @@
     block gains the two missing restart commands and the three measured notes) and README.md's 02.3
     rotation note. No deviation recorded for SF-5 so far. Codebase-assessment refresh SKIPPED again
     (no codebase-assessment.md; documented edge case). Composite NOT re-run (D-08).
+    S2 closed 2026-09-30 after the operator minted a drill PAT (fine-grained, every permission at
+    No access, 7-day expiry): 02:21 against 15:00, replayed from inside claude through the mediator
+    under the github profile -- the one row whose credential IS usable from inside the pod, so the
+    in-pod replay was the point (contrast S3, which has no cluster egress by Decision 6 and is
+    necessarily host-side). One clean 200->401 transition across 74 timestamped poll lines, the
+    operator's console action inside the measured time, and the github profile's five image IDs
+    identical before and after; the profile build that preceded it is a profile switch, not part of
+    the revocation. THIRD evidence shape, and the weakest for an operator watching the pod: a
+    revoked pack credential leaves NO mediator-side signal at all -- the refusal is at the third
+    party inside the tunnel, so the trail reads verdict=allow, http_status=200, TCP_TUNNEL,
+    indistinguishable from success (D18, no TLS termination on this path). Runbook section 4 now
+    carries that rule alongside S1's, plus a survival-window rule: S4/S5 survive until the mediator
+    restarts, S3 survived ~10s in the API server's auth path, S2 showed none measurable -- so replay
+    until refused, never once. NOT measured, recorded as such rather than implied: S2's re-issue half
+    (only one drill token was minted, the operator's choice when asked), and the restart-versus---
+    force-recreate comparison, which was measured on the MOUNT (in-place versus rename) and not on
+    the proxy-credential splice. Also recorded: the first request through a freshly recreated cascade
+    failed (curl_rc=56, verdict=allow http_status=500 bytes_in=0 layer=front -- the known cold-peer
+    behaviour), so the baseline is the poll's own 200s; a drill taking that first failure as its
+    baseline would have concluded the drill credential never worked. One self-inflicted defect found
+    and fixed while writing the record: the S1 procedure cell rewrite contained literal pipe
+    characters (`listener claude|codex|agy`), which shifted that table row's columns and broke phase
+    A's parser -- caught by re-running the parser's own regexes over every row, not by the harness.
+    The revoked drill PAT is still staged at compose/generated/credentials/github/github-cli/ (git-
+    ignored); it is revoked and 7-day-expiring, and removing it is the operator's call. Pod restored
+    to the default profile, its five image IDs unchanged across the whole of SF-5.
     Edge Case 1 does not reopen -- its premise was a LEAKED token -- but E4's standing revocation
     obligation is now live and SF-7 carries it. Composite NOT re-run (D-08).

@@ -387,11 +387,20 @@ recompile, and the operator-heavy drills last.
     own Method. `agy` is not a named gap.)*
   - The **MCP-disable exercise** runs against 02.3's `test-mcp.yaml` and records per Decision 4.
   - The R13.2 and T40 amendment text goes into the drills record.
-- [ ] **SF-5: T26 drills — pod-local and pack credentials (S1–S3, P1–P2).**
+- [x] **SF-5: T26 drills — pod-local and pack credentials (S1–S3, P1–P2).**
   - Drill each row per Contract 6, and measure `restart` versus `--force-recreate` (inode and
     replay).
   - Correct `mediator/identity/README.md` and the 02.3 README section to the working form.
   - P2 needs a disposable cluster. Without one, P2 is a named gap.
+  *(Built 2026-09-30. Read against Deviation 1's row ids, this sub-feature's five rows are S1, S2,
+  S3, S4 and S5 — `P1`/`P2` in the bullet above are the plan's provisional names for the two pack
+  credentials, which the inventory carries as S2 and S3. All five drilled and all inside their
+  stated maxima: S4 00:06, S5 00:14, S1 00:07 (10:00 each), S2 02:21 (15:00), S3 00:11 (30:00),
+  every one with identical image IDs before and after. No named gap: a disposable `kind` cluster was
+  created for S3 and deleted after it. Two halves not measured, recorded as such rather than
+  implied: S2's re-issue (one drill token was minted), and the `restart`-versus-`--force-recreate`
+  comparison was measured on the **mount** — in-place versus rename — not on the proxy-credential
+  splice. Attempt 1 of S4/S5 was re-run under Edge Case 18.)*
 - [ ] **SF-6: T26 drills — provider credentials (E1–E4, V1–V3).**
   - Mint drill credentials, place them in the pod, declare, revoke, and replay both the refresh
     token and the access token.
