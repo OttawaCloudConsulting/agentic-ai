@@ -235,7 +235,24 @@ docker compose images --quiet   # before t0 and after re-issue; the IDs must be 
 **One special case: a proxy credential survives until the mediator restarts** (Edge Case 5).
 `basic_ncsa_auth` caches credentials, so a revoked `codex` or `agy` proxy credential still works
 until `docker compose restart egress-mediator`. The restart is **part of the procedure**, not an
-afterthought, and `t1` is measured after it.
+afterthought, and `t1` is measured after it. **Measured at 02.5 SF-5:** immediately after
+`issue-identity.sh credential <agent> --force`, and before the restart, the revoked credential still
+returned `verdict=allow` for both `codex` and `agy`.
+
+**After the restart, wait for the proxy to answer before you conclude anything.** A replay that
+fails while Squid is still binding its listeners returns *failed to connect* and leaves **no line on
+the audit trail** — indistinguishable from a successful revocation. Confirm the proxy is serving
+(one request with the **new** credential) and only then replay the old one. A revocation confirmed
+against a not-yet-listening proxy is not confirmed (02.5 SF-5, attempt 1).
+
+**How a replaced `file:` secret reaches a container** (Edge Case 4, measured at 02.5 SF-5). Write
+**in place** — which is what `issue-identity.sh` does (`> "$cred"`, and `cp` for the htpasswd). The
+running container then sees the new content with no restart at all. Do **not** replace the file with
+`mv`, and do not edit it with an editor that saves by rename: the mount breaks rather than going
+stale — `stat` inside the container still reports the old inode and size, while a read fails with
+`No such file or directory`. It fails closed (the agent is refused with a 407), but the healthy-
+looking `stat` will mislead you. Recreating the agent is still required for a **proxy credential**,
+because the value is spliced into `HTTPS_PROXY` at the entrypoint, not re-read per request.
 
 ### 3.5 Return to known-good
 
@@ -273,6 +290,15 @@ moved to fit.
 
 - `t1` is a **replay that fails**, not a console click. An operator console action with no replay
   proves nothing (Decision 2).
+- **What a failed replay must show, per row.** S4 and S5 produce a deny line naming the agent:
+  `verdict=deny, http_status=407, squid=TCP_DENIED`, with `identity_source` degraded from
+  `listener+proxy_auth` to `listener`. **S1 does not.** Its rejection happens in the TLS handshake,
+  before Squid has a request to log, so the trail carries only
+  `{"event":"proxy_internal","detail":"error:transaction-end-before-headers"}` — no agent, no
+  destination — and `squid-cache.log` carries nothing at the shipped debug level. For S1, confirm
+  revocation from the replay's own client-side failure (`curl` exit 56) **plus** the certificate
+  sha256 and serial before and after. Do not look for an S1 refusal on the audit trail; it is not
+  there (02.5 SF-5).
 - For an OAuth row (V1, V2, V3), the **refresh token and the access token are both replayed**, and
   the row's effective time is the **later of the two**. If the access token survives revocation until
   its own expiry, **that survival is the measured time** (Edge Case 2).

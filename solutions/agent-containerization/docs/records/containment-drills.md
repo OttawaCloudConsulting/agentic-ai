@@ -72,16 +72,177 @@ are marked **FINDING** inline.
 
 ## T26 — pod-local and pack credentials (SF-5)
 
-*(pending SF-5 — rows S1, S2, S3, S4, S5)*
+Rows **S1, S4 and S5 were drilled against the real pod** (`sandboxed-agent-pod`, `default` profile,
+the `main` pins in `compose/pins.env`) on 2026-09-30, on the operator's explicit authorisation.
+Rows **S2 and S3** are below, after them.
+
+**Credential provenance.** Criterion 1's throwaway rule is satisfied by construction for these three
+rows: S1, S4 and S5 are the pod's **own** locally issued material, and rotating them *is* the drill.
+No third-party account and no provider credential took part — every replay is a bare `curl` through
+the mediator, so 02.5 Deviation 4 (the `apikey` cell used at SF-4) is not engaged here and the
+agents were never authenticated.
+
+**Replay targets** are each agent's own allowlisted host, so an allowed request is a real one:
+`claude` → `api.anthropic.com`, `codex` → `api.github.com`, `agy` →
+`generativelanguage.googleapis.com`. No credential value, and no key material, is recorded — the
+files are identified by sha256 prefix and the certificates additionally by serial.
+
+### FINDING — attempt 1 of S4/S5 measured a `t1` that proved nothing, and was re-run
+
+The first pass declared `t1` on a replay that returned `curl_rc=7` — *failed to connect to the
+proxy* — because the readiness gate after `docker compose restart egress-mediator` tested only that
+`docker exec` into the mediator worked. That is true while Squid is still binding its listeners. A
+connection that never reaches the proxy is **indistinguishable from a revocation**, and the
+egress-audit trail carried no line for the attempt at all, only the mediator's own `startup_check`.
+
+Per Edge Case 18 the drill was **re-run, not annotated**. The gate is now: after the restart, poll
+with the **new** credential until the proxy answers a non-`000` status, and only then replay the old
+one. That wait is part of the procedure and is inside the measured time. Both rows below are from
+attempt 2.
+
+### Drill S4 — `codex` proxy credential (`basic_ncsa_auth`)
+
+- Drill credential: the pod's own issued credential, rotated as the drill; no value recorded. Old
+  credential sha256 prefix `567a93bfad6d`, new `417ddb918acb`
+- Stated maximum: **10:00**
+- t0 (incident declared, UTC): **2026-09-30T15:23:31Z**
+- Steps, exactly as runbook § 4 states them:
+  1. baseline — the old credential works: `http_code=200`, audit `verdict=allow`,
+     `identity_source=listener+proxy_auth`, `squid=TCP_TUNNEL`
+  2. `bash scripts/issue-identity.sh credential codex --force` → new `.cred`, htpasswd rebuilt
+     (`9d765aa569b8…` → `6e93e9bf4593…`)
+  3. **Edge Case 5, measured:** replay the old credential *before* the mediator restart →
+     `http_code=200`, still `verdict=allow`. The htpasswd rebuild alone does **not** revoke
+  4. `docker compose restart egress-mediator`; poll with the new credential until the proxy answers
+     (1 poll)
+  5. replay the old credential
+- t1 (replay refused, UTC): **2026-09-30T15:23:37Z** — evidence: `curl_rc=56` and the audit line
+  `verdict=deny, http_status=407, squid=TCP_DENIED, identity_source="listener"`. The
+  `identity_source` degrading from `listener+proxy_auth` to `listener` is itself the refusal: the
+  credential no longer contributes an identity
+- Access-token replay: n/a (not an OAuth row)
+- Measured: **00:06**   Within maximum: **yes**
+- Image IDs before / after: five IDs, `2f28fb1cfa95 5cd5aa6b06e0 b88fbfd61649 d04b811d8bef
+  eb1e3b8e434c`, identical before and after   Rebuild: **no**
+- Re-issue: `codex` recreated (`up -d --force-recreate --no-deps codex`), entrypoint logged *proxy
+  credential spliced into the proxy URL as user 'codex'*, and the new credential reached
+  `api.github.com`: `http_code=200`, `verdict=allow`
+
+### Drill S5 — `agy` proxy credential (`basic_ncsa_auth`, TLS hop)
+
+- Drill credential: as S4. Old sha256 prefix `b9c7af1a77a6`, new `0609e688d3ce`
+- Stated maximum: **10:00**
+- t0 (incident declared, UTC): **2026-09-30T15:23:41Z**
+- Steps: as S4, substituting `agy`, `--proxy-cacert /run/secrets/mediator-ca.crt` on every replay
+  because its proxy hop is `https://`. Baseline `http_code=404` from
+  `generativelanguage.googleapis.com` (`GET /` on that host answers 404 — the CONNECT was allowed
+  and the real origin replied, which is the pass). **Edge Case 5 again confirmed:** the old
+  credential still returned 404 `verdict=allow` after the htpasswd rebuild and before the restart.
+  Readiness took 2 polls
+- t1 (replay refused, UTC): **2026-09-30T15:23:55Z** — evidence: `curl_rc=56`, audit
+  `verdict=deny, http_status=407, squid=TCP_DENIED, identity_source="listener"`
+- Access-token replay: n/a
+- Measured: **00:14**   Within maximum: **yes**
+- Image IDs before / after: the same five, identical   Rebuild: **no**
+- Re-issue: `agy` recreated, splice logged, new credential reached the origin (`http_code=404`,
+  `verdict=allow`)
+
+### Drill S1 — `claude` mTLS client certificate (Edge Case 6's whole CA path)
+
+Revocation for this row is **not** "reissue the client certificate": there is no CRL and no OCSP, so
+a certificate with the same subject under the same CA would still be accepted. It is
+`ca --force` plus the three listener certificates plus the client certificate plus a mediator
+restart plus `claude`/`agy` restarts, and the stated maximum covers all of it.
+
+- Drill credential: the pod's own CA and client certificate, replaced as the drill. Old CA sha256
+  `922fdd3054eebb71…` → new `dcca8a1b8d00b644…`; old client `2e08b33ad6fca09e…` serial
+  `33EA2106FC98962F0F7E3B457B96A34E9363FC5C` → new `62bec34c58b5294f…` serial
+  `4FC9FDD0375BF452F5DF0207C3504D96FF6C2E84`. The old certificate and key were copied to a scratch
+  directory for the replay and deleted with it
+- Stated maximum: **10:00**
+- t0 (incident declared, UTC): **2026-09-30T15:25:29Z**
+- Steps, exactly as runbook § 5.2 and § 4 state them:
+  1. baseline — the current client certificate reaches `api.anthropic.com`: `http_code=404`
+  2. `bash scripts/issue-identity.sh ca --force` (the script warns that every certificate under the
+     old CA is now invalid)
+  3. `issue-identity.sh listener claude|codex|agy --ip 172.31.{10,20,30}.2 --force` — all three,
+     each verifying its own `iPAddress` SAN at issuance
+  4. `issue-identity.sh client claude --force` — **`--force` per SF-4 Finding 1**; the bare form
+     refuses and the rotation would silently not happen
+  5. `docker compose restart egress-mediator`; poll with the **new** client certificate until it
+     answers (2 polls)
+  6. replay the **old** client certificate, trusting the **new** CA
+     (`--proxy-cacert /run/secrets/mediator-ca.crt`), so the refusal is the mediator's and not a
+     client-side trust failure
+- t1 (replay refused, UTC): **2026-09-30T15:25:36Z** — evidence: `curl_rc=56` (the connection is
+  torn down after the handshake) and `{"event":"proxy_internal","detail":"error:transaction-end-before-headers"}`
+  on `egress-audit.log`. See the finding below: this is a **weaker** evidence form than S4/S5's 407
+- Access-token replay: n/a
+- Measured: **00:07**   Within maximum: **yes**
+- Image IDs before / after: the same five IDs, identical   Rebuild: **no**
+- Re-issue: `claude` and `agy` recreated so they take the new CA certificate. Afterwards **all three
+  agents work under the new CA**: `claude` with the new client certificate → `api.anthropic.com`
+  `http_code=404`; `agy` over its reissued TLS listener → `http_code=404`; `codex` (peek-only
+  listener, `proxy_auth`) → `api.github.com` `http_code=200`. Edge Case 6's claim, that a reissued
+  certificate under a *new* CA is accepted once the CA is redistributed, holds for the full path —
+  SF-4 had shown only the client-certificate half
+
+#### FINDING — a superseded client certificate is refused, but the refusal is not attributable on the trail
+
+S4 and S5 produce a deny line naming the agent, the destination and `http_status=407`. S1 produces
+`{"event":"proxy_internal","detail":"error:transaction-end-before-headers"}` with **no `agent`, no
+`identity_source` and no destination**, because the rejection happens in the TLS handshake, before
+Squid has a request to log. `squid-cache.log` at the shipped debug level carries nothing either —
+`grep -inE "certificate|ssl_accept|clientca|verify"` over it returns no lines.
+
+Measured characterisation of the client-certificate layer, from inside a `claude` container against
+the live listener:
+
+| Client certificate presented | Result |
+|---|---|
+| The current one, issued under the live CA | handshake completes; `Verify return code: 0 (ok)`; request allowed |
+| **None** | `tlsv13 alert certificate required` (**SSL alert 116**) from the listener; `curl_rc=56` |
+| One with subject `CN=claude` from a **foreign CA** (a stand-in for the superseded certificate, generated for this check) | `curl_rc=56`, connection torn down after the handshake; no alert text reaches an early-closing `s_client`, because TLS 1.3 sends the client certificate after the server's Finished |
+
+**Consequence for the runbook, now in § 4:** for S1, confirming revocation cannot rest on the audit
+trail. It rests on the replay's client-side failure plus the certificate sha256 and serial before
+and after. An operator who wants a trail-visible S1 refusal would have to raise Squid's debug level,
+which is not the shipped configuration.
 
 ### `restart` versus `--force-recreate` for a replaced `file:` secret (Edge Case 4)
 
-A Compose `file:` secret is a bind mount. `cp` over the file keeps the inode and a restart sees the
-new content; `mv`, or an editor's write-then-rename, leaves the container on the **old inode** (the
-R4.14 trap). SF-5 measures both — inode before and after, and a replay of the old credential — and
-`mediator/identity/README.md` is corrected to whichever form works.
+Measured on `codex-proxy-credential` against a long-lived container holding the mount
+(Docker Desktop on macOS, `darwin` host; the inode numbers below are the ones the container sees).
+Only sha256 prefixes are printed.
 
-*(pending SF-5)*
+| Form | Host file | Inside the running container | Restart needed? |
+|---|---|---|---|
+| **Truncate in place** — `> "$cred"`, and `cp` for the htpasswd. **This is what `issue-identity.sh` does** | inode unchanged (`544579446`), sha `417ddb918acb` → `9e0e86beec6f` | inode unchanged (`27`), sha follows **immediately**: `9e0e86beec6f` | **No.** The running container sees the new content with no restart and no recreate |
+| **Write-then-rename** — `mv`, or an editor's atomic save (the R4.14 trap) | **new** inode (`552110771`), sha `4ad64e54823b` | `stat` still reports the **old** inode and size (`32`, `55 B`) — the metadata looks healthy — but a read fails: `cat: /run/secrets/codex-proxy-credential: No such file or directory`, rc=1 | **Yes.** `docker restart` of the same container re-resolves the path (inode `32` → the new content, sha `4ad64e54823b`) |
+
+**This sharpens the plan's prediction rather than confirming it.** Edge Case 4 predicted the
+rename form would leave the container *on the old inode*, i.e. quietly using the **old credential**.
+What was measured is worse-looking and safer: the mount **breaks**, and the file becomes unreadable
+while its metadata still looks fine. The failure is therefore **closed** — an agent started against
+that mount gets no credential and is refused with a 407 whose `identity_source` is `listener` — not
+a silent continuation on a revoked credential. The confusing part is the healthy-looking `stat`.
+
+**The working form, now stated in `mediator/identity/README.md` and in README's 02.3 rotation
+note:** rotate with `issue-identity.sh`, which writes in place, so **no restart at all is needed for
+the file's content** to reach a running container. The agent step is still required for a *proxy
+credential*, but for a reason that has nothing to do with the inode: the agent splices the value
+into `HTTPS_PROXY` **at the entrypoint**, so a still-running container keeps using the old URL
+however fresh the file is. The drills used `--force-recreate` and it works; a plain `docker restart`
+re-runs the entrypoint too and would be expected to re-splice, but **that was not measured here** —
+only the mount's re-resolution was. The runbook keeps `--force-recreate`, the measured form.
+
+### Drill S2 — `github-token` fine-grained PAT
+
+*(pending — drill credential to be minted)*
+
+### Drill S3 — `kubeconfig` context credential
+
+*(pending — disposable `kind` cluster)*
 
 ---
 

@@ -161,7 +161,31 @@ bash scripts/issue-identity.sh claude
 bash scripts/issue-identity.sh codex
 bash scripts/issue-identity.sh agy
 bash scripts/issue-identity.sh client claude --force
+# and then, without which the path is not finished:
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml restart egress-mediator
+docker compose --env-file compose/pins.env -f compose/compose.yaml \
+  -f compose/overrides/default.yaml up -d --force-recreate --no-deps claude agy
 ```
+
+**Drilled 2026-09-30 (02.5 SF-5, row S1): 00:07 from incident declaration to the superseded client
+certificate being refused**, against a 10:00 stated maximum, with no image rebuild — the five image
+IDs were identical before and after. Three things that drill measured, and that this file now states
+rather than implies:
+
+- The last two commands above are **part of the procedure**. `claude` and `agy` have to be recreated
+  to receive the new CA certificate; after that all three agents work under the new CA
+  (`claude` by client certificate, `agy` over its reissued TLS hop, `codex` by `proxy_auth`).
+- `client claude --force` is mandatory. **The bare form refuses**, and a refusal run mid-recovery
+  among commands that succeed is easy to step past — the rotation then silently does not happen
+  (02.5 SF-4 Finding 1).
+- **The refusal is not on the audit trail.** A superseded client certificate is rejected in the TLS
+  handshake, so `egress-audit.log` shows only
+  `{"event":"proxy_internal","detail":"error:transaction-end-before-headers"}` — no agent, no
+  destination — and `squid-cache.log` shows nothing at the shipped debug level. Confirm from the
+  replay's client-side failure (`curl` exit 56) plus the certificate sha256 and serial before and
+  after. Presenting **no** certificate is the one case the listener names out loud: TLS 1.3
+  `alert certificate required` (alert 116).
 
 **Reissuing the CA does not touch the proxy credentials.** They are not CA-bound — they are random
 secrets verified against an htpasswd, and the CA has no part in that path. The two lifecycles are
@@ -173,6 +197,23 @@ for you. That restart is not a formality. `basic_ncsa_auth` reads the htpasswd a
 caches accepted credentials for `credentialsttl`, so until the mediator restarts, **the credential
 you just revoked still works**. The rebuild itself is from scratch every time and never appended
 to, so deleting a plaintext genuinely revokes rather than leaving the old hash behind.
+
+**Drilled 2026-09-30 (02.5 SF-5, rows S4 and S5): 00:06 for `codex` and 00:14 for `agy`**, against
+10:00 maxima, no rebuild. What the drill adds to the paragraph above:
+
+- The cached-credential claim is **measured**, not inferred: between the `--force` and the mediator
+  restart, the revoked credential still returned `verdict=allow` for both agents.
+- After the restart, **wait until the proxy answers** before concluding. A replay against a Squid
+  still binding its listeners fails to connect and leaves no audit line at all — which looks exactly
+  like a revocation and is not one.
+- A revoked credential's refusal **is** on the trail, unlike S1's: `verdict=deny, http_status=407,
+  squid=TCP_DENIED`, with `identity_source` degraded from `listener+proxy_auth` to `listener`.
+- **Rotate by writing in place** (which is what this script does) and never by `mv` or an
+  editor that saves by rename. Measured: the rename form breaks the container's secret mount — the
+  in-container `stat` still reports the old inode and size while a read fails with `No such file or
+  directory`. It fails closed, but the healthy-looking `stat` misleads. The in-place form is visible
+  to a running container immediately, with no restart; the agent still needs recreating because the
+  value is spliced into `HTTPS_PROXY` at the entrypoint.
 
 This is a recorded choice, not an oversight. The pod holds **four** certificates under this CA —
 three listener certificates and one client certificate, `claude`'s. (The forecast this paragraph

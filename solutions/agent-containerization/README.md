@@ -916,7 +916,14 @@ docker compose --env-file compose/pins.env \
 
 `compose/generated/credentials/` is git-ignored. **Rotation is a file swap plus
 `--force-recreate` — no rebuild** (R8.5): the secret is a Compose `file:` source, never baked
-into an image layer. **Revocation is independent per credential** (R7.12) — see
+into an image layer. **Swap the file in place** — `cp` over it, or `printf … > file`, never `mv`,
+and never an editor that saves by rename. Measured at 02.5 SF-5 (Edge Case 4) on the equivalent
+proxy-credential secret: the in-place form is visible to a running container immediately, while the
+rename form **breaks the mount** — `stat` inside the container still reports the old inode and size,
+but reading the file fails with `No such file or directory` until the container is restarted. It
+fails closed rather than serving a stale credential, but the healthy-looking `stat` will mislead a
+diagnosis. `--force-recreate` remains the documented step because an agent that reads a secret at
+start (the proxy-credential splice is the clear case) will not notice a fresh file otherwise. **Revocation is independent per credential** (R7.12) — see
 `docs/records/credential-inventory.md`, Tables A/B, rows S2/S3, for the exact revoke-at-provider
 steps and blast radius. A credential reaches all three agent containers under a profile that
 loads its pack, the same rule that gives every agent a pack's egress — stated as blast radius,
