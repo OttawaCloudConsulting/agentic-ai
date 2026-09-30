@@ -1,0 +1,35 @@
+# TEST-ONLY override (02.5 SF-3). Not a shipped profile, and never layered on an operator's
+# bring-up: `tests/acceptance/verify-containment.sh` applies it under its OWN Compose project
+# name, on top of `test-egress.yaml`, so its `up`/`down` cannot touch the default project's
+# containers, state volumes or audit volume.
+#
+# It supplies exactly one thing the other harnesses do not need: agents that are COMPOSE
+# SERVICE containers and stay up.
+#
+# Every other harness gets a long-lived agent with `docker compose run -d --name ... sleep N`.
+# That will not do here. A one-off `run` container carries
+# `com.docker.compose.oneoff=True`, and every Compose subcommand ignores it -- so
+# `docker compose stop claude`, `docker compose start claude` and `docker compose down`, which
+# are the exact commands `docs/containment-runbook.md` § 3.2 and § 5.1 hand the operator, would
+# silently act on nothing. Phases B, C and D assert what those commands do (T40's stop form,
+# the pod-wide cut with the other two agents unaffected, and R12.5's teardown), so the agents
+# have to be service containers with service names, service lifecycle and the
+# `<project>-<service>-1` naming the runbook's `docker network disconnect` lines use.
+#
+# The agent images' CMD is `<agent> --version`, which exits at once, so `up -d` alone would
+# leave three `exited` containers. `sleep infinity` under the image's own ENTRYPOINT is the
+# smallest change that makes them stay: the entrypoint still runs -- the AUTH_MODE dispatch,
+# the capability-declaration gate and `mcp-gate` all execute exactly as they do in a real
+# bring-up -- and only the final `exec` target differs. The same substitution every other
+# harness already makes, moved from `run`'s argv into a service definition.
+#
+# Nothing else is overridden. Networks, hardening, secrets, volumes and the mediator all come
+# from `compose.yaml` + `overrides/default.yaml` + `overrides/test-egress.yaml` unchanged,
+# because what these phases measure is the shipped topology's behaviour under containment.
+services:
+  claude:
+    command: ["sleep", "infinity"]
+  codex:
+    command: ["sleep", "infinity"]
+  agy:
+    command: ["sleep", "infinity"]

@@ -5,10 +5,12 @@ measurements and finalised at SF-7)
 **Requirements:** R13.1, R13.2, R13.3, R12.5, R12.7, D16, and the R9.6 review trigger handed over
 by Feature 02.1.
 **Status:** **DRAFT.** Event and incident definitions and every stated maximum are
-operator-confirmed (2026-09-29); the commands are not yet measured. Written before the drills,
-deliberately (Decision 7) — a drill measures a
-procedure only if the procedure existed before the clock started. Commands marked **UNMEASURED**
-are corrected to their measured form in SF-3 (live containment forms) and SF-5/SF-6 (revocation).
+operator-confirmed (2026-09-29). The **live containment forms (§ 3.1, § 3.2) and the teardown
+guarantee (§ 2, § 5) are measured** — SF-3, 2026-09-30, `verify-containment.sh` phases B–D, recorded
+in `docs/records/containment-drills.md`. The **revocation procedures (§ 3.4, § 4) are not yet
+measured**; SF-5 and SF-6 drill them. Written before the drills, deliberately (Decision 7) — a drill
+measures a procedure only if the procedure existed before the clock started. Commands still marked
+**UNMEASURED** are corrected to their measured form in SF-5/SF-6.
 A deviation observed during a drill is a **finding**: it is fixed here and the drill is re-run, not
 annotated (Test Strategy, Edge Case 18).
 
@@ -70,6 +72,11 @@ runbook changes that, and no maximum below should be read as covering it.
 the agent did. R12.5's teardown is `down` **without** `-v`, which removes containers, the `tmpfs`
 mounts (`/tmp`, `/run`) and the networks, and preserves every named volume.
 
+**MEASURED 2026-09-30** (SF-3 phase D, and its negative control). `down` kept all seven named
+volumes and every marker on a state volume, and the audit trail did not shrink. The same state under
+`down -v` lost all seven volumes, every state marker, and took the audit trail from 46 lines to 2.
+That 46 → 2 is the concrete cost this rule exists to prevent.
+
 The discard in § 5 is **selective**: `docker volume rm` of the named state volumes only, by name,
 after `down`.
 
@@ -85,17 +92,27 @@ the detection signal (R9.1), so the live forms leave DNS, policy and the audit w
 
 ### 3.1 Cut egress, whole pod
 
-**Live form** — UNMEASURED (SF-3 phase C):
+**Live form** — **MEASURED 2026-09-30** (SF-3 phase C; `docs/records/containment-drills.md` § The pod-wide cut):
 
 ```bash
 docker network disconnect sandboxed-agent-pod_egress-net sandboxed-agent-pod-egress-mediator-1
 ```
 
-- **Expected result.** Every agent's allowed request now fails upstream. dnsdist still decides and
-  audits; unbound's upstream fails (`SERVFAIL`). Attempts stay visible — that is the property this
-  form is chosen for (Edge Case 8).
-- **Confirm it.** From any agent, an allowed fixture request fails; a line for that attempt still
-  reaches the audit sink. Re-attach and the same request succeeds:
+- **Expected result.** Every agent's allowed request now fails upstream, and the mediator stays
+  `running` — measured for all three agents. **Attempts stay visible**, which is the property this
+  form is chosen for (Edge Case 8): the policy decision is unchanged, so the audit line reads
+  `"verdict":"allow"` with `"http_status":503`, `bytes_out: 0` and `bytes_in: 0`. Read the 503 and the
+  zero byte counts, not the verdict — the request was accepted, attributed and evaluated, and then
+  had nowhere to go.
+- **Measured refinement of the DNS expectation.** Edge Case 8 expected the failure to surface as a
+  `SERVFAIL` from unbound's dead upstream. With the name already in unbound's cache — the normal case,
+  since a cut follows traffic — no query leaves the mediator at all, `dns-audit.log` stays silent for
+  that name, and the attempt fails at the TCP leg instead. Either way the attempt is on
+  `egress-audit.log`. **Look there first, not at `dns-audit.log`.**
+- **Confirm it.** From any agent, an allowed request fails; a line for that attempt still reaches the
+  audit sink. Re-attach and the same request succeeds — note that the reattach gives the mediator a
+  **dynamically assigned** `egress-net` address rather than the one it had, which nothing depends on
+  but which makes the reattach an approximate, not exact, restoration:
 
 ```bash
 docker network connect sandboxed-agent-pod_egress-net sandboxed-agent-pod-egress-mediator-1
@@ -111,7 +128,7 @@ recording**. Use it only when the recording is worth less than the cut.
 
 ### 3.2 Cut egress from one agent / isolate one agent
 
-**Live form, container kept for forensics** — UNMEASURED (SF-3 phase B, disconnect form):
+**Live form, container kept for forensics** — **MEASURED 2026-09-30** (SF-3 phase B, disconnect form; `docs/records/containment-drills.md` § T40):
 
 ```bash
 docker network disconnect sandboxed-agent-pod_claude-net sandboxed-agent-pod-claude-1
@@ -119,12 +136,17 @@ docker network disconnect sandboxed-agent-pod_claude-net sandboxed-agent-pod-cla
 
 (substitute `codex` / `agy` and their `<agent>-net`)
 
-- **Expected result.** The agent has no route to anything — it is on that one network only. The
-  container keeps running and its filesystem and process state are intact. The other two agents are
-  unaffected, and the mediator keeps serving: it reads `MEDIATOR_AGENT_NETWORKS` **at start only**,
-  so detaching an *agent* leaves it untouched.
+- **Expected result.** The agent has no route to anything — it is on that one network only. Measured
+  for all three agents: the probe returns
+  `curl: (7) Failed to connect to 172.31.<10|20|30>.2 port 3128 after 0 ms`. The container keeps
+  running and its filesystem and process state are intact. The other two agents are unaffected, and
+  the mediator keeps serving — **measured, not assumed**: it reads `MEDIATOR_AGENT_NETWORKS` **at
+  start only**, so detaching an *agent* leaves it untouched.
+- **Take the forensic note BEFORE reconnecting.** Reconnect allocates the agent a **fresh** address
+  from the network's `ip_range` (measured: `claude` returned on `172.31.10.129`), so anything that
+  records "the container's address" must be captured while it is detached.
 - **Confirm it.** The isolated agent cannot reach the mediator. The other two still complete an
-  allowed fixture request and each still produces a fresh egress line. Reconnect restores the agent:
+  allowed request and each still produces a fresh egress line. Reconnect restores the agent:
 
 ```bash
 docker network connect sandboxed-agent-pod_claude-net sandboxed-agent-pod-claude-1
@@ -145,10 +167,11 @@ docker compose stop claude-recorder # the recorder second
 Stopping the **agent first** and letting the recorder drain keeps the tail of the transcript in the
 sink. Stopping the recorder first loses it.
 
-- **Expected result.** The agent and its recorder are `exited`; the other two agents are `running`,
-  their fixture requests are still allowed, and their egress lines still reach the sink.
+- **Expected result — MEASURED 2026-09-30** (SF-3 phase B, stop form). The agent and its recorder are
+  `exited`; the other two agents are `running`, their requests are still allowed, and their egress
+  lines still reach the sink. Measured for all three agents.
 - **Confirm it.** `docker compose ps`, then `docker compose start claude claude-recorder` — the
-  agent restarts cleanly.
+  agent restarts cleanly and reaches the mediator again. Measured for all three.
 
 ### 3.3 Disable one MCP server
 

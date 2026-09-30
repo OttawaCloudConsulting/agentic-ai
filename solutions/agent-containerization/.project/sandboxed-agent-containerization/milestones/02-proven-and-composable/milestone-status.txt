@@ -290,7 +290,7 @@
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
-    Sub-features: 2/7 complete
+    Sub-features: 3/7 complete
     Notes: Started 2026-09-29. SF-1 complete 2026-09-29 (documentation only, 3 files).
     SF-2 complete 2026-09-29 (T37 enforced at compile). Operator supplied both waive
     reasons (github/git-push, kubernetes/infrastructure-apply) and chose the vocabulary
@@ -322,3 +322,26 @@
     not the plan's S2/S3 -- 02.3 had already taken S2/S3 and P1-P4 are the R8.6
     findings), and Edge Case 1 closes with no pre-drill revocation because no
     outstanding one-year CLAUDE_CODE_OAUTH_TOKEN was ever minted outside a test.
+    SF-3 complete 2026-09-30 (verify-containment.sh phases A-D). Measured: 140 passed,
+    4 failed -- and all four are phase A's expected reds. Phases B (T40, both forms, three
+    agents, 63 assertions), C (the pod-wide cut) and D (R12.5) are clean, as is F. The three
+    recorded negative controls were run once each and are in docs/records/containment-drills.md,
+    not left in the suite: stopping the mediator instead of an agent fails "others unaffected"
+    for all three agents; killing the audit writer with the cut in place drops the attempt from
+    the trail, BUT takes the whole mediator down (exit 137, the entrypoint fails closed on any
+    child exit) so it is a two-variable control and is recorded as such; `down -v` takes the
+    audit trail from 46 lines to 2. Two measured refinements went into the runbook: Edge Case 8's
+    predicted SERVFAIL does not occur on a warm DNS cache -- the attempt fails at the TCP leg and
+    is visible on egress-audit.log as verdict=allow with http_status 503 and zero byte counts,
+    not on dns-audit.log; and reconnecting a detached agent (or the mediator) allocates a FRESH
+    address, so a forensic note must be taken before the reconnect. Deviation 3 recorded: phase A
+    is red in TWO parts, drill-evidence until SF-6 and the R14.3 three-route table until SF-7, so
+    the plan's SF-6 bullet "Phase A goes green" was amended to name only the drill-evidence part.
+    Offered as a deviation and DISMISSED by the operator as within the plan's intent:
+    compose/overrides/test-containment.yaml, a new 3-line test-only override not in the plan's
+    Files table, giving the three agents `command: ["sleep","infinity"]` -- phases B/C/D need
+    COMPOSE SERVICE containers because a one-off `compose run` container carries
+    com.docker.compose.oneoff=True and `compose stop`/`start`/`down`, the runbook's own commands,
+    ignore it. Codebase-assessment refresh SKIPPED again (no codebase-assessment.md exists;
+    documented edge case, warning not blocker). The composite was NOT re-run at SF-3 per D-08
+    (tests at feature completion only); SF-2's composite result stands.

@@ -1,12 +1,14 @@
 # Containment Drills — Feature 02.5
 
 **Feature:** `containment-response-and-the-authorization-gate.md`
-**Date:** 2026-09-29 (SF-1: skeleton and template only — no drill has run yet)
+**Date:** 2026-09-29 (SF-1: skeleton and template), 2026-09-30 (SF-3: phases A–D measured)
 **Method:** Every drill follows `docs/containment-runbook.md` **verbatim**. A deviation is a
 **finding**: it is fixed in the runbook and the drill is **re-run**, not annotated (Test Strategy).
 A drill whose clock is interrupted is re-run, not annotated — `t0` to `t1` is only meaningful
 without a gap (Edge Case 18).
-**Outcome:** *(pending — SF-3 through SF-7)*
+**Outcome:** *(pending — SF-4 through SF-7)*. SF-3 is recorded: `verify-containment.sh` phases A–D
+measured green except phase A's two expected reds (§ "Expected red"), plus the three recorded
+negative controls for B, C and D.
 
 > **This repository is public.** No credential value, OAuth code, or token prefix longer than the
 > provider's own public type prefix (`sk-ant-`, `ghp_`) ever enters this record. Drills use
@@ -97,9 +99,63 @@ own sessions is recorded **against R4.17**.
 
 ### Stop form and disconnect form
 
-*(pending SF-3 — `verify-containment.sh` phase B, per agent, both forms. Includes the measured answer
-to whether the mediator tolerates an agent-network detach — it reads `MEDIATOR_AGENT_NETWORKS` at
-start only, and this is measured, not assumed.)*
+**Measured 2026-09-30, `verify-containment.sh` phase B** — the fixture topology, under this
+harness's own Compose project, three agents × two forms, 63 assertions, all green. No model token
+and no login was spent.
+
+**Stop form,** per agent X (`docker compose stop X`, then `docker compose stop X-recorder` once the
+recorder has had its poll interval to drain — the order is Edge Case 9's):
+
+| Asserted | Result |
+|---|---|
+| X is `exited` | yes, all three |
+| X's recorder is `exited`, stopped **after** the agent it records | yes, all three |
+| the other two agents are `running` | yes, for every X |
+| the other two still complete an allowed fixture request through the mediator | yes — `HTTP 200` from each |
+| the other two each produce a **fresh** egress line on the audit trail | yes — one `verdict` line per attempt, inside the assertion's own window |
+| `docker compose start X X-recorder` restarts both cleanly, and X reaches the mediator again | yes, all three |
+
+**Disconnect form,** per agent X (`docker network disconnect <proj>_X-net <proj>-X-1`):
+
+| Asserted | Result |
+|---|---|
+| X is still `running` — the container is kept for forensics | yes, all three |
+| X has no route to anything | yes. `curl: (7) Failed to connect to 172.31.<10\|20\|30>.2 port 3128 after 0 ms: Couldn't connect to server` — it is on that one network only, so the mediator's address is simply not routable |
+| **the mediator keeps serving** | yes. It reads `MEDIATOR_AGENT_NETWORKS` at start only, so an *agent-side* detach does not touch it. **Measured, not assumed** (criterion 2) |
+| the other two agents are unaffected (running, allowed, audited) | yes, for every X |
+| `docker network connect` restores X | yes, all three |
+
+**One measured detail the runbook now states.** Reconnecting an agent gives it a **freshly allocated
+address** from its network's `ip_range` (measured: `claude` came back on `172.31.10.129`), not
+necessarily the address it held before the detach. Nothing depends on an agent's own address — the mediator is reached at its static `.2` and the
+listener certificates carry *its* address, not the agents' — so the agent recovers, but a forensic
+note that records "the container's address" must be taken **before** the reconnect, not after.
+
+**Not measured, and deliberately still untested: detaching the *mediator* from one agent's
+network.** Edge Case 7 stands as written. The mediator validates its network set at start only, so
+that operation's effect is unknown and it is recorded as untested rather than recommended. Phase B
+measures the agent-side detach, which is the form the runbook hands the operator.
+
+#### Recorded negative control (run once, not left in the suite)
+
+**Stop the mediator instead of an agent.** The "others unaffected" assertion must be able to fail,
+or its passes mean nothing.
+
+```
+docker compose -p <fixture project> stop egress-mediator
+```
+
+Measured 2026-09-30, with all three agents running and previously green:
+
+| Agent | Result with the mediator stopped |
+|---|---|
+| `claude` | `curl: (28) Connection timed out after 25003 milliseconds` |
+| `codex` | `curl: (7) Failed to connect to 172.31.20.2 port 3128 after 14286 ms: Couldn't connect to server` |
+| `agy` | `curl: (7) Failed to connect to 172.31.30.2 port 3128 after 14248 ms: Couldn't connect to server` |
+
+All three fail, so the assertion is a real one. `docker compose start egress-mediator` restored all
+three to `HTTP 200`. The asymmetry in the failure mode is itself informative: `claude`'s hop is TLS
+to a listener that is gone, so it times out; `codex` and `agy` are refused at TCP.
 
 ### MCP-disable exercise (Decision 4)
 
@@ -108,6 +164,76 @@ Runs against 02.3's `test-mcp.yaml`, because **no shipped profile carries a serv
 shipped path **requires a rebuild** because the inventory is baked into the image (02.3 Decision 8).
 
 *(pending SF-4)*
+
+---
+
+## The pod-wide cut — Decision 3's other live form (SF-3)
+
+**Measured 2026-09-30, `verify-containment.sh` phase C.** The runbook's § 3.1 live form:
+
+```bash
+docker network disconnect <proj>_egress-net <proj>-egress-mediator-1
+```
+
+| Asserted | Result |
+|---|---|
+| the mediator is **still running** with its egress leg cut | yes — which is the whole reason this form is chosen over `stop egress-mediator` (Decision 3): the detection signal stays alive |
+| every agent's allowed request fails | yes, all three |
+| **each failed attempt is still on the audit trail** | yes, all three — one `verdict` line per attempt, in the assertion's own window |
+| reattaching restores the allow for every agent | yes, all three |
+
+**What the audit line actually says, and why the assertion is keyed on presence rather than on a
+verdict.** The policy decision is unchanged by the cut — the destination is still allowlisted — so
+the line reads `"verdict":"allow"` and the failure appears one layer down:
+
+```json
+{"ts":"…","event":"connect_accepted","agent":"claude","identity_source":"listener+mtls","layer":"inner","dest_host":"allowed.fixture.lab","dest_port":443,"sni":"allowed.fixture.lab"}
+{"ts":"…","agent":"claude","identity_source":"listener+mtls","layer":"inner","dest_host":"allowed.fixture.lab","dest_port":443,"resolved_ip":"172.31.40.20","verdict":"allow","control":null,"bytes_out":0,"bytes_in":0,"sni":"allowed.fixture.lab","method":"CONNECT","http_status":503,"squid":"TCP_TUNNEL"}
+{"ts":"…","event":"proxy_internal","detail":"error:transaction-end-before-headers"}
+```
+
+`http_status: 503` with `bytes_out: 0` and `bytes_in: 0` is the signature of the cut: the request was
+accepted, attributed and evaluated, and then had nowhere to go. A phase that asserted
+`verdict == "deny"` would have been asserting the wrong thing, so phase C asserts **that a line for
+that (agent, destination) exists in the window** and nothing about its verdict.
+
+**Finding — Edge Case 8 is refined, not contradicted.** Edge Case 8 predicted that the failure would
+surface as a DNS `SERVFAIL` from unbound's dead upstream, with dnsdist still deciding and auditing.
+Measured, the name was **already in unbound's cache** from the phase-B requests, so no DNS query left
+the mediator at all: `dns-audit.log` carried nothing in the window, `resolved_ip` was answered from
+cache, and the attempt failed at the TCP leg to `172.31.40.20` instead. The property Edge Case 8 was
+written to protect — *attempts remain visible* — holds either way, but the line that carries them is
+`egress-audit.log`, not `dns-audit.log`. On a cold cache the DNS path would also fail and audit; a
+warm cache is the more likely state during a real incident, since the cut follows traffic.
+
+**One operational detail the runbook now states.** `docker network connect` reattaches the mediator
+with a **dynamically assigned** `egress-net` address, not necessarily the one it had. Nothing depends
+on it — `egress-net` carries no policy-addressed peer in the shipped topology and the fixtures are
+reached by destination address — but the reattach is not an exact restoration of the prior state.
+
+#### Recorded negative control (run once, not left in the suite)
+
+**With the cut in place, stop the audit writer**, and show that the "the attempt still reached the
+audit sink" assertion can fail. The writer has no `ps` in the mediator image, so it is found through
+`/proc`:
+
+```bash
+docker exec <proj>-egress-mediator-1 sh -c \
+  'for d in /proc/[0-9]*; do c=$(tr "\0" " " < $d/cmdline); case "$c" in *audit-writer*) echo ${d#/proc/};; esac; done'
+docker exec <proj>-egress-mediator-1 sh -c 'kill -9 <pid>'
+```
+
+Measured 2026-09-30: the assertion failed — **0** lines for `(claude, allowed.fixture.lab)` after the
+kill, against 2 for the same attempt while the writer was alive.
+
+**And the confound is the finding.** Killing the writer did not leave a mediator that proxies without
+recording. It took the **whole container** down (`exited`, code 137): the entrypoint treats any child
+leaving on its own as an incident, because a live proxy that is no longer recording is exactly the
+state R9.1 forbids. So the negative control proves the assertion *can* fail, but it does so for two
+reasons at once — no writer **and** no proxy — and the subsequent attempt reported
+`curl: (7) Failed to connect to 172.31.10.2 port 3128`. A cleaner single-variable control would need
+a writer that could be stopped without failing the mediator closed, which is a property this design
+deliberately does not have. Recorded as measured rather than engineered around.
 
 ---
 
@@ -128,8 +254,35 @@ One row per store in the runbook's § 5.2 disposition table, with the outcome as
 
 ## R12.5 — teardown (SF-3)
 
-*(pending SF-3 — `verify-containment.sh` phase D: `down` without `-v` removes containers, `tmpfs` and
-networks and preserves every named volume, `audit` included, asserted with markers.)*
+**Measured 2026-09-30, `verify-containment.sh` phase D.** A marker is written into each agent's
+`/tmp` (tmpfs) and each agent's `/home/agent` (its state volume), then `docker compose down`
+**without `-v`**, then `up` again.
+
+| Asserted | Result |
+|---|---|
+| `down` removed every container | yes — 0 containers matching the project prefix |
+| `down` removed every network | yes — 0 networks matching the project prefix |
+| every named volume survived | yes — the same 7 volumes before and after, `audit` included |
+| each agent's `/tmp` marker is **gone** | yes, all three — `/tmp` is a tmpfs and does not survive the container |
+| each agent's state-volume marker is **still there** | yes, all three |
+| the audit line count did not decrease | yes — 94 lines before, 97 after (the three new lines are the mediator's own start-up events on the fresh containers) |
+
+This is the mechanical basis for the runbook's **first rule** (§ 2): `down` is safe during an
+incident and `down -v` destroys the evidence. T41's discard is therefore selective —
+`docker volume rm` of the named **state** volumes only, never `-v`.
+
+#### Recorded negative control (run once, not left in the suite)
+
+**`down -v` instead of `down`.** Measured 2026-09-30, from the same marked state:
+
+| Asserted | Result with `-v` |
+|---|---|
+| named volumes survive | **no** — all 7 project volumes were removed |
+| each agent's state marker is present after `up` | **no** — absent in all three |
+| the audit line count did not decrease | **no** — 46 lines before, 2 after (a fresh volume with only the new start's events) |
+
+Every preservation assertion fails, so the phase is a real one. The 46 → 2 line count is the concrete
+cost the runbook's first rule exists to prevent.
 
 ---
 
@@ -168,25 +321,65 @@ not mean "without a decision".)*
 
 ---
 
-## Expected red — the phase A drill-evidence check (Edge Case 17)
+## Expected red — phase A, in two separate parts
+
+Phase A is **red by design until SF-7**, and in **two independent parts** with different closing
+sub-features. Neither is skipped — there is no skip variable, following the same reasoning as
+`retry_cold_peer`. Measured 2026-09-30 when phase A landed: **12 passed, 4 failed**, and all four
+failures are the two parts below.
+
+### Part 1 — the drill-evidence check (Edge Case 17), green at SF-6
 
 `verify-containment.sh` phase A parses the inventory's **Stated maximum**, **Measured** and
-**Rebuild required** columns and fails on an empty cell. It is therefore **red from SF-3 until
-SF-6**, by design, exactly as 02.4 SF-2 recorded its own expected red. It is **not skipped** — there
-is no skip variable, following the same reasoning as `retry_cold_peer`.
+**Rebuild required** columns and fails on an unfilled cell. It is therefore **red from SF-3 until
+SF-6**, by design, exactly as 02.4 SF-2 recorded its own expected red.
 
-**Parser rule, binding on SF-3.** Interface Contract 4 says phase A "fails on an empty cell", but as
-of SF-1 the Measured and Rebuild cells are **not empty** — they carry the literal token
-`*(pending — 02.5 SF-5/SF-6 drill)*`. Phase A must therefore treat a cell **containing `pending`** as
-unfilled, exactly as it treats an empty one. A parser that only checks for emptiness would go green
-against SF-1's placeholders and assert that drills had happened when none had. The Stated maximum
-column is the opposite case: it is filled for all twelve rows as of SF-1 and phase A should find it
-so.
+Two of the four failures, each naming all twelve rows:
 
-| Recorded at | State |
-|---|---|
-| SF-3 (phase A lands) | *(pending — expected red)* |
-| SF-6 (drills complete) | *(pending — expected green)* |
+```
+FAIL: A2: rows with no measured value and no GAP: E1 E2 E3 E4 V1 V2 V3 S1 S2 S3 S4 S5
+FAIL: A2: rows with no rebuild cell: E1 E2 E3 E4 V1 V2 V3 S1 S2 S3 S4 S5
+```
+
+The **Stated maximum** column is the opposite case, and it passes: filled for all twelve rows as of
+SF-1, as it must be — the maximum is a commitment made before the drill.
+
+**Parser rule, binding on SF-3 — implemented as stated.** Interface Contract 4 says phase A "fails on
+an empty cell", but as of SF-1 the Measured and Rebuild cells are **not empty** — they carry the
+literal token `*(pending — 02.5 SF-5/SF-6 drill)*`. Phase A therefore treats a cell **containing
+`pending`** as unfilled, exactly as it treats an empty one. A parser that only checked for emptiness
+would have gone green against SF-1's placeholders and asserted that drills had happened when none
+had. Beyond that, phase A holds each cell to Contract 4's stated shape: **Measured** must read
+`mm:ss`/`h:mm:ss` or name a `GAP`, and **Rebuild required** must read `no` or `GAP (R8.5)`. Phase A
+also asserts that the Table A and Table B row-id sets are **equal**, so a credential row cannot be
+added to one table and forgotten in the other.
+
+### Part 2 — the R14.3 three-route check (criterion 6), green at SF-7
+
+Interface Contract 8 puts criterion 6's R14.3 check in phase A — "the R14.3 record names an owner and
+triggers for the three routes" — but `third-party-assessments.md` is written by **SF-7**. As of SF-1
+it carries the single-route Antigravity block inherited from 01.4 SF-3 and no cadence statement. So
+phase A's other two failures are:
+
+```
+FAIL: A4: the R14.3 record has no Route/Owner/Review-trigger row for: claude codex agy
+FAIL: A4: the R14.3 record states no monitoring cadence
+```
+
+**Shape rule, binding on SF-7.** Phase A reads, and SF-7 must therefore write, a table **inside the
+`## R14.3` section** whose header row names `Route`, `Owner` and `Review trigger`, with one row per
+route whose first cell is `claude`, `codex` and `agy` (backticks optional), plus the word `cadence`
+somewhere in that section. The existing single-route block satisfies none of this and is not
+retro-fitted here: SF-7 owns the content, and this is only the shape phase A can check.
+
+**This corrects the plan's SF-6 bullet.** SF-6 says "Phase A goes green"; only **Part 1** goes green
+at SF-6. Phase A goes fully green at **SF-7**. See the feature plan's Deviation 3.
+
+| Recorded at | Part 1 (drill evidence) | Part 2 (R14.3) |
+|---|---|---|
+| SF-3 (phase A lands) | **red — measured, 2 failures** | **red — measured, 2 failures** |
+| SF-6 (drills complete) | *(pending — expected green)* | *(pending — still red)* |
+| SF-7 (close-out) | *(pending — expected green)* | *(pending — expected green)* |
 
 ---
 
@@ -225,9 +418,10 @@ Every numbered acceptance criterion maps to a harness phase, a drill, or a recor
 | Criterion | Evidence | Where | State |
 |---|---|---|---|
 | 1 — T26 tested revocation, every persisted type | Drills E1–E4, V1–V3, S1–S5 | This record, § T26 (SF-5, SF-6); inventory Table B | pending |
-| 2 — T40 single-agent isolation | Phase B (both forms); MCP-disable exercise; amendment text | Phase B (SF-3); this record § T40 (SF-4) | pending |
+| 2 — T40 single-agent isolation | Phase B (both forms); MCP-disable exercise; amendment text | Phase B (SF-3); this record § T40 | **both forms measured (SF-3)**; MCP half pending SF-4 |
 | 3 — T41 return to known-good | Phase E (mechanical); full drill; per-store outcomes | Phase E (SF-4); this record § T41 | pending |
-| 4 — R12.5 teardown | Phase D | Phase D (SF-3) | pending |
+| 4 — R12.5 teardown | Phase D | Phase D (SF-3); this record § R12.5 | **measured (SF-3)** |
+| (Decision 3) — the pod-wide cut keeps the detection signal | Phase C | Phase C (SF-3); this record § The pod-wide cut | **measured (SF-3)** |
 | 5 — T37 authorization gate | Phase F, compile negatives and runtime checks | Phase F (SF-2); this record § T37 | pending |
 | 6 — T44 ToS monitoring and the seam | R14.3 record for three routes; tabletop SIMULATION; seam inspection | `third-party-assessments.md`; this record § T44 (SF-7) | pending |
 | 7 — the runbook | Shipped, with event/incident defined before go-live; README links it | `docs/containment-runbook.md` (SF-1 draft, SF-7 final) | **draft (SF-1)** |

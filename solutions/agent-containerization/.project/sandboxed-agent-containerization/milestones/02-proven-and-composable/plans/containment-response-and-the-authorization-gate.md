@@ -368,9 +368,10 @@ recompile, and the operator-heavy drills last.
   - `packs/README.md` documents the field.
   - The composite is green.
   - Size: 6-8 files, one coherent compiler change.
-- [ ] **SF-3: `verify-containment.sh` phases A–D.**
+- [x] **SF-3: `verify-containment.sh` phases A–D.**
   - Phase A: the static checks. The drill-evidence check is **red until SF-6 by design**, and that
-    expected red is recorded, as 02.4 SF-2 did.
+    expected red is recorded, as 02.4 SF-2 did. *(Built: phase A is red in TWO parts — the
+    drill-evidence cells until SF-6 and the R14.3 three-route table until SF-7. See Deviation 3.)*
   - Phase B: T40, both forms, for each agent.
   - Phase C: the pod-wide live cut, with recording continuing.
   - Phase D: R12.5.
@@ -393,7 +394,8 @@ recompile, and the operator-heavy drills last.
     token and the access token.
   - Record the access-token survival findings, and add the compensating action to the runbook where
     one survives.
-  - Phase A goes green.
+  - **The drill-evidence part of phase A goes green.** Its R14.3 part does not — that closes at SF-7
+    (amended at SF-3; see Deviation 3).
   - **Smallest in code and largest in operator wall-clock.** Some access-token replays have to wait
     hours.
 - [ ] **SF-7: T44 and close-out.**
@@ -784,3 +786,26 @@ Paths are relative to the solution root.
   one-year replay window in the inventory's blast-radius column is unchanged — it describes the
   credential type, not an outstanding instance. The feature's long-pole operator dependency list
   loses its one "do this now, ahead of the build" item.
+
+### Deviation 3: phase A is red in two parts, and it goes fully green at SF-7 rather than SF-6
+- **What changed:** `verify-containment.sh` phase A carries Interface Contract 8's R14.3 check
+  (`docs/records/third-party-assessments.md` must name an owner and review triggers for the `claude`,
+  `codex` and `agy` routes, plus a monitoring cadence) alongside the drill-evidence check. That
+  record is written by **SF-7**, so phase A landed with **two independent expected reds**: two
+  failures for the inventory's unfilled Measured and Rebuild cells (green at SF-6) and two for the
+  absent R14.3 three-route table (green at SF-7). Measured at SF-3: 12 passed, 4 failed. Both parts
+  are recorded in `docs/records/containment-drills.md` § "Expected red", which now also states the
+  shape SF-7 must write for phase A to read, and SF-6's bullet above is corrected to say that only
+  the drill-evidence part goes green there.
+- **Originally planned:** Edge Case 17 and the Test Strategy name a single expected red — "its
+  drill-evidence part is red until SF-6 and green afterwards" — and SF-6's bullet says flatly
+  "Phase A goes green". Contract 8 nonetheless lists the R14.3 assertion under phase A.
+- **Why necessary:** the two statements cannot both hold. Dropping the R14.3 assertion would make
+  SF-6's text true at the cost of leaving criterion 6's evidence unchecked by any harness; keeping it
+  makes phase A's red state two-part and moves its green date to SF-7. The operator chose to keep the
+  check and correct the plan text.
+- **Impact:** the Test Command is red from SF-3 until SF-7, by design and recorded, not until SF-6 —
+  `verify-containment.sh` exits 1 on these four failures. Within that harness everything else is
+  green (measured at SF-3: 140 passed, 4 failed, and all four are these expected reds; phases B, C, D
+  and F are clean). SF-6 must not treat a still-red phase A as a failure, and SF-7 must write the
+  R14.3 table in the shape the drills record now specifies.
