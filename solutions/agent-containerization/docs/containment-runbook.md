@@ -274,6 +274,12 @@ docker volume rm sandboxed-agent-pod_claude-state
 docker compose up --build --force-recreate
 ```
 
+   **The whole-pod form is deliberate here**, and it is the one place it is. § 3.3 narrows to
+   `--force-recreate <agent>` because disabling one MCP server should not restart the mediator; a
+   return-to-known-good wants the opposite — every container replaced from the pinned digest,
+   the mediator included, because the question "which containers are clean" is exactly what D16
+   says cannot be answered by inspection.
+
 8. **Re-bootstrap authentication** for each agent.
 9. **Assert every disposition in § 5.2.**
 10. **Run the Test Command.** It must be green.

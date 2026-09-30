@@ -175,6 +175,14 @@ not mean "without a decision".)*
 SF-6**, by design, exactly as 02.4 SF-2 recorded its own expected red. It is **not skipped** — there
 is no skip variable, following the same reasoning as `retry_cold_peer`.
 
+**Parser rule, binding on SF-3.** Interface Contract 4 says phase A "fails on an empty cell", but as
+of SF-1 the Measured and Rebuild cells are **not empty** — they carry the literal token
+`*(pending — 02.5 SF-5/SF-6 drill)*`. Phase A must therefore treat a cell **containing `pending`** as
+unfilled, exactly as it treats an empty one. A parser that only checks for emptiness would go green
+against SF-1's placeholders and assert that drills had happened when none had. The Stated maximum
+column is the opposite case: it is filled for all twelve rows as of SF-1 and phase A should find it
+so.
+
 | Recorded at | State |
 |---|---|
 | SF-3 (phase A lands) | *(pending — expected red)* |
