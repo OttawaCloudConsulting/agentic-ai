@@ -290,4 +290,15 @@
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
-    Sub-features: 0/7 complete
+    Sub-features: 1/7 complete
+    Notes: Started 2026-09-29. SF-1 complete 2026-09-29 (documentation only, 3 files).
+    Codebase-assessment refresh SKIPPED: no .project/sandboxed-agent-containerization/docs/
+    codebase-assessment.md exists (Gate 0 skipped, greenfield) -- the documented
+    edge case, a warning not a blocker, so no refresh commit. Operator confirmed at
+    SF-1: the event/incident definitions as drafted (review assumption 2) and all
+    twelve stated maxima (review assumption 1) -- E1-E4 15:00, V1-V3 10:00 on a
+    containment clock, S1 10:00, S2 15:00, S3 30:00, S4/S5 10:00. Deviations 1 and 2
+    recorded: inventory row ids are S1-S5 (the proxy credentials are new rows S4/S5,
+    not the plan's S2/S3 -- 02.3 had already taken S2/S3 and P1-P4 are the R8.6
+    findings), and Edge Case 1 closes with no pre-drill revocation because no
+    outstanding one-year CLAUDE_CODE_OAUTH_TOKEN was ever minted outside a test.

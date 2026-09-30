@@ -340,7 +340,7 @@ the timing.
 The order is load-bearing: procedures before drills, the compiler change early because it forces a
 recompile, and the operator-heavy drills last.
 
-- [ ] **SF-1: Inventory completion and the runbook draft.**
+- [x] **SF-1: Inventory completion and the runbook draft.**
   - `credential-inventory.md`:
     - S2/S3 rows, the S1 correction if 02.3 has not landed it, and P1/P2 checked present;
     - Table B gains "Stated maximum" and "Rebuild required" columns (Contract 4);
@@ -739,4 +739,48 @@ Paths are relative to the solution root.
 
 ## Architectural Deviations
 
-(none)
+### Deviation 1: credential-inventory row ids are S4/S5 for the proxy credentials, not S2/S3
+- **What changed:** The two proxy credentials are added to `docs/records/credential-inventory.md` as
+  new rows **S4** (`codex`) and **S5** (`agy`), in both Table A and Table B. The existing 02.3 rows
+  keep their committed ids: S1 = `claude` mTLS client key, S2 = `github-token` PAT, S3 = `kubeconfig`.
+  The plan's `P1`/`P2` ids are **not** used at all. Interface Contract 4's column set is applied to
+  twelve rows (E1–E4, V1–V3, S1–S5) rather than the eleven the plan enumerated.
+- **Originally planned:** Acceptance Criterion 1 enumerates the inventory as "S1–S3: the 01.6
+  identity material — `claude`'s client key and the `codex` and `agy` proxy credentials; P1–P2:
+  02.3's GitHub token and `kubeconfig`", and SF-1's checklist says "S2/S3 rows ... and P1/P2 checked
+  present". Decision 2 and Interface Contract 6 repeat the `S1–S3` / `P1–P2` split.
+- **Why necessary:** The plan was written 2026-09-10 and predicted what 02.3 would add. 02.3 landed
+  differently: it took **S2 and S3** for the GitHub token and the `kubeconfig` (the plan's P1/P2) and
+  gave the proxy credentials no rows at all — only prose at the foot of the document. Independently,
+  `P1`–`P4` are already in use in the same file for the **R8.6 transcript-exposure findings**, a
+  different kind of row entirely. Adopting the plan's scheme would mean renumbering rows already
+  committed by 02.3 and relocating four existing R8.6 findings, to no benefit. Operator decision,
+  2026-09-29.
+- **Impact:** The row-id vocabulary is `E1–E4, V1–V3, S1–S5`, and every downstream consumer uses it:
+  the runbook's § 4 revocation index, the drill records' `### Drill <row id>` headings (Interface
+  Contract 6), and `verify-containment.sh` **phase A**, which parses Table B by row. SF-5's scope
+  becomes **S1–S5** (five rows, not the plan's "S1–S3 and P1–P2"); SF-6's stays E1–E4 and V1–V3.
+  Two credentials that were persisted and mounted but carried **no R4.16 row** now have one, which
+  is a completeness gain against R8.4 rather than a renaming exercise. Milestone 03 adds its AWS
+  credential as the next free id in this sequence.
+
+### Deviation 2: Edge Case 1 has no pre-drill revocation, because the token it assumes does not exist
+- **What changed:** `docs/records/containment-drills.md` records, in place of a revocation date, that
+  **no outstanding one-year `CLAUDE_CODE_OAUTH_TOKEN` exists** — it was never minted outside a test
+  (operator-confirmed 2026-09-29). Edge Case 1 is closed without a date.
+- **Originally planned:** Edge Case 1 states "The leaked one-year token must not wait for this
+  feature ... The token is revoked at the provider now, by the operator. It is recorded in
+  `containment-drills.md` as a pre-drill revocation, with the date and without the value." The
+  Documentation section lists "the pre-drill revocation of the leaked token (date only)" as a
+  deliverable of this record, and Decision 2 calls it "the outstanding leaked one-year token".
+- **Why necessary:** The premise is false. The `oauth-token` cell was exercised to prove the delivery
+  path, not to hold a working credential, and R4.12 makes `oauth-interactive` `claude`'s default
+  precisely so that a year-long token is not minted by default. Writing a date here would assert an
+  event that did not happen, in a record whose whole value is that its timestamps are real.
+- **Impact:** One named deliverable of `containment-drills.md` is replaced by a negative finding. **No
+  drill scope changes:** E4 stays in SF-6, which mints a fresh drill token via `claude setup-token`,
+  revokes it and replays it, against the same **15:00** stated maximum. The 01.4 SF-3 standing
+  obligation to revoke a token minted to prove a test cell now applies to that drill token. E4's
+  one-year replay window in the inventory's blast-radius column is unchanged — it describes the
+  credential type, not an outstanding instance. The feature's long-pole operator dependency list
+  loses its one "do this now, ahead of the build" item.
