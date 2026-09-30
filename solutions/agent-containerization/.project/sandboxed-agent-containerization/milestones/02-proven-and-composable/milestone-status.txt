@@ -301,6 +301,17 @@
     lines carrying identity_source listener+mtls and listener+proxy_auth). Probe PROFILES
     are generated into tests/fixtures/authorization/ at run time and removed by the trap;
     only the probe PACK manifests are committed there (README in that directory says why).
+    Follow-up commit in SF-2: the refusal tested a loaded pack's enables_actions with
+    'yq | grep -qFx', which can lose the firing to SIGPIPE under pipefail once a manifest
+    declares more than one action -- changed to a here-string. Composite regression run on
+    the committed tree, harness by harness (one combined run was killed by the OS for
+    memory, not by a failure): pack-composition 109, pod-topology 63, egress-mediator 101,
+    audit-completeness 76, tool-packs 41, mcp-inventory 44, validate-boundary 416 (all four
+    profiles), reproducibility 25, containment 35 -- every one rc=0, lint-policy rc=0.
+    Baseline note: 'compile-policy.sh --check' still exits 4 for test-fixtures and
+    test-selfcheck, as before SF-2; those two are compiled from allowlist.test.yaml.
+    Carried to SF-7: the plan's Test Strategy wants the row-6 negative control recorded in
+    containment-drills.md, and Documentation lists T37 results there. Nothing written yet.
     Codebase-assessment refresh SKIPPED: no .project/sandboxed-agent-containerization/docs/
     codebase-assessment.md exists (Gate 0 skipped, greenfield) -- the documented
     edge case, a warning not a blocker, so no refresh commit. Operator confirmed at
