@@ -276,7 +276,7 @@ moved to fit.
 | E1 | `claude` Anthropic API key | Anthropic Console → API keys → revoke | **15:00** |
 | E2 | `codex` OpenAI API key | OpenAI platform → API keys → revoke | **15:00** |
 | E3 | `agy` Google API key | Google AI Studio → delete key | **15:00** |
-| E4 | `claude` one-year `CLAUDE_CODE_OAUTH_TOKEN` | Revoke at the Anthropic account that minted it | **15:00** |
+| E4 | `claude` one-year `CLAUDE_CODE_OAUTH_TOKEN` | Revoke at the Anthropic account that minted it. **It is an OAuth grant, not an API key — it is NOT on the API-keys page where E1 lives.** Measured 2026-09-30 (02.5 SF-6): the revoke is **single-grant**, with no account-wide logout and no effect on the operator's own sessions; most of that drill's 04:39 was spent finding the page, and an incident is a worse time to search | **15:00** |
 | V1 | `claude` OAuth refresh + 8 h access token | Delete `.credentials.json` from `claude-state` **and** revoke the session at the provider | **10:00** *(containment clock)* |
 | V2 | `codex` OAuth refresh + 10-day access token | `codex logout` **and** revoke the session at the provider | **10:00** *(containment clock)* |
 | V3 | `codex` OAuth set, host-provenance (`oauth-mount`) | As V2. Rotation is **not** revocation — a captured refresh token stays valid after the legitimate client refreshes past it | **10:00** *(containment clock)* |

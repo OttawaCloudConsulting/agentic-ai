@@ -379,9 +379,9 @@ the mediator under the `github` profile, where the replay is run from inside an 
 
 ## T26 — provider credentials (SF-6)
 
-**Rows E1, E2 and E3 are drilled (2026-09-30).** E4 and V1–V3 are still pending: they need
-interactive logins and, for the V rows, access-token replays measured in hours and days
-(Edge Case 2).
+**Rows E1, E2, E3 and E4 are drilled (2026-09-30).** V1–V3 are still pending: they need interactive
+logins and access-token replays measured in hours and days (Edge Case 2), and Edge Case 3 has to be
+put to the operator before V1/V2 are drilled.
 
 **Credential provenance — the throwaway rule is load-bearing here, unlike SF-4's T41.** These drills
 **revoke**, so Deviation 4's use of the working keys in `references/.env_keys` does **not** extend to
@@ -448,6 +448,64 @@ revocation, and the console visit *is* the revocation. Every row had 15:00 of ro
 asserted a specific refused status for this row would be flaky. What is stable is the property that
 matters: **not 200, and never 200 again**. Recorded so that SF-7's criterion-to-evidence table, and
 any later regression of this row, assert the absence of success rather than the presence of one code.
+
+### Drill E4 — the one-year `CLAUDE_CODE_OAUTH_TOKEN` (`oauth-token` cell)
+
+**This row's credential is minted on the HOST, not in the pod** — `images/bootstrap-auth.sh:291`
+requires `CLAUDE_CODE_OAUTH_TOKEN` in the environment and mints nothing, because `claude
+setup-token`'s flow is interactive. So the drill starts with an operator action, and the token
+reaches the container by the bare `-e NAME` form like every other key here.
+
+- Drill credential: a **fresh one-year token** minted by the operator with `claude setup-token` on
+  the host for this drill, staged in `references/.sf6-drill_env_keys`. Asserted at run time to
+  differ from the token already outstanding in `references/.env_keys` — that older one is **SF-7's**
+  standing obligation, not this drill's. No value recorded
+- Stated maximum: **15:00**
+- t0 (incident declared, UTC): **2026-09-30T20:18:01Z**
+- Steps:
+  1. **two probes before any clock**, because a drill whose baseline is wrong measures nothing:
+     - *the cheap one* — the token as a plain `Authorization: Bearer` against
+       `GET api.anthropic.com/v1/models`: **200**, with and without `anthropic-beta:
+       oauth-2025-04-20`. Free and pollable at 2 s, so this became the poll
+     - *the real consumer* — the `claude` CLI itself with `AUTH_MODE=oauth-token`:
+       `claude -p` returned **`OK`**, end to end through the mediator
+  2. one detached poll on the bearer probe, 2 s cadence, 30-minute ceiling
+  3. the operator revokes the grant at the Anthropic account that minted it
+- t1 (replay refused, UTC): **2026-09-30T20:22:40Z** — evidence: HTTP **401** (last 200 at
+  `20:22:38Z`, two seconds earlier), monotonic across the remaining polls, 138 poll lines in total.
+  **Confirmed by the real consumer after revocation:** the CLI replay returned
+  `Not logged in · Please run /login`. The cheap probe and the real credential path agree
+- Access-token replay: n/a — a `setup-token` grant is a single long-lived token, not a
+  refresh/access pair. V1–V3 are where Edge Case 2 bites
+- Measured: **04:39**   Within maximum: **yes**
+- Image IDs before / after: the five `default`-profile IDs, identical   Rebuild: **no**
+- Re-issue: not performed. The token stays revoked, and E4's cell is a documented fallback rather
+  than the default (R4.12 makes `oauth-interactive` `claude`'s default precisely so a year-long
+  credential is not minted by default)
+
+#### Edge Case 3 does NOT bite for this row — the revocation was single-grant
+
+The operator reported that the console offered **only the single-grant revoke**: no account-wide
+"log out all sessions", and no collateral effect on the operator's own sessions. Recorded as the
+favourable case, which means **R4.17 is not engaged for E4**. Edge Case 3 remains open for V1 and
+V2, where the credential is a provider *session* rather than a minted grant, and it is those rows
+that have to be asked about before they are drilled.
+
+**Why E4 took 04:39 where E1–E3 took around 02:15.** The difference is console navigation, not
+provider latency: a `setup-token` grant is an **OAuth grant**, so it does not appear under
+console.anthropic.com → API keys where the three E1–E3 keys live. The runbook's E4 line should say
+where to look, and the operator's report is that the grant is revoked from the Anthropic account
+that minted it rather than from the API-keys page. Recorded because four and a half minutes of a
+fifteen-minute budget went to finding the page, and an incident is a worse time to search.
+
+#### An observation about the cell's own reporting, not a finding against the credential
+
+During both probes `bootstrap-auth` printed `(claude|codex, oauth-interactive) has no credential
+yet` while the CLI on the very same invocation authenticated successfully on the drill token. The
+`-e CLAUDE_AUTH_MODE=oauth-token` passed to `compose run` did not reach the entrypoint's `AUTH_MODE`
+check, so the bootstrap reported the default cell's state while the credential the CLI actually used
+came from the environment. Harmless here — the probe measured the credential, which is what the row
+is about — but worth knowing that this warning does **not** mean the token is absent.
 
 #### The mediator saw all three refused replays as allowed
 

@@ -456,9 +456,9 @@
     The revoked drill PAT is still staged at compose/generated/credentials/github/github-cli/ (git-
     ignored); it is revoked and 7-day-expiring, and removing it is the operator's call. Pod restored
     to the default profile, its five image IDs unchanged across the whole of SF-5.
-    SF-6 PARTIAL 2026-09-30 -- sub-feature NOT closed, count stays 5/7. Rows E1/E2/E3 drilled; E4
-    and V1-V3 remain (interactive logins, and the Edge Case 2 access-token replays measured in hours
-    and days). Measured, one shared t0 2026-09-30T20:07:46Z because one operator declares one
+    SF-6 PARTIAL 2026-09-30 -- sub-feature NOT closed, count stays 5/7. Rows E1/E2/E3/E4 drilled;
+    V1-V3 remain (interactive logins, the Edge Case 2 access-token replays measured in hours and
+    days, and Edge Case 3 to be put to the operator before V1/V2 are drilled). Measured, one shared t0 2026-09-30T20:07:46Z because one operator declares one
     incident and then visits three consoles in series -- so the serialisation is INSIDE the later
     rows' times, recorded rather than hidden: E1 02:29, E2 02:25, E3 02:05, all against 15:00, all
     with the five default-profile image IDs identical before and after (up ran --force-recreate and
@@ -482,5 +482,25 @@
     is confirmable from the pod's own audit trail. Runbook section 4's evidence rule already states
     this for S2/S3 and applies unchanged to every E and V row. Codebase-assessment refresh SKIPPED
     again (no codebase-assessment.md; documented edge case). Composite NOT re-run (D-08).
+    E4 drilled 2026-09-30: 04:39 against 15:00, no rebuild. This cell mints NOTHING in the pod
+    (bootstrap-auth.sh:291 requires the token in the environment because setup-token's flow is
+    interactive), so the operator minted a fresh one-year token on the host; the script asserts it
+    differs from the token still outstanding in .env_keys, which stays SF-7's obligation. TWO probes
+    were run before any clock, because a wrong baseline measures nothing: the token works as a plain
+    Authorization: Bearer against /v1/models (200, with and without the oauth beta header) -- free
+    and pollable at 2s, so that became the poll -- and the real consumer, the claude CLI with
+    AUTH_MODE=oauth-token, returned OK end to end through the mediator. After revocation both agree:
+    bearer 401 (last 200 two seconds earlier, monotonic, 138 poll lines) and the CLI reporting
+    'Not logged in - Please run /login'. EDGE CASE 3 DOES NOT BITE FOR THIS ROW: the console offered
+    only the single-grant revoke, no account-wide logout, no collateral effect on the operator's own
+    sessions, so R4.17 is not engaged for E4 -- it stays open for V1/V2, where the credential is a
+    provider SESSION rather than a minted grant. Finding worth the runbook edit it got: a
+    setup-token grant is an OAuth grant and is NOT on the API-keys page where E1-E3 live, and most of
+    the 04:39 went to finding the right page -- an incident is a worse time to search, so runbook
+    section 4's E4 line now says where to look and records the granularity. Observation, not a
+    finding: bootstrap-auth printed '(claude|codex, oauth-interactive) has no credential yet' on the
+    same invocation where the CLI authenticated on the drill token -- the -e CLAUDE_AUTH_MODE passed
+    to compose run does not reach the entrypoint's AUTH_MODE check, so the warning reports the
+    default cell's state, not the credential's absence.
     Edge Case 1 does not reopen -- its premise was a LEAKED token -- but E4's standing revocation
     obligation is now live and SF-7 carries it. Composite NOT re-run (D-08).
