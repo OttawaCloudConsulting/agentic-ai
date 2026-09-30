@@ -456,5 +456,31 @@
     The revoked drill PAT is still staged at compose/generated/credentials/github/github-cli/ (git-
     ignored); it is revoked and 7-day-expiring, and removing it is the operator's call. Pod restored
     to the default profile, its five image IDs unchanged across the whole of SF-5.
+    SF-6 PARTIAL 2026-09-30 -- sub-feature NOT closed, count stays 5/7. Rows E1/E2/E3 drilled; E4
+    and V1-V3 remain (interactive logins, and the Edge Case 2 access-token replays measured in hours
+    and days). Measured, one shared t0 2026-09-30T20:07:46Z because one operator declares one
+    incident and then visits three consoles in series -- so the serialisation is INSIDE the later
+    rows' times, recorded rather than hidden: E1 02:29, E2 02:25, E3 02:05, all against 15:00, all
+    with the five default-profile image IDs identical before and after (up ran --force-recreate and
+    deliberately NOT --build, so the images could not change under the R8.5 evidence). Baselines were
+    200 on an endpoint that authenticates without spending model tokens (/v1/models for claude and
+    codex, /v1beta/models for agy), each from inside its OWN agent through the mediator; refusal is
+    monotonic in all three rows across 78/62/81 poll lines, with no measurable survival past the
+    console action. The throwaway rule is load-bearing here (Deviation 4 explicitly does not extend
+    to drills that revoke): the operator minted three dedicated keys and the script ASSERTS each
+    differs from its counterpart in references/.env_keys before starting. SECURITY FINDING fixed
+    before any drill ran: .gitignore matched the EXACT path references/.env_keys, so the new
+    references/.sf6-drill_env_keys was ignored by nothing and the `git add
+    solutions/agent-containerization` every commit in this feature runs would have staged three live
+    provider keys into a public repo; rule now references/*env_keys*, committed on its own, and the
+    file never entered history (.dockerignore's references/** deny-all had already kept it out of
+    every build context). Drill findings: (1) E3's refused status is NOT stable -- 401 on most
+    replays and 400 on two of nineteen, interleaved -- so assert the absence of 200, never a specific
+    code; (2) all three refused replays appear on the mediator trail as verdict=allow,
+    http_status=200, TCP_TUNNEL, which with S2 makes four providers and establishes it as an
+    architectural property (D18, no TLS termination on that path): NO provider-credential revocation
+    is confirmable from the pod's own audit trail. Runbook section 4's evidence rule already states
+    this for S2/S3 and applies unchanged to every E and V row. Codebase-assessment refresh SKIPPED
+    again (no codebase-assessment.md; documented edge case). Composite NOT re-run (D-08).
     Edge Case 1 does not reopen -- its premise was a LEAKED token -- but E4's standing revocation
     obligation is now live and SF-7 carries it. Composite NOT re-run (D-08).

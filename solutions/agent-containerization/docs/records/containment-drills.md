@@ -379,7 +379,92 @@ the mediator under the `github` profile, where the replay is run from inside an 
 
 ## T26 — provider credentials (SF-6)
 
-*(pending SF-6 — rows E1, E2, E3, E4, V1, V2, V3)*
+**Rows E1, E2 and E3 are drilled (2026-09-30).** E4 and V1–V3 are still pending: they need
+interactive logins and, for the V rows, access-token replays measured in hours and days
+(Edge Case 2).
+
+**Credential provenance — the throwaway rule is load-bearing here, unlike SF-4's T41.** These drills
+**revoke**, so Deviation 4's use of the working keys in `references/.env_keys` does **not** extend to
+them (the deviation says so itself). The operator minted three dedicated drill keys in
+`references/.sf6-drill_env_keys`, and the drill script **asserts** the separation before it starts:
+each drill key is compared against its counterpart in `references/.env_keys` and the run aborts on a
+match. Keys reach the containers by the bare `-e NAME` form, so no value enters `argv`; the polls
+print status codes only.
+
+> **Repository-hygiene finding, fixed before any drill ran.** `.gitignore` carried the **exact
+> path** `references/.env_keys`, so the newly created `references/.sf6-drill_env_keys` was matched by
+> no rule: `git check-ignore` returned nothing, and the `git add solutions/agent-containerization`
+> that each of this feature's commits runs would have staged three live provider keys into a public
+> repository. The rule is now `references/*env_keys*`. No commit ever staged the file and it is
+> absent from history; `.dockerignore` already excluded `references/**` deny-all, so no build
+> context carried it either.
+
+### Drills E1, E2, E3 — the three provider API keys
+
+All three share **one `t0`**, because one operator declares one incident and then visits three
+consoles in series. Each row's `t1` is its own. The serialisation therefore sits **inside** the
+later rows' measured times, which is the honest reading of R13.1: it bounds detection to
+revocation, and the console visit *is* the revocation. Every row had 15:00 of room and used at most
+02:29 of it.
+
+- Drill credential: three dedicated drill keys minted by the operator for this drill (Anthropic,
+  OpenAI, Google AI Studio), never the working keys — asserted, not assumed, as described above.
+  No value recorded
+- Stated maximum: **15:00** each
+- t0 (incident declared, UTC): **2026-09-30T20:07:46Z**
+- Steps:
+  1. pod up under `default` with `--force-recreate` and **no `--build`**, so the images cannot
+     change under the R8.5 evidence
+  2. baseline, each key from inside **its own** agent and through the mediator, on an endpoint that
+     authenticates without spending model tokens: `claude` → `GET api.anthropic.com/v1/models`
+     (`x-api-key`), `codex` → `GET api.openai.com/v1/models` (`Bearer`), `agy` →
+     `GET generativelanguage.googleapis.com/v1beta/models?key=…`. **All three 200**
+  3. one detached poll per row, same request every 2 s, each line timestamped, 25-minute ceiling —
+     so no clock can gap while the operator is at three consoles (Edge Case 18)
+  4. the operator revokes all three
+- t1 (replay refused, UTC) and measured:
+
+| Row | Agent | Endpoint | Last 200 | t1 (first refusal) | Evidence | Measured | Within 15:00 |
+|---|---|---|---|---|---|---|---|
+| E1 | `claude` | `api.anthropic.com/v1/models` | `20:10:13Z` | **`20:10:15Z`** | HTTP **401** | **02:29** | yes |
+| E2 | `codex` | `api.openai.com/v1/models` | `20:10:08Z` | **`20:10:11Z`** | HTTP **401** | **02:25** | yes |
+| E3 | `agy` | `generativelanguage…/v1beta/models` | `20:09:48Z` | **`20:09:51Z`** | HTTP **401**, then alternating 401/400 | **02:05** | yes |
+
+- **Refusal is monotonic in all three rows** — no poll returned 200 after its first refusal. 78, 62
+  and 81 poll lines respectively. Survival past the console action is under the 2 s cadence for all
+  three, the same as S2 and unlike S3's ~10 s or S4/S5's until-restart
+- Access-token replay: n/a — these are static API keys, not OAuth rows. V1–V3 are where Edge Case 2
+  bites
+- Image IDs before / after: the five `default`-profile IDs (`2f28fb1cfa95 5cd5aa6b06e0
+  b88fbfd61649 d04b811d8bef eb1e3b8e434c`), identical   Rebuild: **no** for all three
+- Re-issue: not performed, and not required by these rows' procedures — a revoked API key is
+  replaced by minting a new one at the provider, which is the same operation as minting the drill
+  key and was already exercised at step 0. The keys stay revoked
+
+#### E3's refusal status is not stable — 401 and 400 alternate
+
+`agy`'s row answered **401** on most refused replays and **400** on two of nineteen, interleaved:
+`401 401 401 401 401 401 401 401 401 400 401 401 401 401 400 401 401 401 401`. A harness that
+asserted a specific refused status for this row would be flaky. What is stable is the property that
+matters: **not 200, and never 200 again**. Recorded so that SF-7's criterion-to-evidence table, and
+any later regression of this row, assert the absence of success rather than the presence of one code.
+
+#### The mediator saw all three refused replays as allowed
+
+Exactly S2's finding, now with a third and fourth provider behind it, so it is a property of the
+architecture rather than of GitHub:
+
+```
+{"agent":"claude","identity_source":"listener+mtls","dest_host":"api.anthropic.com","verdict":"allow","http_status":200,"squid":"TCP_TUNNEL"}
+{"agent":"codex","identity_source":"listener+proxy_auth","dest_host":"api.openai.com","verdict":"allow","http_status":200,"squid":"TCP_TUNNEL"}
+{"agent":"agy","identity_source":"listener+proxy_auth","dest_host":"generativelanguage.googleapis.com","verdict":"allow","http_status":200,"squid":"TCP_TUNNEL"}
+```
+
+Every one of those lines is a **revoked** key being refused by its provider. The `http_status` is
+the CONNECT tunnel's; the mediator does not terminate TLS on this path (D18) and never sees the
+inner 401. **No provider-credential revocation is confirmable from the pod's own audit trail** — for
+E rows, V rows and S2 alike. The runbook's § 4 evidence rule already says this for S2/S3; it applies
+unchanged to every E and V row.
 
 ### Access-token survival findings (Edge Case 2)
 
