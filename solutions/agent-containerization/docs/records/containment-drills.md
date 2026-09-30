@@ -2,16 +2,16 @@
 
 **Feature:** `containment-response-and-the-authorization-gate.md`
 **Date:** 2026-09-29 (SF-1: skeleton and template), 2026-09-30 (SF-3: phases A–D measured; SF-4: phase E,
-the MCP-disable exercise and the R13.2/T40 amendment text)
+the MCP-disable exercise, the R13.2/T40 amendment text and the full T41 drill)
 **Method:** Every drill follows `docs/containment-runbook.md` **verbatim**. A deviation is a
 **finding**: it is fixed in the runbook and the drill is **re-run**, not annotated (Test Strategy).
 A drill whose clock is interrupted is re-run, not annotated — `t0` to `t1` is only meaningful
 without a gap (Edge Case 18).
-**Outcome:** *(pending — SF-4's full drill, and SF-5 through SF-7)*. `verify-containment.sh` phases
-A–F are measured green except phase A's two expected reds (§ "Expected red"), with a recorded
-negative control for each of B, C, D and E. SF-4's mechanical half (phase E), the MCP-disable
-exercise and the R13.2/T40 amendment text are recorded below; **SF-4's full T41 drill is the one
-open item** — it spends real logins and the operator runs it.
+**Outcome:** *(pending — SF-5 through SF-7)*. `verify-containment.sh` phases A–F are measured green
+except phase A's two expected reds (§ "Expected red"), with a recorded negative control for each of
+B, C, D and E. **SF-4 is complete**: phase E, the MCP-disable exercise, the R13.2/T40 amendment text
+and the full T41 drill against the real pod. What remains is the T26 revocation drills (SF-5, SF-6)
+and close-out (SF-7) — including revoking the `CLAUDE_CODE_OAUTH_TOKEN` minted for this work.
 
 > **This repository is public.** No credential value, OAuth code, or token prefix longer than the
 > provider's own public type prefix (`sk-ant-`, `ghp_`) ever enters this record. Drills use
@@ -30,12 +30,22 @@ prove the delivery path, not to hold a working credential, and R4.12 makes `oaut
 | Item | Value |
 |---|---|
 | Row | E4 |
-| Outstanding token at the provider | **None.** Never minted outside a test (operator-confirmed 2026-09-29) |
-| Pre-drill revocation required | **No** — there is nothing to revoke |
+| Outstanding token at the provider | **None at 2026-09-29.** Never minted outside a test (operator-confirmed). **Superseded 2026-09-30 — see below** |
+| Pre-drill revocation required | **No** — Edge Case 1's premise was a *leaked* token, and none existed |
 | Effect on the E4 drill | None. SF-6 mints a fresh drill token via `claude setup-token`, revokes it, and replays it. The 01.4 SF-3 standing obligation to revoke a token minted to prove a test cell still applies to that drill token |
 
-**This closes Edge Case 1 without a revocation date**, which is the honest record: a date entered here
-would assert an event that did not happen. The one-year replay window E4 carries in the inventory's
+**Correction, 2026-09-30.** A `CLAUDE_CODE_OAUTH_TOKEN` **is** outstanding: the operator minted one
+**for this testing work**, and it is held in `references/.env_keys` (git-ignored; excluded from every
+build context by the deny-all `.dockerignore`, which phase A asserts). No value is recorded here.
+
+This does **not** reopen Edge Case 1, whose premise was a *leaked* one-year token needing revocation
+ahead of the build — that token never existed. What it does do is make E4's **standing obligation**
+live rather than hypothetical: `verify-auth-state.sh:236` and the inventory's E4 row both state that
+a token minted to prove a test cell is revoked when the feature closes. **SF-7 must revoke this one**
+and record the date, and the E4 timed drill at SF-6 still uses its own fresh token.
+
+**Edge Case 1 still closes without a revocation date**, which is the honest record: a date entered
+against it would assert an event that did not happen. The one-year replay window E4 carries in the inventory's
 blast-radius column is unchanged — it describes the credential type, and SF-6 still drills it.
 
 ---
@@ -367,18 +377,136 @@ gate refused the agent. That is **Decision 4's fourth prediction, measured from 
 — a contaminated capability declaration is not merely recorded, it stops the agent starting — and it
 is why the recovery path's discard is not optional for an agent contaminated this way.
 
-### The full drill — pending the operator
+### The full drill — performed 2026-09-30
 
-Phase E proves the mechanical path. The drill adds what no unattended harness can spend:
+Run against the **real pod** (`sandboxed-agent-pod`), on the operator's explicit authorisation, from
+the `main`-pinned digests in `compose/pins.env` — `AGENT_BASE_DIGEST sha256:e3ae687e1b43…`,
+`NODE_BASE_DIGEST sha256:83f487e0a634…`, `MEDIATOR_BASE_DIGEST sha256:d7e12182ce18…`. The three
+state volumes and every credential on them were destroyed as part of the drill.
 
-1. identity rotation for the contaminated agent (`scripts/issue-identity.sh`), CA untouched;
-2. re-bootstrap of authentication for **all three** agents — real OAuth logins for `claude` and
-   `codex`, and the `GEMINI_API_KEY` cell for `agy` (operator confirmed 2026-09-30 that a key is
-   available, so `agy` is **not** a named gap here, unlike 02.2 SF-4);
-3. the recorder resuming on the rotated pod without duplicates;
-4. the whole path run against the **`main`-pinned digest from 02.4**, not a local build.
+**Credential provenance, stated rather than glossed.** Decision 2 and criterion 1 say drills use
+dedicated throwaway credentials. This drill used the keys already in `references/.env_keys`
+(git-ignored, and excluded from every build context by the deny-all `.dockerignore` — phase A
+asserts that), on the operator's decision, and exercised the **`apikey`** cell for all three agents
+rather than `claude` and `codex`'s default `oauth-interactive`. T41 **revokes nothing**, so the
+departure is bounded: no credential's lifetime was altered by this drill. It does **not** extend to
+SF-5 and SF-6, where the drills revoke and the throwaway rule is load-bearing. See the feature
+plan's Deviation 4.
 
-*(pending — the operator runs it; SF-4 stays open until it is recorded here)*
+#### Attempt 1 — FAILED at the rotation. Recorded, not annotated away.
+
+The Method above says a deviation is a **finding**: fixed in the runbook, and the drill **re-run**.
+Attempt 1 produced three findings and was discarded as a result.
+
+**Finding 1 — the rotation did not happen, and the drill nearly did not notice.** Step 5.1d ran the
+command the runbook's § 5.2 implied:
+
+```
+issue-identity: FAIL: .../mediator/identity/clients/claude-client.crt already exists.
+                Re-issue it with: bash scripts/issue-identity.sh client claude --force
+```
+
+Nothing rotated. The CA and the client certificate were byte-identical afterwards, and the pod came
+back up **on the same identity material the contaminated agent had held** — the one thing criterion
+3 names for this store. Run mid-recovery among commands that do not fail, the refusal is easy to
+step past. `docs/containment-runbook.md` § 5.2 now carries the `--force` form, the same correction
+for the S4/S5 proxy-credential rows in § 4, and a check-the-sha instruction. **SF-5 must use
+`credential <agent> --force`**; only the `client` case is measured here.
+
+**Finding 2 — the drill discarded the evidence for its own failure.** `codex` exited 3 and `agy`
+exited 2 on their *first* bootstrap, against the pre-existing state volumes. The harness grepped the
+output for a summary line and kept nothing else, and the volumes that caused it were destroyed
+minutes later by step 5.1b. **The cause cannot now be reconstructed.** A drill must keep failure
+output before it discards the store that produced it; the script now writes each bootstrap's full
+output to a file and prints the tail on a non-zero exit.
+
+**Finding 3 — two assertions could not fail.** `agy`'s marker check tested whether
+`~/.gemini/settings.json` *existed*, but `bootstrap-auth` legitimately rewrites that file
+(`images/bootstrap-auth.sh:225`), so contamination surviving and normal operation were
+indistinguishable. It now tests for the marker **key**. And because `codex` and `agy` never
+authenticated in attempt 1, their pre-recovery sessions shipped zero lines, making "0 before, 0
+after" a vacuous no-duplication result.
+
+#### Attempt 2 — the drill of record
+
+| Step | Result |
+|---|---|
+| 1 — pod up from the pinned digests | mediator, three agents and three recorders `running` |
+| 2 — authenticate all three (`apikey`) | **exit 0** for all three. `claude`/`codex`: *credential supplied by environment*; `agy`: *already selects modelProvider=gemini*, then ready |
+| 3 — pre-recovery sessions | shipped for all three, and the evidence prefixes captured: audit **107938 B**, action-audit **148702 / 238232 / 4529 B** |
+| 4 — contaminate (criterion 3) | all five stores planted; `claude` is the contaminated agent |
+| 5.1a — `down`, no `-v` | done |
+| 5.1b — `docker volume rm` the three state volumes | removed by name |
+| 5.1c — preserve rows | `audit` and the three action-audit volumes all still present |
+| 5.1d — **rotate `claude`'s identity, `--force`** | `issued: …/clients/claude-client.crt (subject /CN=claude, clientAuth, no SAN, 365d)`. **CA sha256 unchanged: YES. Client certificate changed: YES** |
+| 5.1e — `up --build --force-recreate` | pod back |
+| 6 — re-bootstrap all three | **exit 0** for all three |
+| 9 — the rotated identity works | `claude` reached `api.anthropic.com` through the mediator presenting the **new** client certificate: **HTTP 404** on `GET /`, which is a pass — the CONNECT was allowed, TLS reached the real origin, and the origin answered. Edge Case 6's claim, that a reissued certificate under the same CA is accepted, holds for the `client` case |
+| 10 — image IDs | the same five IDs before and after. T41 rebuilds by design, and the rebuild was **reproducible** — 02.4's property, observed here incidentally. R8.5's no-rebuild rule is T26's, not this drill's |
+
+**`t0` 2026-09-30T14:54:01Z → recovery complete 14:54:28Z (27 s).** T41 carries no stated maximum —
+this is a duration, not a commitment measured against one.
+
+#### Per-store outcomes — the real pod
+
+| Store | Disposition | Outcome |
+|---|---|---|
+| `claude-state` | `discard` | marker **gone** |
+| `codex-state` | `discard` | `config.toml` re-seeded; the planted `[mcp_servers.t41drill]` table **gone** |
+| `agy-state` | `discard` | the `t41DrillMarker` **key gone**. `settings.json` itself is back, written by `bootstrap-auth` — asserted on the key, per Finding 3 |
+| `audit` | `preserve` | first **107938 B byte-identical** |
+| `claude-action-audit`, `codex-action-audit`, `agy-action-audit` | `preserve` | first **148702 / 238232 / 4529 B byte-identical** |
+| project mount (`workspace/`) | `review` | marker **survived** — reviewed, never discarded (Edge Case 12) |
+| `mediator/identity/` | `rotate` | `claude`'s client certificate **reissued**; **CA untouched**, sha256 unchanged across the whole drill |
+| `compose/generated/` | `rotate` | no pack credential was staged under the `default` profile, so there was nothing to rotate. SF-5 covers P1/P2 |
+
+#### The recorder across the discard
+
+Counted naively the figures look wrong, and the reason is worth recording because it would mislead
+the next reader of this sink too.
+
+**The action-audit volumes are `preserve` rows, and both drill attempts reused the same session
+ids.** So a count of "lines for session `d1d1d1d1`" spans *both* attempts. Read with timestamps, one
+line per attempt:
+
+```
+claude   d1d1d1d1  14:51:21 (attempt 1)   14:53:52 (attempt 2)
+claude   e9e9e9e9  14:51:46 (attempt 1)   14:54:19 (attempt 2)
+codex    eaeaeaea  14:51:47 (attempt 1)   14:54:19 (attempt 2)
+codex    d2d2d2d2                         14:53:52 (attempt 2 only — attempt 1's bootstrap failed)
+```
+
+**Exactly once per attempt**, for every session. A future drill should use a fresh session id per
+run, or window the count by timestamp.
+
+| Asserted | Result |
+|---|---|
+| the recorder does not re-ship its pre-recovery session | yes — each session's line count is unchanged across the recovery |
+| the recorder records after recovery | yes — `claude` and `codex` shipped a post-recovery session at 14:54:19, after `t0` at 14:54:01 |
+
+**A measured property of the recorder, and the reason no-duplication holds.** `recorder.sh:34` keeps
+its per-source state in `/var/log/actions/.state` — on the **sink** volume, which is a `preserve`
+row. The state therefore survives the state-volume discard, which is precisely what stops a
+re-scan from doubling the sink. It is not luck; it is where the state lives.
+
+Its corollary caught this drill out. In `snapshot` mode (`agy`) the state is the file's sha256, so
+re-writing the **same content to the same path** after a discard ships **nothing** — correct
+de-duplication, and it meant `agy`'s post-recovery recording was not demonstrated by attempt 2's
+repeated payload. Closed separately with a unique payload:
+
+```
+{"ts":"2026-09-30T14:56:07.833Z","session_id":"ecececec-…","sha":"9b1058242797"}
+```
+
+One line, exactly once. `agy` records on the fresh volume.
+
+#### After the drill
+
+The pod was brought **down without `-v`**, so the rebuilt state volumes and every evidence volume
+remain. `claude` is on a **new client certificate**; anything holding the previous one will be
+refused. The agents are authenticated in the `apikey` cell from `references/.env_keys`, not in their
+default `oauth-interactive` cell — a subsequent OAuth login is a normal `bootstrap-auth` run and is
+not part of this drill's state.
 
 ---
 
@@ -585,7 +713,7 @@ Every numbered acceptance criterion maps to a harness phase, a drill, or a recor
 |---|---|---|---|
 | 1 — T26 tested revocation, every persisted type | Drills E1–E4, V1–V3, S1–S5 | This record, § T26 (SF-5, SF-6); inventory Table B | pending |
 | 2 — T40 single-agent isolation | Phase B (both forms); MCP-disable exercise; amendment text | Phase B (SF-3); this record § T40, § Proposed edits 2 | **measured (SF-3 + SF-4)** — both isolation forms, the MCP-disable exercise and the amendment text. Acceptance of the amendment is the operator's, and R13.2 stays formally unmet until then |
-| 3 — T41 return to known-good | Phase E (mechanical); full drill; per-store outcomes | Phase E (SF-4); this record § T41 | **mechanical path measured (SF-4)**, every disposition asserted; **full drill pending the operator** |
+| 3 — T41 return to known-good | Phase E (mechanical); full drill; per-store outcomes | Phase E (SF-4); this record § T41 | **measured (SF-4)** — phase E, and the full drill performed 2026-09-30 against the real pod and the `main` pins, after one failed attempt recorded as three findings |
 | 4 — R12.5 teardown | Phase D | Phase D (SF-3); this record § R12.5 | **measured (SF-3)** |
 | (Decision 3) — the pod-wide cut keeps the detection signal | Phase C | Phase C (SF-3); this record § The pod-wide cut | **measured (SF-3)** |
 | 5 — T37 authorization gate | Phase F, compile negatives and runtime checks | Phase F (SF-2); this record § T37 | pending |

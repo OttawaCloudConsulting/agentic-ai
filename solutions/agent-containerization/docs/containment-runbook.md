@@ -266,8 +266,8 @@ moved to fit.
 | S1 | `claude` mTLS client certificate + key | `bash scripts/issue-identity.sh ca --force`, reissue the three listener certificates and the client certificate, restart the mediator, restart `claude` and `agy` so they take the new CA certificate | **10:00** |
 | S2 | `github-token` fine-grained PAT | `https://github.com/settings/personal-access-tokens` → revoke. Rotation is a Compose secret-file swap plus `--force-recreate` | **15:00** |
 | S3 | `kubeconfig` context credential | Delete the ServiceAccount token / client certificate at the cluster. Rotation as S2 | **30:00** |
-| S4 | `codex` proxy credential (`codex-proxy-credential`) | `bash scripts/issue-identity.sh credential codex`, then `docker compose restart egress-mediator` (Edge Case 5) | **10:00** |
-| S5 | `agy` proxy credential (`agy-proxy-credential`) | As S4, for `agy` | **10:00** |
+| S4 | `codex` proxy credential (`codex-proxy-credential`) | `bash scripts/issue-identity.sh credential codex --force`, then `docker compose restart egress-mediator` (Edge Case 5). **`--force` is required** — the bare form refuses to overwrite an existing credential (`scripts/issue-identity.sh:72`); corrected 2026-09-30 from the script's own contract, and measured for the `client` case at SF-4. SF-5 measures this one | **10:00** |
+| S5 | `agy` proxy credential (`agy-proxy-credential`) | As S4, for `agy` — including `--force` | **10:00** |
 
 **Two clock rules that change what a row's number means:**
 
@@ -338,7 +338,21 @@ the harness** — that is the point: a volume cannot arrive without a stated rec
 | `claude-build-cache`, `codex-build-cache`, `agy-build-cache` | Named volume, agent-writable (`compose/overrides/build-cache.yaml`, opt-in) | `discard` | As the state volumes |
 | project mount (`workspace/`, or the profile's path) | Host bind | `review` | The operator reviews it with `git status` and `git diff` and removes untracked content. **It is never discarded by this path** |
 | `compose/generated/` | Host staging, `:ro` in the agents | `rotate` | Kept, but every pack credential staged there that the agent held is revoked and re-staged per § 3.4 |
-| `mediator/identity/` | Host | `rotate` | The contaminated agent's own client key (S1) or proxy credential (S4/S5) is re-issued. **The CA is untouched** — no agent ever held its private key |
+| `mediator/identity/` | Host | `rotate` | The contaminated agent's own client key (S1) or proxy credential (S4/S5) is re-issued. **The CA is untouched** — no agent ever held its private key. The commands are `bash scripts/issue-identity.sh client <agent> --force` and `bash scripts/issue-identity.sh credential <agent> --force`; **`--force` is required and its absence is a hard refusal**, measured at SF-4 — see the note below |
+
+> **`--force` is not optional, and its absence is silent about what it cost you.** Measured at
+> SF-4: `bash scripts/issue-identity.sh client claude` with an existing certificate exits non-zero
+> with `already exists. Re-issue it with: ... --force` and rotates **nothing**. Run mid-recovery,
+> in sequence with commands that do not fail, that refusal is easy to step past — and the pod comes
+> back up on the **same** identity material the contaminated agent held. Check it:
+>
+> ```bash
+> shasum -a 256 mediator/identity/clients/<agent>-client.crt   # before and after; it MUST change
+> shasum -a 256 mediator/identity/ca/mediator-ca.crt           # before and after; it MUST NOT
+> ```
+>
+> Rotate **before** the `up --build --force-recreate` in § 5.1, so the recreated container takes the
+> new material in the same step.
 
 **Why the project mount is reviewed and not discarded** (Edge Case 12). It is host content and the
 operator's own repository, and an agent can write there by design (R2.1). This path does not return

@@ -377,15 +377,16 @@ recompile, and the operator-heavy drills last.
   - Phase D: R12.5.
   - Measures Decision 3's live forms, including whether the mediator tolerates an agent-network
     detach. The runbook commands are corrected to what was measured.
-- [ ] **SF-4: T41 drill and the T40 MCP half.** *(partial, 2026-09-30 — the full drill is the only
-  open item; the sub-feature stays unchecked until it is recorded)*
-  - [x] Harness **phase E** covers T41's mechanical steps (contaminate, selective discard, rebuild,
+- [x] **SF-4: T41 drill and the T40 MCP half.**
+  - Harness **phase E** covers T41's mechanical steps (contaminate, selective discard, rebuild,
     assert dispositions) under the fixture topology with the harness's own project name.
-  - [ ] The **full drill** is performed once and recorded: identity rotation for the contaminated
+  - The **full drill** is performed once and recorded: identity rotation for the contaminated
     agent, re-bootstrap for all three agents, and the recorder resuming without duplicates.
-    *(operator-run; `GEMINI_API_KEY` confirmed available, so `agy` is not a named gap)*
-  - [x] The **MCP-disable exercise** runs against 02.3's `test-mcp.yaml` and records per Decision 4.
-  - [x] The R13.2 and T40 amendment text goes into the drills record.
+    *(run 2026-09-30 against the real pod and the `main` pins. Attempt 1 failed at the rotation and
+    is recorded as three findings; the runbook was corrected and the drill re-run, per the record's
+    own Method. `agy` is not a named gap.)*
+  - The **MCP-disable exercise** runs against 02.3's `test-mcp.yaml` and records per Decision 4.
+  - The R13.2 and T40 amendment text goes into the drills record.
 - [ ] **SF-5: T26 drills — pod-local and pack credentials (S1–S3, P1–P2).**
   - Drill each row per Contract 6, and measure `restart` versus `--force-recreate` (inode and
     replay).
@@ -401,6 +402,8 @@ recompile, and the operator-heavy drills last.
   - **Smallest in code and largest in operator wall-clock.** Some access-token replays have to wait
     hours.
 - [ ] **SF-7: T44 and close-out.**
+  - **Revoke the `CLAUDE_CODE_OAUTH_TOKEN` minted for this testing work** and record the date (E4's
+    standing obligation, made live 2026-09-30 — see Deviation 2's supersession note).
   - `third-party-assessments.md`:
     - R14.3 owner and triggers for all three routes;
     - the cadence;
@@ -788,6 +791,11 @@ Paths are relative to the solution root.
   one-year replay window in the inventory's blast-radius column is unchanged — it describes the
   credential type, not an outstanding instance. The feature's long-pole operator dependency list
   loses its one "do this now, ahead of the build" item.
+- **Partly superseded 2026-09-30.** A `CLAUDE_CODE_OAUTH_TOKEN` **is** now outstanding — the operator
+  minted one for this testing work, held in the git-ignored `references/.env_keys`. This does not
+  reopen Edge Case 1, whose premise was a *leaked* token, but it makes E4's standing obligation live:
+  **SF-7 revokes it and records the date.** See `docs/records/containment-drills.md` § Pre-drill
+  revocation, "Correction, 2026-09-30".
 
 ### Deviation 3: phase A is red in two parts, and it goes fully green at SF-7 rather than SF-6
 - **What changed:** `verify-containment.sh` phase A carries Interface Contract 8's R14.3 check
@@ -811,3 +819,22 @@ Paths are relative to the solution root.
   green (measured at SF-3: 140 passed, 4 failed, and all four are these expected reds; phases B, C, D
   and F are clean). SF-6 must not treat a still-red phase A as a failure, and SF-7 must write the
   R14.3 table in the shape the drills record now specifies.
+
+### Deviation 4: the T41 drill used the existing credentials and the `apikey` cell, not minted throwaways in the default cell
+- **What changed:** the full T41 drill re-bootstrapped all three agents from the keys already in
+  `references/.env_keys`, exercising the **`apikey`** cell for every agent — including `claude` and
+  `codex`, whose shipped default is `oauth-interactive`. No throwaway keys were minted for it.
+- **Originally planned:** criterion 1 and the plan's Dependencies say drills use "dedicated drill
+  credentials, never the operator's working credentials", and list "throwaway Anthropic, OpenAI and
+  Google API keys" plus fresh `claude` and `codex` OAuth logins among the operator actions.
+- **Why necessary:** the operator's decision, taken with the tradeoff stated. T41 **revokes
+  nothing** — it discards volumes and re-authenticates — so credential reuse alters no credential's
+  lifetime and the exposure is bounded to a pod that was torn down at the end. Minting three
+  throwaway keys and driving two interactive logins would have gated the drill on console work for
+  no change in what T41 measures.
+- **Impact:** two limits on what this drill evidences, both recorded in
+  `docs/records/containment-drills.md`. The `oauth-interactive` re-bootstrap path is **not**
+  exercised by it — only `apikey` is — so criterion 3's "each agent re-bootstraps authentication" is
+  met in the `apikey` cell alone. And the departure does **not** extend to SF-5 and SF-6: those
+  drills revoke, so the throwaway rule is load-bearing there and the plan's dependency list stands
+  unchanged for them.

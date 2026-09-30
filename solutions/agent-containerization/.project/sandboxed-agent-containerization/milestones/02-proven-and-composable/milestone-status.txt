@@ -290,7 +290,7 @@
 
 [~] Feature 02.5: Containment, response and the authorization gate
     Plan: .project/sandboxed-agent-containerization/milestones/02-proven-and-composable/plans/containment-response-and-the-authorization-gate.md
-    Sub-features: 3/7 complete
+    Sub-features: 4/7 complete
     Notes: Started 2026-09-29. SF-1 complete 2026-09-29 (documentation only, 3 files).
     SF-2 complete 2026-09-29 (T37 enforced at compile). Operator supplied both waive
     reasons (github/git-push, kubernetes/infrastructure-apply) and chose the vocabulary
@@ -369,3 +369,34 @@
     confirmed a GEMINI_API_KEY IS available, so agy is NOT a named gap this time (unlike
     02.2 SF-4). No deviation recorded for SF-4. Codebase-assessment refresh SKIPPED again
     (no codebase-assessment.md; documented edge case). Composite NOT re-run (D-08).
+    SF-4 COMPLETE 2026-09-30. Full T41 drill run against the REAL pod (sandboxed-agent-pod)
+    on explicit operator authorisation, from the main pins in compose/pins.env; the three
+    state volumes and their credentials were destroyed as part of it. ATTEMPT 1 FAILED and is
+    recorded as three findings rather than annotated away, per the drill record's own Method:
+    (1) `issue-identity.sh client claude` REFUSES without --force, so the rotation silently did
+    not happen and the pod came back on the contaminated agent's own identity material --
+    runbook 5.2 and the S4/S5 rows in section 4 corrected, plus a check-the-sha note; SF-5 must
+    use `credential <agent> --force`, only the client case is measured. (2) The drill grepped
+    bootstrap output and kept nothing, so codex's exit 3 and agy's exit 2 on the pre-existing
+    state volumes are UNRECONSTRUCTABLE -- those volumes were destroyed minutes later. (3) Two
+    assertions could not fail (agy's marker tested file existence, but bootstrap-auth rewrites
+    that file; and codex/agy's vacuous 0-before-0-after no-duplication result). ATTEMPT 2 clean:
+    all three authenticated (apikey), rotation confirmed (client cert changed, CA sha256
+    unchanged), every disposition asserted, audit prefix 107938B and action-audit prefixes
+    148702/238232/4529B byte-identical, workspace marker survived, t0 14:54:01Z to recovery
+    14:54:28Z (27s; T41 has no stated maximum). Rotated cert verified working: claude reached
+    api.anthropic.com through the mediator, HTTP 404 on GET / (CONNECT allowed, real origin
+    answered) -- Edge Case 6 holds for the client case. Image IDs identical before and after,
+    so the T41 rebuild was reproducible (02.4's property, observed incidentally). RECORDER
+    NOTE: the action-audit volumes are preserve rows and both attempts reused the same session
+    ids, so naive counts read as 2; timestamps show exactly one line per attempt. recorder.sh:34
+    keeps per-source state in /var/log/actions/.state ON THE SINK VOLUME, which is why
+    no-duplication holds across a state-volume discard; its corollary is that agy's snapshot mode
+    ships nothing for identical content at an identical path, so agy's post-recovery recording
+    was closed separately with a unique payload (1 line, exactly once). Deviation 4 recorded:
+    the drill used references/.env_keys and the apikey cell, not minted throwaways in the default
+    oauth-interactive cell -- operator decision, bounded because T41 revokes nothing, and it does
+    NOT extend to SF-5/SF-6 which do revoke. E4 CORRECTION: a CLAUDE_CODE_OAUTH_TOKEN IS
+    outstanding (minted by the operator for this testing work, in the git-ignored .env_keys).
+    Edge Case 1 does not reopen -- its premise was a LEAKED token -- but E4's standing revocation
+    obligation is now live and SF-7 carries it. Composite NOT re-run (D-08).
