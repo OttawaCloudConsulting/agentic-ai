@@ -411,6 +411,10 @@ recompile, and the operator-heavy drills last.
   - **Smallest in code and largest in operator wall-clock.** Some access-token replays have to wait
     hours.
 - [ ] **SF-7: T44 and close-out.**
+  - **Write the six MUST-REACH-USER-DOCUMENTATION items (D-1 to D-6) into `README.md` and the
+    runbook.** Operator-directed at SF-6; the table with destinations and sources is in
+    `docs/records/containment-drills.md`. **Close-out is not complete while any of the six is only
+    in a drills record**, and the criterion-to-evidence table must name each one.
   - **Revoke the `CLAUDE_CODE_OAUTH_TOKEN` minted for this testing work** and record the date (E4's
     standing obligation, made live 2026-09-30 — see Deviation 2's supersession note).
   - `third-party-assessments.md`:
@@ -698,6 +702,23 @@ re-approval.
   - a short "Containment and response" section linking to the runbook;
   - the revocation section pointed at the inventory's measured maxima;
   - the credential-rotation form corrected.
+- **MUST REACH USER DOCUMENTATION — six items added at SF-6 (2026-09-30), operator-directed.**
+  `docs/records/containment-drills.md` § "MUST REACH USER DOCUMENTATION" carries the table (**D-1**
+  to **D-6**) with each item's destination and source. These are **not** drill trivia: each is an
+  operator-facing consequence that would otherwise be discoverable only by reading a drills record.
+  **SF-7 is not complete until every one is written into `README.md` and/or the runbook**, and the
+  criterion-to-evidence table names them. In outline:
+  - **D-1** provider revocation does **not** contain a `codex` session — both token halves survive,
+    so the pod-side isolate-and-discard ordering is load-bearing for V2, not defence in depth;
+  - **D-2** the asymmetry between V1 and V2 — an operator must not generalise across providers;
+  - **D-3** a `codex` agent that has run once will not restart until its self-provisioned
+    `~/.codex/skills/.system` is cleared (or the inventory declares it, a rebuild and repin);
+  - **D-4** a stray `compose run` one-off blocks every volume discard, and `compose down` does not
+    clear one-offs — an interactive login leaves exactly such a container;
+  - **D-5** "revoked" is not a state to assume: `t1` is a replay that fails, and V2 is the worked
+    example of a console action reporting success over a credential that kept working;
+  - **D-6** the credential-handling rule for reproducing these drills — never print a credential
+    file's contents while inspecting its structure.
 - **Not edited here:** `docs/ARCHITECTURE_AND_DESIGN.md` (its runbook table),
   `REQUIREMENTS.md` (R13.2/T40), `prd.md`. They are carried as proposed edits, as 02.3 and 02.4 do.
 

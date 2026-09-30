@@ -520,7 +520,55 @@
     /design refresh pass is worth running when 02.5 closes. V1 revocation granularity,
     operator-reported: SINGLE SESSION, not account-wide, so Edge Case 3 does not bite for V1 either
     and R4.17 stays unengaged; two of two provider rows drilled so far offered per-credential
-    revocation. (3) method: the bearer probe that is authoritative for E4 is NOT
+    revocation.
+    V2 PARTIAL 2026-09-30 -- the row's TIMED measurement is still OUTSTANDING (no t0 was declared and
+    no containment clock was run), but its SUBSTANTIVE question is measured and it is the opposite of
+    V1: EDGE CASE 2 IS CONFIRMED FOR V2. After the operator revoked the session in the ChatGPT UI,
+    the preserved credential still worked from inside the pod -- the full credential completed a
+    model call (fresh session, 14-line rollout) and, with the access_token EMPTIED, the refresh_token
+    minted a working token and wrote its OWN new session. Nearly missed: that run emitted 401s on the
+    websocket endpoint and a trailing OK whose token count matched the previous run, which looked
+    like stale output; the session FILES settle it. Evidence of success for codex is a new session
+    file, not the presence of an OK. The access token's JWT gives iat/exp exactly 10.0 days
+    (exp 2026-10-10T21:09:25Z, aud api.openai.com/v1), confirming the inventory's claim to the
+    second. CONSEQUENCE, and it is NOT symmetric with V1: for V1 the isolate-and-discard-before-
+    revoking ordering was defence in depth against a survival that did not occur; for V2 it is
+    LOAD-BEARING, because provider revocation contained nothing, and because the REFRESH token
+    survives the exposure is not bounded by the access token's ten days.
+    METHOD FINDING against my own conduct, recorded rather than quietly fixed: while listing
+    auth.json's FIELD NAMES I used a sed that emitted each key WITH ITS VALUE, printing the session's
+    access_token, id_token and refresh_token in full into the session transcript along with the
+    account id, plan type and the profile email and name. Nothing reached disk in the repository and
+    the preserved copy was mode 0600 outside it; the transcript is the exposure. Same class of
+    failure this feature keeps finding in the pod: a check that looks like it inspects names but
+    actually handles values. Safe form: grep -o on key names, wc -c, sha256 prefix -- never a
+    substitution that echoes the matched text. Remediation attempted and its outcome are the same
+    measurement read twice: the operator revoked immediately, and the replays then proved the
+    revocation ineffective. RESIDUAL ACCEPTED BY THE OPERATOR 2026-09-30: the exposed set stays valid
+    (access token to 2026-10-10, refresh token until something invalidates it); account-wide logout
+    and a password change were offered and DECLINED, no further action taken, local copy deleted.
+    R4.17 is engaged in a way no drill planned -- the per-credential revocation this account offers
+    does not in fact revoke.
+    THIRD FINDING, unrelated to credentials and blocking the replay: codex v0.152.1 PROVISIONS ITS
+    OWN bundled system skills into the state volume on first run (~/.codex/skills/.system with
+    imagegen, openai-docs, plugin-creator, review-agent and a marker, written by the agent three
+    minutes after auth.json, not by the login), and every shipped profile inventories skills: [], so
+    mcp-gate REFUSES the agent at start, exit 3, before the CLI runs. A codex container that has
+    completed one run CANNOT START AGAIN until an operator clears that directory (helper container on
+    the agent's own image, runbook 3.3 -- SF-4 already established the fix cannot be applied from
+    inside the agent) or the inventory declares the skills (a rebuild and repin, 02.3 Decision 8).
+    Affects T41's 'each agent re-bootstraps authentication' on any codex re-bootstrap after real use.
+    NOT fixed here: it is a 02.3 surface and SF-6 has already taken two deviations into image code.
+    OPERATOR-DIRECTED 2026-09-30: document the findings and MARK THEM FOR FINAL USER DOCUMENTATION.
+    Done -- docs/records/containment-drills.md now carries a 'MUST REACH USER DOCUMENTATION' table
+    (D-1 to D-6, each with destination and source), the plan's Documentation section summarises all
+    six, and the SF-7 bullet gates close-out on writing them into README.md and the runbook. The six:
+    D-1 provider revocation does not contain a codex session; D-2 the V1/V2 asymmetry, do not
+    generalise across providers; D-3 a codex agent that has run once will not restart; D-4 a stray
+    one-off container blocks every volume discard and compose down does not clear one-offs; D-5
+    'revoked' is not a state to assume, t1 is a replay that fails; D-6 never print a credential
+    file's contents while inspecting its structure.
+ (3) method: the bearer probe that is authoritative for E4 is NOT
     authoritative for a session token, and its 401 should not have stood beside the CLI failure.
     A-vs-B resolved: a fresh login authenticated and the CLI answered OK, so attempt 1's death was
     probe-induced (leading explanation: a refresh race between concurrent compose run containers

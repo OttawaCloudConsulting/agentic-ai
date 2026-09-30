@@ -740,6 +740,111 @@ part of the isolation could stop traffic that was not flowing. The containment t
 contains, for this shape, is the state-volume discard; T40's disconnect form is measured properly in
 harness phase B, where the agents are given a long-running command for that purpose.
 
+### V2 — the survival half measured, the timed row still outstanding
+
+**What this attempt did and did not produce.** No `t0` was declared and no containment clock was
+run, so **V2's timed row remains undrilled**. What it did produce is the row's *substantive*
+question, measured: whether a revoked `codex` session's tokens keep working. They do — **both
+halves** — which is the opposite of V1's result and the confirmation Edge Case 2 was written for.
+
+#### FINDING (confirmed) — a revoked `codex` session's access **and** refresh tokens both keep working
+
+The operator revoked the session in the ChatGPT UI. Afterwards, from inside the pod, with the
+preserved `auth.json` restored and nothing else changed:
+
+| Replay | Time (UTC) | Result |
+|---|---|---|
+| full credential, real consumer (`codex exec`) | **21:19:36** | **succeeded** — fresh session `01a0f42f-…`, 14-line rollout, model answered |
+| `access_token` **emptied**, `refresh_token` kept, forcing a refresh | **21:20:06** | **succeeded** — its own new session `01a0f430-…`, 14 lines. The refresh token minted a working token *after* revocation |
+| preserved `access_token` direct to its own audience (`api.openai.com/v1/models`) | 21:20:34 | **403**, where an unauthenticated request to the same endpoint returns **401** — the identity is still recognised, and merely unentitled for that endpoint |
+
+The second row is the one that matters and it was nearly missed: that run emitted 401s on
+`wss://chatgpt.com/backend-api/codex/responses` and a trailing `OK` whose token count (1,838) was
+*identical* to the previous run, which looked like stale output. The session files settle it — it
+wrote **its own** rollout, 14 lines, at 21:20:10. The 401s were a transport fallback, not a failure.
+**Evidence of success here is a new session file, not the presence of an `OK`.**
+
+**The access token's own lifetime, read from its JWT rather than from a vendor claim:**
+`iat 2026-09-30T21:09:25Z`, `exp 2026-10-10T21:09:25Z` — **exactly 10.0 days**,
+`aud ["https://api.openai.com/v1"]`, `iss https://auth.openai.com`. The inventory's "10-day access
+token" is confirmed to the second.
+
+**Consequence, and it is not symmetric with V1.** For V1 the isolate-and-discard-before-revoking
+ordering turned out to be defence in depth against a survival that did not occur. **For V2 it is
+load-bearing:** provider-side revocation did not contain this credential at all, so the *only*
+containment that worked is the pod-side one — isolate the agent and discard its volume at `t0`.
+And because the **refresh token** survives, the exposure is **not** bounded by the access token's
+ten days; it is bounded by whatever actually invalidates the refresh token, which per-device
+revocation in the ChatGPT UI demonstrably did not.
+
+#### FINDING (method, against this drill's own conduct) — a credential value was printed
+
+While listing `auth.json`'s **field names**, the drill used a `sed` that emitted each key *with its
+value*, printing the session's `access_token`, `id_token` and `refresh_token` in full into the
+session transcript, along with the account id, plan type and the profile e-mail and name carried in
+the `id_token`. This record's own rule — *no credential value ever enters this record* — held for
+the record itself: nothing was written to disk in the repository, and the preserved copy lived at
+mode 0600 outside the repository. The transcript is the exposure.
+
+It is recorded here rather than quietly fixed because it is the same class of failure this feature
+keeps finding in the pod: **a check that looks like it inspects names but actually handles values.**
+The safe form for this purpose is `grep -o` on the key names, or a byte count and a sha256 prefix —
+never a substitution that echoes the matched text.
+
+**Remediation attempted, and its measured outcome.** The operator revoked the session immediately in
+the ChatGPT UI. The replays above then established that **the revocation did not invalidate either
+half** — which is why this incident and the V2 finding are the same measurement read two ways: the
+mitigation for the leak was the very action the row proves ineffective. **Residual, accepted by the
+operator (2026-09-30):** the exposed credential set remains valid — the access token until
+2026-10-10T21:09:25Z, the refresh token until something invalidates it. Account-wide logout and a
+password change were offered as stronger measures and **declined**; no further action was taken.
+The preserved local copy was deleted. R4.17 is engaged here in a way no drill planned: the
+per-credential revocation this account offers does not, in fact, revoke.
+
+#### FINDING — a `codex` agent that has run once cannot start again
+
+Unrelated to credentials, found while completing the replay, and blocking it. `codex` v0.152.1
+**provisions its own bundled system skills** into the state volume on first run —
+`~/.codex/skills/.system/` holding `imagegen`, `openai-docs`, `plugin-creator`, `review-agent` and a
+`.codex-system-skills.marker`, written at 21:18:24, three minutes *after* `auth.json` and by the
+agent itself rather than by the login. Every shipped profile inventories `skills: []` (02.3
+Decision 8), so `images/mcp-gate.js` then refuses the agent at start:
+
+```
+mcp-gate: REFUSED uninventoried server 'codex-system-skills' in /home/agent/.codex/skills/.system (R7.14, T29)
+```
+
+**exit 3, before the agent CLI runs.** The refusal is correct — the gate is doing exactly its job,
+on content the agent wrote to its own state volume. The consequence is that **a `codex` container
+that has completed one run cannot be started again** until an operator removes that directory or the
+inventory declares those skills. Two existing conclusions are affected:
+
+- **T41's "each agent re-bootstraps authentication"** (criterion 3) meets this on any `codex`
+  re-bootstrap that follows real use, and SF-4's MCP-disable finding already established that the
+  fix cannot be applied from inside the agent — `run_mcp_gate` precedes `exec "$@"`, so a refused
+  agent exits before any edit can run. The working form is a helper container on that agent's **own**
+  image, mounting the state volume (runbook § 3.3).
+- **02.3 Decision 8's image-baked inventory** is what makes this an operator action rather than a
+  configuration change: declaring the skills requires a rebuild and a repin.
+
+Not fixed here — it is a 02.3 surface, and SF-6 is a drills sub-feature that has already taken two
+deviations into image code. Recorded for the operator's decision.
+
+### MUST REACH USER DOCUMENTATION (carried to SF-7)
+
+Operator-facing consequences that a reader of `README.md` and the runbook must not have to find in a
+drills record. **SF-7's close-out is not complete until each is written into user-facing
+documentation.**
+
+| # | What must be documented | Where it belongs | Source |
+|---|---|---|---|
+| **D-1** | **Provider revocation does not contain a `codex` session.** Both token halves keep working after per-device revocation in the ChatGPT UI; the refresh token keeps minting new access tokens, so the window is not the access token's 10 days. **Containment is pod-side: isolate the agent and discard its state volume at `t0`, before revoking** — and for this row that ordering is load-bearing, not defence in depth | `README.md` containment section **and** runbook § 3.4 / § 4 (V2/V3 rows) | V2 finding above |
+| **D-2** | **The asymmetry between rows.** V1's access token died on revocation; V2's did not. An operator must not generalise from one provider to another, and the per-row evidence rule already in runbook § 4 is the reason each row is replayed rather than assumed | runbook § 4 | V1 + V2 |
+| **D-3** | **A `codex` agent that has run once will not restart** until its self-provisioned `~/.codex/skills/.system` is removed by a helper container on its own image, or the profile's MCP inventory declares those skills (a rebuild and repin, 02.3 Decision 8). Include the exact refusal text so the message is searchable | `README.md` MCP-inventory section **and** runbook § 3.3 | codex-skills finding above |
+| **D-4** | **A stray `compose run` one-off container blocks every volume discard**, `compose down` does not clear one-offs, and an interactive login leaves exactly such a container behind. Include the clearing command | runbook § 5 (already in § 3.4; must also reach the README's recovery text) | V1 drill |
+| **D-5** | **"Revoked" is not a state you may assume.** `t1` is a replay that fails. V2 is the worked example: a console action reported success while the credential kept working. User documentation must tell an operator to replay after revoking | `README.md` containment section | V2 finding |
+| **D-6** | **The credential-handling rule for anyone reproducing these drills:** never print a credential file's contents while inspecting its structure — key names via `grep -o`, size via `wc -c`, identity via a sha256 prefix | `docs/records/containment-drills.md` method preamble **and** the README's drill-reproduction note | method finding above |
+
 ### Access-token survival findings (Edge Case 2)
 
 Where a revoked session's access token stays valid until its own expiry, **that survival is the
