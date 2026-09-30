@@ -524,6 +524,83 @@ inner 401. **No provider-credential revocation is confirmable from the pod's own
 E rows, V rows and S2 alike. The runbook's § 4 evidence rule already says this for S2/S3; it applies
 unchanged to every E and V row.
 
+### V1 — first attempt, abandoned before the clock, and the three findings it produced
+
+**No `t0` was declared, so nothing here is a mis-measurement** — the baseline never held, and under
+this record's own Method a drill whose baseline is wrong measures nothing. What the attempt did
+produce is three findings about the pod, two of them defects.
+
+**Sequence, from the mediator's trail and the volume itself:**
+
+| Time (UTC) | Event |
+|---|---|
+| 20:30:11 | the operator's interactive login **completes** — `platform.claude.com` and `api.anthropic.com` both `allow`, **no deny anywhere**. The boundary is not involved in anything below |
+| 20:32:39 | the credential file reads **509 B**, `expiresAt` **2026-10-01T04:29:59Z**, `refreshTokenExpiresAt` **2026-10-28T03:45:20Z** |
+| 20:35:24 | baseline probes run; the CLI reports `Failed to authenticate: OAuth session expired and could not be refreshed` |
+| 20:36 | the on-volume file is **281 B**, with `accessToken` and `refreshToken` as **empty strings** and `expiresAt` **0** |
+
+#### FINDING 1 (defect) — the agent's own failure path destroys the credential evidence
+
+On a refused refresh the CLI **cleared the token fields in place**: 509 B → 281 B,
+`{"claudeAiOauth":{"accessToken":"","refreshToken":"","expiresAt":0,…}}`. No operator action and no
+mediator deny took part.
+
+**Consequence for T26 and T41, and it inverts an ordering:** the credential a revocation drill has to
+replay can be destroyed by the agent before the drill replays it. This attempt's material survived
+only because it was **preserved first** — 509 B copied to host scratch before any probe ran. "Preserve
+before you probe" is therefore a procedural requirement of these rows, not prudence, and it is now
+stated in the runbook. It is also a second, independent illustration of Decision 5's point: a copy of
+the volume may already have left, so discarding is not revoking.
+
+#### FINDING 2 (defect) — `bootstrap-auth` declares that emptied credential *authenticated*
+
+`images/bootstrap-auth.sh:191`, the `claude` branch of `already_authenticated`:
+
+```bash
+[ -s "$CLAUDE_CONFIG_DIR/.credentials.json" ] || [ -s "$HOME/.claude.json" ]
+```
+
+It tests **non-emptiness of the file**, not the shape of its contents. The wiped file is 281 B, so
+`-s` passes and a re-login is skipped:
+
+```
+bootstrap-auth: (claude, oauth-interactive) already authenticated -- no-op
+```
+
+`~/.claude.json` was **absent**, so the `-s` on `.credentials.json` was the sole cause.
+
+**The check that would have caught it is eleven lines below, in the `codex` branch, with a comment
+describing this exact failure** — `[ -s … ] && grep -q '"refresh_token"' …`, annotated *"SHAPE, not
+just presence (edge case 11): a bootstrap interrupted mid-copy … must not read as authenticated"*.
+The `claude` branch never received the equivalent.
+
+**Finding 1 and Finding 2 compose into a trap:** a refused refresh empties the credential, and the
+bootstrap then refuses to re-mint it, so the agent is **unrecoverable without an operator discarding
+the state volume**. That also makes T41's *"each agent re-bootstraps authentication"* step
+conditional on the credential not having been emptied first — a Milestone 02 criterion resting on a
+presence test. The fix is one line mirroring the `codex` branch; it touches an image and therefore a
+rebuild, so it is recorded here for the operator's decision rather than applied inside a drills
+sub-feature.
+
+#### FINDING 3 (method, against this drill) — the cheap probe was the wrong authority for this row
+
+The attempt also ran the access token as a plain bearer against `api.anthropic.com/v1/models`, the
+probe that worked for **E4**, and it returned 401. That proves nothing: a Claude Code *session*
+access token (scopes `user:inference`, `user:profile`, …) is not necessarily accepted at that
+endpoint, so its 401 is consistent with a perfectly live session. Standing it next to the CLI's
+failure, as though both said the same thing, was a method error. **For V1 the CLI is the authority**,
+and the record says so before the measured attempt rather than after.
+
+#### What remains undetermined, and is not being guessed
+
+Whether the session was already dead at 20:32 despite its future expiry — which would mean the E4
+revocation reached **more than the single grant** it appeared to, and would require correcting E4's
+"Edge Case 3 does not bite" conclusion — or whether it was live and the probe sequence triggered a
+refresh the provider legitimately refused. The state volume has been discarded (its runbook
+disposition, and V1's own containment step) and the drill is being re-run with the CLI alone as the
+first and only probe. **E4's conclusion stands as recorded until that re-run says otherwise**, and it
+is flagged here so a reader does not find the two records silently inconsistent.
+
 ### Access-token survival findings (Edge Case 2)
 
 Where a revoked session's access token stays valid until its own expiry, **that survival is the
