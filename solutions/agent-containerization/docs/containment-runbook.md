@@ -306,6 +306,27 @@ moved to fit.
   Confirm from the replay's own HTTP status, run from inside the agent (S2) or from the host (S3,
   whose credential has no route from the pod at all — the shipped `kubernetes` pack declares
   `egress.runtime: []`). Measured at 02.5 SF-5: **S2 02:21, HTTP 401; S3 00:11, HTTP 401.**
+- **Clear stray one-off containers before any volume discard, or the discard fails.** `docker volume
+  rm` refuses while **any** container references the volume, including an exited one, and
+  `compose down` does **not** remove one-off `compose run` containers — they carry
+  `com.docker.compose.oneoff=True` and `stop`/`start`/`down` ignore them (SF-3's finding). An
+  interactive login is performed in exactly such a container, so the one left behind by
+  authenticating is the one most likely to block you. The failure names only a hex container ID.
+  Clear them first:
+
+  ```bash
+  docker ps -aq --filter label=com.docker.compose.project=<project> \
+                --filter label=com.docker.compose.oneoff=True | xargs -r docker rm -f
+  ```
+
+  Measured at 02.5 SF-6: this voided a containment clock, which was re-run per Edge Case 18.
+- **For an agent whose command exits, the disconnect is degenerate and the discard is the
+  containment.** The shipped `default` command prints a version and exits, so there may be no
+  running process to isolate: the disconnect succeeds against an exited container and reports
+  `endpoint … not found` if repeated, having already taken effect, and it stops no traffic because
+  none is flowing. Do not read a successful disconnect as containment in that state — the
+  state-volume discard is what contains. § 3.2's disconnect form matters for an agent that is
+  actually running, which is how `verify-containment.sh` phase B measures it.
 - **Expect a short survival window, and know which one you are in.** Measured at 02.5 SF-5:
   S4/S5 survive until the mediator restarts (Edge Case 5); S3 survived **~10 s** past the
   ServiceAccount delete, in the API server's authentication path, where no operator action shortens
@@ -315,7 +336,12 @@ moved to fit.
   the row's effective time is the **later of the two**. If the access token survives revocation until
   its own expiry, **that survival is the measured time** (Edge Case 2).
 - **The V rows' 10:00 is a containment clock, not a provider clock** (operator decision,
-  2026-09-29). It bounds the action that actually contains: **isolate the agent (§ 3.2, disconnect)
+  2026-09-29). **V1 measured 2026-09-30 (02.5 SF-6): contained in 00:07, and the provider became
+  effective inside 03:27 — and Edge Case 2's anticipated 8-hour access-token survival did NOT
+  occur.** The access token was refused 03:23 after `t0`, against its own stated expiry 7 h 53 m
+  later. The isolate-and-discard-first ordering below therefore stays as **defence in depth against
+  a survival that was not observed**, not as mitigation for a measured hole. V2/V3's 10-day JWT is a
+  separate question this row does not answer. It bounds the action that actually contains: **isolate the agent (§ 3.2, disconnect)
   and discard its volume at `t0`, *before* revoking.** The access token's survival past revocation
   (V1: 8 h; V2/V3: a 10-day JWT `codex` does not verify locally) is measured by SF-6 and recorded as
   a **named finding against R13.1** — it is not folded into this commitment, and the commitment is

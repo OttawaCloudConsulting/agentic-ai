@@ -482,6 +482,39 @@
     is confirmable from the pod's own audit trail. Runbook section 4's evidence rule already states
     this for S2/S3 and applies unchanged to every E and V row. Codebase-assessment refresh SKIPPED
     again (no codebase-assessment.md; documented edge case). Composite NOT re-run (D-08).
+    V1 drilled 2026-09-30 (attempt 2, serialized): contained in 00:07 against the row's 10:00
+    CONTAINMENT clock (isolate + discard at t0, before revoking), with the provider effective inside
+    03:27 -- and EDGE CASE 2'S PREMISE IS NOT REPRODUCED: the access token did NOT outlive
+    revocation to its own stated expiry (2026-10-01T04:42:20Z, 7h53m after t0); both halves were
+    refused 03:23/03:27 after t0 through the row's authoritative consumer, the CLI. Stated
+    limitation: the CLI's single message covers both halves and the bearer probe is not authoritative
+    for a session token, so what is measured with confidence is that the credential as a whole dies
+    well before the access token's expiry. The runbook's isolate-and-discard-first ordering therefore
+    stays as defence in depth rather than as mitigation for a measured hole. Expiries read from the
+    credential itself: access 8h, refresh 28 days via refreshTokenExpiresAt, corroborating 01.4's
+    inference. ATTEMPT 1 was abandoned BEFORE any t0 (so nothing was mis-measured) and produced three
+    findings, two of them defects now recorded for operator decision: (1) the claude CLI EMPTIES the
+    credential in place on a refused refresh, 509B -> 281B with both token fields empty -- observed
+    TWICE, the second time on a file the drill had just restored, so 'preserve before you probe' is
+    now a procedural requirement and is in the runbook; (2) bootstrap-auth.sh:191 tests -s on the
+    file rather than its SHAPE, so that emptied credential reports 'already authenticated' and
+    re-login is skipped -- the shape check that would catch it sits eleven lines below in the codex
+    branch with a comment describing this exact failure. Composed, the two leave the agent
+    unrecoverable without an operator discarding the state volume, which makes T41's 'each agent
+    re-bootstraps authentication' step rest on a presence test; the one-line fix touches an image and
+    therefore a rebuild, so it is OPEN for the operator: fix now as a recorded deviation, defer to
+    SF-7, or leave as a finding. (3) method: the bearer probe that is authoritative for E4 is NOT
+    authoritative for a session token, and its 401 should not have stood beside the CLI failure.
+    A-vs-B resolved: a fresh login authenticated and the CLI answered OK, so attempt 1's death was
+    probe-induced (leading explanation: a refresh race between concurrent compose run containers
+    sharing one state volume -- corroborated, since the serialized baseline left the credential
+    byte-identical) and NOT the E4 revocation reaching further than the single grant. E4's Edge Case 3
+    conclusion therefore STANDS. Two procedural gaps the clock exposed, both now in the runbook: a
+    stray one-off compose run container (the operator's own login container) holds the state volume
+    and makes the discard fail naming only a hex ID -- it VOIDED a containment clock, re-run per Edge
+    Case 18, and compose down does not clear one-offs (compounds SF-3's oneoff=True finding); and for
+    an agent whose command exits, the disconnect is degenerate (it succeeded on an exited container,
+    then reported 'endpoint not found' on repeat) so the discard is what contains.
     E4 drilled 2026-09-30: 04:39 against 15:00, no rebuild. This cell mints NOTHING in the pod
     (bootstrap-auth.sh:291 requires the token in the environment because setup-token's flow is
     interactive), so the operator minted a fresh one-year token on the host; the script asserts it

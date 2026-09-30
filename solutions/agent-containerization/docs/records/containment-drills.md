@@ -601,6 +601,98 @@ disposition, and V1's own containment step) and the drill is being re-run with t
 first and only probe. **E4's conclusion stands as recorded until that re-run says otherwise**, and it
 is flagged here so a reader does not find the two records silently inconsistent.
 
+### Drill V1 — `claude`'s OAuth refresh + access token on the state volume
+
+Attempt 2, run serialized after attempt 1's findings above. **One container touches the credential
+at a time**, because attempt 1's leading explanation is a refresh race between concurrent
+`compose run` containers sharing one state volume — corroborated here: the baseline CLI call left
+the credential **byte-identical** (`fa470907f6c4…` before and after), where attempt 1's overlapping
+containers left it emptied.
+
+- Drill credential: a fresh interactive login performed by the operator into the pod, on the
+  operator's own Anthropic account (this cell has no separate-account form). Preserved to host
+  scratch **before any probe**, per Finding 1. 509 B, sha256 `fa470907f6c4…`; no value recorded
+- Stated maximum: **10:00 — a containment clock, not a provider clock** (operator decision,
+  2026-09-29). It bounds isolate-and-discard, not the provider's effectiveness
+- Measured expiries, read from the credential itself rather than inferred: access token
+  **2026-10-01T04:42:20Z** (7 h 53 m out), refresh token **2026-10-28T02:59:43Z** (28 days).
+  01.4 measured the 28-day refresh lifetime by inference; the file now carries
+  `refreshTokenExpiresAt` explicitly, which corroborates it
+- t0 (incident declared, UTC): **2026-09-30T20:45:46Z**
+- Steps, in the order the runbook mandates for a V row — **contain first, then revoke**, because a
+  copy of the volume may already have left (Decision 5):
+  1. **isolate** — `docker network disconnect` the agent from its only network
+  2. **drain, then stop the recorder** (§ 3.2 ordering), 6 s
+  3. **discard** `claude-state` — `docker volume rm`
+  4. the operator revokes the OAuth session at the provider
+  5. **access-token replay** — the preserved credential restored **unchanged**, expiry still in the
+     future, so the CLI uses the access token without refreshing
+  6. **refresh-token replay** — restored with `expiresAt` forced to the past, so the refresh token
+     is the only way forward
+- **Contained at 20:45:53Z — 00:07.   Within the 10:00 containment clock: yes**
+- t1 (replays refused, UTC): **20:49:09Z** (access token) and **20:49:13Z** (refresh token) —
+  **03:23** and **03:27** from `t0`. Evidence, from the row's authoritative consumer:
+  `Failed to authenticate: OAuth session expired and could not be refreshed`, on both
+- Image IDs before / after: the five `default`-profile IDs, identical   Rebuild: **no**
+- Re-issue: not performed; the session stays revoked
+
+#### Edge Case 2's premise does NOT hold for V1 — the access token did not outlive revocation
+
+This is the row's substantive result, and it is the opposite of what the plan anticipated.
+
+Edge Case 2 and criterion 1 both provide for V1's **8-hour access token surviving revocation until
+its own expiry**, with that survival recorded as the measured time and a compensating action added
+to the runbook. **Measured: it did not survive.** The access token's own stated expiry was
+`2026-10-01T04:42:20Z`, 7 h 53 m after `t0`; it was already refused **03:23** after `t0`, on the
+first post-revocation replay. The token died on revocation, not on expiry.
+
+**The limitation of this measurement, stated rather than glossed.** The CLI reports one message for
+both halves (`OAuth session expired and could not be refreshed`), so through this consumer the two
+cannot be separated cleanly: the natural reading is that the access-token call was rejected, the CLI
+then attempted a refresh, and that was refused too. A raw-HTTP separation is not available for this
+row — the bearer probe that works for E4 is **not** authoritative for a session token (Finding 3),
+and it returned 401 both before *and* after revocation. What is measured with confidence: **the
+credential as a whole stops working within 03:23 of `t0`, and well before the access token's stated
+expiry.**
+
+**Consequence for the runbook:** the compensating action Edge Case 2 asks for — isolate and discard
+at `t0`, before revoking — stays in the runbook, and stays right. But it is now there as
+**defence-in-depth against a survival that was not observed**, rather than as mitigation for a
+measured 8-hour hole. The honest claim against R13.1 for V1 is the containment clock (**00:07**)
+plus the provider becoming effective inside **03:27**, and the plan's anticipated finding is
+recorded as **not reproduced**. V2/V3's 10-day JWT is a separate question and is not answered by
+this row.
+
+#### Finding 1 reproduced independently
+
+The refresh-replay failure wiped the credential a second time — 509 B → **281 B**, both token fields
+empty — from a file this drill had just restored. Two independent observations of the same
+destructive failure path, in one sub-feature, on a file that in the second case was *known-good
+before the call*. The preserved host copy is what made the second replay possible at all.
+
+#### Two procedural gaps the clock exposed, both now in the runbook
+
+**The discard fails while a stray one-off container holds the volume, and the message names only a
+hex ID.** Attempt 2's first clock was **voided** for exactly this (Edge Case 18: a clock that does
+not complete is re-run, not annotated): `docker volume rm` returned
+`volume is in use - [08efe4ad2025…]`. The holder was the operator's own **login container** — a
+`compose run` one-off, still running from the interactive login minutes earlier. This compounds
+SF-3's recorded finding that one-off containers carry `com.docker.compose.oneoff=True` and are
+ignored by `compose stop`/`start`/`down`: **`compose down` will not clear them, so the discard step
+must clear them explicitly.**
+
+```bash
+docker ps -aq --filter label=com.docker.compose.project=<project>               --filter label=com.docker.compose.oneoff=True | xargs -r docker rm -f
+```
+
+**For an agent whose command exits, isolation is degenerate and the discard is the containment.**
+The shipped `default` command prints a version and exits, so `claude` was `exited` when the
+containment ran. The disconnect succeeded on the exited container the first time and returned
+`endpoint sandboxed-agent-pod-claude-1 not found` on the re-run — it had already taken effect. No
+part of the isolation could stop traffic that was not flowing. The containment that actually
+contains, for this shape, is the state-volume discard; T40's disconnect form is measured properly in
+harness phase B, where the agents are given a long-running command for that purpose.
+
 ### Access-token survival findings (Edge Case 2)
 
 Where a revoked session's access token stays valid until its own expiry, **that survival is the
