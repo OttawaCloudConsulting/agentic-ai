@@ -242,7 +242,49 @@ only the mount's re-resolution was. The runbook keeps `--force-recreate`, the me
 
 ### Drill S3 — `kubeconfig` context credential
 
-*(pending — disposable `kind` cluster)*
+- Drill credential: a **disposable `kind` cluster** (`kind-sf5-drill`) created for this drill and
+  deleted after it. Inside it, a dedicated namespace `sf5-drill`, a ServiceAccount `drill-agent`,
+  and a `Role` granting only `get,list` on `pods` in that namespace. The kubeconfig holds one
+  context and **token auth only** (Decision 6: no `exec`/auth-provider plugin), sha256 prefix
+  `8cf3e8f21da6`; the token value is not recorded. Never the operator's `~/.kube/config`
+- Stated maximum: **30:00**
+- t0 (incident declared, UTC): **2026-09-30T15:35:30Z**
+- Steps, exactly as the inventory's procedure states them:
+  1. baseline — the drill kubeconfig works: `kubectl get pods -n sf5-drill` →
+     *No resources found in sf5-drill namespace*
+  2. baseline — and it is **scoped**, which is what makes it a drill credential and not an
+     operator one: `kubectl get nodes` → `Forbidden: nodes is forbidden: User
+     "system:serviceaccount:sf5-drill:drill-agent" cannot list resource "nodes" … at the cluster
+     scope`
+  3. revoke at the cluster: `kubectl -n sf5-drill delete serviceaccount drill-agent`
+  4. replay once per second until refused
+- t1 (replay refused, UTC): **2026-09-30T15:35:41Z** — evidence:
+  `error: You must be logged in to the server (Unauthorized)` (HTTP 401)
+- Access-token replay: n/a (not an OAuth row). But see the survival window below
+- Measured: **00:11**   Within maximum: **yes**
+- Image IDs before / after: the same five IDs, `2f28fb1cfa95 5cd5aa6b06e0 b88fbfd61649
+  d04b811d8bef eb1e3b8e434c`, identical — the pod took **no action at all** in this drill, for the
+  reason stated below   Rebuild: **no**
+- Re-issue: not performed. The disposable cluster was deleted instead, which is the drill's own
+  teardown. The rotation half of this row — a Compose secret-file swap plus `--force-recreate`,
+  no rebuild — shares the pack-credential delivery path with S2 and is measured there
+
+#### Two things this row measured that the plan did not predict
+
+**A deleted ServiceAccount's bound token kept working for ~10 seconds.** The replay was refused on
+the tenth attempt, not the first. This is the same *shape* as Edge Case 5's `basic_ncsa_auth` cache —
+a revocation that is not yet effective — with a different cause (the API server's authentication
+path, not our configuration) and no operator action that shortens it. It is well inside the 30:00
+maximum and is recorded because a drill that replayed **once** immediately after the delete would
+have concluded the credential still worked.
+
+**S3's replay cannot be performed from inside the pod, by design.** The shipped `kubernetes` pack
+declares `egress.runtime: []` (Decision 6), so no agent has a route to any cluster and the
+credential is inert in the pod until a per-cluster egress pack is also loaded. The replay is
+therefore **host-side**, and that is a property of the design rather than a shortcut in the drill:
+the thing a revocation has to stop is reach from wherever the credential can be used, and in the
+shipped configuration that is not the agent containers. Contrast S2, whose token *is* usable through
+the mediator under the `github` profile, where the replay is run from inside an agent.
 
 ---
 
