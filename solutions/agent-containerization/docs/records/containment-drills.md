@@ -265,7 +265,7 @@ One row per store in the runbook's § 5.2 disposition table, with the outcome as
 | every named volume survived | yes — the same 7 volumes before and after, `audit` included |
 | each agent's `/tmp` marker is **gone** | yes, all three — `/tmp` is a tmpfs and does not survive the container |
 | each agent's state-volume marker is **still there** | yes, all three |
-| the audit line count did not decrease | yes — 94 lines before, 97 after (the three new lines are the mediator's own start-up events on the fresh containers) |
+| the audit line count did not decrease | yes — 94 lines before, 97 after. The three added lines were not read back, so they are not attributed here; a +3 delta is consistent with the mediator's own start-up events on the fresh container, and the assertion is `>=`, not equality |
 
 This is the mechanical basis for the runbook's **first rule** (§ 2): `down` is safe during an
 incident and `down -v` destroys the evidence. T41's discard is therefore selective —

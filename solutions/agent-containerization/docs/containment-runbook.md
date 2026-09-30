@@ -5,9 +5,10 @@ measurements and finalised at SF-7)
 **Requirements:** R13.1, R13.2, R13.3, R12.5, R12.7, D16, and the R9.6 review trigger handed over
 by Feature 02.1.
 **Status:** **DRAFT.** Event and incident definitions and every stated maximum are
-operator-confirmed (2026-09-29). The **live containment forms (§ 3.1, § 3.2) and the teardown
-guarantee (§ 2, § 5) are measured** — SF-3, 2026-09-30, `verify-containment.sh` phases B–D, recorded
-in `docs/records/containment-drills.md`. The **revocation procedures (§ 3.4, § 4) are not yet
+operator-confirmed (2026-09-29). The **live containment forms (§ 3.1, § 3.2) are measured**, and so is
+the **teardown guarantee § 2 states and § 5.1's `down`-without-`-v` step depends on** — SF-3,
+2026-09-30, `verify-containment.sh` phases B–D, recorded in `docs/records/containment-drills.md`. The
+rest of § 5's recovery path is **not yet measured**; SF-4 drills it (phase E and the full T41 drill). The **revocation procedures (§ 3.4, § 4) are not yet
 measured**; SF-5 and SF-6 drill them. Written before the drills, deliberately (Decision 7) — a drill
 measures a procedure only if the procedure existed before the clock started. Commands still marked
 **UNMEASURED** are corrected to their measured form in SF-5/SF-6.
