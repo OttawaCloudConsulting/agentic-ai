@@ -686,3 +686,10 @@
     (4) V2's timed row stays a GAP by operator decision; (5) detection stays pull-based (R9.6 MAY).
     Codebase-assessment refresh SKIPPED again: no codebase-assessment.md exists (Gate 0 skipped,
     greenfield) -- the documented edge case, a warning not a blocker, so no refresh commit.
+    POST-CLOSE-OUT, 2026-09-30: operator ACCEPTED the R13.2/T40 amendment. The recorded text was
+    applied verbatim to REQUIREMENTS.md:337 (R13.2) and :510 (T40), so R13.2 is MET AS AMENDED and
+    that DoD box closes. Recorded in the drills record (Proposed edits 2, criterion 2, criterion 9,
+    open items), runbook section 3.3 and README. Containment re-verified 169/0 rc=0, lint OK.
+    STILL OPEN for /milestone, not for this feature: apply the D21 promotion-trigger amendment to
+    docs/ARCHITECTURE_AND_DESIGN.md, then lift the R12.8 'not for real work' notice for every
+    non-AWS profile; proposed edit 1 (the architecture runbook table) also remains unapplied.

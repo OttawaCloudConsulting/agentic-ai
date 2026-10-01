@@ -334,7 +334,7 @@ Every requirement above this section is preventive or detective. These describe 
 | ID | Pri | Src | Requirement |
 |---|---|---|---|
 | R13.1 | MUST | S | For each credential type the design persists, a revocation procedure is documented and tested, with a stated maximum time from detection to revocation |
-| R13.2 | MUST | S | A single agent can be isolated, and a single MCP server or tool disabled, without stopping the other agents |
+| R13.2 | MUST | S | A single agent can be isolated live, without stopping the other agents. A single MCP server or tool can be disabled without stopping the other agents; disabling it restarts the agents that load it, because the capability inventory is image content and the agent's own declaration is on its state volume |
 | R13.3 | SHOULD | S | A documented path returns a contaminated environment to a known-good state, naming what happens to the persistent state volumes |
 
 ## R14 — Third-Party and Provider Governance
@@ -507,7 +507,7 @@ these tests verify requirements that no success criterion reaches directly.
 | T37 Human authorization gate | Attempt an action the profile classifies as irreversible or high-impact, unattended | The action halts for authorization, or the profile carries an explicit recorded waiver | R12.7 |
 | T38 Adversarial validation gate | Run the boundary validation suite before first real use | All six R12.8 scenarios execute, and each records whether the attempt was blocked, logged and attributable | R12.8 |
 | T39 Entry point | Bring the environment up as a fresh operator following the README | `docker compose` with a profile override is the only entry point; no wrapper CLI exists | R12.9 |
-| T40 Single-agent isolation | Stop one agent container; then disable one MCP server | The other two agents continue unaffected. The MCP disable path is exercised and its current rebuild requirement recorded | R13.2 |
+| T40 Single-agent isolation | Isolate one agent, both forms: stop it with its recorder, and detach it from its network with the container kept. Then disable one MCP server: remove it from the inventory, remove the agent's own declaration from its state volume **from outside that agent**, and recreate the agents that load it | The other two agents continue unaffected in both isolation forms, and the mediator keeps serving. The MCP disable requires a rebuild and a restart of the loading agents; removing it from the inventory alone refuses that agent at its next start (`mcp-gate` exit 3), which is containment-safe | R13.2 |
 | T41 Return to known-good | Execute the documented recovery path on a deliberately contaminated environment | The path completes and states explicitly what happened to each persistent state volume | R13.3 |
 | T42 Third-party traffic-path governance | Inspect the record for every third party on the agent traffic path | Each records what it observes, its retention period and its breach-notification path — or records the constraint on use where the assessment could not be completed | R14.1 |
 | T43 Provider governance record | Inspect the per-provider record | Each of the three records version-pinning capability, retention and training-opt-out settings in use, and the data classification permitted to leave | R14.2 |

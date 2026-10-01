@@ -19,9 +19,8 @@ against its own conduct (§ V2).
 stated gap: V2's timed half, by operator decision), `verify-containment.sh` phases A–F **fully
 green** with phase A's two expected reds both closed, T37 and T44 recorded, the R14.3 three-route
 record and the T44 tabletop written in `third-party-assessments.md`, and all **eight** items in
-§ "MUST REACH USER DOCUMENTATION" written into `README.md` and the runbook. **Two things are
-deliberately NOT closed here:** R13.2 stays formally unmet until the operator accepts the T40
-amendment text below (criterion 8), and **the one-year `CLAUDE_CODE_OAUTH_TOKEN` in
+§ "MUST REACH USER DOCUMENTATION" written into `README.md` and the runbook. **One thing is deliberately not
+closed here:** the one-year `CLAUDE_CODE_OAUTH_TOKEN` in
 `references/.env_keys` is still live** — replayed 2026-09-30T22:04:35Z, HTTP **200** twice; the
 operator has stated it will be revoked out of session, and no revocation date is recorded because no
 replay has confirmed one (this feature's own D-5 rule, applied to itself). **SF-6 is complete and phase A's drill-evidence half is green
@@ -1773,8 +1772,9 @@ R13.2 as written asks for a targeted disable path. What exists is a profile edit
 recreation of every agent that loads the server; a stdio server has no enforcement point at all
 (D18). The amendment records the tested path rather than a speculative one.
 
-**R13.2 stays formally unmet until the operator accepts this amendment.** This feature supplies
-tested amendment text; it does not accept it. The milestone Definition of Done gates on acceptance,
+**ACCEPTED BY THE OPERATOR 2026-09-30, and APPLIED to `REQUIREMENTS.md` (lines 337 and 510) verbatim
+as written below.** R13.2 is therefore **met** as amended. This feature supplied the tested text and
+did not accept it; the operator did, after close-out. The milestone Definition of Done gates on acceptance,
 and the R12.8 notice is **not lifted here** (criterion 9).
 
 **Exact replacement text, written 2026-09-30 from the exercised path** (see § T40, MCP-disable
@@ -1812,8 +1812,10 @@ with:
 - **The refusal is named as containment-safe**, because it is the property that makes an
   inventory-only removal a safe intermediate state rather than a half-applied change.
 
-**R13.2 stays formally unmet until the operator accepts this text.** Accepting it is the operator's
-decision, the milestone Definition of Done gates on it, and the R12.8 notice is not lifted here.
+**ACCEPTED 2026-09-30.** The operator accepted this text and it was applied verbatim to
+`REQUIREMENTS.md:337` and `:510`; R13.2 is met as amended, and that DoD box is closed. **The R12.8
+notice is still not lifted** — it waits on the remaining DoD item, applying the D21 amendment to
+`docs/ARCHITECTURE_AND_DESIGN.md`.
 
 ---
 
@@ -1825,7 +1827,7 @@ SF-7, 2026-09-30.
 | Criterion | Evidence | Where | State |
 |---|---|---|---|
 | 1 — T26 tested revocation, every persisted type | Drills E1–E4, V1–V3, S1–S5 | This record, § T26 (SF-5, SF-6); inventory Table B | **MEASURED (SF-5 + SF-6)** — all twelve rows drilled 2026-09-30, each inside its stated maximum, each with identical service image IDs before and after (R8.5). **One stated GAP: V2's timed clock** (operator decision); its substantive question was measured. The inventory's Residual 4 is rewritten from "documented, not tested" to its measured state |
-| 2 — T40 single-agent isolation | Phase B (both forms); MCP-disable exercise; amendment text | Phase B (SF-3); this record § T40, § Proposed edits 2 | **MEASURED (SF-3 + SF-4)** — both isolation forms, the MCP-disable exercise and the amendment text. Acceptance of the amendment is the operator's, and **R13.2 stays formally unmet until then** |
+| 2 — T40 single-agent isolation | Phase B (both forms); MCP-disable exercise; amendment text | Phase B (SF-3); this record § T40, § Proposed edits 2 | **MEASURED (SF-3 + SF-4)** — both isolation forms, the MCP-disable exercise and the amendment text. **The amendment was ACCEPTED and APPLIED 2026-09-30** (`REQUIREMENTS.md:337`, `:510`), so R13.2 is met as amended |
 | 3 — T41 return to known-good | Phase E (mechanical); full drill; per-store outcomes | Phase E (SF-4); this record § T41 | **MEASURED (SF-4)** — phase E, and the full drill performed 2026-09-30 against the real pod and the `main` pins, after one failed attempt recorded as three findings |
 | 4 — R12.5 teardown | Phase D | Phase D (SF-3); this record § R12.5 | **MEASURED (SF-3)** |
 | (Decision 3) — the pod-wide cut keeps the detection signal | Phase C | Phase C (SF-3); this record § The pod-wide cut | **MEASURED (SF-3)** |
@@ -1833,21 +1835,24 @@ SF-7, 2026-09-30.
 | 6 — T44 ToS monitoring and the seam | R14.3 record for three routes; tabletop SIMULATION; seam inspection | `third-party-assessments.md` § R14.3; this record § T44 | **RECORDED (SF-7)** — three-route Route/Owner/Review-trigger table; cadence **quarterly + provider announcements** (operator-confirmed); tabletop labelled **SIMULATION** with the owner's decision (suspend the `agy` route) and the containment it triggers — recorded with the finding that **no written re-review checklist exists**, so the decision was made against the trigger list and the runbook rather than a checklist; seam inspected on the built image (ICAP and eCAP compiled in; TLS termination is the blocker and it is a D4 decision) |
 | 7 — the runbook | Shipped, with event/incident defined before go-live; README links it | `docs/containment-runbook.md` (SF-1 draft, SF-7 final) | **FINAL (SF-7)** — every command is a measured form; the incident list was reviewed again at close-out and neither added to nor struck; § 6's drill cadence set to **quarterly, with the R14.3 review**; `README.md` § "Containment and response (02.5)" links it |
 | 8 — records and proposed edits | This record; the two proposed edits above | This record (SF-7) | **BOTH WRITTEN** — edit 2 (R13.2/T40) from the exercised path (SF-4); edit 1 (the architecture runbook table) from the measured forms (SF-7). Neither applied, by design |
-| 9 — the R12.8 notice is not lifted here | Stated, not acted on | This record, § Proposed edits 2 | **STATED (SF-1, unchanged)** — the milestone Definition of Done lifts it, once the R13.2/T40 amendment is accepted |
+| 9 — the R12.8 notice is not lifted here | Stated, not acted on | This record, § Proposed edits 2 | **STATED (SF-1, unchanged)** — not lifted by this feature. The R13.2/T40 half of its condition is now met (accepted and applied 2026-09-30); the D21 amendment's application to `docs/ARCHITECTURE_AND_DESIGN.md` is the remaining one, and lifting the notice is `/milestone`'s |
 | **MUST REACH USER DOCUMENTATION (D-1 … D-8)** | Eight operator-facing consequences written into `README.md` and the runbook | § MUST REACH USER DOCUMENTATION → "Where each item was written" | **ALL EIGHT WRITTEN (SF-7)** — D-1 README + runbook § 3.4/§ 4; D-2 README + runbook § 3.4/§ 4; D-3 README (MCP section, with the exact refusal text) + runbook § 3.3/§ 5.1; D-4 README + runbook § 5.1 step 6; D-5 README (twice) + runbook § 3.4; D-6 README + this record's Method preamble; D-7 README `oauth-mount` paragraph + inventory V3 row; D-8 runbook § 3.4 |
 
 ### Open items this feature does NOT close
 
 Stated here so close-out is not read as "everything is finished".
 
-1. **R13.2 stays formally unmet** until the operator accepts the T40 amendment text (§ Proposed
-   edits 2). The milestone Definition of Done gates on that acceptance, and the **R12.8 notice is
-   not lifted** by this feature (criterion 9).
+1. **R13.2 is MET as amended** — the operator accepted the T40 amendment text (§ Proposed edits 2)
+   on 2026-09-30 and it was applied verbatim to `REQUIREMENTS.md:337` and `:510`. The **R12.8 notice is
+   still not lifted** (criterion 9): its other condition is the D21 amendment's application to
+   `docs/ARCHITECTURE_AND_DESIGN.md`, and the lift itself is the milestone's act, not this
+   feature's.
 2. **The one-year `CLAUDE_CODE_OAUTH_TOKEN` in `references/.env_keys` is still live** — replayed
    2026-09-30T22:04:35Z, HTTP 200. The operator will revoke it out of session; the closing evidence
    is the next replay that returns 401 (§ Drill E4, "SF-7 close-out").
-3. **Two proposed edits are written and not applied** — `ARCHITECTURE_AND_DESIGN.md`'s runbook table
-   and `REQUIREMENTS.md`'s R13.2/T40 text. Applying them is the design authority's.
+3. **One proposed edit remains unapplied** — `ARCHITECTURE_AND_DESIGN.md`'s runbook table
+   (§ Proposed edits 1). Applying it is the design authority's. The R13.2/T40 edit was accepted and
+   applied on 2026-09-30.
 4. **V2's timed row is a GAP**, by operator decision.
 5. **Detection stays pull-based** (R9.6 remains MAY). Nothing here bounds compromise to detection —
    only detection to revocation.

@@ -1117,8 +1117,9 @@ enough to tell one credential from another without putting a value in a transcri
 a public record. One drill printed a value and recorded it as a finding against its own conduct;
 this is the rule that came out of it.
 
-**What is not closed here:** R13.2 stays formally unmet until the operator accepts the T40 amendment
-text recorded in the drills record, and the R12.8 notice is not lifted by this feature. Detection
+**What is not closed here:** the R12.8 "not for real work" notice is not lifted by this feature.
+R13.2's T40 amendment — the one that admits the MCP disable's rebuild and restart — was accepted by
+the operator on 2026-09-30 and is applied to `REQUIREMENTS.md`, so R13.2 is met as amended. Detection
 stays pull-based (R9.6 remains MAY), so nothing bounds compromise to detection — only detection to
 revocation.
 

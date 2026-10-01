@@ -188,8 +188,9 @@ sink. Stopping the recorder first loses it.
 
 **There is no live form.** This is recorded, not worked around, and it is the substance of the
 **R13.2/T40 amendment** (Decision 4). The amendment text is carried in
-`docs/records/containment-drills.md`; **R13.2 stays formally unmet until the operator accepts it**,
-and the milestone Definition of Done gates on that.
+`docs/records/containment-drills.md`. **The operator accepted that amendment on 2026-09-30 and it
+is applied to `REQUIREMENTS.md` (lines 337 and 510), so R13.2 is met as amended** — the requirement
+now states the restart this path requires rather than implying a live disable.
 
 **Durable form — MEASURED 2026-09-30** (SF-4; `docs/records/containment-drills.md` § MCP-disable
 exercise):
