@@ -2,7 +2,7 @@
 """Generate and ingest per-family system-owner questionnaires.
 
   python3 scripts/questionnaire.py generate --mapping FILE --solution NAME [--out DIR] [--date YYYY-MM-DD]
-  python3 scripts/questionnaire.py ingest [--out DIR] [--mapping FILE] [--json FILE]
+  python3 scripts/questionnaire.py ingest [--out DIR] [--mapping FILE] [--json FILE] [--update-mapping] [--date YYYY-MM-DD]
 
 --mapping defaults to docs/compliance/phase2-control-mapping.md; --out defaults to
 docs/compliance/questionnaire.
@@ -17,7 +17,10 @@ Controls in a file but no longer in the mapping are reported, not removed. New f
 
 ingest parses every questionnaire and reports each entry as answered, partial (the response
 contains a <placeholder> such as <define procedure>) or unanswered, with file:line of the
-response. It does not modify the mapping; folding responses into Phase 2 is the model's work.
+response. With --update-mapping it writes only the script-owned part of the mapping: the Response
+column of the input table (added if absent; Control and Question cells untouched) and the
+"Questionnaire responses ingested:" line under the heading (added if absent). Nothing is written
+when there are parse errors. Folding responses into the per-control entries is the model's work.
 Entries are matched with or without bold labels (**Control ID:** or Control ID:).
 --json writes the full report, response text included. Exit 1 on parse errors.
 Standard library only.
@@ -35,6 +38,8 @@ PROFILE = SKILL / "references" / "cccs-medium-profile.md"
 DEFAULT_MAPPING = Path("docs/compliance/phase2-control-mapping.md")
 DEFAULT_OUT = Path("docs/compliance/questionnaire")
 INPUT_HEADING = "## Controls Requiring System-Owner Input"
+INGESTED = "Questionnaire responses ingested:"
+STATES = ("answered", "partial", "unanswered")
 PENDING = "<!-- PENDING -->"
 SUBMISSION = "## Submission"
 ROW = re.compile(r"^\|\s*([A-Z]{2}-\d+(?:\(\d+\))?)\s*\|(.*)\|\s*$")
@@ -177,6 +182,53 @@ def parse_file(path):
     return entries, errors
 
 
+def update_mapping(path, entries, date):
+    status = {e["control"]: e["status"] for e in entries}
+    n = {s: sum(1 for e in entries if e["status"] == s) for s in STATES}
+    line = f"{INGESTED} {date} — {n['answered']} answered, {n['partial']} partial, {n['unanswered']} unanswered"
+    lines = path.read_text().splitlines(keepends=True)
+    out, inside, has_line, rows = [], False, False, 0
+
+    def cells(l):
+        return l.rstrip("\n").strip().strip("|").split("|")
+
+    def emit(c):
+        out.append("| " + " | ".join(x.strip() for x in c) + " |\n")
+
+    for l in lines:
+        if l.startswith("## "):
+            if inside and not has_line:
+                raise SystemExit(f"ERROR {INPUT_HEADING} has no table")
+            inside = l.strip() == INPUT_HEADING
+            out.append(l)
+            continue
+        if not inside:
+            out.append(l)
+            continue
+        if l.startswith(INGESTED):
+            out.append(line + "\n")
+            has_line = True
+            continue
+        if l.startswith("|") and not has_line:
+            out += [line + "\n", "\n"]
+            has_line = True
+        if not l.startswith("|"):
+            out.append(l)
+            continue
+        c = cells(l)
+        m = ROW.match(l.rstrip("\n"))
+        three = len(c) >= 3 and (c[-1].strip() in STATES or c[-1].strip() == "Response" or set(c[-1].strip()) <= set("-:"))
+        if m:
+            value = status.get(m[1], "unanswered")
+            c = c[:-1] + [value] if len(c) >= 3 and c[-1].strip() in STATES else c + [value]
+            rows += 1
+        elif not three:
+            c = c + (["---"] if set(c[-1].strip()) <= set("-:") else ["Response"])
+        emit(c)
+    path.write_text("".join(out))
+    print(f"mapping updated: {rows} input-table rows; {line}")
+
+
 def ingest(args):
     files = sorted(args.out.glob("*-questionnaire.md"))
     if not files:
@@ -214,7 +266,10 @@ def ingest(args):
                                                      if f["answered"] + f["partial"] == 0) or "none"))
     if args.json:
         Path(args.json).write_text(json.dumps({"families": families, "entries": entries}, indent=2) + "\n")
-    sys.exit(1 if errors else 0)
+    if errors:
+        sys.exit(1)
+    if args.update_mapping:
+        update_mapping(Path(args.mapping), entries, args.date or datetime.date.today().isoformat())
 
 
 def main():
@@ -229,6 +284,8 @@ def main():
     i.add_argument("--out", type=Path, default=DEFAULT_OUT)
     i.add_argument("--mapping", type=Path, default=DEFAULT_MAPPING)
     i.add_argument("--json")
+    i.add_argument("--update-mapping", action="store_true")
+    i.add_argument("--date")
     a = ap.parse_args()
     generate(a) if a.cmd == "generate" else ingest(a)
 

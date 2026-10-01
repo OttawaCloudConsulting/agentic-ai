@@ -118,11 +118,11 @@ Counts cover Applicable controls. A control assessed against several components 
 
 ## Controls Requiring System-Owner Input
 
-Questionnaire responses ingested: [YYYY-MM-DD — X answered, X partial, X unanswered / not yet ingested]
+Questionnaire responses ingested: [YYYY-MM-DD — X answered, X partial, X unanswered; written by the script]
 
 | Control | Question | Response |
 |---|---|---|
-| AC-2 | [Specific record, policy or role the system owner must provide] | [answered / partial / unanswered — from `questionnaire.py ingest`] |
+| AC-2 | [Specific record, policy or role the system owner must provide] | [answered / partial / unanswered — written by `questionnaire.py ingest --update-mapping`] |
 
 ## Control Family: AC — Access Control
 
