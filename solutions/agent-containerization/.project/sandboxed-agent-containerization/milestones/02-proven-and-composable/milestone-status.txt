@@ -692,4 +692,17 @@
     open items), runbook section 3.3 and README. Containment re-verified 169/0 rc=0, lint OK.
     STILL OPEN for /milestone, not for this feature: apply the D21 promotion-trigger amendment to
     docs/ARCHITECTURE_AND_DESIGN.md, then lift the R12.8 'not for real work' notice for every
-    non-AWS profile; proposed edit 1 (the architecture runbook table) also remains unapplied.
+    non-AWS profile.
+    POST-CLOSE-OUT, 2026-09-30 (second): operator instructed PROPOSED EDIT 1 be applied. The
+    nine-line runbook table at docs/ARCHITECTURE_AND_DESIGN.md 'Containment and response runbook'
+    replaced verbatim with the recorded text -- 'denylist entry at the mediator' is gone as a live
+    action (it is a rebuild, D4), isolation now carries both measured forms with the recorder's
+    ordering, the credential row carries replay-confirms-revocation plus the codex ordering, the
+    recovery row carries the one-off container clearing, and the 'define event versus incident'
+    instruction becomes a pointer to runbook section 1. ONE change beyond the verbatim text, stated:
+    the MCP row's '(R13.2 partially unmet)' parenthetical was made false by the same day's R13.2/T40
+    acceptance, so it now names the amendment; the row's substance is unchanged. Both proposed edits
+    are now applied -- neither by the feature, both by the operator after close-out. Containment
+    re-verified 169/0 rc=0.
+    STILL OPEN for /milestone: the D21 promotion-trigger amendment to ARCHITECTURE_AND_DESIGN.md,
+    then lifting the R12.8 notice for every non-AWS profile.

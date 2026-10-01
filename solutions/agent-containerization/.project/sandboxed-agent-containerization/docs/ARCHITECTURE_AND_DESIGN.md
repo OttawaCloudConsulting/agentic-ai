@@ -698,13 +698,15 @@ abandoned; the build uses vendor primitives (R10.5).
 
 | Need | Action |
 |---|---|
-| Cut egress immediately | Denylist entry at the mediator, or detach the agent's network |
-| Isolate one agent, others keep running | Stop that container. Per-agent networks (D2) make this native, not a special case (R13.2) |
-| Disable one MCP server or tool across all agents | Profile inventory change plus rebuild. **No live mechanism exists** — recorded, not solved (R13.2 partially unmet) |
-| Rotate credentials | Per credential type, per the tested revocation procedure with its stated maximum detection-to-revocation time (R13.1, R8.5). The one-year `CLAUDE_CODE_OAUTH_TOKEN` is the longest-lived and the priority |
-| Return to known-good | Rebuild containers from the pinned digest and **discard the state volumes**, re-bootstrapping authentication. A contaminated volume cannot currently be distinguished from a clean one, so the documented path does not attempt to (R13.3, D16) |
+| Cut egress immediately | **`docker network disconnect sandboxed-agent-pod_egress-net sandboxed-agent-pod-egress-mediator-1`** — the live form, and the only one. A denylist entry is **not** a live action: the policy is compiled into the mediator image and there is no live reload (D4), so a denylist change is a recompile plus a rebuild. Detaching the mediator keeps DNS, policy and the audit writer running, so the blocked attempt is still recorded — which is the detection signal (R9.1) |
+| Isolate one agent, others keep running | Two forms, not interchangeable, both measured. **Disconnect** (`docker network disconnect sandboxed-agent-pod_<agent>-net sandboxed-agent-pod-<agent>-1`) keeps the container for forensics and keeps its recorder writing. **Stop** is durable and ends the recording — stop the agent's recorder *alongside* it, after the recorder drains. Per-agent networks (D2) make both native, not a special case (R13.2) |
+| Disable one MCP server or tool across all agents | Profile inventory change plus rebuild. **No live mechanism exists** — recorded, not solved. R13.2 was **amended to state the restart this path requires** and accepted 2026-09-30 (02.5 SF-4's text, `REQUIREMENTS.md:337`/`:510`), so the requirement is met as amended rather than partially unmet |
+| Rotate credentials | Per credential type, per the tested revocation procedure with its stated maximum detection-to-revocation time (R13.1, R8.5). The one-year `CLAUDE_CODE_OAUTH_TOKEN` is the longest-lived and the priority. **Two measured qualifications:** `t1` is a replay that fails, never a console action; and for `codex` neither provider revocation nor rotation retires a captured OAuth set, so for that agent the containment is pod-side — isolate and discard the state volume at `t0`, *before* revoking |
+| Return to known-good | Rebuild containers from the pinned digest and **discard the state volumes**, re-bootstrapping authentication. A contaminated volume cannot currently be distinguished from a clean one, so the documented path does not attempt to (R13.3, D16). **Clear stray one-off `compose run` containers first** — `docker volume rm` refuses while any container references the volume, and `compose down` does not remove one-offs |
 
-Define what constitutes an event versus an incident before go-live.
+Event and incident are defined in `docs/containment-runbook.md` § 1, operator-confirmed
+2026-09-29 and reviewed again at feature close-out. The runbook is the operational form of this
+table; this table is the design statement.
 
 ## Security Considerations
 

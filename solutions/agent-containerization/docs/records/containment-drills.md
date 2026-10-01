@@ -1763,8 +1763,16 @@ with:
 - **The "define event versus incident" instruction is discharged**, so it becomes a pointer rather
   than an open action.
 
-**Not applied here.** This is proposed text for the design authority, exactly as 02.3 and 02.4 did
-with their own architecture edits.
+**APPLIED 2026-09-30, by the operator's instruction after close-out.** The nine-line block above was
+replaced verbatim at `docs/ARCHITECTURE_AND_DESIGN.md` § "Containment and response runbook". The
+feature itself did not apply it, exactly as 02.3 and 02.4 did with their own architecture edits — the
+design authority did, in a separate act.
+
+**One change beyond the verbatim text, stated rather than slipped in.** The MCP row's parenthetical
+read "(R13.2 partially unmet)", which the R13.2/T40 acceptance of the same date made false. It now
+names the amendment and says the requirement is met as amended. The row's substance — profile change
+plus rebuild, no live mechanism — is unchanged, and this edit was not part of the text recorded
+above.
 
 ### 2. `REQUIREMENTS.md` — the R13.2 / T40 amendment
 
@@ -1834,7 +1842,7 @@ SF-7, 2026-09-30.
 | 5 — T37 authorization gate | Phase F, compile negatives and runtime checks | Phase F (SF-2); this record § T37 | **MEASURED (SF-2, recorded SF-7)** — phase F 35 passed, 0 failed; both negative-control variants run once and recorded (exit 2 accounting, exit 3 T37 refusal) |
 | 6 — T44 ToS monitoring and the seam | R14.3 record for three routes; tabletop SIMULATION; seam inspection | `third-party-assessments.md` § R14.3; this record § T44 | **RECORDED (SF-7)** — three-route Route/Owner/Review-trigger table; cadence **quarterly + provider announcements** (operator-confirmed); tabletop labelled **SIMULATION** with the owner's decision (suspend the `agy` route) and the containment it triggers — recorded with the finding that **no written re-review checklist exists**, so the decision was made against the trigger list and the runbook rather than a checklist; seam inspected on the built image (ICAP and eCAP compiled in; TLS termination is the blocker and it is a D4 decision) |
 | 7 — the runbook | Shipped, with event/incident defined before go-live; README links it | `docs/containment-runbook.md` (SF-1 draft, SF-7 final) | **FINAL (SF-7)** — every command is a measured form; the incident list was reviewed again at close-out and neither added to nor struck; § 6's drill cadence set to **quarterly, with the R14.3 review**; `README.md` § "Containment and response (02.5)" links it |
-| 8 — records and proposed edits | This record; the two proposed edits above | This record (SF-7) | **BOTH WRITTEN** — edit 2 (R13.2/T40) from the exercised path (SF-4); edit 1 (the architecture runbook table) from the measured forms (SF-7). Neither applied, by design |
+| 8 — records and proposed edits | This record; the two proposed edits above | This record (SF-7) | **BOTH WRITTEN** — edit 2 (R13.2/T40) from the exercised path (SF-4); edit 1 (the architecture runbook table) from the measured forms (SF-7). Neither applied *by the feature*, by design; the operator applied both on 2026-09-30 after close-out |
 | 9 — the R12.8 notice is not lifted here | Stated, not acted on | This record, § Proposed edits 2 | **STATED (SF-1, unchanged)** — not lifted by this feature. The R13.2/T40 half of its condition is now met (accepted and applied 2026-09-30); the D21 amendment's application to `docs/ARCHITECTURE_AND_DESIGN.md` is the remaining one, and lifting the notice is `/milestone`'s |
 | **MUST REACH USER DOCUMENTATION (D-1 … D-8)** | Eight operator-facing consequences written into `README.md` and the runbook | § MUST REACH USER DOCUMENTATION → "Where each item was written" | **ALL EIGHT WRITTEN (SF-7)** — D-1 README + runbook § 3.4/§ 4; D-2 README + runbook § 3.4/§ 4; D-3 README (MCP section, with the exact refusal text) + runbook § 3.3/§ 5.1; D-4 README + runbook § 5.1 step 6; D-5 README (twice) + runbook § 3.4; D-6 README + this record's Method preamble; D-7 README `oauth-mount` paragraph + inventory V3 row; D-8 runbook § 3.4 |
 
@@ -1850,9 +1858,9 @@ Stated here so close-out is not read as "everything is finished".
 2. **The one-year `CLAUDE_CODE_OAUTH_TOKEN` in `references/.env_keys` is still live** — replayed
    2026-09-30T22:04:35Z, HTTP 200. The operator will revoke it out of session; the closing evidence
    is the next replay that returns 401 (§ Drill E4, "SF-7 close-out").
-3. **One proposed edit remains unapplied** — `ARCHITECTURE_AND_DESIGN.md`'s runbook table
-   (§ Proposed edits 1). Applying it is the design authority's. The R13.2/T40 edit was accepted and
-   applied on 2026-09-30.
+3. **Both proposed edits are now applied** — the R13.2/T40 text to `REQUIREMENTS.md` and the
+   runbook table to `ARCHITECTURE_AND_DESIGN.md`, both on 2026-09-30 by the operator's instruction
+   after close-out. Neither was applied by the feature itself.
 4. **V2's timed row is a GAP**, by operator decision.
 5. **Detection stays pull-based** (R9.6 remains MAY). Nothing here bounds compromise to detection —
    only detection to revocation.
