@@ -3,6 +3,7 @@
 
   python3 scripts/questionnaire.py generate --mapping FILE --solution NAME [--out DIR] [--date YYYY-MM-DD]
   python3 scripts/questionnaire.py ingest [--out DIR] [--mapping FILE] [--json FILE] [--update-mapping] [--date YYYY-MM-DD]
+  python3 scripts/questionnaire.py check [--out DIR] [--mapping FILE]
 
 --mapping defaults to docs/compliance/phase2-control-mapping.md; --out defaults to
 docs/compliance/questionnaire.
@@ -15,9 +16,11 @@ It is merge-safe: an existing file is never rewritten. Controls not yet in it ar
 Controls in a file but no longer in the mapping are reported, not removed. New files carry
 <!-- PENDING --> in Background for the model to replace.
 
-ingest parses every questionnaire and reports each entry as answered, partial (the response
-contains a <placeholder> such as <define procedure>) or unanswered, with file:line of the
-response. With --update-mapping it writes only the script-owned part of the mapping: the Response
+ingest parses every questionnaire and reports each entry as answered, partial or unanswered, with
+file:line of the response. partial means the response contains a placeholder marker: a
+<placeholder> such as <define procedure>, the word TBD or TODO (any case), or ???. Fenced code
+blocks in a response are reviewer notes: they are reported separately in the JSON (notes: label,
+text, line) and their markers still count, so an open TBD in a note makes the entry partial. With --update-mapping it writes only the script-owned part of the mapping: the Response
 column of the input table (added if absent; Control and Question cells untouched) and the
 "Questionnaire responses ingested:" line under the heading (added if absent). Nothing is written
 when there are parse errors. Folding responses into the per-control entries is the model's work.
@@ -48,7 +51,9 @@ CONTROL_LINE = re.compile(r"^\s*(?:\*\*)?Control ID:(?:\*\*)?\s*([A-Z]{2}-\d+(?:
 RESPONSE_LINE = re.compile(r"^\s*(?:\*\*)?Response:(?:\*\*)?\s*(.*)$")
 QUESTION_LINE = re.compile(r"^\s*(?:\*\*)?Question:(?:\*\*)?\s*(.*)$")
 COMMENT = re.compile(r"<!--.*?-->", re.S)
-PLACEHOLDER = re.compile(r"<(?!br\s*/?>|https?://)[^<>\n]+>", re.I)
+PLACEHOLDER = re.compile(r"<(?!br\s*/?>|https?://)[^<>\n]+>|\bTBD\b|\bTODO\b|\?{3,}", re.I)
+FENCE = re.compile(r"^\s*```(.*)$")
+PENDING_MARK = "**Pending system-owner input:**"
 
 
 def titles():
@@ -156,6 +161,17 @@ def parse_file(path):
         text = COMMENT.sub("", "\n".join(body or [])).strip()
         cur["response"] = text
         cur["placeholders"] = PLACEHOLDER.findall(text)
+        cur["notes"], note = [], None
+        for n, l in enumerate(body or []):
+            f = FENCE.match(l)
+            if f and note is None:
+                note = {"label": f[1].strip(), "line": cur["response_line"] + n, "text": []}
+            elif f:
+                note["text"] = "\n".join(note["text"]).strip()
+                cur["notes"].append(note)
+                note = None
+            elif note is not None:
+                note["text"].append(l)
         cur["status"] = "unanswered" if not text else "partial" if cur["placeholders"] else "answered"
         entries.append(cur)
 
@@ -272,6 +288,61 @@ def ingest(args):
         update_mapping(Path(args.mapping), entries, args.date or datetime.date.today().isoformat())
 
 
+def anchors(path):
+    """Map control ID -> list of text anchors: its ### section and any decision-table row."""
+    found, section, inside_input = {}, None, False
+    for l in Path(path).read_text().splitlines():
+        if l.startswith("## "):
+            inside_input = l.strip() == INPUT_HEADING
+            section = None
+            continue
+        if l.startswith("### "):
+            m = re.match(r"^### ([A-Z]{2}-\d+(?:\(\d+\))?):", l)
+            section = found.setdefault(m[1], []) if m else None
+            if m:
+                section.append("")
+            continue
+        if inside_input:
+            continue
+        r = ROW.match(l)
+        if r:
+            found.setdefault(r[1], []).append(l)
+        elif section is not None:
+            section[-1] += l + "\n"
+    return found
+
+
+def check(args):
+    entries, errors = [], []
+    for f in sorted(args.out.glob("*-questionnaire.md")):
+        e, err = parse_file(f)
+        entries += e
+        errors += err
+    status = {e["control"]: e["status"] for e in entries}
+    listed = [cid for cid, _ in parse_mapping(args.mapping)]
+    found = anchors(args.mapping)
+    answered_pending, counts = [], {"pending": 0, "none": 0}
+    for cid in listed:
+        if cid not in found:
+            errors.append(f"{cid}: no ### section or decision-table row in the mapping")
+            continue
+        n = sum(a.count(PENDING_MARK) for a in found[cid])
+        st = status.get(cid, "missing")
+        counts["pending" if n else "none"] += 1
+        if n > 1:
+            errors.append(f"{cid}: {n} pending lines (one expected at most)")
+        elif st == "unanswered" and n != 1:
+            errors.append(f"{cid}: unanswered but no pending line")
+        elif st == "answered" and n == 1:
+            answered_pending.append(cid)
+    for e in errors:
+        print("ERROR", e)
+    for cid in answered_pending:
+        print(f"answered with a pending line (response does not address the question?): {cid}")
+    print(f"controls: {len(listed)}  with pending line: {counts['pending']}  without: {counts['none']}  errors: {len(errors)}")
+    sys.exit(1 if errors else 0)
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -286,8 +357,11 @@ def main():
     i.add_argument("--json")
     i.add_argument("--update-mapping", action="store_true")
     i.add_argument("--date")
+    k = sub.add_parser("check")
+    k.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    k.add_argument("--mapping", type=Path, default=DEFAULT_MAPPING)
     a = ap.parse_args()
-    generate(a) if a.cmd == "generate" else ingest(a)
+    {"generate": generate, "ingest": ingest, "check": check}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -136,7 +136,7 @@ Questionnaire responses ingested: [YYYY-MM-DD — X answered, X partial, X unans
 | [api-service] | [Implemented / Partially / Not Implemented] | [file:line — what it implements] | [code / config / documented / attested] |
 
 - **Notes:** [Caveats, assumptions, or dependencies]
-- **Pending system-owner input:** [Only when the control's Response is partial or unanswered: what is still awaited, and questionnaire/{Family}-questionnaire.md]
+- **Pending system-owner input:** [What is still awaited, and questionnaire/{Family}-questionnaire.md. Exactly one per input-table control with anything awaited, whatever its Response label; omit when nothing is awaited. The only form for "input needed"]
 
 [Repeat for each Applicable control in each family]
 
@@ -145,7 +145,9 @@ Questionnaire responses ingested: [YYYY-MM-DD — X answered, X partial, X unans
 | Control | Title | Decision | Reason |
 |---|---|---|---|
 | AC-18 | Wireless Access | Not Applicable | No component operates wireless networks |
-| AC-1 | Access Control Policy and Procedures | Organizational | Policy obligation; not evidenced in code |
+| AC-1 | Access Control Policy and Procedures | Organizational | Policy obligation; not evidenced in code<br>**Pending system-owner input:** approved access control policy and its review record — questionnaire/AC-questionnaire.md |
+
+A decision-table-only control carries its attested note and pending marker in the Reason cell, on one line: `<br>` between items, `\|` for any pipe.
 
 [Repeat per family]
 ```
@@ -173,7 +175,7 @@ Counts exclude open items awaiting system-owner input.
 
 ## Open Items — Awaiting System-Owner Input
 
-Controls whose remaining gap depends only on a partial or unanswered questionnaire response. Not risk-rated until the response arrives. A control that also has a gap shown by code or config stays in Remediation Priority, with the pending item named in its Gap Description.
+Controls with a **Pending system-owner input** marker and no gap shown by code or config. Not risk-rated until the response arrives. A control that also has a gap shown by code or config stays in Remediation Priority, with the pending item named in its Gap Description.
 
 | Control | Component | Current Status | Awaiting | Questionnaire |
 |---|---|---|---|---|
@@ -397,7 +399,7 @@ docs/compliance/questionnaire/
 
 An existing file is never rewritten, so collected responses survive a re-run. New controls are appended before Submission; controls dropped from the mapping are reported and left in place. Don't hand-edit entries the script owns (Control ID, Description) or a system owner's response.
 
-`scripts/questionnaire.py ingest` parses responses back. An entry is `answered` (non-empty response), `partial` (response contains a `<placeholder>` such as `<define procedure>`), or `unanswered` (empty). Bold and plain labels (`**Control ID:**` / `Control ID:`) both parse, since respondents often edit the formatting.
+`scripts/questionnaire.py ingest` parses responses back. An entry is `answered` (non-empty response), `partial` (response contains a placeholder marker: a `<placeholder>` such as `<define procedure>`, TBD or TODO in any case, or `???`), or `unanswered` (empty). Fenced code blocks in a response are reviewer notes. The JSON reports them separately, and their markers still count toward `partial`. `check` confirms each input-table control carries the right number of **Pending system-owner input** markers. Bold and plain labels (`**Control ID:**` / `Control ID:`) both parse, since respondents often edit the formatting.
 
 ### Family Introductory Paragraph
 
