@@ -1843,7 +1843,7 @@ SF-7, 2026-09-30.
 | 6 — T44 ToS monitoring and the seam | R14.3 record for three routes; tabletop SIMULATION; seam inspection | `third-party-assessments.md` § R14.3; this record § T44 | **RECORDED (SF-7)** — three-route Route/Owner/Review-trigger table; cadence **quarterly + provider announcements** (operator-confirmed); tabletop labelled **SIMULATION** with the owner's decision (suspend the `agy` route) and the containment it triggers — recorded with the finding that **no written re-review checklist exists**, so the decision was made against the trigger list and the runbook rather than a checklist; seam inspected on the built image (ICAP and eCAP compiled in; TLS termination is the blocker and it is a D4 decision) |
 | 7 — the runbook | Shipped, with event/incident defined before go-live; README links it | `docs/containment-runbook.md` (SF-1 draft, SF-7 final) | **FINAL (SF-7)** — every command is a measured form; the incident list was reviewed again at close-out and neither added to nor struck; § 6's drill cadence set to **quarterly, with the R14.3 review**; `README.md` § "Containment and response (02.5)" links it |
 | 8 — records and proposed edits | This record; the two proposed edits above | This record (SF-7) | **BOTH WRITTEN** — edit 2 (R13.2/T40) from the exercised path (SF-4); edit 1 (the architecture runbook table) from the measured forms (SF-7). Neither applied *by the feature*, by design; the operator applied both on 2026-09-30 after close-out |
-| 9 — the R12.8 notice is not lifted here | Stated, not acted on | This record, § Proposed edits 2 | **STATED (SF-1, unchanged)** — not lifted by this feature. The R13.2/T40 half of its condition is now met (accepted and applied 2026-09-30); the D21 amendment's application to `docs/ARCHITECTURE_AND_DESIGN.md` is the remaining one, and lifting the notice is `/milestone`'s |
+| 9 — the R12.8 notice is not lifted here | Stated, not acted on | This record, § Proposed edits 2 | **STATED and HELD by this feature** — 02.5 did not lift it. Both of its conditions were then met on 2026-09-30 (the R13.2/T40 amendment accepted and applied; the D21 amendment applied), and **the operator lifted the notice for every non-AWS profile the same day**, after close-out. It stands for AWS-loading profiles, which wait on Milestone 03 |
 | **MUST REACH USER DOCUMENTATION (D-1 … D-8)** | Eight operator-facing consequences written into `README.md` and the runbook | § MUST REACH USER DOCUMENTATION → "Where each item was written" | **ALL EIGHT WRITTEN (SF-7)** — D-1 README + runbook § 3.4/§ 4; D-2 README + runbook § 3.4/§ 4; D-3 README (MCP section, with the exact refusal text) + runbook § 3.3/§ 5.1; D-4 README + runbook § 5.1 step 6; D-5 README (twice) + runbook § 3.4; D-6 README + this record's Method preamble; D-7 README `oauth-mount` paragraph + inventory V3 row; D-8 runbook § 3.4 |
 
 ### Open items this feature does NOT close
@@ -1852,9 +1852,9 @@ Stated here so close-out is not read as "everything is finished".
 
 1. **R13.2 is MET as amended** — the operator accepted the T40 amendment text (§ Proposed edits 2)
    on 2026-09-30 and it was applied verbatim to `REQUIREMENTS.md:337` and `:510`. The **R12.8 notice is
-   still not lifted** (criterion 9): its other condition is the D21 amendment's application to
-   `docs/ARCHITECTURE_AND_DESIGN.md`, and the lift itself is the milestone's act, not this
-   feature's.
+   not lifted by this feature** (criterion 9). Both of its conditions were met the same day — the
+   D21 amendment was applied too — and **the operator lifted the notice for every non-AWS profile on
+   2026-09-30**, after close-out. It stands for AWS-loading profiles (Milestone 03).
 2. **The one-year `CLAUDE_CODE_OAUTH_TOKEN` in `references/.env_keys` is still live** — replayed
    2026-09-30T22:04:35Z, HTTP 200. The operator will revoke it out of session; the closing evidence
    is the next replay that returns 401 (§ Drill E4, "SF-7 close-out").

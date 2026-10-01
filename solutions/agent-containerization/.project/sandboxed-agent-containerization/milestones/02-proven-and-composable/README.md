@@ -327,11 +327,11 @@ indivisible: the R12.8 notice cannot come off until all five land.
 
 ## Definition of Done
 
-- [ ] All features complete (`[x]` in `milestone-status.txt`)
+- [x] All features complete (`[x]` in `milestone-status.txt`)
 - [ ] All acceptance criteria verified
 - [ ] `gate-3-review.md` checklist fully resolved
-- [ ] `milestone-status.txt` updated with final counts
-- [ ] `progress.txt` milestone summary shows 5/5 features complete
+- [x] `milestone-status.txt` updated with final counts
+- [x] `progress.txt` milestone summary shows 5/5 features complete
 - [ ] SC-1, SC-2, SC-3 demonstrated adversarially and recorded (T1–T8, T38)
 - [ ] SC-6 demonstrated: switch use-case profile, egress policy recomposes with no hand-edit (T14)
 - [ ] SC-7 demonstrated: every attempt from T3–T7 present in the sink with destination and verdict
@@ -342,15 +342,22 @@ indivisible: the R12.8 notice cannot come off until all five land.
       disagreement is recorded as a named gap
 - [ ] Every third party added to the agent traffic path by 02.3 carries an R14.1 record, and T42
       covers all of them — not only the 01.1 set (R14.1 is a MUST per third party)
-- [ ] Both amendments are recorded as proposed edits for an authority that may apply them:
+- [x] Both amendments are recorded as proposed edits for an authority that may apply them:
       **R13.2/T40** (rebuild-required MCP disable, against `REQUIREMENTS.md`) and **D21** (promotion
       trigger, against `docs/ARCHITECTURE_AND_DESIGN.md`, approved at Gate 3 on 2026-09-04).
-      `/milestone` applies neither
-- [ ] **The R13.2/T40 amendment is accepted, or a targeted MCP/tool disable path is built.** R13.2 is
+      `/milestone` applies neither. **Recorded by 02.4 and 02.5; both APPLIED by the operator
+      2026-09-30**, after 02.5's close-out
+- [x] **The R13.2/T40 amendment is accepted, or a targeted MCP/tool disable path is built.** R13.2 is
       a MUST. A recorded proposal is not acceptance, and the milestone does not lift the notice with
-      a MUST outstanding
-- [ ] **The D21 amendment is applied to `docs/ARCHITECTURE_AND_DESIGN.md`.** Until it is, the design
+      a MUST outstanding. **ACCEPTED 2026-09-30 and applied verbatim to `REQUIREMENTS.md:337`
+      (R13.2) and `:510` (T40).** R13.2 is met as amended
+- [x] **The D21 amendment is applied to `docs/ARCHITECTURE_AND_DESIGN.md`.** Until it is, the design
       document still says branch-built images are testing-only and the promotion waits for project
-      completion — a live contradiction with the promotion 02.4 performs
-- [ ] The **"not for real work" notice (R12.8) is lifted for every non-AWS profile**, once the two
-      conditions above are met. A session requiring AWS still waits for Milestone 03
+      completion — a live contradiction with the promotion 02.4 performs. **APPLIED 2026-09-30, all
+      three anchors** (the D21 row's `Decision` and `Alternatives` cells, and § Reproducibility),
+      verbatim from `docs/records/reproducibility.md` § Edit 1
+- [x] The **"not for real work" notice (R12.8) is lifted for every non-AWS profile**, once the two
+      conditions above are met. A session requiring AWS still waits for Milestone 03. **LIFTED
+      2026-09-30** on the operator's decision, both conditions met — `README.md`'s status block now
+      states the clearance, what backs it (T38's six scenarios, SC-1/2/3 under every profile, T45 +
+      T18, 02.5's drilled containment), the AWS carve-out, and three limits that ride along

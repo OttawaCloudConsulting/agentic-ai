@@ -14,9 +14,28 @@ below) are complete, with SC-1/SC-2/SC-3 demonstrated from inside the real agent
 every shipped profile. Feature 02.4 (reproducibility, provenance and onboarding — see
 ["Reproducibility, provenance and onboarding (02.4)"](#reproducibility-provenance-and-onboarding-024)
 below) is complete: every build input is pinned, the consumed base is provably CI-built from `main`
-with an SBOM, and a clean rebuild on a second machine was verified. **This pod is not yet cleared
-for real work** — Feature 02.5 (containment, response and the authorization gate) is still
-building. See [`progress.txt`](progress.txt) for current gate/feature state.
+with an SBOM, and a clean rebuild on a second machine was verified. Feature 02.5 (containment,
+response and the authorization gate — see
+["Containment and response (02.5)"](#containment-and-response-025) below) is complete: the
+authorization gate is enforced at compile time, every persisted credential type has a drilled
+revocation inside a maximum committed beforehand, and the containment, isolation and
+return-to-known-good paths are measured rather than documented.
+
+**The R12.8 "not for real work" notice is LIFTED for every non-AWS profile** (2026-09-30), on the
+operator's decision and against the milestone's stated conditions: all five Milestone 02 features
+landed, the R13.2/T40 amendment is accepted and applied, and the D21 promotion-trigger amendment is
+applied. What backs the clearance: the six R12.8 adversarial scenarios executed with each attempt's
+blocked/logged/attributable status recorded (T38, 02.2); SC-1/SC-2/SC-3 demonstrated from inside the
+real agent containers under every shipped profile; a CI-built, SBOM-carrying base consumed by digest
+with a clean-machine rebuild verified (T45, T18, 02.4); and 02.5's drilled containment.
+
+**The notice still stands for AWS-loading profiles** — those wait on Milestone 03 (R6), which is
+where AWS credential handling and SC-5 are proven. **Three limits ride along with the clearance, and
+they are not footnotes:** detection is pull-based, so nothing bounds compromise to detection (R9.6
+stays MAY); neither provider revocation nor rotation retires a captured `codex` OAuth set, so that
+row's containment is pod-side and ordered; and the project mount is reviewed, never discarded, by
+the recovery path. See [`progress.txt`](progress.txt) for current gate/feature state and
+["Containment and response (02.5)"](#containment-and-response-025) for the response procedure.
 
 **Entry point** (requires Docker Desktop; builds the pod cold on first run):
 

@@ -704,5 +704,23 @@
     acceptance, so it now names the amendment; the row's substance is unchanged. Both proposed edits
     are now applied -- neither by the feature, both by the operator after close-out. Containment
     re-verified 169/0 rc=0.
-    STILL OPEN for /milestone: the D21 promotion-trigger amendment to ARCHITECTURE_AND_DESIGN.md,
-    then lifting the R12.8 notice for every non-AWS profile.
+    POST-CLOSE-OUT, 2026-09-30 (third): operator instructed the D21 amendment and the notice lift.
+    D21 APPLIED -- all three anchors from docs/records/reproducibility.md Edit 1, verbatim: the D21
+    row's Decision cell (promotion trigger is Milestone 02, not project completion, Gate 3 amendment
+    executed at 02.4 SF-4), its Alternatives cell, and the Reproducibility section. The design
+    document no longer contradicts the promotion 02.4 performed.
+    R12.8 NOTICE LIFTED FOR EVERY NON-AWS PROFILE. README's status block now states the clearance,
+    what backs it (T38's six adversarial scenarios with blocked/logged/attributable recorded;
+    SC-1/2/3 from inside the real containers under every shipped profile; T45 CI-built SBOM base
+    consumed by digest plus T18's clean-machine rebuild; 02.5's drilled containment), the AWS
+    carve-out (AWS-loading profiles wait on Milestone 03), and three limits that ride along:
+    detection stays pull-based (R9.6 MAY) so compromise-to-detection is unbounded; neither provider
+    revocation nor rotation retires a captured codex OAuth set; the project mount is reviewed, never
+    discarded. Recorded in reproducibility.md (criterion 11, Edit 1) and containment-drills.md
+    (criterion 9, open items) as operator acts after close-out, not as feature work.
+    Milestone DoD: four boxes ticked (both amendments applied, R13.2/T40 accepted, D21 applied,
+    notice lifted) plus the three mechanical ones (features complete, final counts, progress 5/5).
+    STILL OPEN, and /milestone's: 'All acceptance criteria verified' and 'gate-3-review.md checklist
+    fully resolved', plus the SC-1/2/3, SC-6, SC-7, SC-8, provisional-marker and R14.1 boxes -- each
+    has its evidence in the records, and ticking them is the milestone close-out's act, not a build
+    sub-feature's. Re-verified after these edits: containment 169/0 rc=0, reproducibility 25/0 rc=0.

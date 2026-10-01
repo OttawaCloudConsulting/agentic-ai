@@ -915,6 +915,11 @@ amendment (`docs/records/mcp-inventory.md`).
 
 ### Edit 1 — D21's promotion trigger is Milestone 02, not project completion
 
+**APPLIED 2026-09-30, by the operator's instruction, after Feature 02.5's close-out.** All three
+anchors below were replaced verbatim in `.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md`
+(the D21 row's `Decision` and `Alternatives` cells, and § Reproducibility). This feature recorded the
+text and did not apply it; the design authority did.
+
 **Why.** D21 and § Reproducibility both say the workflow moves to `main` "on project completion".
 The Gate 3 amendment moved that trigger to Milestone 02, and 02.4 SF-4 executed it: the workflow
 has published from `main` since run `34652870008`, with the project far from complete. The document
@@ -1027,7 +1032,7 @@ Feature 02.4's eleven acceptance criteria, each against what actually shows it.
 |---|---|---|---|
 | 1 | T45 — consumed base resolves to a `main`-built, CI-published, SBOM'd digest | **Met** | § T45 above: phase C, 8/8 assertions, run `34799978913`, `head_branch: main`, 327-package SBOM. Red direction measured at planning against run `34376295042` |
 | 2 | No profile consumes a mutable tag (T45, R10.2) | **Met** | `verify-reproducibility.sh` phase A, 6/6 including the negative control that refuses an unpinned `FROM node:22-slim`. `NODE_BASE_DIGEST` (`compose/pins.env:141`) pins `images/Dockerfile:44,82`; the workflow uses buildx's own `sbom: true` rather than an external scanner action |
-| 3 | D21 promotion (Gate 3 amendment) | **Met** | `feature/containerization` landed on `main` by PR #39 (D21 promotion, operator-merged — `/build` prepared it and did not merge it), repinned by PR #40 and closed out by PR #41. The SF-5c republish and its repin landed as PR #45 and PR #46. `compose/pins.env:139-167` names the run, ref and commit. The D21 trigger amendment is recorded above as proposed text, **not applied** |
+| 3 | D21 promotion (Gate 3 amendment) | **Met** | `feature/containerization` landed on `main` by PR #39 (D21 promotion, operator-merged — `/build` prepared it and did not merge it), repinned by PR #40 and closed out by PR #41. The SF-5c republish and its repin landed as PR #45 and PR #46. `compose/pins.env:139-167` names the run, ref and commit. The D21 trigger amendment is recorded above as proposed text, not applied by this feature; **the operator applied all three of its anchors on 2026-09-30** |
 | 4 | T18 — clean rebuild, no manual steps | **Met** | § SF-5 re-run results (2026-09-28): four clean fingerprint diffs across a Compose v2.38.2 → v5.3.1 gap, and the Test Command at `composite exit=0` with all nine scripts green on a factory-reset second Mac. Both halves of the criterion, from captured output. R11.1 discharged |
 | 5 | T39 — fresh operator, `docker compose` the only entry point | **Partly met — statically yes, operationally on attestation** | Static half: `verify-reproducibility.sh` phase D, green (one recorded exception, `scripts/run-shadow-run-sf5.sh`, a boundary-verification harness). Operator half: **closed on operator attestation, not step-log evidence** — see F-a, F-g (ii), F-h |
 | 6 | Onboarding covers first-run auth for all three agents (R12.6) | **Met** | `README.md` § First-run authentication: `claude` paste-back, `codex` device code, and `agy`'s `exec -e GEMINI_API_KEY` / `run --rm -e` path with the paid-tier constraint carried. Exercised live on the second Mac for all three, with F-d (wrong label) and F-e (validity unverified) recorded against it |
@@ -1035,7 +1040,7 @@ Feature 02.4's eleven acceptance criteria, each against what actually shows it.
 | 8 | R10.6 — agent version update path | **Met** | `README.md` § "Updating an agent version (R10.6)": the six-step procedure including `agy`'s by-hand manifest resolution and the mandatory `BOUNDARY_SHADOW_RUN=1` re-verification. `docs/records/agent-verification.md` carries the pointer; `check_pin_agreement()` in `verify-pod-topology.sh` enforces the pins/record agreement |
 | 9 | R10.4 — declared build allowlist, statically checked | **Met as declared + checked; enforcement recorded as absent** | § R10.4 above. `images/build-allowlist.yaml` + phase B (7/7, both negative controls). The finding and its two-part review trigger are recorded, per Decision 5 option A |
 | 10 | Records | **Met by this sub-feature** | This file: T45 chain and results, R10.4 finding and trigger, R11.2 assessment, the two proposed architecture edits as replacement text, and this table. T18/T39 results in § SF-5 re-run results |
-| 11 | The R12.8 notice is **not** lifted here | **Held** | `README.md:17-19` still reads "**This pod is not yet cleared for real work**", now naming 02.5 alone as outstanding. 02.2 SF-6 owns the notice's current-state wording; the milestone Definition of Done lifts it, not this feature |
+| 11 | The R12.8 notice is **not** lifted here | **Held (and later lifted elsewhere)** | Held as stated at 02.4: `README.md:17-19` read "**This pod is not yet cleared for real work**", naming 02.5 alone as outstanding. **The operator lifted the notice for every non-AWS profile on 2026-09-30**, after 02.5 closed out and after both amendments were accepted and applied — not by this feature, and not by 02.5 either. It stands for AWS-loading profiles, which wait on Milestone 03 |
 
 **Not edited by this feature** (feature plan § Documentation, explicit):
 `.project/sandboxed-agent-containerization/docs/ARCHITECTURE_AND_DESIGN.md`, `REQUIREMENTS.md`,
