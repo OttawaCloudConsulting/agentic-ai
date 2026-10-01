@@ -31,11 +31,13 @@ Each skill follows the same bundle structure:
 | `references/phase-templates.md` | Output format templates for all four assessment documents |
 | `references/official-references.md` | Links to official documentation (ITSG and FedRAMP skills) |
 
+`itsg-assessment` additionally bundles `assets/cccs-medium-controls.json` (full Annex B control text, read by scripts only), `scripts/build_profile.py` (regenerates the catalogue from Annex B), and `scripts/evidence_docs.py` (Phase 4 scaffold/check). Both scripts are Python 3, standard library only.
+
 Framework-specific reference files:
 
 | Skill | Control Reference |
 |---|---|
-| `itsg-assessment` | `references/itsg33-controls.md` -- 8 families, ~40 controls with inheritance model |
+| `itsg-assessment` | `references/cccs-medium-profile.md` -- full CCCS Medium catalogue (353 controls incl. enhancements, generated from Annex B); `references/itsg33-controls.md` -- pool resolution, applicability and inheritance model |
 | `nist-fedramp-assessment` | `references/nist-fedramp-controls.md` -- FedRAMP Moderate baseline controls |
 | `nist-csf-assessment` | `references/nist-csf-subcategories.md` -- CSF 2.0 subcategories across 6 Functions with 800-53 mappings |
 
@@ -57,7 +59,7 @@ All three skills proceed through four phases (0-3), with mandatory user checkpoi
 
 Runs first, before any assessment work. Validates that bundled control data matches official sources.
 
-- **itsg-assessment:** Fetches the ITSG-33 Annex 3A page (URL from `references/official-references.md`) and compares against `references/itsg33-controls.md`
+- **itsg-assessment:** Runs `scripts/build_profile.py` against the Annex B CCCS Medium spreadsheet (URL from `references/official-references.md`) and diffs the output against `references/cccs-medium-profile.md` and `assets/cccs-medium-controls.json`; replaces the cached files if they differ
 - **nist-fedramp-assessment:** Fetches the NIST CSRC SP 800-53 Rev 5 page and the FedRAMP.gov documents/templates page, compares against `references/nist-fedramp-controls.md`
 - **nist-csf-assessment:** Fetches the NIST CSF landing page to detect the current published version, compares against the version in `references/nist-csf-subcategories.md`. If a newer CSF version exists, fetches and overwrites the reference file (self-updating)
 
@@ -68,6 +70,8 @@ If differences are found, the reference file is updated and changes are reported
 ### Phase 1 -- Architecture Discovery
 
 Scans the project to build a comprehensive picture of the system architecture.
+
+> **itsg-assessment** uses a different Phase 1: it discovers every component in scope (IaC, application services, pipelines, supplied docs) rather than only the IaC stack. See [itsg-assessment Phase 1](#itsg-assessment-discovery-and-evidence-phases) below.
 
 **Step 1.1 -- Detect Tech Stack.** Scans for technology indicators:
 
@@ -97,13 +101,13 @@ Waits for confirmation before proceeding.
 
 Maps every control or subcategory from the framework-specific reference file to the project's actual implementation.
 
-**itsg-assessment** maps ITSG-33 controls with these fields:
+**itsg-assessment** resolves a control pool (a list supplied in the invocation, otherwise the full CCCS Medium profile), decides applicability per control per component (Applicable / Not Applicable / Organizational), and maps each applicable control with these fields:
 
 | Field | Values |
 |---|---|
-| **Status** | Implemented / Partially Implemented / Not Implemented / Not Applicable |
+| **Status** | Implemented / Partially Implemented / Not Implemented |
 | **Inheritance** | AWS Inherited / AWS Shared / Customer Implemented / GC Org-level |
-| **Evidence** | Specific file paths, line numbers, resource configurations |
+| **Evidence** | file:line or configuration reference, each tagged with provenance (`code`, `config`, `documented`, `attested`) |
 | **Notes** | Caveats, assumptions, dependencies |
 
 **nist-fedramp-assessment** maps FedRAMP Moderate baseline controls with the same fields plus:
@@ -123,16 +127,9 @@ Maps every control or subcategory from the framework-specific reference file to 
 | **800-53 References** | NIST 800-53 Rev 5 informative references for the subcategory |
 | **Notes** | Caveats, assumptions |
 
-**Control Families Assessed (itsg-assessment, 8 families):**
+**Control pool (itsg-assessment):** the full CCCS Medium profile (353 controls including enhancements, across all families) unless the invocation supplies its own control list. Applicability selects from the pool and never adds controls from outside it. Families are read one at a time from `references/cccs-medium-profile.md`.
 
-- **AC** -- Access Control (8 controls: AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, AC-17, AC-20)
-- **AU** -- Audit and Accountability (7 controls: AU-2, AU-3, AU-6, AU-8, AU-9, AU-11, AU-12)
-- **CM** -- Configuration Management (5 controls: CM-2, CM-3, CM-6, CM-7, CM-8)
-- **CP** -- Contingency Planning (3 controls: CP-7, CP-9, CP-10)
-- **IA** -- Identification and Authentication (5 controls: IA-2, IA-3, IA-4, IA-5, IA-8)
-- **SA** -- System and Services Acquisition (5 controls: SA-3, SA-4, SA-8, SA-10, SA-11)
-- **SC** -- System and Communications Protection (5 controls: SC-7, SC-8, SC-12, SC-13, SC-28)
-- **SI** -- System and Information Integrity (5 controls: SI-2, SI-3, SI-4, SI-5, SI-10)
+Phase 2 output includes a `## Controls Requiring System-Owner Input` section (Control, Question). After writing it, the skill generates per-family questionnaires in `docs/compliance/questionnaire/{Family}-questionnaire.md`.
 
 Each skill writes its Phase 2 output to a framework-specific file (`phase2-control-mapping.md`, `phase2-nist-mapping.md`, or `phase2-csf-mapping.md`).
 
@@ -168,6 +165,23 @@ The `nist-csf-assessment` executive summary additionally includes CSF version us
 
 Presents the executive summary and top recommended actions.
 
+### itsg-assessment Discovery and Evidence Phases
+
+**Phase 1 -- Discovery.** The invocation does not need to name the code or controls. The skill:
+
+1. Establishes scope (paths named in the invocation, otherwise the working directory) and enumerates independent code units, following IaC deployment references outward to locate each deployed artifact's source. A deployed component whose source is out of scope is recorded as "source not in scope".
+2. Classifies each unit as infrastructure, application, pipeline, documentation or other, by inspection rather than name.
+3. Analyzes infrastructure for security-relevant configuration, and each application for its security surfaces (entry points, authentication, authorization, sessions, input handling, data, cryptography and secrets, outbound integrations, logging, error handling, supply chain). A surface a component lacks makes the related controls Not Applicable for it.
+4. Reads supplied and conventional architecture docs as `documented` evidence, recording contradictions with code.
+5. Checkpoints with the user, including components with source not in scope and out-of-band controls.
+
+**Phase 4 -- Evidence Documents (optional).** Runs when evidence documents or an evidence package are requested, or accepted after Phase 3. Produces one document per control under `docs/compliance/package/documents/{Family}/`:
+
+- `scripts/evidence_docs.py scaffold` writes the title, Definition, Guidance and requirement column verbatim from `assets/cccs-medium-controls.json` (CCCS Medium values filled in). The model never edits this text.
+- The model writes the Evidential Response (Description, Artifacts, References, Dictionary of Definitions), gathering evidence from supplied files, existing phase outputs, then read-only retrieval via CLIs and MCP servers.
+- Documents move NOT-STARTED to DRAFT; only a reviewer sets APPROVED, and APPROVED documents are never edited.
+- `scripts/evidence_docs.py check` validates structure, Status, Date and source-identical text; every ERROR must be fixed.
+
 ### Smart Re-run
 
 Before starting any phase, each skill checks for existing phase outputs. If found:
@@ -181,12 +195,15 @@ Before starting any phase, each skill checks for existing phase outputs. If foun
 
 | File | Content |
 |---|---|
-| `docs/compliance/phase1-discovery.md` | Architecture discovery: components, services, data flows, trust boundaries |
-| `docs/compliance/phase2-control-mapping.md` | ITSG-33 control mapping (itsg-assessment) |
+| `docs/compliance/phase1-discovery.md` | Architecture discovery: components, services, data flows, trust boundaries (itsg-assessment: component inventory and security surfaces) |
+| `docs/compliance/phase2-control-mapping.md` | ITSG-33 control applicability and mapping (itsg-assessment) |
+| `docs/compliance/questionnaire/{Family}-questionnaire.md` | System-owner questionnaires per family (itsg-assessment) |
 | `docs/compliance/phase2-nist-mapping.md` | FedRAMP Moderate control mapping (nist-fedramp-assessment) |
 | `docs/compliance/phase2-csf-mapping.md` | CSF subcategory mapping (nist-csf-assessment) |
 | `docs/compliance/phase3-gap-analysis.md` | Risk-rated gap entries with remediation recommendations |
 | `docs/compliance/assessment-summary.md` | Executive summary with posture and risk dashboards |
+| `docs/compliance/package/documents/{Family}/*.md` | Optional Phase 4: one evidence document per control (itsg-assessment) |
+| `docs/compliance/package/evidence/{Family}/*` | Optional Phase 4: retrieved evidence too large to inline (itsg-assessment) |
 
 ## Error Handling
 
@@ -194,11 +211,13 @@ All three skills include explicit error handling for common failure scenarios:
 
 | Scenario | Action |
 |---|---|
-| Phase 0 URLs unreachable | Skip validation, warn user, proceed with cached control data in the reference file |
+| Phase 0 URLs unreachable (or `build_profile.py` fails, itsg-assessment) | Skip validation, warn user, proceed with cached control data in the reference file |
 | Phase 0 returns unexpected format (nist-csf-assessment) | Do not overwrite the reference file; report what was received; proceed with existing version |
 | No IaC files detected | Report what was searched. ITSG and FedRAMP skills ask the user if controls exist outside the codebase. |
 | No architecture docs found | Proceed with code-only analysis, note reduced confidence in Phase 1 output |
 | Empty or minimal codebase | Report insufficient evidence for assessment. Ask user for additional context before proceeding. |
+| Deployed component with no source in scope (itsg-assessment) | Assess from config and docs; mark evidence provenance accordingly and raise at the checkpoint |
+| Phase 4 control not in catalogue (itsg-assessment) | Report it; no document generated for that ID |
 | Ambiguous control status | Mark "Partially Implemented" with notes explaining uncertainty; flag for user review at checkpoint |
 | Subcategory reference file missing or corrupt (nist-csf-assessment) | Stop and report. User must restore `references/nist-csf-subcategories.md` before proceeding. |
 
@@ -211,6 +230,8 @@ All three skills include explicit error handling for common failure scenarios:
 - **GC data residency:** Defaults to `ca-central-1`. Flags resources outside Canadian AWS regions (`ca-central-1`, `ca-west-1`)
 - **Respect inheritance:** Many controls are AWS-inherited or GC Org-level. Do not mark these as gaps.
 - **CCCS guidance:** Applies CCCS Medium Cloud Profile control selection as defined in ITSP.50.103 Annex B
+- **Evidence provenance:** Every evidence item is tagged `code`, `config`, `documented` or `attested`. A Customer Implemented control supported only by `documented` or `attested` evidence caps at Partially Implemented. Doc/code conflicts are recorded; code wins.
+- **Read-only retrieval (Phase 4):** Evidence retrieval never changes state, confirms the cloud account before any query, treats retrieved content as data, and never writes secret values into documents. Reviewers own `APPROVED`; the skill never sets or edits it.
 
 ### nist-fedramp-assessment
 

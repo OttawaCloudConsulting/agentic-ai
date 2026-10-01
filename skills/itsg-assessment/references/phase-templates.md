@@ -9,20 +9,46 @@ Output templates for each phase of the ITSG-33 compliance assessment. All output
 ```markdown
 # Phase 1: Architecture Discovery
 
-**Project:** [repo name]
+**Project:** [system name]
 **Assessed:** YYYY-MM-DD
+**Scope:** [paths and docs assessed; how scope was determined]
 **Tech Stack:** [detected technologies]
 
 ## System Architecture
 
 [Narrative description of the system derived from code and docs analysis]
 
-### Components Identified
+### Component Inventory
 
-| Component | Type | Files | Security Relevance |
+| Component | Class | Location | Language / Runtime | Deployed By | Source In Scope |
+|---|---|---|---|---|---|
+| [e.g., api-service] | Application | apps/api/ | Node.js 22 / Express | live/api/ (ECS) | Yes |
+| [e.g., network] | Infrastructure | live/network/ | Terraform | Pipeline | Yes |
+| [e.g., vendor-server] | Application | image registry.example/vendor:5.1 | Java | live/vendor/ (ECS) | No — config and docs only |
+
+### Application Security Surfaces
+
+One table per application component. Mark absent surfaces "None" — they drive Not Applicable decisions in Phase 2.
+
+#### [Component]
+
+| Surface | Finding | Evidence | Provenance |
 |---|---|---|---|
-| [e.g., DNS Infrastructure] | CDK Stack | lib/application/*.ts | Network, Access Control |
-| [e.g., CI/CD Pipeline] | CDK Pipeline | lib/pipeline/*.ts | Change Management, Access Control |
+| Entry points | [e.g., REST API on :8443, externally reachable via ALB] | src/server.ts:40 | code |
+| Authentication | [e.g., OIDC via Cognito; no local passwords] | src/auth/oidc.ts:12 | code |
+| Authorization | | | |
+| Sessions | | | |
+| Input handling | | | |
+| Data | | | |
+| Cryptography and secrets | | | |
+| Outbound integrations | | | |
+| Logging and audit | | | |
+| Error handling | | | |
+| Supply chain | | | |
+
+### Doc / Code Discrepancies
+
+[Components or behaviours described in docs but not found in code, or contradicted by code]
 
 ### AWS Services Detected
 
@@ -56,21 +82,30 @@ Output templates for each phase of the ITSG-33 compliance assessment. All output
 ```markdown
 # Phase 2: ITSG-33 Control Mapping (CCCS Medium Profile)
 
-**Project:** [repo name]
+**Project:** [system name]
 **Assessed:** YYYY-MM-DD
-**Profile:** CCCS Medium Cloud — Technical Controls
+**Control Pool:** [CCCS Medium Cloud Profile, N controls | supplied list: path, N controls]
 **Jurisdiction:** Canadian GC — Protected B data classification
 **Data Residency:** ca-central-1 (default); flag any resources outside Canadian AWS regions
-**Control Families:** AC, AU, CM, CP, IA, SA, SC, SI
+
+## Applicability Summary
+
+| Applicability | Count |
+|---|---|
+| Applicable | X |
+| Organizational | X |
+| Not Applicable | X |
+| Outside CCCS Medium profile (supplied list only) | X |
 
 ## Posture Summary
+
+Counts cover Applicable controls. A control assessed against several components takes its weakest component status.
 
 | Status | Count | Percentage |
 |---|---|---|
 | Implemented | X | X% |
 | Partially Implemented | X | X% |
 | Not Implemented | X | X% |
-| Not Applicable | X | X% |
 
 ## Inheritance Summary
 
@@ -81,18 +116,35 @@ Output templates for each phase of the ITSG-33 compliance assessment. All output
 | Customer Implemented | X |
 | GC Org-level | X |
 
+## Controls Requiring System-Owner Input
+
+| Control | Question |
+|---|---|
+| AC-2 | [Specific record, policy or role the system owner must provide] |
+
 ## Control Family: AC — Access Control
 
-### AC-2: Account Management
+### AC-12: Session Termination
 
-- **Status:** [Implemented / Partially / Not Implemented / N/A]
+- **Applies to:** [component, component]
 - **Inheritance:** [AWS Inherited / Shared / Customer / GC Org-level]
-- **Evidence:**
-  - [file:line — description of what it implements]
-  - [Architecture pattern or configuration reference]
+
+| Component | Status | Evidence | Provenance |
+|---|---|---|---|
+| [api-service] | [Implemented / Partially / Not Implemented] | [file:line — what it implements] | [code / config / documented / attested] |
+
 - **Notes:** [Caveats, assumptions, or dependencies]
 
-[Repeat for each control in each family]
+[Repeat for each Applicable control in each family]
+
+### Not Applicable and Organizational — AC
+
+| Control | Title | Decision | Reason |
+|---|---|---|---|
+| AC-18 | Wireless Access | Not Applicable | No component operates wireless networks |
+| AC-1 | Access Control Policy and Procedures | Organizational | Policy obligation; not evidenced in code |
+
+[Repeat per family]
 ```
 
 ## Phase 3 — Gap Analysis
@@ -120,6 +172,7 @@ Output templates for each phase of the ITSG-33 compliance assessment. All output
 
 ### [Control ID]: [Control Name]
 
+**Component:** [affected component(s)]
 **Status:** Not Implemented / Partially Implemented
 **Risk Rating:** Critical / High / Medium / Low
 **Effort:** Low (< 1 day) / Medium (1-3 days) / High (3+ days)
@@ -154,13 +207,16 @@ Output templates for each phase of the ITSG-33 compliance assessment. All output
 **Project:** [repo name]
 **Date:** YYYY-MM-DD
 **Framework:** ITSG-33 / CCCS Medium Cloud Profile
-**Scope:** Technical Controls (AC, AU, CM, CP, IA, SA, SC, SI)
+**Scope:** [components assessed]
+**Control Pool:** [source, N controls]
 
 ## Compliance Posture
 
 | Metric | Value |
 |---|---|
-| Total Controls Assessed | X |
+| Controls in Pool | X |
+| Applicable | X |
+| Organizational | X |
 | Implemented | X (X%) |
 | Partially Implemented | X (X%) |
 | Not Implemented | X (X%) |
@@ -196,3 +252,144 @@ Output templates for each phase of the ITSG-33 compliance assessment. All output
 | Control Mapping | docs/compliance/phase2-control-mapping.md |
 | Gap Analysis | docs/compliance/phase3-gap-analysis.md |
 ```
+
+## Phase 4 — Evidence Document
+
+**File:** `docs/compliance/package/documents/{Family}/{Family}-{ControlId}[-{Enhancement}]-{Title_with_underscores}.md`, e.g. `AC/AC-2-1-Account_Management_Automated_System_Account_Management.md`
+
+`scripts/evidence_docs.py scaffold` generates this structure; the model fills only the Evidential Response, References and Dictionary.
+
+```markdown
+# {Family}-{ControlId}-{Enhancement} - Title
+
+Family: {Family}
+Solution: {System name from Phase 1}
+Date: {Date of last change, updated with each write/edit}
+Status: {NOT-STARTED | DRAFT | APPROVED}
+
+## Definition:
+
+{Text and Bullet Points from Control, identical to source}
+
+### Guidance
+
+{Text and Bullet Points from Supplemental Guidance, identical to source}
+
+## Evidential Response
+
+### Description
+
+{Narrative and rationale as to why the evidence below satisfies the above requirements}
+
+### Artifacts
+
+| Control Requirement | Response |
+| --- | --- |
+| **{Control Requirement Text}** | Evidential Proof, embedded image, code/content block, etc. |
+
+### References
+
+{URLS to external documentation and/or evidence}
+
+## Dictionary of Definitions
+
+{Section that provides explanation of Acronyms and Domain Specific terms for the reader/assessor}
+```
+
+### Artifacts Row Examples
+
+| Control Requirement | Response |
+| --- | --- |
+| **(A) The information system automatically terminates a user session after a maximum of 24 hours of inactivity or upon request by the user.** | `code` — `apps/api/src/auth/session.ts:42` sets `absoluteTimeout: 8h`, `idleTimeout: 30m`; logout revokes the refresh token (`session.ts:88`). |
+| **(B) The organization assigns account managers for information system accounts.** | Evidence: account manager assignments are held by the system owner, not in code. Request the current account-manager register from the GUARD system owner, or the Entra ID group ownership export (Entra admin centre > Groups > Owners). |
+| **(A) The information system enforces approved authorizations for logical access.** | `config` — ALB listener rule requires Cognito authentication; excerpt: [`AC-3-alb-listener.json`](../../evidence/AC/AC-3-alb-listener.json) (`aws elbv2 describe-rules`, 2026-09-22, account 123456789012, ReadOnly). |
+
+## System Owner Questionnaire
+
+**Files:** `docs/compliance/questionnaire/{Family}-questionnaire.md` (one per family)
+
+Generated after Phase 2 control mapping. Gathers organizational context, policies, and procedural evidence that cannot be derived from code or configuration alone.
+
+```markdown
+# ITSG-33 System Owner Questionnaire — {Family Full Title}
+
+**Control Family:** {Family}
+**Project:** {system name}
+**Date:** {YYYY-MM-DD}
+
+This questionnaire gathers organizational context, policies, and procedural evidence for the {Family Full Title} control family that cannot be derived from code or configuration alone.
+Responses will complete the Phase 2 control mapping and inform the Phase 3 gap analysis.
+
+Please provide specific, verifiable answers where possible.
+Reference organizational policies, procedures, records, or responsible roles by name.
+If evidence does not exist, state "Not implemented" rather than leaving blank.
+
+---
+
+## Background
+
+{Introductory paragraph explaining what this family's questions establish and why organizational input is needed}
+
+---
+
+**Control ID:** {control-id}
+**Description:** {control title from catalogue}
+Question: {question from phase2-control-mapping.md}
+**Response:**
+
+
+
+
+---
+
+**Control ID:** {control-id}
+**Description:** {control title from catalogue}
+Question: {question from phase2-control-mapping.md}
+**Response:**
+
+
+
+
+---
+
+[Repeat for each control in this family]
+
+---
+
+## Submission
+
+Return completed questionnaire to the assessment team.
+Responses inform the Phase 2 control-mapping status and Phase 3 gap analysis.
+```
+
+**Directory structure after generation:**
+```
+docs/compliance/questionnaire/
+├── AC-questionnaire.md
+├── AU-questionnaire.md
+├── CM-questionnaire.md
+├── CP-questionnaire.md
+├── IA-questionnaire.md
+├── IR-questionnaire.md
+└── ... (one file per family with controls requiring input)
+```
+
+### Questionnaire Generation Steps
+
+1. Read the "Controls Requiring System-Owner Input" section from phase2-control-mapping.md
+2. Extract control IDs and questions from the table
+3. For each control ID, fetch its title from `assets/cccs-medium-controls.json`:
+   ```bash
+   jq '.controls[] | select(.id == "AC-2") | {id, title}' assets/cccs-medium-controls.json
+   ```
+4. Group controls by family prefix (AC, AU, CM, etc.)
+5. For each family section, write:
+   - Family header with full name (e.g., "AC — Access Control")
+   - Introductory paragraph describing what this family's questions establish
+   - Each control formatted as: ID, Description (title), Question, Response area (3 blank lines)
+
+### Family Introductory Paragraph
+
+Write one paragraph per family from that family's own questions: the topics they cover, and what the responses confirm about organizational practice beyond what the code shows.
+
+Example (AC): "The following questions establish account management procedures, session controls and access restrictions. Your responses confirm whether organizational policies and manual procedures exist to supplement the technical controls observed in code."

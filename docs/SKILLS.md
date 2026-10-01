@@ -10,7 +10,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 |---|---|---|---|
 | CDK Testing | `/cdk-testing` | Validate, scan, build, test, and deploy CDK code | [View](skills/cdk-testing.md) |
 | Terraform Testing | `/terraform-testing` | Validate, scan, plan, and deploy Terraform code | [View](skills/terraform-testing.md) |
-| ITSG Assessment | `/itsg-assessment` | ITSG-33 / CCCS Medium compliance assessment for Canadian GC cloud workloads handling Protected B data, with user checkpoints | [View](skills/itsg-assessment.md) |
+| ITSG Assessment | `/itsg-assessment` | ITSG-33 / CCCS Medium compliance assessment for Canadian GC cloud workloads handling Protected B data; discovers infrastructure and application code, applies the full CCCS Medium profile, optional per-control evidence documents, user checkpoints | [View](skills/compliance-assess.md) |
 | NIST FedRAMP Assessment | `/nist-fedramp-assessment` | NIST SP 800-53 Rev 5 / FedRAMP Moderate compliance assessment for US cloud workloads with dual inheritance model and FedRAMP ATO readiness | [View](skills/nist-fedramp-assessment.md) |
 | NIST CSF Assessment | `/nist-csf-assessment` | NIST CSF 2.0 outcome-based assessment across all 6 Functions with platform-agnostic evidence mapping, 800-53 informative references, and self-updating Phase 0 that always validates against the latest published CSF version | [View](skills/nist-csf-assessment.md) |
 | Create PRD | `/create-prd` | Guided interview to produce a PRD, architecture document, and progress file for a new project | [View](skills/create-prd.md) |
@@ -38,6 +38,7 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
   - `SKILL.md` — the skill definition with YAML frontmatter (`name`, `description`)
   - `scripts/` — executable shell scripts (optional)
   - `references/` — supporting documentation loaded on-demand (optional)
+  - `assets/` — data files read by scripts, not loaded into context (optional)
 - The `description` field in frontmatter includes trigger phrases so the model knows when to invoke the skill
 - Skills are invoked manually via `/<skill-name>` or automatically when the model matches trigger phrases
 - Set `disable-model-invocation: true` in frontmatter to prevent auto-triggering (use for interactive or destructive skills)
@@ -47,8 +48,9 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 ```
 skills/<name>/
 ├── SKILL.md                  ← skill definition (YAML frontmatter required)
-├── scripts/                  ← executable scripts (portable, auto-detect OS)
-│   └── *.sh
+├── scripts/                  ← scripts (portable, auto-detect OS; `*.sh` or Python 3 stdlib)
+│   └── *.sh / *.py
+├── assets/                   ← data files for scripts (optional)
 └── references/               ← supporting docs (loaded by SKILL.md as needed)
     └── *.md
 ```
