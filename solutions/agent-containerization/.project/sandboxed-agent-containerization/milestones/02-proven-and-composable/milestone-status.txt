@@ -724,3 +724,14 @@
     fully resolved', plus the SC-1/2/3, SC-6, SC-7, SC-8, provisional-marker and R14.1 boxes -- each
     has its evidence in the records, and ticking them is the milestone close-out's act, not a build
     sub-feature's. Re-verified after these edits: containment 169/0 rc=0, reproducibility 25/0 rc=0.
+    MILESTONE DoD FULLY RESOLVED 2026-09-30 (/milestone, operator-directed): the remaining seven
+    boxes ticked, each annotated with the record or harness that evidences it -- criterion tables
+    per feature; gate-3-review.md [x] Approved; boundary-validation.md for SC-1/2/3 (T1-T8, T38);
+    pack-composition phase E for SC-6 (T14); boundary-validation plus agent-action-log and the
+    README's T35 section for SC-7; reproducibility.md for SC-8 (T18, T45); allowlist.base.yaml:16
+    provisional=false; third-party-assessments.md section T42 for R14.1 per third party. Named gaps
+    stay named rather than being counted as met: P2's disposable cluster (02.2), the agy boundary
+    leg's missing GEMINI_API_KEY (02.2), V2's timed row (02.5), and T39 closing on operator
+    attestation rather than step-log evidence (02.4).
+    GATE 3 IS NOT CLOSED HERE. /milestone never writes [x] to Gate 3 (D-05); progress.txt keeps
+    [~] In progress and /project owns the closure.

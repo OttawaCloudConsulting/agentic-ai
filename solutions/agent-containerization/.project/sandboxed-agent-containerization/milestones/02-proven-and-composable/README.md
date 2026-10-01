@@ -328,20 +328,40 @@ indivisible: the R12.8 notice cannot come off until all five land.
 ## Definition of Done
 
 - [x] All features complete (`[x]` in `milestone-status.txt`)
-- [ ] All acceptance criteria verified
-- [ ] `gate-3-review.md` checklist fully resolved
+- [x] All acceptance criteria verified — each feature's record carries a criterion-to-evidence
+      table: `agent-action-log.md` (02.1), `boundary-validation.md` (02.2), `tool-packs` /
+      `mcp-inventory.md` (02.3), `reproducibility.md` (02.4), `containment-drills.md` (02.5). Named
+      gaps are carried as gaps, not as met criteria — P2's disposable cluster (02.2), V2's timed row
+      (02.5), and the `agy` boundary leg's missing `GEMINI_API_KEY`
+- [x] `gate-3-review.md` checklist fully resolved — `reviews/gate-3-review.md` reads
+      **[x] Approved** with every structural, content and [Auto] item `[x]`
 - [x] `milestone-status.txt` updated with final counts
 - [x] `progress.txt` milestone summary shows 5/5 features complete
-- [ ] SC-1, SC-2, SC-3 demonstrated adversarially and recorded (T1–T8, T38)
-- [ ] SC-6 demonstrated: switch use-case profile, egress policy recomposes with no hand-edit (T14)
-- [ ] SC-7 demonstrated: every attempt from T3–T7 present in the sink with destination and verdict
-      (T16), correlatable and attributable (T35)
-- [ ] SC-8 demonstrated: clean-machine rebuild, no manual steps (T18), against a CI-published digest
-      with an SBOM (T45)
-- [ ] `policy/allowlist.base.yaml` no longer carries the `provisional` marker, or the remaining
-      disagreement is recorded as a named gap
-- [ ] Every third party added to the agent traffic path by 02.3 carries an R14.1 record, and T42
-      covers all of them — not only the 01.1 set (R14.1 is a MUST per third party)
+- [x] SC-1, SC-2, SC-3 demonstrated adversarially and recorded (T1–T8, T38) —
+      `docs/records/boundary-validation.md` (02.2), the six R12.8 scenarios with each attempt's
+      blocked / logged / attributable status, run from inside the real agent containers under every
+      shipped profile; `validate-boundary.sh` 416/0 across four profiles
+- [x] SC-6 demonstrated: switch use-case profile, egress policy recomposes with no hand-edit (T14)
+      — `verify-pack-composition.sh` phase E ("load and unload — T14"), 109/0, plus phase D's drift
+      refusal that makes the recompile non-optional (02.3)
+- [x] SC-7 demonstrated: every attempt from T3–T7 present in the sink with destination and verdict
+      (T16), correlatable and attributable (T35) — `docs/records/boundary-validation.md` (T16) and
+      `docs/records/agent-action-log.md` with README § "Correlating the egress and action trails
+      (T35)" (02.1); `verify-audit-completeness.sh` 76/0
+- [x] SC-8 demonstrated: clean-machine rebuild, no manual steps (T18), against a CI-published digest
+      with an SBOM (T45) — `docs/records/reproducibility.md`: four profiles fingerprinted on a
+      factory-reset second Mac, all diffing clean; the pinned base's SPDX SBOM and SLSA provenance
+      checked back to a `main` run; `verify-reproducibility.sh` 25/0. **Caveat carried, not hidden:**
+      T39's operator walkthrough closed on attestation, not step-log evidence
+- [x] `policy/allowlist.base.yaml` no longer carries the `provisional` marker, or the remaining
+      disagreement is recorded as a named gap — `policy/allowlist.base.yaml:16` reads
+      `provisional: false`, flipped at 02.2 SF-5 once the mediator's own trail corroborated all four
+      single-source entries (verdict=allow, correct `identity_source`, http_status=200)
+- [x] Every third party added to the agent traffic path by 02.3 carries an R14.1 record, and T42
+      covers all of them — not only the 01.1 set (R14.1 is a MUST per third party) —
+      `docs/records/third-party-assessments.md` § T42 (02.3 SF-8) re-inspects the whole set, with
+      HashiCorp, GitHub and the Kubernetes posture record added; `verify-mcp-inventory.sh` 44/0 and
+      `verify-tool-packs.sh` 41/0
 - [x] Both amendments are recorded as proposed edits for an authority that may apply them:
       **R13.2/T40** (rebuild-required MCP disable, against `REQUIREMENTS.md`) and **D21** (promotion
       trigger, against `docs/ARCHITECTURE_AND_DESIGN.md`, approved at Gate 3 on 2026-09-04).
