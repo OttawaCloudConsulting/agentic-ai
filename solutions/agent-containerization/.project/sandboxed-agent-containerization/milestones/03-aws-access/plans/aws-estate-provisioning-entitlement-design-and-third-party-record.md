@@ -214,7 +214,7 @@ Ordered so the specification exists before the provisioning it specifies, and th
 after the records it parses. **Five sub-features** — SF-2 and SF-3 are the external/buildable split
 the review asked for.
 
-- [ ] **SF-1: The entitlement design record (specification first).**
+- [x] **SF-1: The entitlement design record (specification first).**
   - `docs/records/aws-estate-entitlement.md` created, carrying: the principal and permission-set
     design; read-only default; the per-profile write-grant table (empty is valid, recorded as
     empty); the session duration **as a number** with its accepted cost; the data-perimeter
