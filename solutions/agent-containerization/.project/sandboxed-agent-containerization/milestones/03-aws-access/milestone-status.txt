@@ -3,8 +3,33 @@
 
 ## Features
 
-[ ] Feature 03.1: AWS estate provisioning, entitlement design and third-party record
-    Plan: (not yet planned)
+[~] Feature 03.1: AWS estate provisioning, entitlement design and third-party record
+    Plan: .project/sandboxed-agent-containerization/milestones/03-aws-access/plans/aws-estate-provisioning-entitlement-design-and-third-party-record.md
+    Sub-features: 0/5 complete
+    Notes: Gate 4 approved 2026-10-04 after one external (Codex) review cycle -- eight findings
+    raised, all eight applied, mapped in the plan's Review Revisions section. Two were verified in
+    the code before being accepted: anchor resolution is enforced by scripts/lint-policy.sh:260 and
+    NOT by compile-policy.sh (phase E asserts against lint-policy), and a repo-wide 12-digit account
+    scan would have been red on arrival (policy/allowlist.base.yaml:141 carries a GCP project
+    number), so phase C is scoped to the two AWS records with AWS-specific patterns.
+    START-GATE SATISFIED: Q9 answered yes and Q1 answered 'a broad S3 surface', both operator-
+    answered 2026-09-30 and APPLIED to REQUIREMENTS.md's Q1/Q9 rows on 2026-10-04 -- so the plan
+    cites the register rather than a conversation. Q1's consequence is carried in full: R6.4.3 is
+    IMPRACTICAL and T13 rests entirely on R6.3.6, a SHOULD enforced by SCPs in an estate this
+    project does not own.
+    OPERATOR DECISION 2026-10-04 on the blocking/gap-able split: a missing DATA PERIMETER BLOCKS
+    03.1 (criterion 4) because Q1's answer leaves T13 with no other control -- Edge Case 1 is an
+    escalation, not a gap; a missing permission boundary or destructive-action deny is gap-able with
+    a recorded consequence (criterion 5), because the read-only default survives their absence.
+    'GAP:' is accepted ONLY under those two sections and only with a non-empty consequence.
+    SF-2 is an EXTERNAL PRECONDITION with a defined BLOCKED state and a stop rule: a /build session
+    reaching it with no operator report halts rather than proceeding to SF-3 on assumptions.
+    Records-only feature: no credential-inventory row is created here (it would take
+    verify-containment.sh phase A red on landing); 03.2 and 03.5 own the AWS credential rows. The
+    R14.1 traffic-path field is PROVISIONAL, keyed to Q1's endpoint classes, with 03.3 named as the
+    verifier of the exact FQDNs. R6.5.2 is Model-A-scoped and therefore not load-bearing here --
+    criterion 1 rests on R6.3.2, and the milestone README's '(R6.3.2, R6.5.2)' citation is recorded
+    as an observation against a gate artifact rather than silently followed.
 
 [ ] Feature 03.2: Credential broker — the mediator's fifth role
     Plan: (not yet planned)

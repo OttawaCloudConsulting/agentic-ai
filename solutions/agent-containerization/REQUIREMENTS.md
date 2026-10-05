@@ -383,11 +383,12 @@ Explicitly out of scope. Listed so they are not silently assumed.
 
 ## Open Questions
 
-**Seven of nine were answered at Gate 1 (2026-09-03).** Q1 and Q9 remain open; neither blocks the design.
+**Seven of nine were answered at Gate 1 (2026-09-03).** Q1 and Q9 were answered by the operator on
+2026-09-30, at the start of Milestone 03 and before Feature 03.1 was planned — see their rows.
 
 | # | Question | Status |
 |---|---|---|
-| Q1 | Which AWS accounts and services must the agent actually reach? | **Open.** Determines whether R6.4.3's bucket-level allowlisting is practical or whether the surface is too broad |
+| Q1 | Which AWS accounts and services must the agent actually reach? | **Answered 2026-09-30 — a broad S3 surface.** The consequence is therefore the second branch the question anticipated: **R6.4.3 is impractical** (bucket-specific FQDN allowlisting needs a bounded bucket set; the alternatives are a `*.s3.<region>` wildcard, which re-opens the exfiltration path R6.4.2 prohibits, or an allowlist that churns per bucket), and **T13 rests entirely on R6.3.6** — a SHOULD, enforced by SCPs in an estate this project does not own. R6.4.1/R6.4.2 are unchanged: no `*.amazonaws.com`, no bare `s3.<region>` endpoint, no `*.s3.<region>` wildcard, and `s3.addressing_style = virtual`. Recorded in full in Feature 03.1's entitlement record |
 | Q2 | Is this for one workstation or a team/CI artifact? | **Answered — one workstation.** A1 holds; R10 and R11.2 stay SHOULD |
 | Q3 | Will agents operate on untrusted third-party repositories? | **Answered — no, trusted-ish only.** A3 holds; Option 3 is not forced |
 | Q4 | Which agent auth mode per agent — subscription OAuth or API key? | **Answered — both.** `AUTH_MODE` per agent (R4.12). Defaults: Claude Code and Codex `oauth-interactive`, `agy` `apikey` |
@@ -395,7 +396,7 @@ Explicitly out of scope. Listed so they are not silently assumed.
 | Q6 | Acceptable session-duration and re-authentication frequency? | **Answered — split.** AWS short-lived via Model B brokering; model-provider credentials long-lived on state volumes per R4.16 |
 | Q7 | Are Kubernetes or Terraform packs needed at first release, or later? | **Answered — all four packs at first release**, plus pinned OS packages (R7.18/R7.19). Staging across milestones is a Gate 3 question |
 | Q8 | Which credential delivery model — A or B? | **Answered — Model B (brokered).** Gated on R8.8, now MUST |
-| Q9 | Can a dedicated Identity Center user or group be created for agent use? | **Open.** Model B still requires a principal to broker from; A5 assumes the estate can be modified |
+| Q9 | Can a dedicated Identity Center user or group be created for agent use? | **Answered 2026-09-30 — yes.** A5 holds: the estate can be modified to add a dedicated principal and an agent permission set. Milestone 03's start-gate is therefore satisfied and D13a's fail-closed outcome is not invoked |
 
 ## Acceptance Test Matrix
 
