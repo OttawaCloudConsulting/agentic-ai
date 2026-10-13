@@ -13,13 +13,15 @@ For single-file commands (no supporting assets), see [COMMANDS.md](COMMANDS.md).
 | ITSG Assessment | `/itsg-assessment` | ITSG-33 / CCCS Medium compliance assessment for Canadian GC cloud workloads handling Protected B data, with user checkpoints | [View](skills/itsg-assessment.md) |
 | NIST FedRAMP Assessment | `/nist-fedramp-assessment` | NIST SP 800-53 Rev 5 / FedRAMP Moderate compliance assessment for US cloud workloads with dual inheritance model and FedRAMP ATO readiness | [View](skills/nist-fedramp-assessment.md) |
 | NIST CSF Assessment | `/nist-csf-assessment` | NIST CSF 2.0 outcome-based assessment across all 6 Functions with platform-agnostic evidence mapping, 800-53 informative references, and self-updating Phase 0 that always validates against the latest published CSF version | [View](skills/nist-csf-assessment.md) |
-| Create PRD | `/create-prd` | Guided interview to produce a PRD, architecture document, and progress file for a new project | [View](skills/create-prd.md) |
+| Create Spec | `/create-spec` | Capture requirements, scope, and interface contracts in a root-level `spec.md` before the PRD; seeds from a plan-mode plan when one exists | [View](skills/create-spec.md) |
+| Create PRD | `/create-prd` | Guided interview to produce a PRD, architecture document, and progress file for a new project; runs confirmation-only when a `spec.md` exists | [View](skills/create-prd.md) |
 | Define | `/define` | Single-session codebase assessment, optional Working Backwards, and PRD creation (Gates 0/WB/1) | [View](skills/define.md) |
 | Design | `/design` | Architecture and design specification from approved PRD, with refresh mode for deviation consolidation (Gate 2) | [View](skills/design.md) |
 | Milestone | `/milestone` | Per-milestone feature breakdown with acceptance criteria and revision support (Gate 3) | [View](skills/milestone.md) |
 | Plan Feature | `/plan-feature` | Per-feature implementation plan with sub-feature sizing and test commands (Gate 4) | [View](skills/plan-feature.md) |
 | Build | `/build` | Sub-feature implementation from Gate 4-approved plans with test gating and deviation tracking | [View](skills/build.md) |
 | Spike | `/spike` | Adversarial technical research with red-team validation and follow-up support | [View](skills/spike.md) |
+| Research | `/research` | Standalone adversarial technical research from free text and/or existing files, with independent red-team validation; no `/project` bootstrap or `progress.txt` | [View](skills/research.md) |
 | Red-Team | `/red-team` | Adversarial review of any artifact — spawns parallel sub-agents with different adversarial lenses | [View](skills/red-team.md) |
 | OCC Skill Creator | `/occ-skill-creator` | Guide for creating new skills that extend Claude's capabilities | [View](skills/occ-skill-creator.md) |
 | OCC Skill Refactor | `/occ-skill-refactor` | Reviews and refactors an existing skill against quality standards and best practices | [View](skills/occ-skill-refactor.md) |
@@ -86,7 +88,9 @@ cp -r skills/terraform-testing/         <target-repo>/.claude/skills/terraform-t
 cp -r skills/itsg-assessment/           <target-repo>/.claude/skills/itsg-assessment/
 cp -r skills/nist-fedramp-assessment/   <target-repo>/.claude/skills/nist-fedramp-assessment/
 cp -r skills/nist-csf-assessment/       <target-repo>/.claude/skills/nist-csf-assessment/
+cp -r skills/create-spec/               <target-repo>/.claude/skills/create-spec/
 cp -r skills/create-prd/                <target-repo>/.claude/skills/create-prd/
+cp -r skills/research/                  <target-repo>/.claude/skills/research/
 cp -r skills/red-team/                  <target-repo>/.claude/skills/red-team/
 cp -r skills/occ-skill-creator/         <target-repo>/.claude/skills/occ-skill-creator/
 cp -r skills/occ-skill-refactor/        <target-repo>/.claude/skills/occ-skill-refactor/

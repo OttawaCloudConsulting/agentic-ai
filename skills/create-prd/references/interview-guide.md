@@ -4,6 +4,10 @@ Reference for Step 2 (PRD Deep Dive) and Step 3 (Architecture and Design) interv
 Group into rounds of 2–4 questions each. Do not ask all questions at once.
 Adapt questions to the project type — not all rounds apply to every project.
 
+**When `spec.md` exists** (written by `/create-spec`), every round runs in confirmation-only mode:
+show what the spec already answers, ask only about gaps and contradictions, and skip a round the
+spec fully covers. Round 5 additionally re-raises each spec `Open assumptions` entry.
+
 ## PRD Interview Rounds
 
 ### Round 1 — Scope and Boundaries
@@ -47,7 +51,8 @@ Adapt questions to the project type — not all rounds apply to every project.
 
 - Present key design decisions implied by the PRD and ask the user to confirm or override.
 - For each decision, capture: what was decided, what alternatives exist, and why this choice was made.
-- Number decisions sequentially (Decision #1, #2, ...) for cross-referencing.
+- Number decisions sequentially (D1, D2, ...) for cross-referencing. Decisions carried in from a
+  `spec.md` keep their spec IDs.
 - Target 10–20 decisions for a substantial architecture. Push beyond the obvious ones.
 
 ### Component Design

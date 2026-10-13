@@ -100,8 +100,8 @@ project-root/
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| 1 | | |
-| 2 | | |
+| D1 | | |
+| D2 | | |
 
 ## Deployment Workflow
 
