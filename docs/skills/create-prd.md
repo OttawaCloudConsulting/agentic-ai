@@ -16,7 +16,7 @@ Guided skill for producing a complete project foundation through structured inte
 | `assets/prd-template.md` | PRD output scaffold — Summary, Goals, Non-Goals, Architecture, Features, Configuration, Outputs, Risk Assessment, External Dependencies, Success Criteria, Future Enhancements |
 | `assets/architecture-template.md` | Architecture doc scaffold — Component Diagram, Data Flow, Component Inventory, Security Model, File Organization, Configuration, Outputs, Design Decisions, Deployment Workflow, Dependency Graph, Out of Scope |
 | `assets/progress-template.txt` | Progress file scaffold with status legend, multi-phase variant, and NOTES field conventions |
-| `references/interview-guide.md` | Question bank for PRD rounds (Round 1–5) and architecture interview areas |
+| `references/interview-guide.md` | Question bank for PRD rounds (Round 1–5) and architecture interview areas, plus confirmation-only mode when `spec.md` exists |
 
 ## Usage
 
@@ -25,6 +25,23 @@ Guided skill for producing a complete project foundation through structured inte
 ```
 
 Invoke at the start of a new project. The skill checks for existing output files and confirms before overwriting any.
+
+## Spec-Seeded Mode
+
+If a root-level `spec.md` exists (written by `/create-spec`), the skill reads it and runs the interview in confirmation-only mode: each round presents what the spec already answers and asks only about gaps and contradictions; a round the spec fully covers is skipped. The skill never writes or modifies `spec.md`.
+
+| `spec.md` section | Seeds |
+|---|---|
+| Context, Requirements | PRD Summary, Goals, Features |
+| Out of scope | PRD Non-Goals |
+| Risks (`R<n>`) | PRD Risk Assessment |
+| External dependencies | PRD External Dependencies |
+| Approach decisions (`D<n>`) | Architecture Design Decisions |
+| Interface contracts | Architecture Component Inventory, Configuration |
+| Acceptance criteria | Feature acceptance criteria |
+| Open assumptions | Re-raised in Round 5; resolved or recorded in Risk Assessment |
+
+`D<n>` and `R<n>` identifiers carry across verbatim and are never renumbered. Spec requirement numbers are traceability, not feature numbers: Feature numbering is unchanged, and each PRD feature cites the requirements it satisfies in a `**Traces to:**` line. The final report states `SEEDED FROM: spec.md | interview`.
 
 ## Workflow
 
@@ -108,5 +125,6 @@ Presents a summary: artifact names, feature count, configuration parameter count
 
 ## Related Skills
 
+- **create-spec** — run first to capture requirements in `spec.md`; `/create-prd` then runs in confirmation-only mode
 - **skill-creator** — use to build new skill bundles like this one
 - **start-feature** — invoke after `/create-prd` to begin implementing Feature 1

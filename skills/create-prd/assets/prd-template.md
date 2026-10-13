@@ -32,6 +32,8 @@ Use a text diagram for system-level projects; use a narrative for simpler or lib
 
 [Description of what this feature does and why it is needed]
 
+<!-- Spec-seeded runs only: **Traces to:** [spec requirement numbers, e.g. 2, 4a]. Omit otherwise. -->
+
 **Acceptance Criteria:**
 
 - [Specific, testable requirement]
@@ -73,9 +75,9 @@ Use a text diagram for system-level projects; use a narrative for simpler or lib
 
 <!-- Include when the project has meaningful technical, operational, or delivery risks. -->
 
-| Risk | Mitigation |
-|------|-----------|
-| | |
+| ID | Risk | Mitigation |
+|----|------|-----------|
+| R1 | | |
 
 ## External Dependencies
 

@@ -21,10 +21,36 @@ Create a complete project foundation through a structured interview process. Pro
 - **Do not begin implementation.** This skill produces planning documents only.
 - **Cross-reference everything.** Feature numbers, parameter names, and component names must match
   across all three documents.
+- **Never write `spec.md`.** When one exists it is input only (see **Spec-seeded mode**).
+
+## Spec-seeded mode
+
+`/create-spec` produces a root-level `spec.md` that captures requirements, scope, and interface
+contracts before this skill runs. When it exists, the interview becomes confirmation-only: present
+what the spec already answers and ask only about gaps and contradictions.
+
+| `spec.md` section | Seeds |
+|-------------------|-------|
+| Context, Requirements | `prd.md` Summary, Goals, Features |
+| Out of scope | `prd.md` Non-Goals (same table shape) |
+| Risks (`R<n>`) | `prd.md` Risk Assessment |
+| External dependencies | `prd.md` External Dependencies |
+| Approach decisions (`D<n>`) | Architecture Design Decisions |
+| Interface contracts | Architecture Component Inventory and Configuration |
+| Acceptance criteria | Feature acceptance criteria |
+| Open assumptions | Resolved in Round 5, or carried into Risk Assessment |
+
+**Identifiers.** `D<n>` and `R<n>` carry across verbatim and are never renumbered. Spec requirement
+numbers are *traceability*, not feature numbers: Feature numbering is unchanged (Feature 1 is the
+architecture document), and each PRD feature cites the requirement numbers it satisfies in a
+`**Traces to:**` line. Every spec requirement must appear in at least one feature's `Traces to:`.
 
 ## Prerequisites
 
 - Working directory is the project root (or subdirectory where the project will live)
+- If `spec.md` exists in the working directory, read it in full and tell the user the run is
+  spec-seeded. Otherwise the run is interview-seeded and the **Spec-seeded mode** sections below do
+  not apply.
 - Check whether any of the three output files exist (`prd.md`, `docs/ARCHITECTURE_AND_DESIGN.md`,
   `progress.txt`) — confirm with the user before overwriting any that are present
 - **Coexistence with `/project` (schema guard).** `/create-prd` writes a *light* `progress.txt`
@@ -38,7 +64,11 @@ Create a complete project foundation through a structured interview process. Pro
 
 ## Step 1 — Seed the PRD
 
-Use `AskUserQuestion` to gather the initial project concept:
+**Spec-seeded:** do not ask the questions below. Seed `prd.md` from `spec.md` per the mapping in
+**Spec-seeded mode**, then ask one `AskUserQuestion` only for what the spec leaves unanswered
+(typically technology stack or project type).
+
+**Interview-seeded:** use `AskUserQuestion` to gather the initial project concept:
 
 - What are you building? (1-2 sentence description)
 - What is the technology stack? (languages, frameworks, services, platforms)
@@ -65,6 +95,11 @@ Each round maps to these PRD sections:
 - Round 4 (Security) → Risk Assessment (security entries); may surface new features
 - Round 5 (Operational) → Risk Assessment (operational entries), Future Enhancements
 
+**Spec-seeded:** run each round in confirmation-only mode. Show what `spec.md` already answers for
+the round's sections, ask only about gaps and contradictions, and skip a round the spec fully
+covers (say so). In Round 5, also raise every `Open assumptions` entry from the spec: resolve it
+with the user, or record it in Risk Assessment with its stated default.
+
 Continue until the user indicates the PRD is comprehensive, or all rounds are complete.
 
 **Quality bar:** The PRD must have specific acceptance criteria per feature and clear
@@ -77,6 +112,10 @@ Read `assets/architecture-template.md` for the document structure.
 
 Use Bash (`mkdir -p docs`) to ensure `docs/` exists. Conduct a focused interview using
 `AskUserQuestion` covering all areas from the interview guide.
+
+**Spec-seeded:** pre-fill Design Decisions from the spec's `D<n>` entries, keeping their IDs and
+rejected alternatives, and pre-fill Component Inventory and Configuration from its Interface
+contracts. Ask only about areas the spec does not cover.
 
 Use the Write tool to create `docs/ARCHITECTURE_AND_DESIGN.md`. Omit sections that are
 irrelevant to the project; add sections needed but not in the template. Read the file back
@@ -131,6 +170,8 @@ Present a final summary:
 
 ```
 PROJECT SETUP COMPLETE: [Project Title]
+
+SEEDED FROM: [spec.md | interview]
 
 ARTIFACTS CREATED:
 - prd.md — [N] features, [M] configuration parameters, [K] outputs

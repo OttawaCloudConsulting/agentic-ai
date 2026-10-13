@@ -23,6 +23,7 @@ No arguments. The command conducts an interactive interview to gather all requir
 | Project concept and requirements | User responses via `AskUserQuestion` | Yes |
 | Scope and boundary decisions | User responses via `AskUserQuestion` | Yes |
 | Architecture and security decisions | User responses via `AskUserQuestion` | Yes |
+| Existing `spec.md` | File system (written by `/create-spec`; read-only input — when present, the interview runs in confirmation-only mode, `D<n>`/`R<n>` IDs carry across verbatim, and each feature cites the spec requirements it satisfies in a `Traces to:` line) | No |
 | Existing `prd.md` | File system (checked for overwrite confirmation) | No |
 | Existing `docs/ARCHITECTURE_AND_DESIGN.md` | File system (checked for overwrite confirmation) | No |
 | Existing `progress.txt` | File system (checked for overwrite confirmation) | No |
