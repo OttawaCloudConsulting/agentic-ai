@@ -78,3 +78,4 @@ skills/project/spike/
 | `/milestone` | Reads spike artifacts when referenced in milestone planning |
 | `/design` | Spike findings may inform architecture decisions |
 | `/plan-feature` | Spike findings may inform feature planning |
+| `/research` | Standalone sibling with the same research and red-team agent pair; no `progress.txt` or `.project/` coupling, accepts existing files as input |
