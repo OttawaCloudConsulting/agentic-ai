@@ -236,7 +236,7 @@ the review asked for.
     destructive deny is missing, SF-2 completes and the gap is recorded in SF-3 (criterion 5).
   - `/build` cannot drive this. A build session reaching SF-2 with no operator report **stops and
     says so** rather than proceeding to SF-3 on assumptions.
-- [ ] **SF-3: The provisioning evidence, recorded.**
+- [x] **SF-3: The provisioning evidence, recorded.**
   - `aws-estate-entitlement.md` gains the evidence against each criterion, in placeholder form: what
     exists, at what scope, how confirmed, and **how "no operator permission set is reachable" was
     established**.
