@@ -254,7 +254,7 @@ the review asked for.
   - A `## T42 — Third-party traffic-path governance (re-inspection, Feature 03.1 SF-4)` section with
     the AWS row, stating the record exists **before** any agent request reaches an AWS endpoint.
   - 1 file, 3 insertions.
-- [ ] **SF-5: The static harness, and the carried proposals.**
+- [x] **SF-5: The static harness, and the carried proposals.**
   - `tests/acceptance/verify-aws-estate.sh` created, house idiom (`set -euo pipefail`, `ROOT`
     resolution, `pass`/`fail`/`phase`/`note`, `=== Results:` termination, exit 1 on any failure):
     - **Phase A — the entitlement record:** every required section present, **including CloudTrail

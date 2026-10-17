@@ -39,9 +39,9 @@ other account or OU was considered necessary at this feature.
 
 | Field | Value |
 |---|---|
-| Role | `arn:aws:iam::<ACCOUNT_ID>:role/platform/AgentSandboxReadOnlyRole` |
+| Role | `<TARGET_ROLE_ARN>` |
 | MaxSessionDuration | 3600 seconds (AWS ceiling; the broker built in 03.2 proposes requesting `DurationSeconds=900` — not yet confirmed, since the broker does not exist yet) |
-| Permission boundary | `arn:aws:iam::<ACCOUNT_ID>:policy/org/Boundary-Default` (mandatory on this role) |
+| Permission boundary | `<BOUNDARY_POLICY_ARN>` (mandatory on this role) |
 | Managed policy | `ReadOnlyAccess` |
 | Trust policy | Allows `sts:AssumeRole` + `sts:SetSourceIdentity` from the Dev account root, narrowed by: `aws:PrincipalArn` `ArnLike` matching `AWSReservedSSO_OCC-Agent-Sandbox-RO_*`; `aws:PrincipalOrgID` `StringEquals` `<ORG_ID>`; `sts:SourceIdentity` `StringLike` `?*` (non-empty, required) |
 
@@ -99,7 +99,7 @@ added for them.
 
 | Field | Value |
 |---|---|
-| Mechanism | `arn:aws:iam::<ACCOUNT_ID>:policy/org/Boundary-Default`, attached to both `AgentSandboxReadOnlyRole` and the `OCC-Agent-Sandbox-RO` permission set (mandatory on the Dev role) |
+| Mechanism | `<BOUNDARY_POLICY_ARN>`, attached to both `AgentSandboxReadOnlyRole` and the `OCC-Agent-Sandbox-RO` permission set (mandatory on the Dev role) |
 | Prevents | principal creation and privilege escalation |
 
 Criterion 5 (R6.3.7): attached. Not a gap. A SHOULD with a control that survives its absence — the
@@ -198,6 +198,33 @@ Specifically carried forward to 03.4, unverified here despite the SF-3 live test
 - The broker's actual issued session duration (03.2 does not exist yet; 900 seconds is a proposal,
   not a built value) and whether the broker in fact sets `SourceIdentity`/`RoleSessionName` to the
   R8.8 workload identity as this record assumes it will.
+
+## Carried proposals and observations (recorded, not applied)
+
+Gate artifacts are not edited by `/build`; these are put to the operator, as 02.3, 02.4 and 02.5 did.
+
+1. **Proposed edit, `docs/ARCHITECTURE_AND_DESIGN.md` § Security:** a one-line pointer to this record
+   as the owner of the AWS estate design (principal, permission set, data perimeter, chained role).
+2. **R6.3.8 attribution-granularity finding: not raised.** It was conditional on per-agent naming
+   proving unreachable. It is reachable (see CloudTrail attribution), so no amendment is proposed.
+3. **Observation against the milestone README:** it cites "(R6.3.2, R6.5.2)" for the principal
+   criterion. R6.5.2 is Model-A-scoped; this feature rests on R6.3.2. See the citation note above.
+4. **Deviation recorded in the feature plan:** `SourceIdentity` added as a trust-policy gate alongside
+   `RoleSessionName`. Consider `/design refresh` to consolidate.
+5. **Real identifiers are held outside this repository** (the operator's infrastructure repository and
+   the AWS console). This record carries placeholders only; the harness enforces it (phase C).
+
+## Negative controls (run once on 2026-10-17, not left in the suite)
+
+| Control | Expected failure | Observed |
+|---|---|---|
+| Session duration set to `TBD` | A2, A3 | A2, A3 failed |
+| Data-perimeter condition keys name no key | A7 | A7 failed |
+| Data perimeter cell carrying a gap marker (criterion 4) | A6 | A6, A9 failed |
+| Gap marker with no consequence in a criterion-5 cell | A8 | A8 failed |
+| R14.1 `Incomplete` with an empty constraint | B4 | B3, B4 failed |
+| Dummy ARN string and a 12-digit account id in this record | C | C failed (both patterns) |
+| Probe pack citing a nonexistent anchor | E2 | refused with `does not resolve -- no id="…" anchor` (the standing assertion E2) |
 
 ## Criterion-to-evidence table
 

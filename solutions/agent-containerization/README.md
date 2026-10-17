@@ -1142,8 +1142,25 @@ the operator on 2026-09-30 and is applied to `REQUIREMENTS.md`, so R13.2 is met 
 stays pull-based (R9.6 remains MAY), so nothing bounds compromise to detection — only detection to
 revocation.
 
+### AWS access (03.1)
+
+Feature 03.1 is the estate-side half of Milestone 03. **What exists:** an Identity Center principal
+and a chain-only permission set provisioned in the operator's AWS organisation (outside this
+repository), the entitlement design and the evidence of what was provisioned
+([`docs/records/aws-estate-entitlement.md`](docs/records/aws-estate-entitlement.md)), and the R14.1
+third-party record for AWS ([`docs/records/third-party-assessments.md`](docs/records/third-party-assessments.md),
+anchor `r141-aws`). `tests/acceptance/verify-aws-estate.sh` checks that those records say the right
+things; it is static, makes no AWS call, and **a green run is not a proven perimeter** — T10, T12,
+T13, T19 and T20 are Feature 03.4's.
+
+**What does not exist:** no AWS pack, no credential broker, no AWS credential of any kind in the
+image, the environment or a volume. Real account, organisation and SSO identifiers are kept out of
+this public repository; the records carry placeholders.
+
+**The R12.8 notice remains in force for AWS-loading profiles.** Nothing in 03.1 lifts it.
+
 Still not produced:
 
-- AWS access (R6) — Milestone 03
+- AWS access (R6) — Milestone 03, Features 03.2 to 03.5
 
 Note that requirements R6 (AWS access) and R7 (loadable tool packs) were added after the options analysis was written. The three options remain valid — both requirements are orthogonal to the choice of enforcement architecture — but the options analysis does not yet evaluate them per option.
