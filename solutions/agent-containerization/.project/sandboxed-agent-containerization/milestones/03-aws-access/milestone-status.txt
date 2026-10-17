@@ -1,12 +1,12 @@
 # Milestone 03: AWS Access
-# Status: [ ] pending  5 features, 0 complete
+# Status: [~] in progress  5 features, 1 complete
 
 ## Features
 
-[~] Feature 03.1: AWS estate provisioning, entitlement design and third-party record
+[x] Feature 03.1: AWS estate provisioning, entitlement design and third-party record
     Plan: .project/sandboxed-agent-containerization/milestones/03-aws-access/plans/aws-estate-provisioning-entitlement-design-and-third-party-record.md
     Sub-features: 5/5 complete
-    Notes: Gate 4 approved 2026-10-04 after one external (Codex) review cycle -- eight findings
+    Notes: Completed 2026-10-17. Gate 4 approved 2026-10-04 after one external (Codex) review cycle -- eight findings
     raised, all eight applied, mapped in the plan's Review Revisions section. Two were verified in
     the code before being accepted: anchor resolution is enforced by scripts/lint-policy.sh:260 and
     NOT by compile-policy.sh (phase E asserts against lint-policy), and a repo-wide 12-digit account
