@@ -226,7 +226,7 @@ the review asked for.
     section.
   - Placeholders only — no account ID, ARN, start URL, SSO instance or principal ID.
   - Documentation only, 1 file. Written **before** any estate change, deliberately.
-- [ ] **SF-2: The estate precondition (external; not this repository's work).**
+- [x] **SF-2: The estate precondition (external; not this repository's work).**
   - The operator creates the principal, the permission set and its assignment; attaches the data
     perimeter and the permission boundary; confirms the destructive-action denies; obtains CloudTrail
     read access for the agent principal's events.
@@ -512,4 +512,12 @@ and a repo-wide 12-digit scan really would have been red on arrival
 
 ## Architectural Deviations
 
-(none)
+1. **SourceIdentity added as a trust-policy gate alongside RoleSessionName (criterion 6).** The plan
+   specified attribution via `RoleSessionName` carrying the R8.8 workload identity. The estate build
+   (tg-infra, SF-2) sets both `RoleSessionName` and `sts:SourceIdentity` when chaining into
+   `AgentSandboxReadOnlyRole`, but enforces only `SourceIdentity` in the role's trust policy
+   (`StringLike sts:SourceIdentity "?*"` — AssumeRole fails without it, confirmed by live test).
+   `RoleSessionName` is still set and recorded on the CloudTrail event, but is not itself a trust
+   condition. Accepted: `SourceIdentity` is trust-enforceable and persists across role chaining in a
+   way `RoleSessionName` alone does not, which strengthens the per-agent attribution criterion 6 asks
+   for rather than weakening it. Recorded 2026-10-17, operator-accepted.
