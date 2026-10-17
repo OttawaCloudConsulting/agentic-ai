@@ -244,7 +244,7 @@ the review asked for.
     observed, and the **event-to-visibility delay as a number**.
   - Each gap-able control that was not attached recorded as `GAP: <consequence>` (criterion 5).
   - 1 file modified.
-- [ ] **SF-4: The AWS R14.1 third-party record.**
+- [x] **SF-4: The AWS R14.1 third-party record.**
   - `docs/records/third-party-assessments.md` gains `## R14.1 — Amazon Web Services` with an
     explicit `<a id="r141-aws"></a>` anchor, in the existing `Field | Value` shape.
   - The traffic-path field is keyed to **Q1's endpoint classes** and marked **provisional**, with

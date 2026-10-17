@@ -22,6 +22,7 @@ record past the next agent version bump (R10.6).
 - [R14.3 — ToS Monitoring Owner, Cadence and Review Triggers (all three provider routes)](#r143--tos-monitoring-owner-cadence-and-review-triggers-all-three-provider-routes)
 - [R14.1 — HashiCorp](#r141--hashicorp)
 - [R14.1 — GitHub](#r141--github)
+- [R14.1 — Amazon Web Services](#r141--amazon-web-services)
 - [R14.1 — Kubernetes (posture)](#r141--kubernetes-posture-not-a-filled-record--feature-023-sf-5-decision-6)
 - [Summary Table](#summary-table)
 
@@ -217,6 +218,25 @@ running a checklist. Recorded as an absence observed, not a procedure performed.
 
 ---
 
+## R14.1 — Amazon Web Services
+
+<a id="r141-aws"></a>
+
+| Field | Value |
+|---|---|
+| Party | Amazon Web Services, Inc. |
+| Role on the traffic path | **Provisional (Q1 endpoint classes; exact FQDNs verified at 03.3).** STS in-region; S3 virtual-hosted in-region; Identity Center endpoints are mediator-side only and absent from every agent allowlist (R6.4.6). Placed on the path by `packs/aws-cli/pack.yaml` at 03.3, which does not exist yet. Feature 03.1 places no agent traffic on this party: it records the estate design only (`docs/records/aws-estate-entitlement.md`) |
+| What it can observe | **Unconfirmed against AWS documentation in this session.** Under D4 splicing the mediator does not decrypt, so AWS receives request content exactly as the AWS CLI sends it, including S3 object bodies and any data the agent reads or writes. At minimum AWS holds connection metadata and, for the Development account, a CloudTrail management-event record of every API call, including `SourceIdentity` on chained sessions (observed live 2026-10-17, event `781c6910`) |
+| Stated retention | **Not confirmed for this traffic.** CloudTrail event history in the Development account is a 90-day management-event window (observed, `aws-estate-entitlement.md` § CloudTrail read access evidence). No retention figure for S3 request data or STS call metadata was checked against AWS documentation |
+| Deletion terms | **Not confirmed.** Not checked against the AWS Customer Agreement or Data Processing Addendum in this session |
+| Breach-notification path | **Not confirmed.** Not checked against the AWS Data Processing Addendum in this session |
+| Assessment status | **Incomplete** — retention, deletion terms and breach-notification path unconfirmed; the estate itself is operator-owned, which changes what AWS-side terms matter (AWS is the infrastructure provider for resources the operator owns, not a separate recipient of agent content the operator does not control) |
+| Resulting constraint on use | No agent traffic reaches AWS until 03.3 ships a pack that lints against this anchor. Until the unconfirmed fields are checked against AWS's own terms, do not rely on any retention, deletion or breach-notification figure for AWS-held data under a client obligation; the operator's own account agreement is the authority, not this record. The agent principal is read-only with a data perimeter (aws-estate-entitlement.md), so what AWS can observe is bounded by what the principal can read, but `ReadOnlyAccess` includes S3 object reads and Cost Explorer and Support API reads, accepted by the operator 2026-10-17 |
+| Date | 2026-10-17 |
+| Source | None fetched this session. Observed facts cite `docs/records/aws-estate-entitlement.md`. AWS terms to be checked from the operator's own account agreement before the unconfirmed fields are closed |
+
+---
+
 ## R14.1 — Kubernetes (posture, not a filled record — Feature 02.3 SF-5, Decision 6)
 
 This entry is a **recorded posture**, not a standard filled R14.1 row like HashiCorp's or GitHub's:
@@ -260,6 +280,7 @@ such a kubeconfig fails at first use, not at compile time.
 | Google | Incomplete (breach-notification, tier unconfirmed) | Yes — pinning moderate, training opt-out tier-dependent | **Confirm `GEMINI_API_KEY` is billed (paid tier) before real use** |
 | HashiCorp | Incomplete (retention, deletion, breach-notification not published for this infrastructure) | No (not a model provider) | Checksum-verified binary source only, no credential or workspace content sent; `CHECKPOINT_DISABLE=1` suppresses the unrelated telemetry call |
 | GitHub | Incomplete (retention, deletion, breach-notification not published for API/CLI traffic) | No (not a model provider) | Real repository content crosses this party by design; mitigation is PAT scope (fine-grained, named repositories), not avoidance |
+| Amazon Web Services | Incomplete (retention, deletion, breach-notification unconfirmed; traffic path provisional until 03.3) | No (not a model provider) | No agent traffic until 03.3's pack lints against `#r141-aws`; do not rely on unconfirmed AWS terms under a client obligation |
 | Kubernetes (shipped pack) | N/A — no runtime egress, no party on the traffic path | No (not a model provider) | Cluster reach requires a separate per-cluster egress pack, which carries its own R14.1 record before it can be loaded; public-FQDN endpoints only |
 
 ## T42 — Third-party traffic-path governance (re-inspection, Feature 02.3 SF-8)
@@ -281,3 +302,13 @@ three are Incomplete in the same sense 02.2's base-allowlist parties are Incompl
 constraint-on-use clause of T42's pass text is what each record supplies in place of a confirmed
 retention/breach-notification figure, and that clause is present in both. No party was found on
 the path with no record at all, which is the failure mode T42 exists to catch.
+
+## T42 — Third-party traffic-path governance (re-inspection, Feature 03.1 SF-4)
+
+T42 requires every party on the agent traffic path to have a record before traffic reaches it.
+AWS is not yet on any agent's traffic path: the record exists first, so that 03.3's pack can lint
+against it, and no agent request can reach an AWS endpoint before this record does.
+
+| Party | Traffic-path FQDNs | Placed on the path by | Record | T42 result |
+|---|---|---|---|---|
+| Amazon Web Services | Provisional: Q1 endpoint classes (STS in-region, S3 virtual-hosted in-region); exact FQDNs verified at 03.3 | `packs/aws-cli/pack.yaml` (03.3, not yet built) | [R14.1 — Amazon Web Services](#r141--amazon-web-services) | Present before any traffic — retention/deletion/breach-notification unconfirmed, recorded as Incomplete with a constraint on use rather than omitted |

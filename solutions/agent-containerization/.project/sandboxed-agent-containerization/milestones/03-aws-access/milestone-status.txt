@@ -5,7 +5,7 @@
 
 [~] Feature 03.1: AWS estate provisioning, entitlement design and third-party record
     Plan: .project/sandboxed-agent-containerization/milestones/03-aws-access/plans/aws-estate-provisioning-entitlement-design-and-third-party-record.md
-    Sub-features: 3/5 complete
+    Sub-features: 4/5 complete
     Notes: Gate 4 approved 2026-10-04 after one external (Codex) review cycle -- eight findings
     raised, all eight applied, mapped in the plan's Review Revisions section. Two were verified in
     the code before being accepted: anchor resolution is enforced by scripts/lint-policy.sh:260 and
